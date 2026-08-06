@@ -1,0 +1,3 @@
+/* Tailwind v4 entry. All brand tokens live in theme/theme.css via @theme. */
+@import 'tailwindcss';
+@import './theme/theme.css';

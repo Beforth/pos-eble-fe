@@ -1,0 +1,83 @@
+/*
+ * Annapurna's Rajubhai Dabeliwale — design tokens.
+ *
+ * Tailwind v4 `@theme` block turns every `--color-*` token into a CSS
+ * variable AND generates the matching utilities (bg-primary, text-deep,
+ * border-line, bg-primary/10, ...). Do not hardcode hex values anywhere
+ * in components — reference tokens only.
+ *
+ * Dark mode: the `@custom-variant` below is already registered. To enable
+ * dark mode later, add `class="dark"` to <html> and provide `--color-*`
+ * overrides inside a `.dark` scope (see commented block at the bottom).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Brand palette */
+  --color-primary: #ff0917; /* brand red — logo, CTAs, active nav, alerts */
+  --color-primary-hover: #d70d18; /* darkened primary for hover states */
+  --color-secondary: #ffdf54; /* accent yellow — highlights, badges, chart accent */
+  --color-surface-tint: #ffd8b4; /* soft peach — card/hover fills, login bg */
+  --color-accent: #f67d00; /* orange — secondary CTA, progress, PARCEL tags */
+  --color-deep: #904137; /* maroon-brown — headings, sidebar active text */
+
+  /* Neutrals */
+  --color-page: #fafafa; /* page background */
+  --color-card: #ffffff; /* card background */
+  --color-ink: #1a1a1a; /* primary text */
+  --color-muted: #6b7280; /* secondary / meta text */
+  --color-line: #ededed; /* borders, dividers */
+  --color-success: #16a34a; /* order success / synced states */
+  --color-danger: #dc2626;
+
+  /* Typography */
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', Times, serif;
+}
+
+/* Base layer */
+body {
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Thin scrollbars for dense panels */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+/* Live status indicator (Running / Pending Orders) */
+@keyframes live-dot-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 55%, transparent);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+.live-dot {
+  animation: live-dot-blink 2.4s ease-in-out infinite;
+}
+
+/*
+ * Dark mode blueprint (uncomment when ready):
+ * .dark {
+ *   --color-page: #16181d;
+ *   --color-card: #20242b;
+ *   --color-ink: #f3f4f6;
+ *   --color-muted: #9ca3af;
+ *   --color-line: #2b3038;
+ * }
+ */
