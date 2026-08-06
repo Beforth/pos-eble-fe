@@ -5,4 +5,5 @@ export const brand = {
   established: 1987,
   outletName: "Annapurna's Rajubhai Dabeliwale — Dadar",
   currency: '₹',
+  appVersion: '1.0.0',
 } as const

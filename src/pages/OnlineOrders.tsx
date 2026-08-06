@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
 import {
   BarChart3,
   ChevronDown,
@@ -14,22 +14,91 @@ import { TopBar } from '../components/layout/TopBar'
 import {
   onlineOrdersList,
   type OnlineAggregator,
+  type OnlineOrderRow,
 } from '../mocks/onlineOrdersData'
 import { brand } from '../theme/brand'
 
 const PAGE_SIZE = 5
 
-function AggregatorMark({ name }: { name: 'Zomato' | 'Swiggy' }) {
-  if (name === 'Zomato') {
-    return (
-      <span className="flex size-5 items-center justify-center rounded bg-[#E23744] text-[10px] font-black text-white">
-        Z
-      </span>
-    )
+/** Parse mock timestamps like `23-07-2026 13:56:52` into a Date. */
+function parseOrderDate(value: string): Date | null {
+  const match = value.match(
+    /^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/,
+  )
+  if (!match) return null
+  const [, dd, mm, yyyy, hh, mi, ss] = match
+  return new Date(
+    Number(yyyy),
+    Number(mm) - 1,
+    Number(dd),
+    Number(hh),
+    Number(mi),
+    Number(ss),
+  )
+}
+
+/** Use latest order day as "today" so mock data filters meaningfully. */
+const REFERENCE_DAY = (() => {
+  let latest = new Date(0)
+  for (const row of onlineOrdersList) {
+    const created = parseOrderDate(row.created)
+    if (created && created > latest) latest = created
   }
+  return new Date(latest.getFullYear(), latest.getMonth(), latest.getDate())
+})()
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function matchesRecordType(row: OnlineOrderRow, recordType: string): boolean {
+  if (recordType === 'custom') return true
+
+  const created = parseOrderDate(row.created)
+  if (!created) return true
+
+  const day = startOfDay(created)
+  const today = REFERENCE_DAY
+
+  if (recordType === 'today') {
+    return day.getTime() === today.getTime()
+  }
+
+  if (recordType === '24h') {
+    const windowStart = new Date(today)
+    windowStart.setHours(0, 0, 0, 0)
+    const windowEnd = new Date(today)
+    windowEnd.setHours(23, 59, 59, 999)
+    return created >= windowStart && created <= windowEnd
+  }
+
+  if (recordType === '7d') {
+    const from = new Date(today)
+    from.setDate(from.getDate() - 6)
+    from.setHours(0, 0, 0, 0)
+    const to = new Date(today)
+    to.setHours(23, 59, 59, 999)
+    return created >= from && created <= to
+  }
+
+  return true
+}
+
+function AggregatorMark({ name }: { name: 'Zomato' | 'Swiggy' }) {
+  const isSwiggy = name === 'Swiggy'
   return (
-    <span className="flex size-5 items-center justify-center rounded-full bg-[#FC8019] text-[10px] font-black text-white">
-      S
+    <span className="relative inline-flex size-6 shrink-0 items-center justify-center overflow-hidden rounded">
+      <img
+        src={isSwiggy ? '/swiggy.png' : '/zomato.png'}
+        alt={`${name} logo`}
+        width={isSwiggy ? 40 : 24}
+        height={isSwiggy ? 40 : 24}
+        className={
+          isSwiggy
+            ? 'absolute size-10 max-w-none scale-110 object-cover'
+            : 'size-6 object-contain'
+        }
+      />
     </span>
   )
 }
@@ -45,8 +114,10 @@ export default function OnlineOrders() {
   const [recordType, setRecordType] = useState('24h')
   const [status, setStatus] = useState('all')
   const [orderNo, setOrderNo] = useState('')
+  const [appliedRecordType, setAppliedRecordType] = useState('24h')
   const [appliedOrderNo, setAppliedOrderNo] = useState('')
   const [appliedStatus, setAppliedStatus] = useState('all')
+  const [filtersApplied, setFiltersApplied] = useState(false)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const closeOtherDrawers = () => {
@@ -56,25 +127,30 @@ export default function OnlineOrders() {
   }
 
   const filtered = useMemo(() => {
+    const query = appliedOrderNo.trim().toLowerCase()
     return onlineOrdersList.filter((row) => {
       const tabOk = tab === 'All' || row.aggregator === tab
+      const recordOk = matchesRecordType(row, appliedRecordType)
       const statusOk =
         appliedStatus === 'all' ||
         row.status.toLowerCase() === appliedStatus.toLowerCase()
       const orderOk =
-        !appliedOrderNo.trim() ||
-        row.orderNo.includes(appliedOrderNo.trim()) ||
-        row.customerName.toLowerCase().includes(appliedOrderNo.trim().toLowerCase())
-      return tabOk && statusOk && orderOk
+        !query ||
+        row.orderNo.toLowerCase().includes(query) ||
+        row.customerName.toLowerCase().includes(query) ||
+        Boolean(row.customerPhone?.includes(query))
+      return tabOk && recordOk && statusOk && orderOk
     })
-  }, [tab, appliedOrderNo, appliedStatus])
+  }, [tab, appliedRecordType, appliedOrderNo, appliedStatus])
 
   const visibleRows = filtered.slice(0, visibleCount)
   const hasMore = visibleCount < filtered.length
 
   function applyFilters() {
+    setAppliedRecordType(recordType)
     setAppliedOrderNo(orderNo)
     setAppliedStatus(status)
+    setFiltersApplied(true)
     setVisibleCount(PAGE_SIZE)
   }
 
@@ -82,9 +158,24 @@ export default function OnlineOrders() {
     setRecordType('24h')
     setStatus('all')
     setOrderNo('')
+    setAppliedRecordType('24h')
     setAppliedOrderNo('')
     setAppliedStatus('all')
+    setFiltersApplied(false)
+    setTab('All')
     setVisibleCount(onlineOrdersList.length)
+  }
+
+  function handleFilterKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      applyFilters()
+    }
+  }
+
+  function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    applyFilters()
   }
 
   return (
@@ -186,7 +277,10 @@ export default function OnlineOrders() {
           </div>
 
           {/* Filters */}
-          <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          <form
+            onSubmit={handleFilterSubmit}
+            className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-line bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+          >
             <label className="min-w-[140px] text-xs text-muted">
               Record Type
               <select
@@ -220,13 +314,13 @@ export default function OnlineOrders() {
               <input
                 value={orderNo}
                 onChange={(e) => setOrderNo(e.target.value)}
+                onKeyDown={handleFilterKeyDown}
                 placeholder="Order No. / Customer"
                 className="mt-1 h-9 w-full rounded-lg border border-line px-2.5 text-sm text-ink outline-none focus:border-primary"
               />
             </label>
             <button
-              type="button"
-              onClick={applyFilters}
+              type="submit"
               className="h-9 rounded-lg border border-primary bg-primary px-4 text-sm font-semibold text-white hover:brightness-95"
             >
               Apply
@@ -244,32 +338,44 @@ export default function OnlineOrders() {
             >
               Export Report
             </button>
-          </div>
+          </form>
 
-          <OnlineOrdersTable rows={visibleRows} />
+          {filtersApplied && (
+            <p className="mb-3 text-xs text-muted">
+              Showing {filtered.length} result
+              {filtered.length === 1 ? '' : 's'}
+              {appliedStatus !== 'all' ? ` · Status: ${appliedStatus}` : ''}
+              {appliedOrderNo.trim()
+                ? ` · Search: “${appliedOrderNo.trim()}”`
+                : ''}
+            </p>
+          )}
 
           {filtered.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-line bg-card px-6 py-16 text-center">
+            <div className="rounded-xl border border-line bg-card px-6 py-16 text-center">
               <p className="text-base font-semibold text-ink">No Results Found</p>
               <p className="mt-1 text-sm text-muted">
                 We couldn&apos;t find a match for your search.
               </p>
             </div>
           ) : (
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                disabled={!hasMore}
-                onClick={() =>
-                  setVisibleCount((n) =>
-                    Math.min(filtered.length, n + PAGE_SIZE),
-                  )
-                }
-                className="h-9 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-ink hover:bg-page disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Load More
-              </button>
-            </div>
+            <>
+              <OnlineOrdersTable rows={visibleRows} />
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  disabled={!hasMore}
+                  onClick={() =>
+                    setVisibleCount((n) =>
+                      Math.min(filtered.length, n + PAGE_SIZE),
+                    )
+                  }
+                  className="h-9 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-ink hover:bg-page disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Load More
+                </button>
+              </div>
+            </>
           )}
         </main>
       </div>
