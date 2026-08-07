@@ -4,29 +4,10 @@ import { LoginForm } from './LoginForm'
 
 export function LoginPage() {
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-page">
-      {/* Ambient wash */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_20%,color-mix(in_srgb,var(--color-surface-tint)_55%,transparent),transparent_50%),radial-gradient(ellipse_at_85%_15%,color-mix(in_srgb,var(--color-primary)_12%,transparent),transparent_45%),radial-gradient(ellipse_at_70%_90%,color-mix(in_srgb,var(--color-secondary)_28%,transparent),transparent_40%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(color-mix(in_srgb,var(--color-line)_80%,transparent)_1px,transparent_1px),linear-gradient(90deg,color-mix(in_srgb,var(--color-line)_80%,transparent)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]"
-      />
-
+    <div className="relative flex min-h-screen overflow-hidden bg-white">
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col lg:flex-row lg:items-stretch">
         {/* Brand panel */}
         <aside className="relative flex flex-col justify-between px-6 pb-4 pt-10 sm:px-10 lg:w-[46%] lg:px-12 lg:py-14">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -left-16 top-24 size-56 rounded-full bg-primary/10 blur-3xl login-float"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute bottom-20 right-4 size-40 rounded-full bg-accent/15 blur-3xl login-float-delayed"
-          />
-
           <div className="login-rise relative">
             <div className="inline-flex items-center gap-3">
               <BrandLogo size={56} className="drop-shadow-sm" />

@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react'
-import { ArrowDown, Eye, Info, List, PencilLine } from 'lucide-react'
+import { ArrowDown, Eye, Info, List, Pencil, PencilLine } from 'lucide-react'
 import type { KotRow, KotStatus } from '../../mocks/kotData'
 
 interface KotTableProps {
   rows: KotRow[]
+  onEdit?: (row: KotRow) => void
+  onView?: (row: KotRow) => void
+  onDetails?: (row: KotRow) => void
 }
 
 const statusClass: Record<KotStatus, string> = {
@@ -14,9 +17,11 @@ const statusClass: Record<KotStatus, string> = {
 
 function ActionButton({
   label,
+  onClick,
   children,
 }: {
   label: string
+  onClick?: () => void
   children: ReactNode
 }) {
   return (
@@ -24,16 +29,17 @@ function ActionButton({
       type="button"
       title={label}
       aria-label={label}
-      className="flex size-7 items-center justify-center rounded border border-line text-muted hover:bg-page hover:text-ink"
+      onClick={onClick}
+      className="flex size-7 items-center justify-center rounded border border-line text-muted transition-colors hover:bg-page hover:text-ink"
     >
       {children}
     </button>
   )
 }
 
-export function KotTable({ rows }: KotTableProps) {
+export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+    <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
       <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-line bg-page/80 text-[11px] font-semibold uppercase tracking-wide text-muted">
@@ -65,11 +71,15 @@ export function KotTable({ rows }: KotTableProps) {
                 <span className="inline-flex items-center gap-1.5 font-semibold tabular-nums text-ink">
                   {row.kotId}
                   {row.modified ? (
-                    <PencilLine
-                      size={12}
-                      className="text-primary"
-                      aria-label="Modified KOT"
-                    />
+                    <button
+                      type="button"
+                      title="Edit modified KOT"
+                      aria-label={`Edit KOT ${row.kotId}`}
+                      onClick={() => onEdit?.(row)}
+                      className="inline-flex size-5 items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"
+                    >
+                      <PencilLine size={12} />
+                    </button>
                   ) : null}
                 </span>
               </td>
@@ -107,11 +117,23 @@ export function KotTable({ rows }: KotTableProps) {
               </td>
               <td className="px-3 py-3 align-top">
                 <div className="flex items-center gap-1.5">
-                  <ActionButton label="View KOT">
+                  <ActionButton
+                    label="View KOT"
+                    onClick={() => onView?.(row)}
+                  >
                     <Eye size={13} />
                   </ActionButton>
-                  <ActionButton label="KOT details">
+                  <ActionButton
+                    label="KOT details"
+                    onClick={() => onDetails?.(row)}
+                  >
                     <List size={13} />
+                  </ActionButton>
+                  <ActionButton
+                    label="Edit"
+                    onClick={() => onEdit?.(row)}
+                  >
+                    <Pencil size={13} />
                   </ActionButton>
                 </div>
               </td>
