@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   BarChart3,
   ChevronDown,
+  FileDown,
   FileText,
   Globe,
   PiggyBank,

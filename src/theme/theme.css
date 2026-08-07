@@ -71,6 +71,44 @@ body {
   animation: live-dot-blink 2.4s ease-in-out infinite;
 }
 
+/* Login page entrance + ambient motion */
+@keyframes login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.login-rise {
+  animation: login-rise 0.55s ease-out both;
+}
+
+.login-rise-delayed {
+  animation: login-rise 0.65s ease-out 0.12s both;
+}
+
+.login-float {
+  animation: login-float 9s ease-in-out infinite;
+}
+
+.login-float-delayed {
+  animation: login-float 11s ease-in-out 1.4s infinite;
+}
+
 /*
  * Dark mode blueprint (uncomment when ready):
  * .dark {

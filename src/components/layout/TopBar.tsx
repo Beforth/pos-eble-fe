@@ -1,12 +1,21 @@
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Bell,
   ChevronDown,
   Compass,
+  FileText,
   Headset,
+  LogOut,
   Menu,
   Monitor,
   Settings,
+  Shield,
+  Store,
+  UserRound,
 } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
+import { brand } from '../../theme/brand'
 import { IconButton } from '../common/IconButton'
 
 interface TopBarProps {
@@ -22,6 +31,42 @@ export function TopBar({
   onNotificationsClick,
   outletName,
 }: TopBarProps) {
+  const navigate = useNavigate()
+  const { logout } = useAuth()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!settingsOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (
+        settingsRef.current &&
+        !settingsRef.current.contains(event.target as Node)
+      ) {
+        setSettingsOpen(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSettingsOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [settingsOpen])
+
+  function closeSettings() {
+    setSettingsOpen(false)
+  }
+
+  function handleLogout() {
+    closeSettings()
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-line bg-card px-4">
       <IconButton
@@ -65,9 +110,81 @@ export function TopBar({
         >
           <Bell size={18} />
         </IconButton>
-        <IconButton label="Settings">
-          <Settings size={18} />
-        </IconButton>
+
+        <div ref={settingsRef} className="relative">
+          <IconButton
+            label="Settings"
+            active={settingsOpen}
+            aria-haspopup="menu"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((prev) => !prev)}
+          >
+            <Settings size={18} />
+          </IconButton>
+
+          {settingsOpen && (
+            <div
+              role="menu"
+              aria-label="Settings"
+              className="absolute right-0 z-40 mt-1.5 w-56 overflow-hidden rounded-xl border border-line bg-card py-1 shadow-lg"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={closeSettings}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-page"
+              >
+                <UserRound size={15} className="shrink-0 text-muted" />
+                Edit Profile
+              </button>
+
+              <div
+                role="menuitem"
+                className="flex w-full items-start gap-2.5 px-3 py-2.5"
+              >
+                <Store size={15} className="mt-0.5 shrink-0 text-muted" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-ink">{brand.shortName}</p>
+                  <p className="mt-0.5 text-xs font-light text-muted">
+                    Version {brand.appVersion}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={closeSettings}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-page"
+              >
+                <FileText size={15} className="shrink-0 text-muted" />
+                Terms & Condition
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={closeSettings}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-page"
+              >
+                <Shield size={15} className="shrink-0 text-muted" />
+                Privacy Policy
+              </button>
+
+              <div className="my-1 border-t border-line" />
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-page"
+              >
+                <LogOut size={15} className="shrink-0 text-muted" />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
 
         <button
           type="button"

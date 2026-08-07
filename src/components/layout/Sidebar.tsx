@@ -10,6 +10,7 @@ import {
   Globe,
   HandCoins,
   LayoutDashboard,
+  LogOut,
   Megaphone,
   Package,
   PlusCircle,
@@ -21,6 +22,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
 import { brand } from '../../theme/brand'
 import { BrandLogo } from '../brand/BrandLogo'
 import { SidebarNavItem, type NavItemDef } from './SidebarNavItem'
@@ -87,6 +89,10 @@ const NAV: NavEntry[] = [
     item: { id: 'aggregator', label: 'Aggregator Center', icon: Smartphone },
   },
   {
+    kind: 'link',
+    item: { id: 'logout', label: 'Logout', icon: LogOut },
+  },
+  {
     kind: 'group',
     group: { title: 'Quick Links', addButton: true, items: [] },
   },
@@ -118,6 +124,7 @@ export function Sidebar({
   onNavigate,
 }: SidebarProps) {
   const navigate = useNavigate()
+  const { logout } = useAuth()
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -130,6 +137,11 @@ export function Sidebar({
 
   function handleNavigate(id: string) {
     onCloseMobile()
+    if (id === 'logout') {
+      logout()
+      navigate('/login', { replace: true })
+      return
+    }
     onNavigate?.(id)
     const path = ROUTES[id]
     if (path) navigate(path)
