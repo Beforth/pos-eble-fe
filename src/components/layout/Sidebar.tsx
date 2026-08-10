@@ -1,25 +1,19 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  BarChart3,
+  BadgePercent,
   BookOpen,
-  Boxes,
   ChevronsLeft,
   ChevronsRight,
   Clock3,
+  CookingPot,
+  FileCheck,
   Globe,
-  HandCoins,
   LayoutDashboard,
   LogOut,
-  Megaphone,
-  Package,
-  PlusCircle,
-  Printer,
-  Settings,
   ShoppingBag,
-  Smartphone,
-  Users,
-  Wallet,
+  SlidersHorizontal,
+  Upload,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
@@ -30,18 +24,19 @@ import { SidebarNavItem, type NavItemDef } from './SidebarNavItem'
 interface NavGroupDef {
   title: string
   items: NavItemDef[]
-  addButton?: boolean
 }
 
 type NavEntry =
   | { kind: 'link'; item: NavItemDef }
   | { kind: 'group'; group: NavGroupDef }
+  | { kind: 'divider' }
 
 const NAV: NavEntry[] = [
   {
     kind: 'link',
     item: { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   },
+  { kind: 'divider' },
   {
     kind: 'group',
     group: {
@@ -50,51 +45,80 @@ const NAV: NavEntry[] = [
         { id: 'live-orders', label: 'Live Orders', icon: Clock3 },
         { id: 'all-orders', label: 'All Orders', icon: ShoppingBag },
         { id: 'online-orders', label: 'Online Orders', icon: Globe },
-        { id: 'kot', label: 'KOT', icon: Printer },
+        { id: 'kot', label: 'KOT', icon: CookingPot },
         {
           id: 'due-payments',
           label: 'Due Payment Settlement',
-          icon: HandCoins,
+          icon: FileCheck,
         },
       ],
     },
   },
+  { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'hyperpure', label: 'Explore Hyperpure', icon: Package },
+    item: {
+      id: 'menu',
+      label: 'Menu',
+      icon: BookOpen,
+      chevron: true,
+      children: [
+        {
+          id: 'menu-discounts',
+          label: 'Menu & Discounts',
+          icon: BadgePercent,
+        },
+        {
+          id: 'menu-images-upload',
+          label: 'Multi-Item Images Upload',
+          icon: Upload,
+        },
+        {
+          id: 'menu-on-off',
+          label: 'Menu on/off',
+          icon: SlidersHorizontal,
+        },
+      ],
+    },
   },
-  { kind: 'link', item: { id: 'menu', label: 'Menu', icon: BookOpen } },
-  { kind: 'link', item: { id: 'inventory', label: 'Inventory', icon: Boxes } },
+  { kind: 'divider' },
+  {
+    kind: 'link',
+    item: { id: 'inventory', label: 'Inventory' },
+  },
+  { kind: 'divider' },
   {
     kind: 'link',
     item: {
       id: 'marketing',
       label: 'Marketing Automation',
-      icon: Megaphone,
       badge: 'New',
     },
   },
+  { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'finance', label: 'Finance', icon: Wallet, badge: 'New' },
+    item: { id: 'finance', label: 'Finance', badge: 'New' },
   },
-  { kind: 'link', item: { id: 'reports', label: 'Reports', icon: BarChart3 } },
+  { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'management', label: 'Management', icon: Settings },
+    item: { id: 'reports', label: 'Reports', chevron: true },
   },
-  { kind: 'link', item: { id: 'crm', label: 'CRM', icon: Users } },
+  { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'aggregator', label: 'Aggregator Center', icon: Smartphone },
+    item: { id: 'management', label: 'Management', chevron: true },
   },
+  { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'logout', label: 'Logout', icon: LogOut },
+    item: { id: 'crm', label: 'CRM', chevron: true },
   },
+  { kind: 'divider' },
   {
-    kind: 'group',
-    group: { title: 'Quick Links', addButton: true, items: [] },
+    kind: 'link',
+    item: { id: 'aggregator', label: 'Aggregator Center', chevron: true },
   },
 ]
 
@@ -104,6 +128,8 @@ const ROUTES: Record<string, string> = {
   'all-orders': '/all-orders',
   'online-orders': '/online-orders',
   kot: '/kot',
+  'menu-discounts': '/menu',
+  'menu-images-upload': '/menu/multi-item-images',
 }
 
 interface SidebarProps {
@@ -125,6 +151,7 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate()
   const { logout } = useAuth()
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -134,6 +161,15 @@ export function Sidebar({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [mobileOpen, onCloseMobile])
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   function handleNavigate(id: string) {
     onCloseMobile()
@@ -208,69 +244,85 @@ export function Sidebar({
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3">
-          <ul className="space-y-1">
-            {NAV.map((entry) => {
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-2">
+          <ul className="space-y-0.5">
+            {NAV.map((entry, index) => {
+              if (entry.kind === 'divider') {
+                return (
+                  <li
+                    key={`divider-${index}`}
+                    aria-hidden="true"
+                    className="my-1.5 border-t border-line"
+                  />
+                )
+              }
+
               if (entry.kind === 'link') {
                 return (
                   <SidebarNavItem
                     key={entry.item.id}
                     item={entry.item}
-                    active={activeItem === entry.item.id}
+                    active={
+                      activeItem === entry.item.id ||
+                      Boolean(
+                        entry.item.children?.some(
+                          (child) => child.id === activeItem,
+                        ),
+                      )
+                    }
                     collapsed={collapsed}
                     onClick={handleNavigate}
+                    expanded={expandedIds.has(entry.item.id)}
+                    onToggleExpand={() => toggleExpanded(entry.item.id)}
                   />
                 )
               }
+
               const group = entry.group
               return (
-                <li key={group.title} className="pt-3 first:pt-0">
-                  {!collapsed && (
-                    <p className="mb-1 flex items-center justify-between px-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
+                <li key={group.title} className="space-y-0.5">
+                  {!collapsed ? (
+                    <p className="mb-1 rounded-lg bg-page px-3 py-2 text-sm font-bold text-ink">
                       {group.title}
-                      {group.addButton && (
-                        <span className="flex items-center gap-1 text-primary">
-                          <PlusCircle size={13} /> Add
-                        </span>
-                      )}
+                    </p>
+                  ) : (
+                    <p className="mb-1 px-1 text-center text-[9px] font-semibold uppercase tracking-wide text-muted">
+                      Ops
                     </p>
                   )}
-                  {group.items.length > 0 && (
-                    <ul className="space-y-1">
-                      {group.items.map((item) => (
-                        <SidebarNavItem
-                          key={item.id}
-                          item={item}
-                          active={activeItem === item.id}
-                          collapsed={collapsed}
-                          onClick={handleNavigate}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                  {group.addButton && !collapsed && (
-                    <button
-                      type="button"
-                      onClick={() => handleNavigate('add')}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-accent/60 px-3 py-2 text-xs font-medium text-accent transition-colors hover:bg-accent/5"
-                    >
-                      <PlusCircle size={14} /> Add
-                    </button>
-                  )}
+                  <ul className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <SidebarNavItem
+                        key={item.id}
+                        item={item}
+                        active={activeItem === item.id}
+                        collapsed={collapsed}
+                        nested
+                        onClick={handleNavigate}
+                      />
+                    ))}
+                  </ul>
                 </li>
               )
             })}
           </ul>
         </nav>
 
-        <div className="border-t border-line px-4 py-3">
-          {collapsed ? (
-            <div className="flex justify-center">
-              <span className="text-[10px] font-semibold text-muted">R®</span>
-            </div>
-          ) : (
-            <p className="text-center text-[10px] text-muted">
-              {brand.shopName} · {brand.tagline}
+        <div className="border-t border-line px-2.5 py-2">
+          <button
+            type="button"
+            onClick={() => handleNavigate('logout')}
+            title={collapsed ? 'Logout' : undefined}
+            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-muted transition-colors hover:bg-page hover:text-ink ${
+              collapsed ? 'justify-center px-0' : ''
+            }`}
+          >
+            <LogOut size={18} strokeWidth={1.75} className="shrink-0" />
+            {!collapsed && <span>Logout</span>}
+          </button>
+          {!collapsed && (
+            <p className="mt-1 px-1 pb-1 text-center text-[10px] text-muted">
+              {brand.shopName}
             </p>
           )}
         </div>
