@@ -41,6 +41,10 @@ const MENU_ROUTES: Record<string, string> = {
   'back-billing': '/billing',
   'menu-discounts': '/menu',
   'menu-images-upload': '/menu/multi-item-images',
+  'special-note': '/menu/special-note',
+  'item-commission': '/menu/item-commission',
+  'schedule-changes': '/menu/schedule-changes',
+  'physical-menu': '/menu/physical-menu',
 }
 
 interface MenuSidebarProps {

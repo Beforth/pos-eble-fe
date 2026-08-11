@@ -130,6 +130,7 @@ const ROUTES: Record<string, string> = {
   kot: '/kot',
   'menu-discounts': '/menu',
   'menu-images-upload': '/menu/multi-item-images',
+  inventory: '/inventory',
 }
 
 interface SidebarProps {

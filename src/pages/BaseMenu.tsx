@@ -5,12 +5,14 @@ import {
   ChevronRight,
   Clipboard,
   ClipboardList,
+  Copy,
   Eye,
   FileOutput,
   Pencil,
   Plus,
   ReceiptText,
   Search,
+  Trash2,
   Upload,
 } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
@@ -21,6 +23,7 @@ import {
 } from '../components/menu/MenuActionButtons'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { AddNewItemsModal } from '../components/menu/AddNewItemsModal'
+import { AddItemsGridModal } from '../components/menu/AddItemsGridModal'
 import { MenuItemDetailsModal } from '../components/menu/MenuItemDetailsModal'
 import { UpdateAreaWisePriceModal } from '../components/menu/UpdateAreaWisePriceModal'
 import { UpdateNutritionModal } from '../components/menu/UpdateNutritionModal'
@@ -115,9 +118,12 @@ function updateItem(
 
 export default function BaseMenu({
   channelId = 'base-menu',
+  mode = 'default',
 }: {
   channelId?: MenuChannelId
+  mode?: 'default' | 'schedule'
 }) {
+  const isSchedule = mode === 'schedule'
   const channel = MENU_CHANNELS[channelId]
   const navigate = useNavigate()
   const [categoryId, setCategoryId] = useState(baseMenuCategories[0].id)
@@ -128,6 +134,7 @@ export default function BaseMenu({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
   const [addItemsOpen, setAddItemsOpen] = useState(false)
+  const [addGridOpen, setAddGridOpen] = useState(false)
   const [detailsItem, setDetailsItem] = useState<MenuItemRow | null>(null)
   const [areaPriceItem, setAreaPriceItem] = useState<MenuItemRow | null>(null)
   const [nutritionItem, setNutritionItem] = useState<MenuItemRow | null>(null)
@@ -204,22 +211,48 @@ export default function BaseMenu({
 
   return (
     <MenuPageShell
-      backTo="/menu/all-in-one"
+      backTo={isSchedule ? '/menu/schedule-changes' : '/menu/all-in-one'}
+      activeItem={isSchedule ? 'schedule-changes' : 'menu-discounts'}
       title={
         <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
           <Link to="/menu" className="text-primary hover:underline">
-            Menu Management
+            Menu
           </Link>
           <span className="font-normal text-muted">&gt;</span>
-          <Link to="/menu/all-in-one" className="text-primary hover:underline">
-            All In One Menu
-          </Link>
-          <span className="font-normal text-muted">&gt;</span>
-          <span className="font-semibold text-ink">{channel.label}</span>
+          {isSchedule ? (
+            <>
+              <Link
+                to="/menu/schedule-changes"
+                className="text-primary hover:underline"
+              >
+                Schedule Menu
+              </Link>
+              <span className="font-normal text-muted">-</span>
+              <span className="font-semibold text-ink">{channel.label}</span>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/menu/all-in-one"
+                className="text-primary hover:underline"
+              >
+                All In One Menu
+              </Link>
+              <span className="font-normal text-muted">&gt;</span>
+              <span className="font-semibold text-ink">{channel.label}</span>
+            </>
+          )}
         </span>
       }
     >
       <MenuSectionNav activeTab="items" />
+
+      {isSchedule ? (
+        <div className="mb-3 rounded-lg border border-secondary/50 bg-secondary/25 px-4 py-2.5 text-sm text-deep">
+          You can make updates to your restaurant&apos;s menu anytime and have
+          them go live on the exact date and time you desire.
+        </div>
+      ) : null}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <label className="relative min-w-[180px] flex-1">
@@ -271,17 +304,52 @@ export default function BaseMenu({
           options={QUICK_ACTION_OPTIONS}
         />
 
-        <PrimaryButton>Save</PrimaryButton>
-
-        <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-line bg-card px-3 text-sm text-ink">
-          <input
-            type="checkbox"
-            checked={rankWise}
-            onChange={(event) => setRankWise(event.target.checked)}
-            className="size-4 cursor-pointer accent-primary"
-          />
-          Rank wise
-        </label>
+        {isSchedule ? (
+          <>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
+            >
+              Publish Date
+            </button>
+            <PrimaryButton>Save Later</PrimaryButton>
+            <div className="inline-flex h-9 items-center gap-3 rounded-md border border-line bg-card px-3 text-sm text-ink">
+              <label className="inline-flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="rank-mode"
+                  checked={!rankWise}
+                  onChange={() => setRankWise(false)}
+                  className="size-3.5 accent-primary"
+                />
+                Normal
+              </label>
+              <label className="inline-flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="rank-mode"
+                  checked={rankWise}
+                  onChange={() => setRankWise(true)}
+                  className="size-3.5 accent-primary"
+                />
+                Rank wise
+              </label>
+            </div>
+          </>
+        ) : (
+          <>
+            <PrimaryButton>Save</PrimaryButton>
+            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-line bg-card px-3 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={rankWise}
+                onChange={(event) => setRankWise(event.target.checked)}
+                className="size-4 cursor-pointer accent-primary"
+              />
+              Rank wise
+            </label>
+          </>
+        )}
 
         <PrimaryButton onClick={() => setAddItemsOpen(true)}>
           <Plus size={15} />
@@ -506,40 +574,89 @@ export default function BaseMenu({
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-0.5">
-                          <RowActionButton
-                            label="Item details"
-                            onClick={() => setDetailsItem(row)}
-                          >
-                            <ClipboardEyeIcon />
-                          </RowActionButton>
-                          <RowActionButton
-                            label="Update area wise price & status"
-                            onClick={() => setAreaPriceItem(row)}
-                          >
-                            <ReceiptText size={15} />
-                          </RowActionButton>
-                          <RowActionButton
-                            label="Edit item"
-                            onClick={() =>
-                              navigate(
-                                `/menu/channel/${channelId}/${row.id}/edit`,
-                              )
-                            }
-                          >
-                            <Pencil size={15} />
-                          </RowActionButton>
-                          <RowActionButton
-                            label="Update item nutrition and info detail"
-                            onClick={() => setNutritionItem(row)}
-                          >
-                            <FileOutput size={15} />
-                          </RowActionButton>
-                          <RowActionButton
-                            label="Show changes"
-                            onClick={() => setChangesName(row.name)}
-                          >
-                            <ClipboardList size={15} />
-                          </RowActionButton>
+                          {isSchedule ? (
+                            <>
+                              <RowActionButton
+                                label="Duplicate item"
+                                onClick={() => {
+                                  setItems((prev) => {
+                                    const source = prev.find((i) => i.id === row.id)
+                                    if (!source) return prev
+                                    const copy: MenuItemRow = {
+                                      ...source,
+                                      id: `${source.id}-copy-${Date.now()}`,
+                                      name: `${source.name} (Copy)`,
+                                    }
+                                    const index = prev.findIndex(
+                                      (i) => i.id === row.id,
+                                    )
+                                    const next = [...prev]
+                                    next.splice(index + 1, 0, copy)
+                                    return next
+                                  })
+                                }}
+                              >
+                                <Copy size={15} />
+                              </RowActionButton>
+                              <RowActionButton
+                                label="Edit item"
+                                onClick={() =>
+                                  navigate(
+                                    `/menu/channel/${channelId}/${row.id}/edit`,
+                                  )
+                                }
+                              >
+                                <Pencil size={15} />
+                              </RowActionButton>
+                              <RowActionButton
+                                label="Delete item"
+                                onClick={() =>
+                                  setItems((prev) =>
+                                    prev.filter((i) => i.id !== row.id),
+                                  )
+                                }
+                              >
+                                <Trash2 size={15} />
+                              </RowActionButton>
+                            </>
+                          ) : (
+                            <>
+                              <RowActionButton
+                                label="Item details"
+                                onClick={() => setDetailsItem(row)}
+                              >
+                                <ClipboardEyeIcon />
+                              </RowActionButton>
+                              <RowActionButton
+                                label="Update area wise price & status"
+                                onClick={() => setAreaPriceItem(row)}
+                              >
+                                <ReceiptText size={15} />
+                              </RowActionButton>
+                              <RowActionButton
+                                label="Edit item"
+                                onClick={() =>
+                                  navigate(
+                                    `/menu/channel/${channelId}/${row.id}/edit`,
+                                  )
+                                }
+                              >
+                                <Pencil size={15} />
+                              </RowActionButton>
+                              <RowActionButton
+                                label="Update item nutrition and info detail"
+                                onClick={() => setNutritionItem(row)}
+                              >
+                                <FileOutput size={15} />
+                              </RowActionButton>
+                              <RowActionButton
+                                label="Show changes"
+                                onClick={() => setChangesName(row.name)}
+                              >
+                                <ClipboardList size={15} />
+                              </RowActionButton>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -608,6 +725,27 @@ export default function BaseMenu({
       <AddNewItemsModal
         open={addItemsOpen}
         onClose={() => setAddItemsOpen(false)}
+        onGrid={() => setAddGridOpen(true)}
+        onSheet={() => {
+          const header =
+            'Name,Short Code,Online Display Name,Price,Description\n'
+          const blob = new Blob([header], { type: 'text/csv;charset=utf-8' })
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'menu-items-sheet.csv'
+          link.click()
+          URL.revokeObjectURL(url)
+        }}
+      />
+      <AddItemsGridModal
+        open={addGridOpen}
+        categoryId={categoryId}
+        onClose={() => setAddGridOpen(false)}
+        onSave={(newItems) => {
+          setItems((prev) => [...newItems, ...prev])
+          setPage(1)
+        }}
       />
       <MenuItemDetailsModal
         open={Boolean(detailsItem)}
