@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   Monitor,
+  Plus,
   Settings,
   Shield,
   Store,
@@ -88,6 +89,15 @@ export function TopBar({
           {outletName}
         </span>
         <ChevronDown size={14} className="shrink-0 text-muted" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => navigate('/table-view')}
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
+      >
+        <Plus size={16} strokeWidth={2.5} />
+        <span>New Order</span>
       </button>
 
       <div className="ml-auto flex items-center gap-1.5">

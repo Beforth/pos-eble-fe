@@ -65,7 +65,7 @@ export const menuItems: MenuItemRow[] = [
     name: 'Paani Puri',
     shortCode: '01',
     onlineDisplayName: 'Paani Puri',
-    price: 40,
+    price: 78.90,
     description: 'Crispy fried puffed balls',
     available: true,
     tags: CHAAT_TAGS,
