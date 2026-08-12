@@ -31,6 +31,8 @@ import MultiItemImagesUpload from './pages/MultiItemImagesUpload'
 import OnlineOrders from './pages/OnlineOrders'
 import ParcelMenu from './pages/ParcelMenu'
 import PlaceholderPage from './pages/PlaceholderPage'
+import Configuration from './pages/Configuration'
+import CurrentOrders from './pages/configuration/CurrentOrders'
 import CoverSizeReport from './pages/reports/CoverSizeReport'
 import TableView from './pages/TableView'
 import SwiggyMenu from './pages/SwiggyMenu'
@@ -329,7 +331,15 @@ export default function App() {
             path="/configuration"
             element={
               <ProtectedRoute>
-                <PlaceholderPage />
+                <Configuration />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/configuration/orders"
+            element={
+              <ProtectedRoute>
+                <CurrentOrders />
               </ProtectedRoute>
             }
           />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
+  Ban,
   Eye,
   Save,
   ShoppingCart,
@@ -17,6 +18,7 @@ import {
   ticketsForTable,
   type KotTicket,
 } from '../../mocks/kotViewData'
+import { CancelKotModal } from './CancelKotModal'
 import { KotTicketViewModal } from './KotTicketViewModal'
 import { SettleSaveModal, type SettleSaveResult } from './SettleSaveModal'
 
@@ -46,6 +48,7 @@ function KotCard({
   onDismiss,
   onView,
   onSettle,
+  onCancelOrder,
 }: {
   ticket: KotTicket
   now: number
@@ -53,6 +56,7 @@ function KotCard({
   onDismiss: (id: string) => void
   onView: (ticket: KotTicket) => void
   onSettle: (ticket: KotTicket) => void
+  onCancelOrder: (ticket: KotTicket) => void
 }) {
   const isReady = ticket.status === 'ready'
 
@@ -87,6 +91,15 @@ function KotCard({
               className="inline-flex size-7 items-center justify-center rounded border border-black/15 bg-white/80 text-ink hover:bg-white"
             >
               <Save size={14} />
+            </button>
+            <button
+              type="button"
+              title="Cancel order"
+              aria-label="Cancel order"
+              onClick={() => onCancelOrder(ticket)}
+              className="inline-flex size-7 items-center justify-center rounded border border-black/15 bg-white/80 text-primary hover:bg-white"
+            >
+              <Ban size={14} />
             </button>
           </div>
         </div>
@@ -173,6 +186,7 @@ export function KotView({
   const [now, setNow] = useState(() => Date.now())
   const [viewTicket, setViewTicket] = useState<KotTicket | null>(null)
   const [settleTicket, setSettleTicket] = useState<KotTicket | null>(null)
+  const [cancelTicket, setCancelTicket] = useState<KotTicket | null>(null)
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
@@ -209,6 +223,17 @@ export function KotView({
         open={Boolean(viewTicket)}
         ticket={viewTicket}
         onClose={() => setViewTicket(null)}
+      />
+
+      <CancelKotModal
+        open={Boolean(cancelTicket)}
+        kotNo={cancelTicket?.kotNo ?? 0}
+        onClose={() => setCancelTicket(null)}
+        onConfirm={() => {
+          if (!cancelTicket) return
+          onDismiss(cancelTicket.id)
+          setCancelTicket(null)
+        }}
       />
 
       <SettleSaveModal
@@ -311,6 +336,7 @@ export function KotView({
                 onDismiss={onDismiss}
                 onView={setViewTicket}
                 onSettle={setSettleTicket}
+                onCancelOrder={setCancelTicket}
               />
             ))}
           </div>

@@ -146,31 +146,22 @@ export function ItemGrid({
           </div>
         ) : (
           <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {items.map((item, index) => {
+            {items.map((item) => {
               const diet = getDietType(item.tags, item.name)
               return (
-                <li
-                  key={item.id}
-                  className="billing-item-card"
-                  style={{ animationDelay: `${Math.min(index, 20) * 30}ms` }}
-                >
+                <li key={item.id}>
                   <button
                     type="button"
                     disabled={!item.available}
                     onClick={() => onAddItem(item)}
-                    className={`group relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border border-line bg-card px-3 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-300 ease-out will-change-transform disabled:cursor-not-allowed disabled:opacity-45 ${
-                      item.available
-                        ? 'hover:-translate-y-1 hover:scale-[1.02] hover:border-line hover:shadow-[0_10px_24px_rgba(0,0,0,0.08)]'
-                        : ''
-                    }`}
+                    className="relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border border-line bg-card px-3 text-left disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    <span className="billing-item-shine" aria-hidden />
                     <span className="relative flex min-w-0 flex-1 items-center gap-2">
                       <span className="min-w-0 flex-1">
-                        <span className="line-clamp-2 text-sm font-semibold leading-snug text-ink transition-colors duration-200">
+                        <span className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
                           {item.name}
                         </span>
-                        <span className="mt-0.5 block text-xs text-muted transition-transform duration-300 group-hover:translate-x-0.5">
+                        <span className="mt-0.5 block text-xs text-muted">
                           ₹{item.price}
                           {item.shortCode ? ` · ${item.shortCode}` : ''}
                         </span>
@@ -181,7 +172,7 @@ export function ItemGrid({
                           <span aria-hidden className="text-primary">
                             <Heart
                               size={14}
-                              className="fill-primary text-primary drop-shadow-sm"
+                              className="fill-primary text-primary"
                               strokeWidth={1.5}
                             />
                           </span>
@@ -194,18 +185,12 @@ export function ItemGrid({
             })}
 
             {showOpenItem ? (
-              <li
-                className="billing-item-card"
-                style={{
-                  animationDelay: `${Math.min(items.length, 20) * 30}ms`,
-                }}
-              >
+              <li>
                 <button
                   type="button"
                   onClick={onOpenItemClick}
-                  className="group relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border border-line bg-card px-3 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.02] hover:shadow-[0_10px_24px_rgba(0,0,0,0.08)]"
+                  className="relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border border-line bg-card px-3 text-left"
                 >
-                  <span className="billing-item-shine" aria-hidden />
                   <span className="relative flex min-w-0 flex-1 items-center gap-2">
                     <span className="min-w-0 flex-1 text-sm font-semibold text-ink">
                       Open Item
@@ -213,7 +198,7 @@ export function ItemGrid({
                     <span aria-hidden className="shrink-0 text-primary">
                       <Heart
                         size={14}
-                        className="fill-primary text-primary drop-shadow-sm"
+                        className="fill-primary text-primary"
                         strokeWidth={1.5}
                       />
                     </span>

@@ -81,14 +81,17 @@ export function FinalBillCustomerModal({
     if (letters < 2 || letters > 10 || !/^[A-Za-z\s]+$/.test(trimmedName)) {
       nextErrors.name = 'Enter a valid name'
     }
-    if (digits.length !== 10) {
-      nextErrors.phone = 'Enter a 10-digit mobile number'
+    if (digits.length > 0 && digits.length !== 10) {
+      nextErrors.phone = 'Enter a valid 10-digit mobile number'
     }
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    onConfirm({ name: trimmedName, phone: `+91${digits}` })
+    onConfirm({
+      name: trimmedName,
+      phone: digits.length === 10 ? `+91${digits}` : '',
+    })
   }
 
   if (!open) return null
@@ -160,7 +163,7 @@ export function FinalBillCustomerModal({
           </label>
 
           <label className="block text-sm font-semibold text-ink">
-            Phone <span className="text-primary">*</span>
+            Phone
             <div
               className={`mt-1.5 flex h-10 overflow-hidden rounded-md border bg-white focus-within:border-primary ${
                 errors.phone ? 'border-primary' : 'border-line'
@@ -185,7 +188,7 @@ export function FinalBillCustomerModal({
                     handleConfirm()
                   }
                 }}
-                placeholder="10-digit mobile"
+                placeholder="10-digit mobile (optional)"
                 className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm font-normal text-ink outline-none placeholder:text-muted"
               />
             </div>
@@ -195,13 +198,13 @@ export function FinalBillCustomerModal({
               </span>
             ) : (
               <span className="mt-1 block text-xs font-normal text-muted">
-                Enter up to 10 digits
+                Optional — enter up to 10 digits
               </span>
             )}
           </label>
 
           <p className="text-xs text-muted">
-            Name and phone will be printed on the final merged bill.
+            Name will be printed on the final bill. Phone is optional.
           </p>
         </div>
 

@@ -4,7 +4,6 @@ import { BrandLogo } from '../components/brand/BrandLogo'
 import { brand } from '../theme/brand'
 
 const TITLES: Record<string, string> = {
-  '/configuration': 'Configuration',
   '/day-end': 'Day End',
   '/logs': 'Logs',
   '/reports/category-summary': 'Category Summary',

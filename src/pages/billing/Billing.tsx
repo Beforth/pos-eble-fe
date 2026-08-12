@@ -17,6 +17,8 @@ import { DummyBillModal, type DummyBillData } from '../../components/billing/Dum
 import { OpenItemModal } from '../../components/billing/OpenItemModal'
 import { OtherPaymentModal, type OtherPaymentDetails } from '../../components/billing/OtherPaymentModal'
 import { OrderNotesModal } from '../../components/billing/OrderNotesModal'
+import { DraftBillsModal } from '../../components/billing/DraftBillsModal'
+import { SaveDraftNameModal } from '../../components/billing/SaveDraftNameModal'
 import { PartPaymentView } from '../../components/billing/PartPaymentView'
 import { SplitBillModal } from '../../components/billing/SplitBillModal'
 import {
@@ -34,8 +36,19 @@ import {
 import { getItemInitials, itemNameMatchesQuery } from '../../utils/itemSearch'
 import { recordCoverSize } from '../../utils/coverSizeStore'
 import {
+  loadDraftBills,
+  upsertDraftBill,
+  deleteDraftBill,
+  type DraftBill,
+} from '../../utils/draftBillStore'
+import {
+  appendKotTicket,
   getTableStatus,
+  loadAllKotTickets,
+  markTablePrinted,
+  replaceKotTickets,
   setTableStatus,
+  settleTableSession,
 } from '../../utils/tableStatusStore'
 
 const FAVORITES_ID = 'favorites'
@@ -158,7 +171,9 @@ export default function Billing() {
   const [kotViewOpen, setKotViewOpen] = useState(
     () => searchParams.get('kot') === '1',
   )
-  const [kotTickets, setKotTickets] = useState<KotTicket[]>([])
+  const [kotTickets, setKotTickets] = useState<KotTicket[]>(() =>
+    loadAllKotTickets(),
+  )
   const [finalBillOpen, setFinalBillOpen] = useState(false)
   const [finalBillAction, setFinalBillAction] = useState<
     'Save' | 'Save & Print' | 'Save & eBill'
@@ -172,6 +187,10 @@ export default function Billing() {
   const [paymentBeforeOther, setPaymentBeforeOther] =
     useState<PaymentMethod>('cash')
   const [settlementAmount, setSettlementAmount] = useState<number | null>(null)
+  const [draftsOpen, setDraftsOpen] = useState(false)
+  const [draftCount, setDraftCount] = useState(() => loadDraftBills().length)
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null)
+  const [saveDraftOpen, setSaveDraftOpen] = useState(false)
 
   useEffect(() => {
     const nextTableId = searchParams.get('tableId')
@@ -374,6 +393,83 @@ export default function Billing() {
     setOtherPayment(null)
   }
 
+  function clearBillForNextCustomer() {
+    setLines([])
+    setOrderNote('')
+    setOrderType('dine-in')
+    setPayment('cash')
+    setTableId('')
+    setGuests(0)
+    setComplimentary(false)
+    setItsPaid(false)
+    setLoyalty(false)
+    setFeedbackSms(false)
+    setCustomer(EMPTY_CUSTOMER)
+    setCustomerErrors({})
+    setShowCustomerErrors(false)
+    setCustomerFormOpen(false)
+    setSettlementAmount(null)
+    setOtherPayment(null)
+    setActiveDraftId(null)
+  }
+
+  function refreshDraftCount() {
+    setDraftCount(loadDraftBills().length)
+  }
+
+  function saveCurrentAsDraft(customerName: string) {
+    if (lines.length === 0) {
+      showToast('Add items before saving a draft')
+      return
+    }
+    const saved = upsertDraftBill({
+      id: activeDraftId ?? undefined,
+      tableId,
+      tableNo: selectedTableNo,
+      guests,
+      orderType,
+      payment,
+      lines,
+      orderNote,
+      customer: {
+        ...customer,
+        name: customerName,
+      },
+    })
+    setActiveDraftId(saved.id)
+    refreshDraftCount()
+    setSaveDraftOpen(false)
+    clearBillForNextCustomer()
+    showToast(`Draft saved for ${customerName}`)
+  }
+
+  function startSaveDraft() {
+    if (lines.length === 0) {
+      showToast('Add items before saving a draft')
+      return
+    }
+    setSaveDraftOpen(true)
+  }
+
+  function resumeDraft(draft: DraftBill) {
+    setLines(draft.lines)
+    setTableId(draft.tableId)
+    setGuests(draft.guests)
+    setOrderType(draft.orderType)
+    setPayment(draft.payment === 'part' ? 'cash' : draft.payment)
+    setOrderNote(draft.orderNote)
+    setCustomer(draft.customer)
+    setActiveDraftId(draft.id)
+    setDraftsOpen(false)
+    setPartPaymentOpen(false)
+    setKotViewOpen(false)
+    showToast(
+      draft.tableNo !== 'No table'
+        ? `Draft resumed · Table ${draft.tableNo}`
+        : 'Draft resumed',
+    )
+  }
+
   function newOrder() {
     navigate('/table-view')
   }
@@ -388,8 +484,17 @@ export default function Billing() {
   const tableKotSummary = useMemo(
     () =>
       tableKotTickets.map((t) => ({
+        id: t.id,
         kotNo: t.kotNo,
         amount: kotTicketAmount(t),
+        createdAt: t.createdAt,
+        items: t.items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          qty: item.qty,
+          price: item.price,
+          note: item.note,
+        })),
       })),
     [tableKotTickets],
   )
@@ -486,20 +591,19 @@ export default function Billing() {
         guests > 0
           ? guests
           : Math.max(0, ...kotsSnapshot.map((k) => k.persons), 0)
-      if (coverPersons > 0) {
-        recordCoverSize(coverPersons, selectedTableNo)
+
+      // Print / eBill → green (printed). Keep KOTs until settlement.
+      if (action === 'Save & Print' || action === 'Save & eBill') {
+        markTablePrinted(kotKey)
       }
-      if (hasTableSelected) {
-        setTableStatus(
-          kotKey,
-          action === 'Save & Print' || action === 'Save & eBill'
-            ? 'printed'
-            : 'paid',
-        )
-      }
-      setKotTickets((prev) => prev.filter((t) => t.tableId !== kotKey))
+      // Do not clear table KOTs here — settlement clears to blank.
       setLines([])
       setOrderNote('')
+
+      // Stash cover size persons on session via guests for later settlement
+      if (coverPersons > 0) {
+        setGuests(coverPersons)
+      }
     }
 
     if (!hasTableSelected && guests > 0) {
@@ -519,6 +623,11 @@ export default function Billing() {
       name: customerInfo.name,
       mobile: customerInfo.phone,
     }))
+    if (activeDraftId) {
+      deleteDraftBill(activeDraftId)
+      setActiveDraftId(null)
+      refreshDraftCount()
+    }
 
     if (action === 'Save & Print' || action === 'Save & eBill') {
       setDummyBill({
@@ -541,8 +650,8 @@ export default function Billing() {
       setDummyBillOpen(true)
       showToast(
         action === 'Save & eBill'
-          ? `eBill #${bill} generated`
-          : `Bill #${bill} ready to print`,
+          ? `eBill #${bill} generated · table printed`
+          : `Bill #${bill} ready to print · table printed`,
       )
       return
     }
@@ -550,6 +659,37 @@ export default function Billing() {
     showToast(
       `Bill #${bill} · Table ${selectedTableNo} · ${kotCount} KOT${kotCount === 1 ? '' : 's'} merged · saved`,
     )
+  }
+
+  function finalizeTableSettlement(amount: number) {
+    if (!hasTableSelected) {
+      setSettlementAmount(amount)
+      showToast(`Settlement saved · ₹${amount}`)
+      return
+    }
+    const kotsSnapshot = ticketsForTable(kotTickets, tableId)
+    const coverPersons =
+      guests > 0
+        ? guests
+        : Math.max(0, ...kotsSnapshot.map((k) => k.persons), 0)
+    if (coverPersons > 0) {
+      recordCoverSize(coverPersons, selectedTableNo)
+    }
+    const remaining = kotTickets.filter((t) => t.tableId !== tableId)
+    settleTableSession(tableId, remaining)
+    setKotTickets(remaining)
+    setLines([])
+    setOrderNote('')
+    setSettlementAmount(null)
+    setGuests(0)
+    setTableId('')
+    if (activeDraftId) {
+      deleteDraftBill(activeDraftId)
+      setActiveDraftId(null)
+      refreshDraftCount()
+    }
+    showToast(`Settled ₹${amount} · table cleared`)
+    navigate('/table-view')
   }
 
   function startFinalBill(action: 'Save' | 'Save & Print' | 'Save & eBill') {
@@ -587,7 +727,8 @@ export default function Billing() {
     if (lines.length > 0) {
       const ticket = createKotFromLines(lines, orderNote)
       if (ticket) {
-        setKotTickets((prev) => [...prev, ticket])
+        const next = appendKotTicket(ticket)
+        setKotTickets(next)
         setLines([])
         setOrderNote('')
       }
@@ -612,6 +753,10 @@ export default function Billing() {
         showToast('Add items before sending KOT')
         return
       }
+      if (!hasTableSelected) {
+        showToast('Select a table before sending KOT')
+        return
+      }
       if (payment === 'due' && !isCustomerComplete(customer)) {
         setCustomerFormOpen(true)
         setShowCustomerErrors(true)
@@ -623,18 +768,16 @@ export default function Billing() {
       const ticket = createKotFromLines(lines, orderNote)
       if (!ticket) return
 
-      setKotTickets((prev) => [...prev, ticket])
+      const next = appendKotTicket(ticket)
+      setKotTickets(next)
       setLines([])
       setOrderNote('')
-      setKotViewOpen(true)
-      if (ticket.tableId !== 'no-table') {
-        setTableStatus(ticket.tableId, 'running-kot')
-      }
       showToast(
         action === 'KOT & Print'
           ? `Table ${ticket.tableNo} · KOT ${ticket.kotNo} sent · Print started`
-          : `Table ${ticket.tableNo} · KOT ${ticket.kotNo} sent to kitchen`,
+          : `Table ${ticket.tableNo} · KOT ${ticket.kotNo} sent`,
       )
+      navigate('/table-view')
       return
     }
 
@@ -643,12 +786,8 @@ export default function Billing() {
       return
     }
 
-    if (action === 'Hold') {
-      if (lines.length === 0 && tableKotTickets.length === 0) {
-        showToast('Nothing to hold')
-        return
-      }
-      showToast(`Table ${selectedTableNo} held`)
+    if (action === 'Draft') {
+      startSaveDraft()
       return
     }
 
@@ -743,6 +882,9 @@ export default function Billing() {
         onClose={() => {
           setDummyBillOpen(false)
           setDummyBill(null)
+          if (hasTableSelected) {
+            navigate('/table-view')
+          }
         }}
       />
 
@@ -784,15 +926,21 @@ export default function Billing() {
           tickets={kotTickets}
           onBack={() => setKotViewOpen(false)}
           onFoodReady={(id) => {
-            setKotTickets((prev) =>
-              prev.map((t) =>
+            setKotTickets((prev) => {
+              const next = prev.map((t) =>
                 t.id === id ? { ...t, status: 'ready' as const } : t,
-              ),
-            )
+              )
+              replaceKotTickets(next)
+              return next
+            })
             showToast('Marked as Food Is Ready')
           }}
           onDismiss={(id) => {
-            setKotTickets((prev) => prev.filter((t) => t.id !== id))
+            setKotTickets((prev) => {
+              const next = prev.filter((t) => t.id !== id)
+              replaceKotTickets(next)
+              return next
+            })
             showToast('KOT cancelled')
           }}
           onSettleSave={({ tableId: settledTableId, ticketIds, result }) => {
@@ -806,12 +954,15 @@ export default function Billing() {
             if (coverPersons > 0) {
               recordCoverSize(coverPersons, tableLabel)
             }
-            if (settledTableId && settledTableId !== 'no-table') {
-              setTableStatus(settledTableId, 'paid')
-            }
-            setKotTickets((prev) =>
-              prev.filter((t) => !ticketIds.includes(t.id)),
+            const remaining = kotTickets.filter(
+              (t) => !ticketIds.includes(t.id),
             )
+            if (settledTableId && settledTableId !== 'no-table') {
+              settleTableSession(settledTableId, remaining)
+            } else {
+              replaceKotTickets(remaining)
+            }
+            setKotTickets(remaining)
             if (settledTableId === tableId || settledTableId === 'no-table') {
               setLines([])
               setOrderNote('')
@@ -824,6 +975,9 @@ export default function Billing() {
                   : ''
               }`,
             )
+            if (settledTableId && settledTableId !== 'no-table') {
+              navigate('/table-view')
+            }
           }}
         />
       ) : (
@@ -884,15 +1038,26 @@ export default function Billing() {
           onRemoveLine={(id) =>
             setLines((prev) => prev.filter((line) => line.id !== id))
           }
+          onRemoveKotItem={({ ticketId, itemId, reason }) => {
+            setKotTickets((prev) => {
+              const next = prev
+                .map((ticket) => {
+                  if (ticket.id !== ticketId) return ticket
+                  const items = ticket.items.filter((item) => item.id !== itemId)
+                  return { ...ticket, items }
+                })
+                .filter((ticket) => ticket.items.length > 0)
+              replaceKotTickets(next)
+              return next
+            })
+            showToast(`Item removed · ${reason}`)
+          }}
           onClearItems={() => {
             if (lines.length === 0) return
             setLines([])
             showToast('All items removed')
           }}
-          onSettleSave={(amount) => {
-            setSettlementAmount(amount)
-            showToast(`Settlement saved · ₹${amount}`)
-          }}
+          onSettleSave={finalizeTableSettlement}
           onAction={handleAction}
           onCustomerChange={(next) => {
             setCustomer(next)
@@ -903,9 +1068,24 @@ export default function Billing() {
           onCustomerFormOpenChange={setCustomerFormOpen}
           onNotesClick={() => setNotesOpen(true)}
           hasOrderNote={Boolean(orderNote.trim())}
+          onOpenDrafts={() => setDraftsOpen(true)}
+          draftCount={draftCount}
         />
       </div>
       )}
+
+      <DraftBillsModal
+        open={draftsOpen}
+        onClose={() => setDraftsOpen(false)}
+        onResume={resumeDraft}
+      />
+
+      <SaveDraftNameModal
+        open={saveDraftOpen}
+        initialName={customer.name}
+        onClose={() => setSaveDraftOpen(false)}
+        onConfirm={saveCurrentAsDraft}
+      />
     </div>
   )
 }

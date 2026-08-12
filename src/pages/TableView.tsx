@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Eye, Plus, RefreshCw } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
 import {
   TABLE_STATUS_LEGEND,
@@ -8,7 +8,13 @@ import {
   tableCardClass,
   type TableFloorStatus,
 } from '../mocks/billingTables'
-import { loadTableStatuses } from '../utils/tableStatusStore'
+import {
+  formatElapsedMinutes,
+  formatTableAmount,
+  loadTableSessions,
+  loadTableStatuses,
+  type TableSession,
+} from '../utils/tableStatusStore'
 
 const AREA_ORDER = ['Ground Floor', 'BASEMENT', 'Party Hall'] as const
 
@@ -19,7 +25,16 @@ export default function TableView() {
   const [statuses, setStatuses] = useState<Record<string, TableFloorStatus>>(
     () => loadTableStatuses(),
   )
+  const [sessions, setSessions] = useState<Record<string, TableSession>>(() =>
+    loadTableSessions(),
+  )
+  const [now, setNow] = useState(() => Date.now())
   const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30000)
+    return () => window.clearInterval(id)
+  }, [])
 
   const areas = useMemo(() => {
     const map = new Map<string, typeof billingTables>()
@@ -45,14 +60,25 @@ export default function TableView() {
     window.setTimeout(() => setToast(null), 2200)
   }
 
-  function handleRefresh() {
+  function reloadFloor() {
     setStatuses(loadTableStatuses())
+    setSessions(loadTableSessions())
+  }
+
+  function handleRefresh() {
+    reloadFloor()
     showToast('Table view refreshed')
   }
 
   function openTable(tableId: string, tableNo: string, persons: number) {
     navigate(
       `/billing?tableId=${encodeURIComponent(tableId)}&tableNo=${encodeURIComponent(tableNo)}&persons=${persons}`,
+    )
+  }
+
+  function viewTable(tableId: string, tableNo: string, persons: number) {
+    navigate(
+      `/billing?tableId=${encodeURIComponent(tableId)}&tableNo=${encodeURIComponent(tableNo)}&persons=${persons}&view=1`,
     )
   }
 
@@ -179,6 +205,46 @@ export default function TableView() {
               <div className="flex flex-wrap gap-3">
                 {area.tables.map((table) => {
                   const status = statuses[table.id] ?? 'blank'
+                  const session = sessions[table.id]
+                  const actionable =
+                    (status === 'running-kot' || status === 'printed') &&
+                    Boolean(session)
+
+                  if (actionable && session) {
+                    return (
+                      <div
+                        key={table.id}
+                        className={`relative flex h-[100px] w-[88px] flex-col items-center justify-center rounded-md border-2 px-1 pb-3 pt-1 text-center sm:h-[108px] sm:w-24 ${tableCardClass(status)}`}
+                      >
+                        <p className="text-[10px] font-medium leading-tight opacity-90">
+                          {formatElapsedMinutes(session.startedAt, now)}
+                        </p>
+                        <p className="text-lg font-bold leading-tight">
+                          {table.tableNo}
+                        </p>
+                        <p className="text-[11px] font-bold leading-tight">
+                          {formatTableAmount(session.amount)}
+                        </p>
+                        <button
+                          type="button"
+                          title="View order"
+                          aria-label={`View table ${table.tableNo}`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            viewTable(
+                              table.id,
+                              table.tableNo,
+                              session.persons || table.persons,
+                            )
+                          }}
+                          className="absolute -bottom-3 left-1/2 inline-flex size-7 -translate-x-1/2 items-center justify-center rounded border border-ink/40 bg-white text-ink shadow-sm hover:bg-page"
+                        >
+                          <Eye size={14} />
+                        </button>
+                      </div>
+                    )
+                  }
+
                   return (
                     <button
                       key={table.id}

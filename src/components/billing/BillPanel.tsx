@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
+  ChevronDown,
   ChevronUp,
   Clock3,
+  FilePenLine,
   FileText,
   History,
   List,
@@ -26,6 +28,7 @@ import {
   type CustomerHistoryOrder,
 } from './CustomerHistoryModal'
 import { CustomerGstModal } from './CustomerGstModal'
+import { DeleteReasonModal } from './DeleteReasonModal'
 import { OTHER_PAYMENT_TYPES } from './OtherPaymentModal'
 
 const SEED_CUSTOMER_HISTORY: Record<string, CustomerHistoryOrder[]> = {
@@ -69,7 +72,13 @@ export interface CustomerDetails {
 interface BillPanelProps {
   lines: CartLine[]
   /** KOTs already sent for the selected table (merged into final bill). */
-  tableKots?: { kotNo: number; amount: number }[]
+  tableKots?: {
+    id: string
+    kotNo: number
+    amount: number
+    createdAt?: number
+    items: { id: string; name: string; qty: number; price: number; note?: string }[]
+  }[]
   orderType: OrderType
   payment: PaymentMethod
   tableId: string
@@ -91,6 +100,11 @@ interface BillPanelProps {
   onFeedbackSmsChange: (value: boolean) => void
   onQtyChange: (lineId: string, qty: number) => void
   onRemoveLine: (lineId: string) => void
+  onRemoveKotItem?: (payload: {
+    ticketId: string
+    itemId: string
+    reason: string
+  }) => void
   onClearItems?: () => void
   onAction: (action: string) => void
   onSettleSave?: (amount: number) => void
@@ -98,6 +112,8 @@ interface BillPanelProps {
   onCustomerFormOpenChange: (open: boolean) => void
   onNotesClick?: () => void
   hasOrderNote?: boolean
+  onOpenDrafts?: () => void
+  draftCount?: number
 }
 
 const ORDER_TYPES: { id: OrderType; label: string }[] = [
@@ -150,6 +166,7 @@ export function BillPanel({
   onFeedbackSmsChange,
   onQtyChange,
   onRemoveLine,
+  onRemoveKotItem,
   onClearItems,
   onAction,
   onSettleSave,
@@ -157,10 +174,22 @@ export function BillPanel({
   onCustomerFormOpenChange,
   onNotesClick,
   hasOrderNote = false,
+  onOpenDrafts,
+  draftCount = 0,
 }: BillPanelProps) {
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
   const [guestsPickerOpen, setGuestsPickerOpen] = useState(false)
+  const [expandedKotNo, setExpandedKotNo] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    ticketId: string
+    itemId: string
+    itemName: string
+  } | null>(null)
   const selectedTable = billingTables.find((t) => t.id === tableId)
+
+  useEffect(() => {
+    setExpandedKotNo(null)
+  }, [tableId])
   const currentTotal = lines.reduce((sum, line) => sum + line.price * line.qty, 0)
   const kotTotal = tableKots.reduce((sum, kot) => sum + kot.amount, 0)
   const total = currentTotal + kotTotal
@@ -327,6 +356,21 @@ export function BillPanel({
         }}
       />
 
+      <DeleteReasonModal
+        open={Boolean(deleteTarget)}
+        title={deleteTarget ? `Delete ${deleteTarget.itemName}` : 'Delete item'}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={(reason) => {
+          if (!deleteTarget || !onRemoveKotItem) return
+          onRemoveKotItem({
+            ticketId: deleteTarget.ticketId,
+            itemId: deleteTarget.itemId,
+            reason,
+          })
+          setDeleteTarget(null)
+        }}
+      />
+
       {/* Order type */}
       <div className="grid grid-cols-3 gap-1 border-b border-line p-2">
         {ORDER_TYPES.map((type) => {
@@ -422,6 +466,25 @@ export function BillPanel({
           <StickyNote size={16} />
           {hasOrderNote ? (
             <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-primary" />
+          ) : null}
+        </button>
+        <button
+          type="button"
+          title="Draft bills"
+          aria-label="Draft bills"
+          onClick={() => {
+            setTablePickerOpen(false)
+            setGuestsPickerOpen(false)
+            onCustomerFormOpenChange(false)
+            onOpenDrafts?.()
+          }}
+          className="relative inline-flex size-9 items-center justify-center rounded-lg border border-line text-muted hover:bg-page hover:text-primary"
+        >
+          <FilePenLine size={16} />
+          {draftCount > 0 ? (
+            <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+              {draftCount > 9 ? '9+' : draftCount}
+            </span>
           ) : null}
         </button>
         <button
@@ -671,26 +734,119 @@ export function BillPanel({
             ) : (
               <div>
                 {hasSentKots ? (
-                  <div className="border-b border-line bg-page/60 px-3 py-2">
-                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      Sent KOTs · {selectedTable ? `Table ${selectedTable.tableNo}` : 'No table'}
+                  <div className="border-b border-line bg-page/60">
+                    <p className="border-b border-line px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      Sent KOTs ·{' '}
+                      {selectedTable
+                        ? `Table ${selectedTable.tableNo}`
+                        : 'No table'}
                     </p>
-                    <ul className="space-y-1">
-                      {tableKots.map((kot) => (
-                        <li
-                          key={kot.kotNo}
-                          className="flex items-center justify-between text-sm text-ink"
-                        >
-                          <span className="font-medium">KOT {kot.kotNo}</span>
-                          <span className="font-semibold">
-                            ₹
-                            {kot.amount.toLocaleString('en-IN', {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 2,
-                            })}
-                          </span>
-                        </li>
-                      ))}
+                    <ul>
+                      {tableKots.map((kot) => {
+                        const open = expandedKotNo === kot.kotNo
+                        const timeLabel = kot.createdAt
+                          ? new Date(kot.createdAt).toLocaleTimeString('en-IN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            })
+                          : null
+                        return (
+                          <li key={kot.id} className="border-b border-line last:border-b-0">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedKotNo(open ? null : kot.kotNo)
+                              }
+                              className="flex w-full items-center justify-between gap-2 bg-page px-3 py-2 text-left text-sm text-ink hover:bg-card"
+                              aria-expanded={open}
+                            >
+                              <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold">
+                                {open ? (
+                                  <ChevronUp size={14} className="shrink-0 text-muted" />
+                                ) : (
+                                  <ChevronDown
+                                    size={14}
+                                    className="shrink-0 text-muted"
+                                  />
+                                )}
+                                <span>
+                                  KOT - {kot.kotNo}
+                                  {timeLabel ? (
+                                    <span className="ml-2 font-normal text-muted">
+                                      Time - {timeLabel}
+                                    </span>
+                                  ) : (
+                                    <span className="ml-1.5 text-xs font-normal text-muted">
+                                      ({kot.items.length} item
+                                      {kot.items.length === 1 ? '' : 's'})
+                                    </span>
+                                  )}
+                                </span>
+                              </span>
+                              <span className="shrink-0 font-semibold tabular-nums">
+                                ₹
+                                {kot.amount.toLocaleString('en-IN', {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </span>
+                            </button>
+                            {open ? (
+                              <ul className="divide-y divide-line bg-card">
+                                {kot.items.map((item) => (
+                                  <li
+                                    key={item.id}
+                                    className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 px-3 py-2.5"
+                                  >
+                                    <div className="flex min-w-0 items-start gap-2">
+                                      <button
+                                        type="button"
+                                        title={`Delete ${item.name}`}
+                                        aria-label={`Delete ${item.name}`}
+                                        onClick={() =>
+                                          setDeleteTarget({
+                                            ticketId: kot.id,
+                                            itemId: item.id,
+                                            itemName: item.name,
+                                          })
+                                        }
+                                        className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-white hover:bg-primary-hover"
+                                      >
+                                        <X size={11} strokeWidth={2.5} />
+                                      </button>
+                                      <span className="min-w-0">
+                                        <span className="block text-sm font-medium text-ink underline decoration-line">
+                                          {item.name}
+                                        </span>
+                                        {item.note ? (
+                                          <span className="mt-0.5 block text-xs italic text-muted">
+                                            [Note] {item.note}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    </div>
+                                    <span className="w-16 text-center text-sm tabular-nums text-ink">
+                                      ×{item.qty}
+                                    </span>
+                                    <span className="w-14 text-right text-sm font-semibold tabular-nums text-ink">
+                                      ₹
+                                      {(item.price * item.qty).toLocaleString(
+                                        'en-IN',
+                                        {
+                                          minimumFractionDigits: 0,
+                                          maximumFractionDigits: 2,
+                                        },
+                                      )}
+                                    </span>
+                                    <span className="w-7" />
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </li>
+                        )
+                      })}
                     </ul>
                   </div>
                 ) : null}
@@ -876,71 +1032,71 @@ export function BillPanel({
               />
             </label>
 
-            <div className="space-y-1.5 border-t border-line pt-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-ink">
-                  Settlement Amount
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={settlementInput}
-                  onChange={(e) => {
-                    setSettlementInput(e.target.value)
-                    if (settlementError) setSettlementError(null)
-                  }}
-                  onBlur={handleSettlementBlur}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleSettleSave()
-                    }
-                  }}
-                  className={`ml-auto h-9 w-[110px] rounded-md border bg-white px-2.5 text-sm text-ink outline-none focus:border-primary ${
-                    settlementError ? 'border-primary' : 'border-line'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={handleSettleSave}
-                  className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-                >
-                  Settle & Save
-                </button>
-              </div>
-              {settlementError ? (
-                <p className="text-xs text-primary">{settlementError}</p>
-              ) : null}
+            <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+              <button
+                type="button"
+                onClick={() => onAction('Bogo Offer')}
+                className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
+              >
+                Bogo Offer
+              </button>
+              <button
+                type="button"
+                onClick={() => onAction('Split')}
+                className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
+              >
+                Split
+              </button>
             </div>
           </div>
         ) : null}
 
         <div className="space-y-3 bg-white p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onAction('Bogo Offer')}
-              className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-            >
-              Bogo Offer
-            </button>
-            <button
-              type="button"
-              onClick={() => onAction('Split')}
-              className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-            >
-              Split
-            </button>
-            <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-ink">
+                Settlement Amount
+              </span>
               <input
-                type="checkbox"
-                checked={complimentary}
-                onChange={(event) => onComplimentaryChange(event.target.checked)}
-                className="size-3.5 accent-primary"
+                type="number"
+                min={0}
+                step="0.01"
+                value={settlementInput}
+                onChange={(e) => {
+                  setSettlementInput(e.target.value)
+                  if (settlementError) setSettlementError(null)
+                }}
+                onBlur={handleSettlementBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSettleSave()
+                  }
+                }}
+                className={`h-9 w-[110px] rounded-md border bg-white px-2.5 text-sm text-ink outline-none focus:border-primary ${
+                  settlementError ? 'border-primary' : 'border-line'
+                }`}
               />
-              Complimentary
-            </label>
+              <button
+                type="button"
+                onClick={handleSettleSave}
+                className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
+              >
+                Settle & Save
+              </button>
+              <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
+                <input
+                  type="checkbox"
+                  checked={complimentary}
+                  onChange={(event) => onComplimentaryChange(event.target.checked)}
+                  className="size-3.5 accent-primary"
+                />
+                Complimentary
+              </label>
+            </div>
+            {settlementError ? (
+              <p className="text-xs text-primary">{settlementError}</p>
+            ) : null}
           </div>
 
           <div className="flex items-end justify-between">
@@ -1038,25 +1194,33 @@ export function BillPanel({
           </div>
 
           <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-            {[
-              'Save',
-              'Save & Print',
-              'Save & eBill',
-              'KOT',
-              'KOT & Print',
-              'Hold',
-            ].map((action) => (
+            {(
+              [
+                { id: 'Save', label: 'Save' },
+                { id: 'Save & Print', label: 'Save & Print' },
+                { id: 'Save & eBill', label: 'Save & eBill' },
+                { id: 'KOT', label: 'KOT' },
+                { id: 'KOT & Print', label: 'KOT & Print' },
+                { id: 'Draft', label: 'Draft', icon: true },
+              ] as const
+            ).map((action) => (
               <button
-                key={action}
+                key={action.id}
                 type="button"
-                onClick={() => onAction(action)}
-                className={`h-10 rounded-lg px-1 text-[11px] font-semibold leading-tight sm:text-xs ${
-                  action === 'Hold'
-                    ? 'border border-line bg-white text-ink hover:bg-page'
+                title={
+                  action.id === 'Draft'
+                    ? 'Save current order as draft'
+                    : action.label
+                }
+                onClick={() => onAction(action.id)}
+                className={`inline-flex h-10 items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-semibold leading-tight sm:text-xs ${
+                  action.id === 'Draft'
+                    ? 'border border-primary bg-card text-primary hover:bg-primary/5'
                     : 'bg-primary text-white hover:bg-primary-hover'
                 }`}
               >
-                {action}
+                {action.icon ? <FilePenLine size={13} /> : null}
+                {action.label}
               </button>
             ))}
           </div>

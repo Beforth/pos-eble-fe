@@ -51,7 +51,7 @@ export const TABLE_STATUS_LEGEND: {
   {
     id: 'running-kot',
     label: 'Running KOT Table',
-    swatch: 'bg-primary',
+    swatch: 'bg-secondary',
   },
 ]
 
@@ -60,11 +60,11 @@ export function tableCardClass(status: TableFloorStatus): string {
     case 'running':
       return 'border-sky-400 bg-sky-200 text-ink'
     case 'printed':
-      return 'border-success bg-success/80 text-white'
+      return 'border-success bg-success text-white'
     case 'paid':
       return 'border-[#c4a882] bg-[#e8d5b7] text-ink'
     case 'running-kot':
-      return 'border-primary bg-primary text-white'
+      return 'border-[#c9a82d] bg-secondary text-deep'
     case 'blank':
     default:
       return 'border-dashed border-[#bdbdbd] bg-[#ececec] text-ink'
