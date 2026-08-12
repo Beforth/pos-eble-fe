@@ -30,6 +30,11 @@ import MenuManagement from './pages/MenuManagement'
 import MultiItemImagesUpload from './pages/MultiItemImagesUpload'
 import OnlineOrders from './pages/OnlineOrders'
 import ParcelMenu from './pages/ParcelMenu'
+import PlaceholderPage from './pages/PlaceholderPage'
+import Configuration from './pages/Configuration'
+import CurrentOrders from './pages/configuration/CurrentOrders'
+import CoverSizeReport from './pages/reports/CoverSizeReport'
+import TableView from './pages/TableView'
 import SwiggyMenu from './pages/SwiggyMenu'
 import SpecialNote from './pages/SpecialNote'
 import SetItemCommission from './pages/SetItemCommission'
@@ -653,6 +658,54 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AddDiscount />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/configuration"
+            element={
+              <ProtectedRoute>
+                <Configuration />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/configuration/orders"
+            element={
+              <ProtectedRoute>
+                <CurrentOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/day-end"
+            element={
+              <ProtectedRoute>
+                <PlaceholderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/logs"
+            element={
+              <ProtectedRoute>
+                <PlaceholderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/cover-size-summary"
+            element={
+              <ProtectedRoute>
+                <CoverSizeReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/:reportId"
+            element={
+              <ProtectedRoute>
+                <PlaceholderPage />
               </ProtectedRoute>
             }
           />

@@ -5,11 +5,68 @@ export interface BillingTable {
   areaName: string
 }
 
+export type TableFloorStatus =
+  | 'blank'
+  | 'running'
+  | 'printed'
+  | 'paid'
+  | 'running-kot'
+
 export const billingTables: BillingTable[] = [
-  { id: 't1', tableNo: '1', persons: 2, areaName: 'Ground Floor' },
-  { id: 't2', tableNo: '2', persons: 4, areaName: 'Ground Floor' },
-  { id: 't3', tableNo: '3', persons: 4, areaName: 'Ground Floor' },
-  { id: 't4', tableNo: '4', persons: 6, areaName: 'Ground Floor' },
-  { id: 't5', tableNo: '5', persons: 2, areaName: 'First Floor' },
-  { id: 't6', tableNo: '6', persons: 4, areaName: 'First Floor' },
+  ...Array.from({ length: 10 }, (_, i) => ({
+    id: `gf-${i + 1}`,
+    tableNo: String(i + 1),
+    persons: i % 3 === 0 ? 6 : i % 2 === 0 ? 4 : 2,
+    areaName: 'Ground Floor',
+  })),
+  ...Array.from({ length: 10 }, (_, i) => ({
+    id: `bs-${i + 11}`,
+    tableNo: String(i + 11),
+    persons: i % 2 === 0 ? 4 : 2,
+    areaName: 'BASEMENT',
+  })),
+  {
+    id: 'ph-1',
+    tableNo: 'Hall 1',
+    persons: 20,
+    areaName: 'Party Hall',
+  },
+  {
+    id: 'ph-2',
+    tableNo: 'Hall 2',
+    persons: 20,
+    areaName: 'Party Hall',
+  },
 ]
+
+export const TABLE_STATUS_LEGEND: {
+  id: TableFloorStatus
+  label: string
+  swatch: string
+}[] = [
+  { id: 'blank', label: 'Blank Table', swatch: 'bg-[#e8e8e8] border border-dashed border-[#bdbdbd]' },
+  { id: 'running', label: 'Running Table', swatch: 'bg-sky-300' },
+  { id: 'printed', label: 'Printed Table', swatch: 'bg-success' },
+  { id: 'paid', label: 'Paid Table', swatch: 'bg-[#e8d5b7]' },
+  {
+    id: 'running-kot',
+    label: 'Running KOT Table',
+    swatch: 'bg-secondary',
+  },
+]
+
+export function tableCardClass(status: TableFloorStatus): string {
+  switch (status) {
+    case 'running':
+      return 'border-sky-400 bg-sky-200 text-ink'
+    case 'printed':
+      return 'border-success bg-success text-white'
+    case 'paid':
+      return 'border-[#c4a882] bg-[#e8d5b7] text-ink'
+    case 'running-kot':
+      return 'border-[#c9a82d] bg-secondary text-deep'
+    case 'blank':
+    default:
+      return 'border-dashed border-[#bdbdbd] bg-[#ececec] text-ink'
+  }
+}

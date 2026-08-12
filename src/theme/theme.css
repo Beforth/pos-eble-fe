@@ -109,6 +109,130 @@ body {
   animation: login-float 11s ease-in-out 1.4s infinite;
 }
 
+/* Billing category rail motion */
+@keyframes category-rail-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes category-active-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ink) 12%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-ink) 0%, transparent);
+  }
+}
+
+@keyframes category-shine {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes billing-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes billing-item-tap {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.category-rail-item {
+  animation: category-rail-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.category-rail-item-active {
+  animation:
+    category-rail-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
+    category-active-pulse 2.2s ease-in-out 0.35s 1;
+}
+
+.category-rail-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.category-rail-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, white 55%, transparent),
+    transparent
+  );
+  transform: translateX(-120%);
+}
+
+.group:hover .category-rail-shine::after {
+  animation: category-shine 0.7s ease-out;
+}
+
+.billing-item-card {
+  animation: billing-item-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.billing-item-card:active:not(:disabled) {
+  animation: billing-item-tap 0.28s ease-out;
+}
+
+.billing-item-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.billing-item-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, white 60%, transparent),
+    transparent
+  );
+  transform: translateX(-130%);
+}
+
+.group:hover .billing-item-shine::after {
+  animation: category-shine 0.75s ease-out;
+}
+
 /*
  * Dark mode blueprint (uncomment when ready):
  * .dark {
