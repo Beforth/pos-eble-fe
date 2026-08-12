@@ -53,7 +53,12 @@ export function ActionDropdown({
 }: {
   label?: string
   icon?: ReactNode
-  options?: { label: string; onClick?: () => void; badge?: string }[]
+  options?: {
+    label: string
+    onClick?: () => void
+    badge?: string
+    danger?: boolean
+  }[]
   searchable?: boolean
   menuClassName?: string
 }) {
@@ -140,7 +145,9 @@ export function ActionDropdown({
                   option.onClick?.()
                   setOpen(false)
                 }}
-                className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-page"
+                className={`flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-page ${
+                  option.danger ? 'text-primary' : 'text-ink'
+                }`}
               >
                 <span>{option.label}</span>
                 {option.badge ? (

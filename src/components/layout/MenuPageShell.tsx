@@ -18,6 +18,7 @@ const AUTO_COLLAPSE_PATHS = [
   '/menu/zomato',
   '/menu/swiggy',
   '/menu/channel',
+  '/menu/schedule-changes',
 ]
 
 interface MenuPageShellProps {
