@@ -96,7 +96,9 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
     setEditingItemId((current) => (current === id ? null : current))
   }
 
-  function handleSave() {
+  if (!open || !kot) return null
+
+  const handleSave = () => {
     const nextItems = items
       .map((item) => item.name.trim())
       .filter(Boolean)

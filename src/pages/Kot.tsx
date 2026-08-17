@@ -12,9 +12,10 @@ import { NotificationsDrawer } from '../components/layout/NotificationsDrawer'
 import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
-import { kotList, parseKotDate, type KotRow } from '../mocks/kotData'
+import { parseKotDate, type KotRow } from '../mocks/kotData'
 import { brand } from '../theme/brand'
 import { formatNumber } from '../utils/format'
+import { loadKotRows } from '../utils/kotListStore'
 
 const PAGE_SIZE = 15
 
@@ -24,6 +25,7 @@ const ORDER_TYPE_OPTIONS = [
   { value: 'PARCEL', label: 'Parcel' },
   { value: 'DELIVERY', label: 'Delivery' },
   { value: 'PICK UP', label: 'Pick Up' },
+  { value: 'OTHER', label: 'Other' },
 ]
 
 const STATUS_OPTIONS = [
@@ -98,7 +100,7 @@ export default function Kot() {
   const [page, setPage] = useState(1)
   const [searchFlash, setSearchFlash] = useState(false)
   const [showAllFlash, setShowAllFlash] = useState(false)
-  const [rows, setRows] = useState<KotRow[]>(() => [...kotList])
+  const [rows, setRows] = useState<KotRow[]>(loadKotRows)
   const [editKot, setEditKot] = useState<KotRow | null>(null)
   const [viewKot, setViewKot] = useState<KotRow | null>(null)
   const [detailsKot, setDetailsKot] = useState<KotRow | null>(null)

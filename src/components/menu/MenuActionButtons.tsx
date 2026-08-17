@@ -378,10 +378,12 @@ export function SearchByFilterDropdown({
 export function RowActionButton({
   label,
   onClick,
+  boxed = false,
   children,
 }: {
   label: string
   onClick?: () => void
+  boxed?: boolean
   children: ReactNode
 }) {
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -407,7 +409,9 @@ export function RowActionButton({
         onMouseLeave={() => setOpen(false)}
         onFocus={handleEnter}
         onBlur={() => setOpen(false)}
-        className="inline-flex cursor-pointer rounded p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
+        className={`inline-flex cursor-pointer rounded p-1.5 text-muted transition-colors hover:bg-page hover:text-ink ${
+          boxed ? 'border border-line bg-card hover:border-muted' : ''
+        }`}
       >
         {children}
       </button>

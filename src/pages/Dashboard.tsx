@@ -1,10 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Armchair, Bike, Package } from 'lucide-react'
 import type { OrderTypeKey } from '../types'
-import {
-  DatePickerPill,
-  type DateRangeOption,
-} from '../components/common/DatePickerPill'
 import { ExpensesPanel } from '../components/dashboard/ExpensesPanel'
 import { ItemPerformancePanel } from '../components/dashboard/ItemPerformancePanel'
 import { LeakagePanel } from '../components/dashboard/LeakagePanel'
@@ -19,6 +15,7 @@ import { PageContainer } from '../components/layout/PageContainer'
 import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
+import type { DateRangeOption } from '../components/common/DatePickerPill'
 import {
   channelSeries,
   chartStatus,
@@ -49,6 +46,29 @@ function formatCustomRangeLabel(from: string, to: string): string {
   return `${formatDayMonth(parseInputDate(from))} – ${formatDayMonth(parseInputDate(to))}`
 }
 
+function useDatePickerState(initial = 'today') {
+  const [range, setRange] = useState(initial)
+  const [customLabel, setCustomLabel] = useState<string | undefined>()
+
+  const handleRangeSelect = (next: string) => {
+    if (next !== 'custom') setCustomLabel(undefined)
+    setRange(next)
+  }
+
+  const handleCustomRange = (from: string, to: string) => {
+    setCustomLabel(formatCustomRangeLabel(from, to))
+    setRange('custom')
+  }
+
+  return {
+    options: dateOptions,
+    value: range,
+    onSelect: handleRangeSelect,
+    customLabel,
+    onCustomRange: handleCustomRange,
+  }
+}
+
 type IconTone = 'primary' | 'accent' | 'success'
 
 const orderTypeIcons: Record<
@@ -66,26 +86,12 @@ export default function Dashboard() {
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
-  const [range, setRange] = useState('today')
-  const [customLabel, setCustomLabel] = useState<string | undefined>()
 
-  const handleRangeSelect = (next: string) => {
-    if (next !== 'custom') setCustomLabel(undefined)
-    setRange(next)
-  }
-
-  const handleCustomRange = (from: string, to: string) => {
-    setCustomLabel(formatCustomRangeLabel(from, to))
-    setRange('custom')
-  }
-
-  const datePickerProps = {
-    options: dateOptions,
-    value: range,
-    onSelect: handleRangeSelect,
-    customLabel,
-    onCustomRange: handleCustomRange,
-  }
+  const salesDatePicker = useDatePickerState('today')
+  const onlineOrdersDatePicker = useDatePickerState('today')
+  const leakageDatePicker = useDatePickerState('today')
+  const itemPerfDatePicker = useDatePickerState('today')
+  const expensesDatePicker = useDatePickerState('today')
 
   const closeOtherDrawers = () => {
     setSupportOpen(false)
@@ -137,22 +143,19 @@ export default function Dashboard() {
         <PageContainer
           title="Sales Statistics"
           actions={
-            <>
-              <DatePickerPill {...datePickerProps} />
-              <ActionCenterButton
-                count={2}
-                onClick={() => {
-                  closeOtherDrawers()
-                  setActionCenterOpen(true)
-                }}
-              />
-            </>
+            <ActionCenterButton
+              count={2}
+              onClick={() => {
+                closeOtherDrawers()
+                setActionCenterOpen(true)
+              }}
+            />
           }
           syncStatus={[
             { label: 'POS', minutesAgo: syncStatus.posSyncedMinutesAgo },
             { label: 'Orders', minutesAgo: syncStatus.ordersSyncedMinutesAgo },
           ]}
-          onRefresh={() => setRange(range)}
+          onRefresh={() => salesDatePicker.onSelect(salesDatePicker.value)}
         >
           {/*
             PetPooja-style grid:
@@ -168,6 +171,7 @@ export default function Dashboard() {
                   status={chartStatus}
                   totalOrders={salesStats.totalOrders}
                   className="lg:col-span-2"
+                  {...salesDatePicker}
                 />
               </div>
 
@@ -185,17 +189,17 @@ export default function Dashboard() {
                 })}
               </div>
 
-              <OnlineOrdersPanel data={onlineOrders} {...datePickerProps} />
+              <OnlineOrdersPanel data={onlineOrders} {...onlineOrdersDatePicker} />
             </div>
 
             <div className="space-y-4 xl:col-span-4">
-              <LeakagePanel data={leakage} {...datePickerProps} />
+              <LeakagePanel data={leakage} {...leakageDatePicker} />
               <ItemPerformancePanel
                 top={topItems}
                 low={lowItems}
-                {...datePickerProps}
+                {...itemPerfDatePicker}
               />
-              <ExpensesPanel data={expenses} {...datePickerProps} />
+              <ExpensesPanel data={expenses} {...expensesDatePicker} />
               <QuickHelpPanel data={quickHelp} />
             </div>
           </div>

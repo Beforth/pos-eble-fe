@@ -17,7 +17,7 @@ interface KotItemRow {
   preparationTime: string
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children }: { label: string; children?: ReactNode }) {
   return (
     <div className="min-w-0">
       <p className="text-[11px] font-semibold text-ink">{label}:</p>

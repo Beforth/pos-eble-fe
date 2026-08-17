@@ -23,6 +23,110 @@ interface SidebarNavItemProps {
   nested?: boolean
   expanded?: boolean
   onToggleExpand?: () => void
+  /** Highlight nested child when it matches the current route. */
+  activeChildId?: string
+  /** Shared expand state for nested sections (e.g. Management > Configuration). */
+  expandedIds?: Set<string>
+  onToggleExpandId?: (id: string) => void
+}
+
+function isDescendantActive(
+  item: NavItemDef,
+  activeChildId?: string,
+): boolean {
+  if (!activeChildId) return false
+  if (item.id === activeChildId) return true
+  return Boolean(
+    item.children?.some((child) => isDescendantActive(child, activeChildId)),
+  )
+}
+
+function NestedNavList({
+  items,
+  depth,
+  activeChildId,
+  expandedIds,
+  onToggleExpandId,
+  onClick,
+}: {
+  items: NavItemDef[]
+  depth: number
+  activeChildId?: string
+  expandedIds?: Set<string>
+  onToggleExpandId?: (id: string) => void
+  onClick: (id: string) => void
+}) {
+  const paddingLeft = depth === 1 ? 'pl-8' : depth === 2 ? 'pl-12' : 'pl-16'
+
+  return (
+    <ul className="mt-0.5 space-y-0.5">
+      {items.map((child) => {
+        const ChildIcon = child.icon
+        const hasNested = Boolean(child.children?.length)
+        const nestedExpanded = expandedIds?.has(child.id) ?? false
+        const childActive =
+          activeChildId === child.id ||
+          isDescendantActive(child, activeChildId)
+
+        return (
+          <li key={child.id}>
+            <button
+              type="button"
+              aria-current={activeChildId === child.id ? 'page' : undefined}
+              aria-expanded={hasNested ? nestedExpanded : undefined}
+              onClick={() => {
+                if (hasNested && onToggleExpandId) {
+                  onToggleExpandId(child.id)
+                  return
+                }
+                onClick(child.id)
+              }}
+              className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${paddingLeft} ${
+                childActive
+                  ? 'bg-primary/10 font-semibold text-primary'
+                  : 'text-ink hover:bg-page'
+              }`}
+            >
+              {ChildIcon ? (
+                <ChildIcon
+                  size={depth === 1 ? 17 : 16}
+                  strokeWidth={childActive ? 2.2 : 1.75}
+                  className={`shrink-0 ${childActive ? 'text-primary' : 'text-muted'}`}
+                />
+              ) : null}
+              <span className="min-w-0 flex-1 truncate text-left">
+                {child.label}
+              </span>
+              {child.badge ? (
+                <span className="shrink-0 rounded-md bg-[#e8e0f5] px-1.5 py-0.5 text-[10px] font-semibold text-[#5b4fcf]">
+                  {child.badge}
+                </span>
+              ) : null}
+              {hasNested || child.chevron ? (
+                <ChevronRight
+                  size={14}
+                  className={`shrink-0 text-muted transition-transform duration-200 ${
+                    nestedExpanded ? 'rotate-90' : ''
+                  }`}
+                />
+              ) : null}
+            </button>
+
+            {hasNested && nestedExpanded ? (
+              <NestedNavList
+                items={child.children!}
+                depth={depth + 1}
+                activeChildId={activeChildId}
+                expandedIds={expandedIds}
+                onToggleExpandId={onToggleExpandId}
+                onClick={onClick}
+              />
+            ) : null}
+          </li>
+        )
+      })}
+    </ul>
+  )
 }
 
 export function SidebarNavItem({
@@ -33,6 +137,9 @@ export function SidebarNavItem({
   nested = false,
   expanded = false,
   onToggleExpand,
+  activeChildId,
+  expandedIds,
+  onToggleExpandId,
 }: SidebarNavItemProps) {
   const Icon = item.icon
   const isExpandable = Boolean(item.children?.length) || item.chevron
@@ -93,29 +200,14 @@ export function SidebarNavItem({
       </button>
 
       {!collapsed && expanded && item.children && item.children.length > 0 ? (
-        <ul className="mt-0.5 space-y-0.5">
-          {item.children.map((child) => {
-            const ChildIcon = child.icon
-            return (
-              <li key={child.id}>
-                <button
-                  type="button"
-                  onClick={() => onClick(child.id)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-page"
-                >
-                  {ChildIcon ? (
-                    <ChildIcon
-                      size={17}
-                      strokeWidth={1.75}
-                      className="shrink-0 text-muted"
-                    />
-                  ) : null}
-                  <span className="truncate text-left">{child.label}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <NestedNavList
+          items={item.children}
+          depth={1}
+          activeChildId={activeChildId}
+          expandedIds={expandedIds}
+          onToggleExpandId={onToggleExpandId}
+          onClick={onClick}
+        />
       ) : null}
     </li>
   )

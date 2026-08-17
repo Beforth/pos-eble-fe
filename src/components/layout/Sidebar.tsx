@@ -2,18 +2,29 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BadgePercent,
+  BarChart3,
   BookOpen,
+  Calculator,
   ChevronsLeft,
   ChevronsRight,
   Clock3,
   CookingPot,
   FileCheck,
+  FileText,
   Globe,
+  History,
   LayoutDashboard,
   LogOut,
+  Megaphone,
+  MessageSquare,
+  Settings,
   ShoppingBag,
   SlidersHorizontal,
+  Star,
+  Store,
+  Truck,
   Upload,
+  Users,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
@@ -89,31 +100,250 @@ const NAV: NavEntry[] = [
   { kind: 'divider' },
   {
     kind: 'link',
+    item: { id: 'finance', label: 'Finance' },
+  },
+  { kind: 'divider' },
+  {
+    kind: 'link',
     item: {
-      id: 'marketing',
-      label: 'Marketing Automation',
-      badge: 'New',
+      id: 'reports',
+      label: 'Reports',
+      chevron: true,
+      children: [
+        {
+          id: 'day-end-summary',
+          label: 'Day End Summary',
+          icon: FileText,
+        },
+        {
+          id: 'other-reports',
+          label: 'Other Reports',
+          icon: History,
+        },
+        {
+          id: 'report-notification',
+          label: 'Report Notification',
+          icon: BarChart3,
+        },
+        {
+          id: 'delivery-management',
+          label: 'Delivery Management',
+          icon: Truck,
+        },
+      ],
     },
   },
   { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'finance', label: 'Finance', badge: 'New' },
+    item: {
+      id: 'management',
+      label: 'Management',
+      chevron: true,
+      children: [
+        {
+          id: 'mgmt-configuration',
+          label: 'Configuration',
+          icon: Settings,
+          chevron: true,
+          children: [
+            {
+              id: 'config-outlet',
+              label: 'Outlet Configuration',
+            },
+            {
+              id: 'config-sub-order-type',
+              label: 'Sub Order Type',
+            },
+            {
+              id: 'config-delivery-distance',
+              label: 'Delivery Distance',
+            },
+            {
+              id: 'config-area-locality-delivery',
+              label: 'Area/Locality Wise Delivery Charges',
+            },
+            {
+              id: 'config-floor-plan',
+              label: 'Floor Plan',
+            },
+            {
+              id: 'config-email-template',
+              label: 'Email Template Settings',
+            },
+          ],
+        },
+        {
+          id: 'mgmt-accounting',
+          label: 'Accounting',
+          icon: Calculator,
+          chevron: true,
+          children: [
+            {
+              id: 'acct-payments',
+              label: 'Payments',
+              chevron: true,
+              children: [
+                {
+                  id: 'acct-payment-information',
+                  label: 'Payment Information',
+                },
+                {
+                  id: 'acct-virtual-wallet',
+                  label: 'Virtual Wallet',
+                },
+              ],
+            },
+            {
+              id: 'acct-online-order-reconciliation',
+              label: 'Online Order Reconciliation',
+            },
+            {
+              id: 'acct-gst-information',
+              label: 'GST Information',
+            },
+            {
+              id: 'acct-utility-bills',
+              label: 'Utility Bills',
+            },
+            {
+              id: 'acct-expense-withdrawal',
+              label: 'Expense & Withdrawal',
+            },
+            {
+              id: 'acct-service-payment-history',
+              label: 'Service Payment History',
+            },
+            {
+              id: 'acct-loan-information',
+              label: 'Loan Information',
+            },
+            {
+              id: 'acct-denomination',
+              label: 'Denomination',
+            },
+          ],
+        },
+        {
+          id: 'mgmt-user-management',
+          label: 'User Management',
+          chevron: true,
+          children: [
+            {
+              id: 'user-mgmt-biller-app',
+              label: 'Biller App',
+            },
+          ],
+        },
+        {
+          id: 'mgmt-user-logs',
+          label: 'User Logs',
+          chevron: true,
+          children: [
+            {
+              id: 'user-logs-online-store',
+              label: 'Online Store Logs',
+            },
+            {
+              id: 'user-logs-online-item-on-off',
+              label: 'Online Item On/Off Logs',
+            },
+            {
+              id: 'user-logs-auto-accept-change',
+              label: 'Auto Accept Change Logs',
+            },
+            {
+              id: 'user-logs-support-mgmt',
+              label: 'Support Management',
+            },
+            {
+              id: 'user-logs-notification',
+              label: 'Notification',
+            },
+            {
+              id: 'user-logs-menu-trigger',
+              label: 'Menu Trigger Logs',
+            },
+            {
+              id: 'user-logs-closing-hour',
+              label: 'Closing Hour Logs',
+            },
+            {
+              id: 'user-logs-expense',
+              label: 'Expense Logs',
+            },
+            {
+              id: 'user-logs-withdrawal',
+              label: 'Withdrawal Logs',
+            },
+            {
+              id: 'user-logs-cash-top-up',
+              label: 'Cash Top-Up Logs',
+            },
+          ],
+        },
+        {
+          id: 'mgmt-explore-products',
+          label: 'Explore Products',
+          icon: Store,
+          chevron: true,
+          children: [
+            {
+              id: 'explore-products-marketplace',
+              label: 'Marketplace',
+            },
+            {
+              id: 'explore-products-marketplace-setting',
+              label: 'Marketplace Setting',
+            },
+          ],
+        },
+        {
+          id: 'mgmt-audit-trail',
+          label: 'Audit Trail',
+        },
+        {
+          id: 'mgmt-device-mapping',
+          label: 'Device Mapping',
+        },
+      ],
+    },
   },
   { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'reports', label: 'Reports', chevron: true },
-  },
-  { kind: 'divider' },
-  {
-    kind: 'link',
-    item: { id: 'management', label: 'Management', chevron: true },
-  },
-  { kind: 'divider' },
-  {
-    kind: 'link',
-    item: { id: 'crm', label: 'CRM', chevron: true },
+    item: {
+      id: 'crm',
+      label: 'CRM',
+      chevron: true,
+      children: [
+        {
+          id: 'crm-marketing',
+          label: 'Marketing',
+          icon: BarChart3,
+        },
+        {
+          id: 'crm-campaign',
+          label: 'Campaign',
+          icon: Megaphone,
+        },
+        {
+          id: 'crm-customers',
+          label: 'Customers',
+          icon: Users,
+        },
+        {
+          id: 'crm-feedback',
+          label: 'Feedback',
+          icon: MessageSquare,
+        },
+        {
+          id: 'crm-petpooja-loyalty',
+          label: 'Petpooja Loyalty',
+          icon: Star,
+        },
+      ],
+    },
   },
   { kind: 'divider' },
   {
@@ -131,6 +361,113 @@ const ROUTES: Record<string, string> = {
   'menu-discounts': '/menu',
   'menu-images-upload': '/menu/multi-item-images',
   inventory: '/inventory',
+  marketing: '/marketing',
+  finance: '/finance',
+  'day-end-summary': '/reports/day-end-summary',
+  'other-reports': '/reports/other-reports',
+  'report-notification': '/reports/report-notification',
+  'delivery-management': '/reports/delivery-management',
+  'mgmt-user-management': '/management/user-management',
+  'user-mgmt-biller-app': '/management/user-management/biller-app',
+  'mgmt-user-logs': '/management/user-logs/online-store',
+  'user-logs-online-store': '/management/user-logs/online-store',
+  'user-logs-online-item-on-off': '/management/user-logs/online-item-on-off',
+  'user-logs-auto-accept-change': '/management/user-logs/auto-accept-change',
+  'user-logs-support-mgmt': '/management/user-logs/support-management',
+  'user-logs-notification': '/management/user-logs/notification',
+  'user-logs-menu-trigger': '/management/user-logs/menu-trigger',
+  'user-logs-closing-hour': '/management/user-logs/closing-hour',
+  'user-logs-expense': '/management/user-logs/expense',
+  'user-logs-withdrawal': '/management/user-logs/withdrawal',
+  'user-logs-cash-top-up': '/management/user-logs/cash-top-up',
+  'mgmt-explore-products': '/management/explore-products/marketplace',
+  'explore-products-marketplace': '/management/explore-products/marketplace',
+  'explore-products-marketplace-setting':
+    '/management/explore-products/marketplace-setting',
+  'mgmt-audit-trail': '/management/audit-trail',
+  'mgmt-device-mapping': '/management/device-mapping',
+  'config-outlet': '/management/configuration/outlet',
+  'config-sub-order-type': '/management/configuration/sub-order-type',
+  'config-delivery-distance': '/management/configuration/delivery-distance',
+  'config-area-locality-delivery':
+    '/management/configuration/area-locality-delivery',
+  'config-floor-plan': '/management/configuration/floor-plan',
+  'config-email-template': '/management/configuration/email-template',
+  'acct-payment-information': '/management/accounting/payment-information',
+  'acct-virtual-wallet': '/management/accounting/virtual-wallet',
+  'acct-online-order-reconciliation':
+    '/management/accounting/online-order-reconciliation',
+  'acct-gst-information': '/management/accounting/gst-information',
+  'acct-utility-bills': '/management/accounting/utility-bills',
+  'acct-expense-withdrawal': '/management/accounting/expense-withdrawal',
+  'acct-service-payment-history':
+    '/management/accounting/service-payment-history',
+  'acct-loan-information': '/management/accounting/loan-information',
+  'acct-denomination': '/management/accounting/denomination',
+  crm: '/crm/crm_dashboard',
+  'crm-marketing': '/crm/crm_dashboard',
+  'crm-campaign': '/crm/campaign',
+  'crm-customers': '/crm/customers',
+  'crm-feedback': '/crm/feedback',
+  'crm-petpooja-loyalty': '/crm/petpooja-loyalty',
+}
+
+const AUTO_EXPAND_PARENTS: Record<string, string[]> = {
+  'crm-marketing': ['crm'],
+  'crm-campaign': ['crm'],
+  'crm-customers': ['crm'],
+  'crm-feedback': ['crm'],
+  'crm-petpooja-loyalty': ['crm'],
+  'menu-discounts': ['menu'],
+  'menu-images-upload': ['menu'],
+  'menu-on-off': ['menu'],
+  'day-end-summary': ['reports'],
+  'other-reports': ['reports'],
+  'report-notification': ['reports'],
+  'delivery-management': ['reports'],
+  'mgmt-user-management': ['management'],
+  'user-mgmt-biller-app': ['management', 'mgmt-user-management'],
+  'mgmt-user-logs': ['management'],
+  'user-logs-online-store': ['management', 'mgmt-user-logs'],
+  'user-logs-online-item-on-off': ['management', 'mgmt-user-logs'],
+  'user-logs-auto-accept-change': ['management', 'mgmt-user-logs'],
+  'user-logs-support-mgmt': ['management', 'mgmt-user-logs'],
+  'user-logs-notification': ['management', 'mgmt-user-logs'],
+  'user-logs-menu-trigger': ['management', 'mgmt-user-logs'],
+  'user-logs-closing-hour': ['management', 'mgmt-user-logs'],
+  'user-logs-expense': ['management', 'mgmt-user-logs'],
+  'user-logs-withdrawal': ['management', 'mgmt-user-logs'],
+  'user-logs-cash-top-up': ['management', 'mgmt-user-logs'],
+  'mgmt-explore-products': ['management'],
+  'explore-products-marketplace': ['management', 'mgmt-explore-products'],
+  'explore-products-marketplace-setting': [
+    'management',
+    'mgmt-explore-products',
+  ],
+  'mgmt-audit-trail': ['management'],
+  'mgmt-device-mapping': ['management'],
+  'mgmt-configuration': ['management'],
+  'mgmt-accounting': ['management'],
+  'acct-payments': ['management', 'mgmt-accounting'],
+  'config-outlet': ['management', 'mgmt-configuration'],
+  'config-sub-order-type': ['management', 'mgmt-configuration'],
+  'config-delivery-distance': ['management', 'mgmt-configuration'],
+  'config-area-locality-delivery': ['management', 'mgmt-configuration'],
+  'config-floor-plan': ['management', 'mgmt-configuration'],
+  'config-email-template': ['management', 'mgmt-configuration'],
+  'acct-payment-information': [
+    'management',
+    'mgmt-accounting',
+    'acct-payments',
+  ],
+  'acct-virtual-wallet': ['management', 'mgmt-accounting', 'acct-payments'],
+  'acct-online-order-reconciliation': ['management', 'mgmt-accounting'],
+  'acct-gst-information': ['management', 'mgmt-accounting'],
+  'acct-utility-bills': ['management', 'mgmt-accounting'],
+  'acct-expense-withdrawal': ['management', 'mgmt-accounting'],
+  'acct-service-payment-history': ['management', 'mgmt-accounting'],
+  'acct-loan-information': ['management', 'mgmt-accounting'],
+  'acct-denomination': ['management', 'mgmt-accounting'],
 }
 
 interface SidebarProps {
@@ -152,7 +489,22 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate()
   const { logout } = useAuth()
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
+    const parents = AUTO_EXPAND_PARENTS[activeItem]
+    return parents ? new Set(parents) : new Set()
+  })
+
+  useEffect(() => {
+    const parents = AUTO_EXPAND_PARENTS[activeItem]
+    if (!parents?.length) return
+    setExpandedIds((prev) => {
+      const missing = parents.filter((id) => !prev.has(id))
+      if (missing.length === 0) return prev
+      const next = new Set(prev)
+      missing.forEach((id) => next.add(id))
+      return next
+    })
+  }, [activeItem])
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -266,15 +618,24 @@ export function Sidebar({
                     active={
                       activeItem === entry.item.id ||
                       Boolean(
-                        entry.item.children?.some(
-                          (child) => child.id === activeItem,
-                        ),
+                        entry.item.children?.some((child) => {
+                          if (child.id === activeItem) return true
+                          return child.children?.some((grand) => {
+                            if (grand.id === activeItem) return true
+                            return grand.children?.some(
+                              (leaf) => leaf.id === activeItem,
+                            )
+                          })
+                        }),
                       )
                     }
+                    activeChildId={activeItem}
                     collapsed={collapsed}
                     onClick={handleNavigate}
                     expanded={expandedIds.has(entry.item.id)}
                     onToggleExpand={() => toggleExpanded(entry.item.id)}
+                    expandedIds={expandedIds}
+                    onToggleExpandId={toggleExpanded}
                   />
                 )
               }

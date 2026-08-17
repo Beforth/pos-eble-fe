@@ -28,6 +28,7 @@ import {
 } from '../../mocks/menuItemsData'
 import { billingTables } from '../../mocks/billingTables'
 import {
+  labelForOrderType,
   kotTicketAmount,
   nextKotNoForTable,
   ticketsForTable,
@@ -504,6 +505,14 @@ export default function Billing() {
     [lines],
   )
 
+  const selectedQtyByItemId = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const line of lines) {
+      map[line.itemId] = (map[line.itemId] ?? 0) + line.qty
+    }
+    return map
+  }, [lines])
+
   const kotTotal = useMemo(
     () => tableKotSummary.reduce((sum, k) => sum + k.amount, 0),
     [tableKotSummary],
@@ -529,13 +538,22 @@ export default function Billing() {
   ): KotTicket | null {
     if (sourceLines.length === 0) return null
     const table = billingTables.find((t) => t.id === tableId)
-    const kotKey = tableId || 'no-table'
+    const kotKey = tableId || `order-${orderType}-${Date.now()}`
     const kotNo = nextKotNoForTable(kotTickets, kotKey)
+    const displayTableNo =
+      table?.tableNo ??
+      (orderType === 'delivery'
+        ? 'Delivery'
+        : orderType === 'pick-up'
+          ? 'Pick Up'
+          : orderType === 'other'
+            ? 'Other'
+            : 'Counter')
     return {
       id: `kot-${kotKey}-${kotNo}-${Date.now()}`,
       kotNo,
-      tableId: kotKey,
-      tableNo: table?.tableNo ?? 'NT',
+      tableId: tableId || 'no-table',
+      tableNo: displayTableNo,
       orderType,
       biller: 'biller (biller)',
       persons: guests > 0 ? guests : table?.persons ?? 0,
@@ -544,6 +562,7 @@ export default function Billing() {
       note: note?.trim() || undefined,
       items: sourceLines.map((line) => ({
         id: line.id,
+        itemId: line.itemId,
         name: line.name,
         qty: line.qty,
         price: line.price,
@@ -753,10 +772,6 @@ export default function Billing() {
         showToast('Add items before sending KOT')
         return
       }
-      if (!hasTableSelected) {
-        showToast('Select a table before sending KOT')
-        return
-      }
       if (payment === 'due' && !isCustomerComplete(customer)) {
         setCustomerFormOpen(true)
         setShowCustomerErrors(true)
@@ -772,12 +787,15 @@ export default function Billing() {
       setKotTickets(next)
       setLines([])
       setOrderNote('')
+      const destLabel = ticket.tableNo ? `${ticket.tableNo}` : labelForOrderType(ticket.orderType)
       showToast(
         action === 'KOT & Print'
-          ? `Table ${ticket.tableNo} · KOT ${ticket.kotNo} sent · Print started`
-          : `Table ${ticket.tableNo} · KOT ${ticket.kotNo} sent`,
+          ? `${destLabel} · KOT ${ticket.kotNo} sent · Print started`
+          : `${destLabel} · KOT ${ticket.kotNo} sent`,
       )
-      navigate('/table-view')
+      if (hasTableSelected) {
+        navigate('/table-view')
+      }
       return
     }
 
@@ -1006,6 +1024,7 @@ export default function Billing() {
               name: c.name,
             }))}
             onAddItem={addItem}
+            selectedQtyByItemId={selectedQtyByItemId}
             showFavoriteHeart={railCategoryId === FAVORITES_ID}
             showOpenItem={railCategoryId === FAVORITES_ID}
             onOpenItemClick={() => setOpenItemModalOpen(true)}

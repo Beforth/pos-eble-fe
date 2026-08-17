@@ -126,7 +126,7 @@ export default function BaseMenu({
   const isSchedule = mode === 'schedule'
   const channel = MENU_CHANNELS[channelId]
   const navigate = useNavigate()
-  const [categoryId, setCategoryId] = useState(baseMenuCategories[0].id)
+  const [categoryId, setCategoryId] = useState<string>(baseMenuCategories[0].id)
   const [query, setQuery] = useState('')
   const [rankWise, setRankWise] = useState(false)
   const [hideEmpty, setHideEmpty] = useState(false)

@@ -111,12 +111,41 @@ export function loadAllKotTickets(): KotTicket[] {
 
 export function saveAllKotTickets(tickets: KotTicket[]): void {
   localStorage.setItem(KOT_KEY, JSON.stringify(tickets))
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pos-eble-all-kot-tickets', { detail: tickets }))
+    try {
+      const channel = new BroadcastChannel('pos-eble-kot-sync')
+      channel.postMessage({ type: 'tickets_updated', tickets })
+      channel.close()
+    } catch {
+      // BroadcastChannel optional fallback
+    }
+  }
+}
+
+export function updateKotTicketStatus(
+  ticketId: string,
+  status: 'active' | 'ready',
+): KotTicket[] {
+  const current = loadAllKotTickets()
+  const next = current.map((ticket) =>
+    ticket.id === ticketId ? { ...ticket, status } : ticket,
+  )
+  saveAllKotTickets(next)
+  return next
+}
+
+export function removeKotTicket(ticketId: string): KotTicket[] {
+  const current = loadAllKotTickets()
+  const next = current.filter((ticket) => ticket.id !== ticketId)
+  saveAllKotTickets(next)
+  return next
 }
 
 export function appendKotTicket(ticket: KotTicket): KotTicket[] {
   const next = [...loadAllKotTickets(), ticket]
   saveAllKotTickets(next)
-  if (ticket.tableId !== 'no-table') {
+  if (ticket.tableId && ticket.tableId !== 'no-table') {
     const tableTickets = next.filter((t) => t.tableId === ticket.tableId)
     const amount = tableTickets.reduce((sum, t) => sum + kotTicketAmount(t), 0)
     upsertTableSession(ticket.tableId, {

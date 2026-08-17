@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -16,6 +17,27 @@ import {
   Wrench,
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
+
+const INVENTORY_REPORT_ROUTES: Record<string, string> = {
+  'consumption-summary': '/inventory/other-reports/consumption-summary',
+  'opening-closing': '/inventory/other-reports/opening-closing',
+  'food-costing': '/inventory/other-reports/food-costing',
+  'recipe-costing': '/inventory/other-reports/recipe-costing',
+  'material-purchase': '/inventory/other-reports/material-purchase',
+  'supplier-payment': '/inventory/other-reports/supplier-payment',
+  'material-transfer': '/inventory/other-reports/material-transfer',
+  'transfer-payment': '/inventory/other-reports/transfer-payment',
+  'purchase-sales-return': '/inventory/other-reports/purchase-sales-return',
+  'manual-stock-entry': '/inventory/other-reports/manual-stock-entry',
+  'stock-report-timewise': '/inventory/other-reports/stock-report-timewise',
+  'sales-transfer-variance': '/inventory/other-reports/sales-transfer-variance',
+  'raised-po-variance': '/inventory/other-reports/raised-po-variance',
+  'purchase-order-received': '/inventory/other-reports/purchase-order-received',
+  'semi-finished-food-costing':
+    '/inventory/other-reports/semi-finished-food-costing',
+  'payment-ledger': '/inventory/other-reports/payment-ledger',
+  'expiry-batchwise': '/inventory/other-reports/expiry-batchwise',
+}
 
 type ReportTabId =
   | 'bookmarked'
@@ -230,7 +252,10 @@ function ReportCard({
   onView: () => void
 }) {
   return (
-    <article className="flex h-full flex-col rounded-xl border border-line bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
+    <article
+      onClick={onView}
+      className="group flex h-full cursor-pointer flex-col rounded-xl border border-line bg-card p-4 shadow-sm transition-all hover:border-primary/50 hover:bg-page/40 hover:shadow-md"
+    >
       <div className="mb-3 flex items-start gap-3">
         <span
           className={`inline-flex size-10 shrink-0 items-center justify-center rounded-full ${report.iconClassName}`}
@@ -239,11 +264,16 @@ function ReportCard({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-semibold text-ink">{report.title}</h3>
+            <h3 className="text-sm font-semibold text-ink group-hover:text-primary">
+              {report.title}
+            </h3>
             <button
               type="button"
               aria-label={bookmarked ? 'Remove bookmark' : 'Add bookmark'}
-              onClick={onToggleBookmark}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleBookmark()
+              }}
               className="shrink-0 rounded p-0.5 text-secondary hover:bg-page"
             >
               <Star
@@ -261,10 +291,13 @@ function ReportCard({
       <div className="mt-auto flex justify-end pt-2">
         <button
           type="button"
-          onClick={onView}
-          className="text-sm font-medium text-primary hover:underline"
+          onClick={(e) => {
+            e.stopPropagation()
+            onView()
+          }}
+          className="text-sm font-semibold text-primary hover:underline"
         >
-          View Report
+          View Report →
         </button>
       </div>
     </article>
@@ -272,6 +305,7 @@ function ReportCard({
 }
 
 export default function OtherReports() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<ReportTabId>('bookmarked')
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(REPORTS.map((report) => [report.id, Boolean(report.bookmarked)])),
@@ -290,6 +324,13 @@ export default function OtherReports() {
   function showToast(message: string) {
     setToast(message)
     window.setTimeout(() => setToast(null), 2200)
+  }
+
+  function openReport(report: ReportItem) {
+    const route =
+      INVENTORY_REPORT_ROUTES[report.id] ||
+      `/inventory/other-reports/${report.id}`
+    navigate(route)
   }
 
   function toggleBookmark(id: string) {
@@ -357,7 +398,7 @@ export default function OtherReports() {
               report={report}
               bookmarked={Boolean(bookmarks[report.id])}
               onToggleBookmark={() => toggleBookmark(report.id)}
-              onView={() => showToast(`Opening ${report.title}`)}
+              onView={() => openReport(report)}
             />
           ))}
         </div>

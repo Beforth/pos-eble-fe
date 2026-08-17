@@ -30,7 +30,7 @@ export default function PlaceholderPage() {
         <span className="text-sm font-bold text-ink">{brand.shortName}</span>
         <button
           type="button"
-          onClick={() => navigate('/billing')}
+          onClick={() => navigate('/dashboard')}
           className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page"
         >
           <ArrowLeft size={14} />

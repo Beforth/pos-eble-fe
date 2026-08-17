@@ -43,7 +43,9 @@ export default function TableView() {
       list.push(table)
       map.set(table.areaName, list)
     }
-    const ordered = AREA_ORDER.filter((name) => map.has(name)).map((name) => ({
+    const ordered: { name: string; tables: typeof billingTables }[] = AREA_ORDER.filter(
+      (name) => map.has(name),
+    ).map((name) => ({
       name,
       tables: map.get(name) ?? [],
     }))

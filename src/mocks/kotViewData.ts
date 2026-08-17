@@ -2,6 +2,8 @@ export type KotViewOrderType = 'dine-in' | 'delivery' | 'pick-up' | 'other'
 
 export interface KotViewItem {
   id: string
+  /** Menu item id (when sourced from the menu) — used to map back to category. */
+  itemId?: string
   name: string
   qty: number
   price: number

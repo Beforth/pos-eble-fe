@@ -1,0 +1,152 @@
+export interface FinanceExpense {
+  id: string
+  expenseDate: string
+  description: string
+  amount: number
+  category: string
+  status: 'Active' | 'Inactive'
+  type: 'Expense' | 'Withdrawal' | 'Cash Top up'
+  paidFrom: string
+  billingUser: string
+}
+
+export const FINANCE_EXPENSES: FinanceExpense[] = [
+  {
+    id: '1',
+    expenseDate: '2026-08-11',
+    description: 'CHAI',
+    amount: 68,
+    category: 'Chai',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '2',
+    expenseDate: '2026-08-11',
+    description: 'FOR PIZZA BASE',
+    amount: 200,
+    category: 'Cash to Mustak Bhai',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '3',
+    expenseDate: '2026-08-11',
+    description: 'MANISH BHAI',
+    amount: 110,
+    category: 'Other',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '4',
+    expenseDate: '2026-08-10',
+    description: 'VEGETABLES',
+    amount: 850,
+    category: 'Grocery',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '5',
+    expenseDate: '2026-08-10',
+    description: 'GAS CYLINDER',
+    amount: 1450,
+    category: 'Utilities',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '6',
+    expenseDate: '2026-08-09',
+    description: 'STAFF TEA',
+    amount: 120,
+    category: 'Chai',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '7',
+    expenseDate: '2026-08-09',
+    description: 'PACKAGING',
+    amount: 640,
+    category: 'Packaging',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '8',
+    expenseDate: '2026-08-08',
+    description: 'CLEANING MATERIAL',
+    amount: 320,
+    category: 'Other',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '9',
+    expenseDate: '2026-08-08',
+    description: 'MILK',
+    amount: 280,
+    category: 'Dairy',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '10',
+    expenseDate: '2026-08-07',
+    description: 'PETROL',
+    amount: 500,
+    category: 'Transport',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '11',
+    expenseDate: '2026-08-07',
+    description: 'NAPKINS',
+    amount: 180,
+    category: 'Packaging',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+  {
+    id: '12',
+    expenseDate: '2026-08-06',
+    description: 'MAINTENANCE',
+    amount: 900,
+    category: 'Other',
+    status: 'Active',
+    type: 'Expense',
+    paidFrom: 'From Cash',
+    billingUser: '—',
+  },
+]
+
+export const EXPENSE_SUMMARY = {
+  expense: { amount: 29810, count: 48 },
+  withdrawal: { amount: 0, count: 0 },
+  cashTopUp: { amount: 0, count: 0 },
+}

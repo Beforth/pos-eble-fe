@@ -1,0 +1,188 @@
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, FileText, Search } from 'lucide-react'
+import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
+import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { OutlineButton } from '../../components/menu/MenuActionButtons'
+
+const TYPE_OPTIONS = [
+  'With Purchase Order',
+  'With Direct Sales / Transfer',
+]
+
+const FROM_OPTIONS = [
+  'All',
+  'Local Suppliers',
+  'Wholesale Market',
+  'Dairy Vendors',
+  'Other Restaurant',
+]
+
+function ExportMenu({
+  onExportPage,
+  onExportAll,
+}: {
+  onExportPage?: () => void
+  onExportAll?: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
+      >
+        <FileText size={15} className="text-muted" />
+        Export
+        <ChevronDown size={14} className="text-muted" />
+      </button>
+      {open ? (
+        <ul className="absolute right-0 z-40 mt-1.5 min-w-[180px] overflow-hidden rounded-md border border-line bg-card py-1 shadow-lg">
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                onExportPage?.()
+                setOpen(false)
+              }}
+              className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
+            >
+              Export Current Page
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                onExportAll?.()
+                setOpen(false)
+              }}
+              className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
+            >
+              Export All
+            </button>
+          </li>
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+export default function SalesTransferVarianceReport() {
+  const [fromDate, setFromDate] = useState('2026-08-11')
+  const [toDate, setToDate] = useState('2026-08-11')
+  const [type, setType] = useState('With Purchase Order')
+  const [from, setFrom] = useState('All')
+  const [toast, setToast] = useState<string | null>(null)
+
+  function showToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(null), 2200)
+  }
+
+  function handleClear() {
+    setFromDate('2026-08-11')
+    setToDate('2026-08-11')
+    setType('With Purchase Order')
+    setFrom('All')
+  }
+
+  return (
+    <InventoryPageShell activeItem="other-reports">
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+          {toast}
+        </div>
+      ) : null}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-lg font-bold text-ink">
+          Sales And Transfer Variance Report
+        </h1>
+        <ExportMenu
+          onExportPage={() => showToast('Exported current page')}
+          onExportAll={() => showToast('Exported all')}
+        />
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink">
+            From Date
+          </label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(event) => setFromDate(event.target.value)}
+            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink">
+            To Date
+          </label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(event) => setToDate(event.target.value)}
+            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+          />
+        </div>
+        <div className="min-w-[220px]">
+          <SearchableSelect
+            label="Type"
+            value={type}
+            options={TYPE_OPTIONS}
+            placeholder="With Purchase Order"
+            searchPlaceholder="Search"
+            includePlaceholderOption={false}
+            onChange={setType}
+          />
+        </div>
+        <div className="min-w-[140px]">
+          <SearchableSelect
+            label="From"
+            value={from}
+            options={FROM_OPTIONS}
+            placeholder="All"
+            searchPlaceholder="Search"
+            includePlaceholderOption={false}
+            onChange={setFrom}
+          />
+        </div>
+        <OutlineButton onClick={() => showToast('Search applied')}>
+          Search
+        </OutlineButton>
+        <OutlineButton variant="gray" onClick={handleClear}>
+          Clear
+        </OutlineButton>
+      </div>
+
+      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+        <span className="relative mb-4 text-muted">
+          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
+          <Search
+            size={24}
+            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+          />
+        </span>
+        <p className="text-base font-semibold text-ink">
+          Sales And Transfer Variance Report Record Not Found
+        </p>
+      </div>
+    </InventoryPageShell>
+  )
+}

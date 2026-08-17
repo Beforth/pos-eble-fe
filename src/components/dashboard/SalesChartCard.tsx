@@ -17,6 +17,7 @@ import type { ChannelKey, ChartPoint, ChartStatus } from '../../types'
 import { theme } from '../../theme/colors'
 import { formatINR, formatINRCompact, formatNumber } from '../../utils/format'
 import { Card } from '../common/Card'
+import { DatePickerPill, type DateRangeOption } from '../common/DatePickerPill'
 
 type ChartKind = 'line' | 'area' | 'column'
 
@@ -207,6 +208,11 @@ interface SalesChartCardProps {
   status: ChartStatus
   channels?: ChannelDef[]
   totalOrders: number
+  options?: DateRangeOption[]
+  value?: string
+  onSelect?: (value: string) => void
+  customLabel?: string
+  onCustomRange?: (from: string, to: string) => void
   className?: string
 }
 
@@ -215,6 +221,11 @@ export function SalesChartCard({
   status,
   channels = DEFAULT_CHANNELS,
   totalOrders,
+  options,
+  value,
+  onSelect,
+  customLabel,
+  onCustomRange,
   className = '',
 }: SalesChartCardProps) {
   const [chartKind, setChartKind] = useState<ChartKind>('area')
@@ -267,6 +278,15 @@ export function SalesChartCard({
             </span>
           </span>
           <ChartTypeDropdown value={chartKind} onChange={setChartKind} />
+          {options && value && onSelect && (
+            <DatePickerPill
+              options={options}
+              value={value}
+              onSelect={onSelect}
+              customLabel={customLabel}
+              onCustomRange={onCustomRange}
+            />
+          )}
         </div>
       }
       className={`overflow-hidden ${className}`}

@@ -50,7 +50,7 @@ const SEED_CUSTOMER_HISTORY: Record<string, CustomerHistoryOrder[]> = {
   ],
 }
 
-export type OrderType = 'dine-in' | 'delivery' | 'pick-up'
+export type OrderType = 'dine-in' | 'delivery' | 'pick-up' | 'other'
 export type PaymentMethod = 'cash' | 'card' | 'due' | 'other' | 'part'
 
 export interface CartLine {
@@ -1219,7 +1219,7 @@ export function BillPanel({
                     : 'bg-primary text-white hover:bg-primary-hover'
                 }`}
               >
-                {action.icon ? <FilePenLine size={13} /> : null}
+                {action.id === 'Draft' ? <FilePenLine size={13} /> : null}
                 {action.label}
               </button>
             ))}

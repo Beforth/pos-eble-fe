@@ -162,7 +162,7 @@ export function ChangePaymentModal({
   const paymentError = attempted && !payment
   const reasonError = attempted && !reason.trim()
 
-  function handleSave() {
+  const handleSave = () => {
     setAttempted(true)
     if (!payment || !reason.trim()) return
     onSave(order.id, payment, reason.trim())

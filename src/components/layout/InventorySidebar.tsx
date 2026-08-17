@@ -51,7 +51,7 @@ interface NavBranch {
 }
 
 const INVENTORY_ROUTES: Record<string, string> = {
-  'back-billing': '/billing',
+  'back-billing': '/dashboard',
   dashboard: '/inventory',
   'stock-purchase': '/inventory/purchase',
   'purchase-order': '/inventory/purchase-order',

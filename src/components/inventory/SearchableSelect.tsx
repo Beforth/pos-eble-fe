@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronDown, Search } from 'lucide-react'
 
 interface SearchableSelectProps {
-  label: ReactNode
+  label?: ReactNode
   required?: boolean
   value: string
   options: string[]
@@ -12,6 +12,8 @@ interface SearchableSelectProps {
   includePlaceholderOption?: boolean
   /** Prefer opening the menu above the trigger (useful near page bottom). */
   dropdownPlacement?: 'below' | 'above'
+  /** Compact trigger height for dense tables/forms. */
+  compact?: boolean
   onChange: (value: string) => void
 }
 
@@ -24,6 +26,7 @@ export function SearchableSelect({
   searchPlaceholder = 'Search',
   includePlaceholderOption = false,
   dropdownPlacement = 'below',
+  compact = false,
   onChange,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
@@ -95,17 +98,21 @@ export function SearchableSelect({
 
   return (
     <div ref={rootRef}>
-      <label className="mb-1.5 flex items-center gap-1 text-sm font-medium text-ink">
-        {label}
-        {required ? <span className="text-primary"> *</span> : null}
-      </label>
+      {label ? (
+        <label className="mb-1.5 flex items-center gap-1 text-sm font-medium text-ink">
+          {label}
+          {required ? <span className="text-primary"> *</span> : null}
+        </label>
+      ) : null}
       <div className="relative">
         <button
           type="button"
           aria-haspopup="listbox"
           aria-expanded={open}
           onClick={() => setOpen((prev) => !prev)}
-          className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-line bg-card px-3 text-left text-sm outline-none hover:bg-page focus:border-primary"
+          className={`flex w-full items-center justify-between gap-2 rounded-md border border-line bg-card px-3 text-left outline-none hover:bg-page focus:border-primary ${
+            compact ? 'h-8 text-xs' : 'h-10 text-sm'
+          }`}
         >
           <span className={value ? 'truncate text-ink' : 'truncate text-muted'}>
             {value || placeholder}

@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type { ReactNode } from 'react'
 import type { OrdersChartPoint } from '../../mocks/allOrdersData'
 import { formatNumber } from '../../utils/format'
 
@@ -43,7 +44,7 @@ function ChartTip({ active, label, payload }: TipProps) {
 function valueLabel(props: {
   x?: number | string
   y?: number | string
-  value?: number | string
+  value?: ReactNode
 }) {
   const { x, y, value } = props
   if (x == null || y == null || value == null) return null
