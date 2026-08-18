@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { List, Percent, SplitSquareHorizontal, X } from 'lucide-react'
+import { List, Percent, SplitSquareHorizontal, Trash2, X } from 'lucide-react'
 import type { CartLine } from './BillPanel'
 
 type SplitTab = 'portion' | 'percentage' | 'item'
@@ -172,6 +172,13 @@ export function SplitBillModal({
         index === partIndex ? ids.filter((id) => id !== lineId) : ids,
       ),
     )
+  }
+
+  function removePart(partIndex: number) {
+    setParts((prev) => {
+      if (prev.length <= 2) return prev
+      return prev.filter((_, index) => index !== partIndex)
+    })
   }
 
   function handleSave() {
@@ -428,11 +435,23 @@ export function SplitBillModal({
                         Add
                       </button>
                       <span>Part {partIndex + 1}</span>
-                      {itemSplitAmounts[partIndex] > 0 ? (
-                        <span className="ml-auto text-xs font-medium">
-                          ₹{itemSplitAmounts[partIndex].toFixed(2)}
-                        </span>
-                      ) : null}
+                      <span className="ml-auto flex items-center gap-2">
+                        {itemSplitAmounts[partIndex] > 0 ? (
+                          <span className="text-xs font-medium">
+                            ₹{itemSplitAmounts[partIndex].toFixed(2)}
+                          </span>
+                        ) : null}
+                        {parts.length > 2 ? (
+                          <button
+                            type="button"
+                            aria-label={`Delete Part ${partIndex + 1}`}
+                            onClick={() => removePart(partIndex)}
+                            className="rounded p-0.5 text-white/90 hover:bg-white/20 hover:text-white"
+                          >
+                            <Trash2 size={15} strokeWidth={2.25} />
+                          </button>
+                        ) : null}
+                      </span>
                     </div>
                     <ul className="min-h-[72px] divide-y divide-line bg-white">
                       {partIds.length === 0 ? (

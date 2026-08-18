@@ -12,6 +12,7 @@ interface DraftBillsModalProps {
   open: boolean
   onClose: () => void
   onResume: (draft: DraftBill) => void
+  onDraftsChange?: (count: number) => void
 }
 
 function formatWhen(ts: number): string {
@@ -36,13 +37,20 @@ export function DraftBillsModal({
   open,
   onClose,
   onResume,
+  onDraftsChange,
 }: DraftBillsModalProps) {
   const [drafts, setDrafts] = useState<DraftBill[]>([])
   const [search, setSearch] = useState('')
 
+  function reloadDrafts() {
+    const next = loadDraftBills()
+    setDrafts(next)
+    onDraftsChange?.(next.length)
+  }
+
   useEffect(() => {
     if (!open) return
-    setDrafts(loadDraftBills())
+    reloadDrafts()
     setSearch('')
   }, [open])
 
@@ -177,7 +185,7 @@ export function DraftBillsModal({
                       aria-label="Delete draft"
                       onClick={() => {
                         deleteDraftBill(draft.id)
-                        setDrafts(loadDraftBills())
+                        reloadDrafts()
                       }}
                       className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line text-muted hover:border-primary hover:text-primary"
                     >

@@ -24,6 +24,9 @@ export interface KotTicket {
   note?: string
   createdAt: number
   status: 'active' | 'ready'
+  customerName?: string
+  /** Customer-facing token (10–99). */
+  displayToken?: number
 }
 
 export const ORDER_TYPE_LEGEND: {

@@ -36,6 +36,8 @@ import ParcelMenu from './pages/ParcelMenu'
 import PlaceholderPage from './pages/PlaceholderPage'
 import Configuration from './pages/Configuration'
 import CurrentOrders from './pages/configuration/CurrentOrders'
+import Customers from './pages/customer-screen/Customers'
+import CustomerDisplay from './pages/customer-screen/CustomerDisplay'
 import CoverSizeReport from './pages/reports/CoverSizeReport'
 import TableView from './pages/TableView'
 import SwiggyMenu from './pages/SwiggyMenu'
@@ -1243,6 +1245,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <CurrentOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/configuration/customers"
+            element={
+              <ProtectedRoute>
+                <Customers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer-display"
+            element={
+              <ProtectedRoute>
+                <CustomerDisplay />
               </ProtectedRoute>
             }
           />

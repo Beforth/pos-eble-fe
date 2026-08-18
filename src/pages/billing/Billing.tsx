@@ -36,6 +36,7 @@ import {
 } from '../../mocks/kotViewData'
 import { getItemInitials, itemNameMatchesQuery } from '../../utils/itemSearch'
 import { recordCoverSize } from '../../utils/coverSizeStore'
+import { randomDisplayToken } from '../customer-screen/customerDisplayData'
 import {
   loadDraftBills,
   upsertDraftBill,
@@ -69,21 +70,28 @@ const EMPTY_CUSTOMER: CustomerDetails = {
   gstNo: '',
 }
 
+function normalizeCustomerMobile(value: string): string {
+  let digits = value.replace(/\D/g, '')
+  if (digits.startsWith('91') && digits.length > 10) {
+    digits = digits.slice(2)
+  }
+  return digits.slice(0, 10)
+}
+
 function isCustomerComplete(customer: CustomerDetails) {
+  const nameLen = customer.name.trim().length
   return (
-    customer.mobile.trim().length >= 10 &&
-    customer.name.trim().length > 0 &&
-    customer.address.trim().length > 0 &&
-    customer.locality.trim().length > 0
+    normalizeCustomerMobile(customer.mobile).length === 10 &&
+    nameLen >= 3 &&
+    nameLen <= 12
   )
 }
 
 function customerFieldErrors(customer: CustomerDetails) {
+  const nameLen = customer.name.trim().length
   return {
-    mobile: customer.mobile.trim().length < 10,
-    name: customer.name.trim().length === 0,
-    address: customer.address.trim().length === 0,
-    locality: customer.locality.trim().length === 0,
+    mobile: normalizeCustomerMobile(customer.mobile).length !== 10,
+    name: nameLen < 3 || nameLen > 12,
   }
 }
 
@@ -308,6 +316,12 @@ export default function Billing() {
   }
 
   function quickAddFromSearch() {
+    const q = search.trim().toLowerCase()
+    if (q === 'oi') {
+      setSearch('')
+      setOpenItemModalOpen(true)
+      return
+    }
     const item = findBySearchQuery(search)
     if (!item) {
       showToast('No matching item found')
@@ -319,6 +333,12 @@ export default function Billing() {
   }
 
   function quickAddFromShortCode() {
+    const code = shortCode.trim()
+    if (code === '00') {
+      setShortCode('')
+      setOpenItemModalOpen(true)
+      return
+    }
     const item = findByShortCode(shortCode)
     if (!item) {
       showToast('No item for this short code')
@@ -549,9 +569,13 @@ export default function Billing() {
           : orderType === 'other'
             ? 'Other'
             : 'Counter')
+    const displayToken = randomDisplayToken(
+      kotTickets.map((ticket) => ticket.displayToken).filter((n): n is number => n != null),
+    )
     return {
       id: `kot-${kotKey}-${kotNo}-${Date.now()}`,
       kotNo,
+      displayToken,
       tableId: tableId || 'no-table',
       tableNo: displayTableNo,
       orderType,
@@ -559,6 +583,7 @@ export default function Billing() {
       persons: guests > 0 ? guests : table?.persons ?? 0,
       createdAt: Date.now(),
       status: 'active',
+      customerName: customer.name.trim() || undefined,
       note: note?.trim() || undefined,
       items: sourceLines.map((line) => ({
         id: line.id,
@@ -799,7 +824,34 @@ export default function Billing() {
       return
     }
 
-    if (action === 'Save' || action === 'Save & Print' || action === 'Save & eBill') {
+    if (action === 'Save') {
+      if (lines.length === 0) {
+        showToast('Add items before saving to View KOT')
+        return
+      }
+      if (payment === 'due' && !isCustomerComplete(customer)) {
+        setCustomerFormOpen(true)
+        setShowCustomerErrors(true)
+        setCustomerErrors(customerFieldErrors(customer))
+        showToast('Customer details are compulsory for Due payment')
+        return
+      }
+
+      const ticket = createKotFromLines(lines, orderNote)
+      if (!ticket) return
+
+      const next = appendKotTicket(ticket)
+      setKotTickets(next)
+      setLines([])
+      setOrderNote('')
+      showToast(
+        `Table ${ticket.tableNo} · KOT ${ticket.kotNo} saved · opening View KOT`,
+      )
+      setKotViewOpen(true)
+      return
+    }
+
+    if (action === 'Save & Print' || action === 'Save & eBill') {
       startFinalBill(action)
       return
     }
@@ -999,7 +1051,7 @@ export default function Billing() {
           }}
         />
       ) : (
-      <div className="flex min-h-0 flex-1 flex-col gap-0 lg:flex-row lg:p-0">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:p-0">
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-card shadow-[0_1px_0_rgba(0,0,0,0.03)]">
           <CategoryRail
             categories={RAIL_CATEGORIES}
@@ -1026,7 +1078,11 @@ export default function Billing() {
             onAddItem={addItem}
             selectedQtyByItemId={selectedQtyByItemId}
             showFavoriteHeart={railCategoryId === FAVORITES_ID}
-            showOpenItem={railCategoryId === FAVORITES_ID}
+            showOpenItem={
+              railCategoryId === FAVORITES_ID ||
+              shortCode.trim() === '00' ||
+              search.trim().toLowerCase() === 'oi'
+            }
             onOpenItemClick={() => setOpenItemModalOpen(true)}
           />
         </div>
@@ -1087,7 +1143,10 @@ export default function Billing() {
           onCustomerFormOpenChange={setCustomerFormOpen}
           onNotesClick={() => setNotesOpen(true)}
           hasOrderNote={Boolean(orderNote.trim())}
-          onOpenDrafts={() => setDraftsOpen(true)}
+          onOpenDrafts={() => {
+            refreshDraftCount()
+            setDraftsOpen(true)
+          }}
           draftCount={draftCount}
         />
       </div>
@@ -1095,8 +1154,12 @@ export default function Billing() {
 
       <DraftBillsModal
         open={draftsOpen}
-        onClose={() => setDraftsOpen(false)}
+        onClose={() => {
+          setDraftsOpen(false)
+          refreshDraftCount()
+        }}
         onResume={resumeDraft}
+        onDraftsChange={setDraftCount}
       />
 
       <SaveDraftNameModal

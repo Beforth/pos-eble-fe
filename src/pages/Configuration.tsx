@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Sun,
   Table2,
+  Tv,
   Users,
   Wallet,
   WalletCards,
@@ -57,6 +58,13 @@ const CONFIG_TILES: ConfigTile[] = [
     id: 'customers',
     label: 'Customers',
     icon: <Users size={28} strokeWidth={1.5} />,
+    to: '/configuration/customers',
+  },
+  {
+    id: 'customer-display',
+    label: 'Customer Display',
+    icon: <Tv size={28} strokeWidth={1.5} />,
+    to: '/customer-display',
   },
   {
     id: 'cash-flow',

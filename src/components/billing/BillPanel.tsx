@@ -142,6 +142,18 @@ function fieldClass(error?: boolean) {
   }`
 }
 
+function normalizeMobileDigits(value: string): string {
+  let digits = value.replace(/\D/g, '')
+  if (digits.startsWith('91') && digits.length > 10) {
+    digits = digits.slice(2)
+  }
+  return digits.slice(0, 10)
+}
+
+function sanitizeCustomerName(value: string): string {
+  return value.slice(0, 12)
+}
+
 export function BillPanel({
   lines,
   tableKots = [],
@@ -320,7 +332,7 @@ export function BillPanel({
   }
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-l border-line bg-card lg:w-[380px] xl:w-[420px]">
+    <aside className="flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[380px] lg:border-l lg:border-t-0 xl:w-[420px]">
       {historyNotice ? (
         <div className="fixed bottom-5 right-5 z-[80] rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {historyNotice}
@@ -407,7 +419,9 @@ export function BillPanel({
           <Utensils size={16} />
           {selectedTable ? (
             <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-              {selectedTable.tableNo}
+              {selectedTable.areaName === 'Party Hall'
+                ? `P${selectedTable.tableNo.replace(/\D/g, '')}`
+                : selectedTable.tableNo}
             </span>
           ) : null}
         </button>
@@ -481,11 +495,9 @@ export function BillPanel({
           className="relative inline-flex size-9 items-center justify-center rounded-lg border border-line text-muted hover:bg-page hover:text-primary"
         >
           <FilePenLine size={16} />
-          {draftCount > 0 ? (
-            <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-              {draftCount > 9 ? '9+' : draftCount}
-            </span>
-          ) : null}
+          <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-0.5 text-[10px] font-bold text-white">
+            {draftCount > 99 ? '99+' : draftCount}
+          </span>
         </button>
         <button
           type="button"
@@ -498,9 +510,6 @@ export function BillPanel({
           <Trash2 size={14} />
           Delete All
         </button>
-        <span className="rounded-md bg-secondary px-2.5 py-1.5 text-xs font-bold text-deep">
-          {selectedTable?.areaName ?? 'Select Area'}
-        </span>
 
         {guestsPickerOpen ? (
           <div className="absolute left-0 right-0 top-full z-20 flex items-center justify-between gap-3 border-b border-line bg-[#f3f3f3] px-3 py-2.5 shadow-sm">
@@ -582,7 +591,8 @@ export function BillPanel({
               <div>
                 <p className="text-sm font-semibold text-ink">Customer details</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-                  Required for Due payment — all fields marked with * are compulsory
+                  Required for Due payment — mobile and name marked with * are
+                  compulsory
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-page p-0.5">
@@ -633,16 +643,30 @@ export function BillPanel({
                   Mobile
                   <RequiredMark />
                 </span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  value={customer.mobile}
-                  onChange={(e) => updateCustomer('mobile', e.target.value)}
-                  placeholder="10-digit mobile number"
-                  className={fieldClass(customerErrors?.mobile)}
-                  aria-required
-                  autoFocus
-                />
+                <div
+                  className={`flex h-9 overflow-hidden rounded-lg border bg-card focus-within:border-primary ${
+                    customerErrors?.mobile
+                      ? 'border-primary bg-primary/[0.03]'
+                      : 'border-line focus-within:bg-white'
+                  }`}
+                >
+                  <span className="inline-flex shrink-0 items-center border-r border-line bg-page px-2.5 text-sm font-semibold text-ink">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={normalizeMobileDigits(customer.mobile)}
+                    onChange={(e) =>
+                      updateCustomer('mobile', normalizeMobileDigits(e.target.value))
+                    }
+                    maxLength={10}
+                    placeholder="10-digit mobile"
+                    className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-ink outline-none placeholder:text-muted"
+                    aria-required
+                    autoFocus
+                  />
+                </div>
               </label>
 
               <label className="block">
@@ -653,7 +677,10 @@ export function BillPanel({
                 <input
                   type="text"
                   value={customer.name}
-                  onChange={(e) => updateCustomer('name', e.target.value)}
+                  onChange={(e) =>
+                    updateCustomer('name', sanitizeCustomerName(e.target.value))
+                  }
+                  maxLength={12}
                   placeholder="Customer name"
                   className={fieldClass(customerErrors?.name)}
                   aria-required
@@ -663,7 +690,6 @@ export function BillPanel({
               <label className="block">
                 <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">
                   Address
-                  <RequiredMark />
                 </span>
                 <div className="relative">
                   <input
@@ -671,8 +697,7 @@ export function BillPanel({
                     value={customer.address}
                     onChange={(e) => updateCustomer('address', e.target.value)}
                     placeholder="Full address"
-                    className={`pr-8 ${fieldClass(customerErrors?.address)}`}
-                    aria-required
+                    className={`pr-8 ${fieldClass()}`}
                   />
                   {customer.address ? (
                     <button
@@ -690,25 +715,20 @@ export function BillPanel({
               <label className="block">
                 <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">
                   Locality
-                  <RequiredMark />
                 </span>
                 <input
                   type="text"
                   value={customer.locality}
                   onChange={(e) => updateCustomer('locality', e.target.value)}
                   placeholder="Area / locality"
-                  className={fieldClass(customerErrors?.locality)}
-                  aria-required
+                  className={fieldClass()}
                 />
               </label>
             </div>
 
-            {(customerErrors?.mobile ||
-              customerErrors?.name ||
-              customerErrors?.address ||
-              customerErrors?.locality) && (
+            {(customerErrors?.mobile || customerErrors?.name) && (
               <p className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-2 text-xs font-medium text-primary">
-                Please fill all compulsory fields marked with *
+                Enter a valid 10-digit mobile and a name of 3–12 characters
               </p>
             )}
           </div>
@@ -722,7 +742,7 @@ export function BillPanel({
             <span className="w-7" />
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-y-auto">
+          <div className="relative min-h-0 flex-1 overflow-y-auto lg:flex-1" style={{ maxHeight: 'calc(100dvh - 56px - 56px - 220px)' }}>
             {!hasAnyItems ? (
               <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-2 px-4 text-center">
                 <Utensils size={48} className="text-line" strokeWidth={1} />
@@ -983,17 +1003,8 @@ export function BillPanel({
                 className="h-8 w-24 rounded-md border border-line bg-white px-2 text-right text-sm outline-none focus:border-primary"
               />
             </label>
-            <div className="flex items-center justify-between text-sm text-ink">
-              <span>
-                Tax{' '}
-                <button
-                  type="button"
-                  onClick={() => onAction('Tax')}
-                  className="text-xs font-semibold text-primary"
-                >
-                  More
-                </button>
-              </span>
+            <div className="flex items-center justify-between gap-2 text-sm text-ink">
+              <span>Tax</span>
               <span className="font-semibold">{money(0)}</span>
             </div>
             <div className="flex items-center justify-between text-sm text-ink">
