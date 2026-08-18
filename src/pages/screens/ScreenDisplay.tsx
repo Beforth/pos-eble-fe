@@ -25,11 +25,13 @@ import {
 } from '../../mocks/kotViewData'
 import { fetchScreen } from '../../services/screenService'
 import { getMenuItemById } from '../../mocks/menuItemsData'
+import { KOT_STORE_EVENT, loadAllKotTickets, updateKotTicketStatus } from '../../utils/tableStatusStore'
 import {
-  appendKotTicket,
-  loadAllKotTickets,
-  removeKotTicket,
-} from '../../utils/tableStatusStore'
+  isKotFullyReady,
+  loadReadyProgress,
+  markKotItemsReady,
+  pruneReadyProgress,
+} from '../../utils/kotPrepStore'
 import { upsertScreen } from '../../utils/screenStore'
 import { EditScreenModal } from '../../components/screens/EditScreenModal'
 
@@ -56,6 +58,7 @@ export default function ScreenDisplay() {
   const [screen, setScreen] = useState<KotScreen | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [tickets, setTickets] = useState<KotTicket[]>([])
+  const [readyByTicket, setReadyByTicket] = useState<Record<string, string[]>>({})
   const [now, setNow] = useState(Date.now())
   const [editOpen, setEditOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -84,7 +87,10 @@ export default function ScreenDisplay() {
   }, [loadScreenData])
 
   const refreshTickets = useCallback(() => {
-    setTickets(loadAllKotTickets())
+    const next = loadAllKotTickets()
+    pruneReadyProgress(next.map((ticket) => ticket.id))
+    setTickets(next)
+    setReadyByTicket(loadReadyProgress())
   }, [])
 
   useEffect(() => {
@@ -94,7 +100,8 @@ export default function ScreenDisplay() {
     const onStorage = (event: StorageEvent) => {
       if (
         event.key === 'pos-eble-all-kot-tickets' ||
-        event.key === 'pos-eble-kot-screens'
+        event.key === 'pos-eble-kot-screens' ||
+        event.key === 'pos-eble-kot-item-ready'
       ) {
         refreshTickets()
         loadScreenData()
@@ -109,6 +116,7 @@ export default function ScreenDisplay() {
     window.addEventListener('storage', onStorage)
     window.addEventListener('pos-eble-all-kot-tickets', onCustomEvent)
     window.addEventListener('pos-eble-kot-screens', onCustomEvent)
+    window.addEventListener(KOT_STORE_EVENT, onCustomEvent)
 
     let channel: BroadcastChannel | null = null
     try {
@@ -126,6 +134,7 @@ export default function ScreenDisplay() {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('pos-eble-all-kot-tickets', onCustomEvent)
       window.removeEventListener('pos-eble-kot-screens', onCustomEvent)
+      window.removeEventListener(KOT_STORE_EVENT, onCustomEvent)
       if (channel) channel.close()
     }
   }, [refreshTickets, loadScreenData])
@@ -138,15 +147,37 @@ export default function ScreenDisplay() {
   const filtered = useMemo(() => {
     if (!screen) return []
     const entries = sortKotTicketsForDisplay(tickets)
-      .map((ticket) => filterTicketForScreen(ticket, screen))
+      .map((ticket) => {
+        const readyIds = new Set(readyByTicket[ticket.id] ?? [])
+        const allItemsReady =
+          ticket.status === 'ready' ||
+          (ticket.items.length > 0 &&
+            ticket.items.every((item) => readyIds.has(item.id)))
+        if (allItemsReady) return null
+        const entry = filterTicketForScreen(ticket, screen)
+        if (!entry) return null
+        const items = entry.items.filter((item) => !readyIds.has(item.id))
+        if (items.length === 0) return null
+        const amount = items.reduce((sum, item) => sum + item.price * item.qty, 0)
+        return { ticket, items, amount }
+      })
       .filter((entry): entry is FilteredScreenTicket => entry !== null)
     return [...entries].reverse()
-  }, [tickets, screen])
+  }, [tickets, screen, readyByTicket])
 
-  function handleComplete(ticketId: string) {
-    const updated = removeKotTicket(ticketId)
-    setTickets(updated)
-    showToast('KOT completed / cleared')
+  function handleComplete(ticketId: string, itemIds: string[]) {
+    markKotItemsReady(ticketId, itemIds)
+    const ticket = loadAllKotTickets().find((row) => row.id === ticketId)
+    const fullyReady = Boolean(ticket && isKotFullyReady(ticket))
+    if (fullyReady) {
+      updateKotTicketStatus(ticketId, 'ready')
+    }
+    refreshTickets()
+    showToast(
+      fullyReady
+        ? 'All stations done — order ready'
+        : 'Station done — waiting for other categories',
+    )
   }
 
   function handleEnableAllCategories() {
@@ -159,40 +190,6 @@ export default function ScreenDisplay() {
     })
     setScreen(updated)
     showToast('Screen updated: Showing all categories')
-  }
-
-  function handleCreateSampleKot() {
-    const sample: KotTicket = {
-      id: `kot-T1-1-${Date.now()}`,
-      kotNo: 1,
-      tableId: 't1',
-      tableNo: 'T1',
-      orderType: 'dine-in',
-      biller: 'biller (biller)',
-      persons: 2,
-      createdAt: Date.now(),
-      status: 'active',
-      items: [
-        {
-          id: `line-i1-${Date.now()}`,
-          itemId: 'i1',
-          name: 'Paani Puri',
-          qty: 2,
-          price: 78.9,
-        },
-        {
-          id: `line-i8-${Date.now() + 1}`,
-          itemId: 'i8',
-          name: 'Regular Dabeli',
-          qty: 1,
-          price: 40,
-        },
-      ],
-      note: 'Extra spicy',
-    }
-    const next = appendKotTicket(sample)
-    setTickets(next)
-    showToast('Demo KOT created for Table T1')
   }
 
   if (notFound) {
@@ -384,14 +381,6 @@ export default function ScreenDisplay() {
                 <Plus size={14} />
                 Go to Billing & Place Order
               </Link>
-              <button
-                type="button"
-                onClick={handleCreateSampleKot}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-xs font-semibold text-ink hover:bg-page"
-              >
-                <Sparkles size={14} className="text-primary" />
-                Add Demo KOT
-              </button>
             </div>
           ) : null}
 
@@ -466,7 +455,9 @@ export default function ScreenDisplay() {
                       <p className="text-sm font-bold leading-tight">
                         {ticket.tableNo} {labelForOrderType(ticket.orderType)}
                       </p>
-                      <p className="mt-0.5 opacity-90">KOT #{ticket.kotNo}</p>
+                      <p className="mt-0.5 opacity-90">
+                        Token {ticket.displayToken ?? ticket.kotNo} · KOT #{ticket.kotNo}
+                      </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-0.5">
                       <p className="font-mono tabular-nums">
@@ -528,9 +519,14 @@ export default function ScreenDisplay() {
                     <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-line pt-2">
                       <button
                         type="button"
-                        onClick={() => handleComplete(ticket.id)}
+                        onClick={() =>
+                          handleComplete(
+                            ticket.id,
+                            items.map((item) => item.id),
+                          )
+                        }
                         className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-line bg-page px-2.5 text-xs font-semibold text-muted hover:bg-card hover:text-primary"
-                        title="Clear from kitchen screen"
+                        title="Mark this station done"
                       >
                         <CheckCheck size={14} />
                         Done

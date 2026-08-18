@@ -6,6 +6,12 @@ const STATUS_KEY = 'pos-eble-table-floor-statuses'
 const SESSION_KEY = 'pos-eble-table-sessions'
 const KOT_KEY = 'pos-eble-all-kot-tickets'
 
+export const KOT_STORE_EVENT = 'pos-eble-kot-store'
+
+function emitKotStoreChange() {
+  window.dispatchEvent(new Event(KOT_STORE_EVENT))
+}
+
 export interface TableSession {
   tableId: string
   tableNo: string
@@ -111,6 +117,7 @@ export function loadAllKotTickets(): KotTicket[] {
 
 export function saveAllKotTickets(tickets: KotTicket[]): void {
   localStorage.setItem(KOT_KEY, JSON.stringify(tickets))
+  emitKotStoreChange()
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('pos-eble-all-kot-tickets', { detail: tickets }))
     try {

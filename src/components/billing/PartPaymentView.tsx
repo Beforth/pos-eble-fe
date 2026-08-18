@@ -4,6 +4,7 @@ import {
   FileText,
   Clock3,
   Coins,
+  MessageSquare,
   Wallet,
   X,
 } from 'lucide-react'
@@ -27,8 +28,22 @@ interface PartPaymentViewProps {
   onEBill?: () => void
 }
 
-const OTHER_OPTIONS = ['Google Pay', 'Paytm', 'Cheque'] as const
-const WALLET_OPTIONS = ['Paytm', 'PhonePe', 'Amazon Pay'] as const
+const OTHER_OPTIONS = [
+  'Google Pay',
+  'PhonePe',
+  'Paytm',
+  'BharatPe',
+  'Amazon Pay',
+  'CRED Pay',
+  'Cheque',
+] as const
+const WALLET_OPTIONS = ['Paytm', 'PhonePe', 'Amazon Pay', 'Mobikwik'] as const
+
+interface ToastEntry {
+  id: string
+  lines: string[]
+}
+
 
 const TABS: {
   id: PartMethodTab
@@ -51,11 +66,12 @@ export function PartPaymentView({
 }: PartPaymentViewProps) {
   const [tab, setTab] = useState<PartMethodTab>('card')
   const [amount, setAmount] = useState(String(payableAmount || ''))
-  const [otherType, setOtherType] = useState<(typeof OTHER_OPTIONS)[number]>('Paytm')
+  const [otherType, setOtherType] = useState<(typeof OTHER_OPTIONS)[number]>('Google Pay')
   const [walletType, setWalletType] = useState<(typeof WALLET_OPTIONS)[number]>('Paytm')
   const [comment, setComment] = useState('')
   const [entries, setEntries] = useState<PartPaymentEntry[]>([])
   const [otherOpen, setOtherOpen] = useState(false)
+  const [toasts, setToasts] = useState<ToastEntry[]>([])
 
   const paidTotal = useMemo(
     () => entries.reduce((sum, e) => sum + e.amount, 0),
@@ -70,8 +86,16 @@ export function PartPaymentView({
   function methodLabel(): string {
     if (tab === 'card') return 'Card'
     if (tab === 'wallets') return `Wallets (${walletType})`
-    if (tab === 'other') return `Other (${otherType})`
+    if (tab === 'other') return `Other [${otherType}]`
     return 'Due Payment'
+  }
+
+  function showToast(lines: string[]) {
+    const id = `toast-${Date.now()}`
+    setToasts((prev) => [...prev, { id, lines }])
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    }, 3500)
   }
 
   function handleSave() {
@@ -79,18 +103,30 @@ export function PartPaymentView({
     if (!Number.isFinite(value) || value <= 0) return
     if (value > remaining + 0.001) return
 
-    setEntries((prev) => [
-      ...prev,
-      {
-        id: `pay-${Date.now()}`,
-        method: tab,
-        label: methodLabel(),
-        amount: Number(value.toFixed(2)),
-        comment: comment.trim() || undefined,
-      },
-    ])
+    const label = methodLabel()
+    const newEntry: PartPaymentEntry = {
+      id: `pay-${Date.now()}`,
+      method: tab,
+      label,
+      amount: Number(value.toFixed(2)),
+      comment: comment.trim() || undefined,
+    }
+
+    const newPaidTotal = paidTotal + newEntry.amount
+    const newRemaining = Math.max(0, Number((payableAmount - newPaidTotal).toFixed(2)))
+
+    // Build toast lines matching the reference image style
+    const toastLines: string[] = [
+      `Paid via ${label} of ₹${newEntry.amount.toLocaleString('en-IN')}`,
+    ]
+    if (newRemaining > 0) {
+      toastLines.push(`Pay via Cash of ₹${newRemaining.toLocaleString('en-IN')}`)
+    }
+
+    setEntries((prev) => [...prev, newEntry])
     setComment('')
     setOtherOpen(false)
+    showToast(toastLines)
   }
 
   function removeEntry(id: string) {
@@ -99,6 +135,39 @@ export function PartPaymentView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+      {/* Toast notifications */}
+      {toasts.length > 0 ? (
+        <div className="fixed bottom-24 left-1/2 z-[90] flex -translate-x-1/2 flex-col gap-2">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className="flex items-start gap-3 rounded-lg bg-[#2d2d2d] px-4 py-3 shadow-2xl"
+              style={{ minWidth: 260, maxWidth: 380 }}
+            >
+              <MessageSquare size={18} className="mt-0.5 shrink-0 text-white/70" />
+              <div className="space-y-0.5">
+                <p className="text-xs font-semibold text-white/80 uppercase tracking-wide mb-1">
+                  Part Payment Details
+                </p>
+                {toast.lines.map((line, i) => (
+                  <p key={i} className="text-sm text-white/90 leading-snug">
+                    {line}
+                  </p>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setToasts((prev) => prev.filter((t) => t.id !== toast.id))
+                }
+                className="ml-auto shrink-0 rounded p-0.5 text-white/50 hover:text-white"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
         <h1 className="text-xl font-bold text-ink">Part Payment</h1>
 

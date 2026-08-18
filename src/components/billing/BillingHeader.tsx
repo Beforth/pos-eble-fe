@@ -97,7 +97,7 @@ export function BillingHeader({
 
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-card px-2 sm:gap-3 sm:px-3">
+      <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-line bg-card px-1.5 sm:gap-2 sm:px-3">
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
