@@ -317,7 +317,7 @@ export function SupportAgentDrawer({ open, onClose }: SupportAgentDrawerProps) {
                       <button
                         type="button"
                         onClick={() => sendMessage(suggestion)}
-                        className="w-full rounded-xl border border-line border-l-[3px] border-l-primary bg-card px-4 py-3 text-left text-sm leading-snug text-primary shadow-sm transition-colors hover:bg-primary/5"
+                        className="w-full rounded-xl border border-line bg-card px-4 py-3 text-left text-sm leading-snug text-primary shadow-sm transition-colors hover:bg-primary/5"
                       >
                         {suggestion}
                       </button>

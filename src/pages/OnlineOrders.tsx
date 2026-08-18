@@ -5,13 +5,16 @@ import {
   CircleHelp,
   LayoutGrid,
 } from 'lucide-react'
+import { AllOrdersChart } from '../components/all-orders/AllOrdersChart'
 import { OnlineOrdersTable } from '../components/online-orders/OnlineOrdersTable'
+import { AggregatorHelpCenterModal } from '../components/online-orders/AggregatorHelpCenterModal'
 import { ActionCenterDrawer } from '../components/layout/ActionCenterDrawer'
 import { NotificationsDrawer } from '../components/layout/NotificationsDrawer'
 import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
 import {
+  onlineOrdersChartSeries,
   onlineOrdersList,
   type OnlineAggregator,
   type OnlineOrderRow,
@@ -119,6 +122,8 @@ export default function OnlineOrders() {
   const [appliedStatus, setAppliedStatus] = useState('all')
   const [filtersApplied, setFiltersApplied] = useState(false)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [chartOpen, setChartOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   const closeOtherDrawers = () => {
     setSupportOpen(false)
@@ -200,6 +205,10 @@ export default function OnlineOrders() {
         open={actionCenterOpen}
         onClose={() => setActionCenterOpen(false)}
       />
+      <AggregatorHelpCenterModal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+      />
 
       <div
         className={`transition-all duration-300 ${collapsed ? 'lg:pl-[76px]' : 'lg:pl-[264px]'}`}
@@ -225,19 +234,37 @@ export default function OnlineOrders() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary bg-card px-3 text-sm font-medium text-primary"
+                aria-expanded={chartOpen}
+                onClick={() => setChartOpen((prev) => !prev)}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary bg-card px-3 text-sm font-medium text-primary hover:bg-primary/5"
               >
                 <BarChart3 size={14} />
                 Last 5 Days Orders
-                <ChevronDown size={14} />
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-200 ${
+                    chartOpen ? 'rotate-180' : ''
+                  }`}
+                />
               </button>
               <button
                 type="button"
+                onClick={() => setHelpOpen(true)}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
               >
                 <CircleHelp size={14} className="text-primary" />
                 Aggregator Help Center
               </button>
+            </div>
+          </div>
+
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+              chartOpen ? 'mb-4 grid-rows-[1fr]' : 'mb-0 grid-rows-[0fr]'
+            }`}
+          >
+            <div className="overflow-hidden">
+              <AllOrdersChart series={onlineOrdersChartSeries} />
             </div>
           </div>
 

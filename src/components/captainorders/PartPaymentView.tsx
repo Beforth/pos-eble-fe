@@ -4,19 +4,20 @@ import {
   FileText,
   Clock3,
   Coins,
+  QrCode,
   Wallet,
   X,
 } from 'lucide-react'
 
 export interface PartPaymentEntry {
   id: string
-  method: 'card' | 'wallets' | 'other' | 'due'
+  method: 'card' | 'upi' | 'wallets' | 'other' | 'due'
   label: string
   amount: number
   comment?: string
 }
 
-type PartMethodTab = 'card' | 'wallets' | 'other' | 'due'
+type PartMethodTab = 'card' | 'upi' | 'wallets' | 'other' | 'due'
 
 interface PartPaymentViewProps {
   billNo: string
@@ -36,6 +37,7 @@ const TABS: {
   icon: typeof CreditCard
 }[] = [
   { id: 'card', label: 'Card', icon: CreditCard },
+  { id: 'upi', label: 'UPI', icon: QrCode },
   { id: 'wallets', label: 'Wallets', icon: Wallet },
   { id: 'other', label: 'Other', icon: Coins },
   { id: 'due', label: 'Due Payment', icon: Clock3 },
@@ -69,6 +71,7 @@ export function PartPaymentView({
 
   function methodLabel(): string {
     if (tab === 'card') return 'Card'
+    if (tab === 'upi') return 'UPI'
     if (tab === 'wallets') return `Wallets (${walletType})`
     if (tab === 'other') return `Other (${otherType})`
     return 'Due Payment'
@@ -144,10 +147,14 @@ export function PartPaymentView({
 
         {/* Input section */}
         <div className="mt-5 space-y-4">
-          {tab === 'card' || tab === 'due' ? (
+          {tab === 'card' || tab === 'upi' || tab === 'due' ? (
             <div>
               <p className="mb-2 text-sm font-bold text-ink">
-                {tab === 'card' ? 'Captured Amount:' : 'Due Amount:'}
+                {tab === 'card'
+                  ? 'Captured Amount:'
+                  : tab === 'upi'
+                    ? 'UPI Amount:'
+                    : 'Due Amount:'}
               </p>
               <div className="flex flex-wrap items-end gap-2">
                 <label className="text-sm text-ink">

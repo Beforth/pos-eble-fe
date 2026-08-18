@@ -506,6 +506,14 @@ export default function CaptainOrders() {
     [lines],
   )
 
+  const selectedQtyByItemId = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const line of lines) {
+      map[line.itemId] = (map[line.itemId] ?? 0) + line.qty
+    }
+    return map
+  }, [lines])
+
   const kotTotal = useMemo(
     () => tableKotSummary.reduce((sum, k) => sum + k.amount, 0),
     [tableKotSummary],
@@ -1097,6 +1105,7 @@ export default function CaptainOrders() {
                   name: c.name,
                 }))}
                 onAddItem={addItem}
+                selectedQtyByItemId={selectedQtyByItemId}
                 showFavoriteHeart={railCategoryId === FAVORITES_ID}
                 showOpenItem={railCategoryId === FAVORITES_ID}
                 onOpenItemClick={() => setOpenItemModalOpen(true)}

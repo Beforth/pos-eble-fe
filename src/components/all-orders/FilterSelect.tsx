@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 interface FilterSelectProps {
-  label: string
+  label?: string
   value: string
   onChange: (value: string) => void
   options: Array<{ value: string; label: string }>
@@ -33,14 +33,15 @@ export function FilterSelect({
   }, [open])
 
   return (
-    <div ref={rootRef} className={`relative min-w-[140px] flex-1 ${className}`}>
-      <p className="text-xs text-muted">{label}</p>
+    <div ref={rootRef} className={`relative ${className || 'min-w-[140px] flex-1'}`}>
+      {label ? <p className="text-xs text-muted">{label}</p> : null}
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="mt-1 flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-line bg-card px-2.5 text-left text-sm text-ink transition-colors hover:border-muted"
+        aria-label={label || 'Select'}
+        className={`${label ? 'mt-1' : ''} flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-line bg-card px-2.5 text-left text-sm text-ink transition-colors hover:border-muted`}
       >
         <span className="truncate">{selected?.label}</span>
         <ChevronDown

@@ -24,6 +24,7 @@ import { NotificationsDrawer } from '../components/layout/NotificationsDrawer'
 import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
+import { ActionDropdown } from '../components/menu/MenuActionButtons'
 import {
   advanceOrdersChartSeries,
   allOrdersChartSeries,
@@ -149,6 +150,7 @@ export default function AllOrders() {
   const [editOrder, setEditOrder] = useState<AllOrderRow | null>(null)
   const [paymentOrder, setPaymentOrder] = useState<AllOrderRow | null>(null)
   const [orders, setOrders] = useState(allOrdersList)
+  const [toast, setToast] = useState<string | null>(null)
 
   const [startDate, setStartDate] = useState(() => atStartOfDay(new Date()))
   const [endDate, setEndDate] = useState(() => atEndOfDay(new Date()))
@@ -252,6 +254,35 @@ export default function AllOrders() {
     })
   }
 
+  function showToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(null), 2200)
+  }
+
+  function selectedRows(): AllOrderRow[] {
+    return orders.filter((row) => selected.has(row.id))
+  }
+
+  function withSelection(fn: (rows: AllOrderRow[]) => void) {
+    const rows = selectedRows()
+    if (rows.length === 0) {
+      showToast('Select at least one order')
+      return
+    }
+    fn(rows)
+  }
+
+  function updateSelectedStatus(status: AllOrderRow['status'], message: string) {
+    withSelection((rows) => {
+      const ids = new Set(rows.map((row) => row.id))
+      setOrders((prev) =>
+        prev.map((row) => (ids.has(row.id) ? { ...row, status } : row)),
+      )
+      setSelected(new Set())
+      showToast(message)
+    })
+  }
+
   return (
     <div className="min-h-screen bg-page">
       <Sidebar
@@ -319,6 +350,11 @@ export default function AllOrders() {
         />
 
         <main className="px-4 py-4 sm:px-5">
+          {toast ? (
+            <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+              {toast}
+            </div>
+          ) : null}
           {/* Header */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3 sm:gap-4">
@@ -379,13 +415,77 @@ export default function AllOrders() {
                       }`}
                     />
                   </button>
-                  <button
-                    type="button"
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink"
-                  >
-                    Action
-                    <ChevronDown size={14} className="text-muted" />
-                  </button>
+                  <ActionDropdown
+                    options={[
+                      {
+                        label: 'Print',
+                        onClick: () =>
+                          withSelection((rows) =>
+                            showToast(`Printing ${rows.length} order${rows.length === 1 ? '' : 's'}`),
+                          ),
+                      },
+                      {
+                        label: 'Print KOT',
+                        onClick: () =>
+                          withSelection((rows) =>
+                            showToast(`Printing KOT for ${rows.length} order${rows.length === 1 ? '' : 's'}`),
+                          ),
+                      },
+                      {
+                        label: 'Print Bill',
+                        onClick: () =>
+                          withSelection((rows) =>
+                            showToast(`Printing bill for ${rows.length} order${rows.length === 1 ? '' : 's'}`),
+                          ),
+                      },
+                      {
+                        label: 'Send eBill',
+                        onClick: () =>
+                          withSelection((rows) =>
+                            showToast(`eBill sent for ${rows.length} order${rows.length === 1 ? '' : 's'}`),
+                          ),
+                      },
+                      {
+                        label: 'Change Payment Type',
+                        onClick: () =>
+                          withSelection((rows) => {
+                            if (rows.length !== 1) {
+                              showToast('Select one order to change payment type')
+                              return
+                            }
+                            setPaymentOrder(rows[0])
+                          }),
+                      },
+                      {
+                        label: 'Assign Delivery Boy',
+                        onClick: () =>
+                          withSelection((rows) =>
+                            showToast(
+                              `Assign delivery boy for ${rows.length} order${rows.length === 1 ? '' : 's'}`,
+                            ),
+                          ),
+                      },
+                      {
+                        label: 'Complimentary',
+                        onClick: () =>
+                          withSelection((rows) => {
+                            showToast(
+                              `${rows.length} order${rows.length === 1 ? '' : 's'} marked complimentary`,
+                            )
+                            setSelected(new Set())
+                          }),
+                      },
+                      {
+                        label: 'Cancel Order',
+                        danger: true,
+                        onClick: () =>
+                          updateSelectedStatus(
+                            'Cancelled',
+                            `${selected.size} order${selected.size === 1 ? '' : 's'} cancelled`,
+                          ),
+                      },
+                    ]}
+                  />
                 </>
               ) : (
                 <>
@@ -544,23 +644,24 @@ export default function AllOrders() {
                     <div className="flex flex-wrap items-end gap-2">
                       <div className="min-w-[180px] flex-1">
                         <p className="text-xs text-muted">Grand Total</p>
-                        <div className="mt-1 flex h-9 overflow-hidden rounded-lg border border-line">
-                          <select
+                        <div className="mt-1 flex items-center gap-2">
+                          <FilterSelect
                             value={grandTotalOp}
-                            onChange={(e) => setGrandTotalOp(e.target.value)}
-                            className="h-full w-14 border-r border-line bg-page px-1.5 text-sm text-ink outline-none"
-                          >
-                            <option value="=">=</option>
-                            <option value=">">{'>'}</option>
-                            <option value="<">{'<'}</option>
-                            <option value=">=">{'>='}</option>
-                            <option value="<=">{'<='}</option>
-                          </select>
+                            onChange={setGrandTotalOp}
+                            options={[
+                              { value: '=', label: '=' },
+                              { value: '>', label: '>' },
+                              { value: '<', label: '<' },
+                              { value: '>=', label: '>=' },
+                              { value: '<=', label: '<=' },
+                            ]}
+                            className="min-w-[4.75rem] flex-none"
+                          />
                           <input
                             value={grandTotalValue}
                             onChange={(e) => setGrandTotalValue(e.target.value)}
                             placeholder="Amount"
-                            className="h-full min-w-0 flex-1 bg-card px-2.5 text-sm text-ink outline-none"
+                            className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-card px-2.5 text-sm text-ink outline-none focus:border-primary"
                           />
                         </div>
                       </div>

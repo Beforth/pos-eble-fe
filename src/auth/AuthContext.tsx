@@ -22,6 +22,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
   login: (credentials: LoginCredentials) => Promise<void>
   logout: () => void
+  updateProfile: (patch: Partial<AuthUser>) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -56,9 +57,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const updateProfile = useCallback((patch: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, ...patch }
+      localStorage.setItem(USER_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
+
   const value = useMemo<AuthContextValue>(
-    () => ({ token, user, isAuthenticated: Boolean(token), login, logout }),
-    [token, user, login, logout],
+    () => ({
+      token,
+      user,
+      isAuthenticated: Boolean(token),
+      login,
+      logout,
+      updateProfile,
+    }),
+    [token, user, login, logout, updateProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

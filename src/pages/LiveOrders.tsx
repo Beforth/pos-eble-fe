@@ -41,6 +41,14 @@ export default function LiveOrders() {
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
   const [tab, setTab] = useState<LiveTab>('orders')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+
+  function handleRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    setRefreshKey((key) => key + 1)
+    window.setTimeout(() => setRefreshing(false), 800)
+  }
 
   const closeOtherDrawers = () => {
     setSupportOpen(false)
@@ -129,10 +137,19 @@ export default function LiveOrders() {
 
             <button
               type="button"
-              onClick={() => setRefreshKey((key) => key + 1)}
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink transition-colors hover:border-muted"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              aria-label="Refresh live orders"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink transition-colors hover:border-muted disabled:opacity-80"
             >
-              <RefreshCw size={15} className="text-muted" />
+              <RefreshCw
+                size={15}
+                className={
+                  refreshing
+                    ? 'animate-spin text-primary'
+                    : 'text-muted transition-transform duration-300 hover:rotate-180'
+                }
+              />
               Refresh
             </button>
           </div>

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, ProtectedRoute } from './auth/AuthContext'
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
+import EditProfile from './pages/EditProfile'
 import Kot from './pages/Kot'
 import LiveOrders from './pages/LiveOrders'
 import Login from './pages/Login'
@@ -210,6 +211,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <EditProfile />
               </ProtectedRoute>
             }
           />

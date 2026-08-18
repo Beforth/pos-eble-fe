@@ -18,6 +18,8 @@ import {
 import { useAuth } from '../../auth/AuthContext'
 import { brand } from '../../theme/brand'
 import { IconButton } from '../common/IconButton'
+import { ChangelogModal } from './ChangelogModal'
+import { LegalDocModal, type LegalDocKind } from './LegalDocModal'
 
 interface TopBarProps {
   onMenuClick: () => void
@@ -35,6 +37,8 @@ export function TopBar({
   const navigate = useNavigate()
   const { logout } = useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [changelogOpen, setChangelogOpen] = useState(false)
+  const [legalDoc, setLegalDoc] = useState<LegalDocKind | null>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -141,30 +145,23 @@ export function TopBar({
               <button
                 type="button"
                 role="menuitem"
-                onClick={closeSettings}
+                onClick={() => {
+                  closeSettings()
+                  navigate('/profile')
+                }}
                 className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-page"
               >
                 <UserRound size={15} className="shrink-0 text-muted" />
                 Edit Profile
               </button>
 
-              <div
-                role="menuitem"
-                className="flex w-full items-start gap-2.5 px-3 py-2.5"
-              >
-                <Store size={15} className="mt-0.5 shrink-0 text-muted" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-ink">{brand.shortName}</p>
-                  <p className="mt-0.5 text-xs font-light text-muted">
-                    Version {brand.appVersion}
-                  </p>
-                </div>
-              </div>
-
               <button
                 type="button"
                 role="menuitem"
-                onClick={closeSettings}
+                onClick={() => {
+                  closeSettings()
+                  setLegalDoc('terms')
+                }}
                 className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-page"
               >
                 <FileText size={15} className="shrink-0 text-muted" />
@@ -174,11 +171,34 @@ export function TopBar({
               <button
                 type="button"
                 role="menuitem"
-                onClick={closeSettings}
+                onClick={() => {
+                  closeSettings()
+                  setLegalDoc('privacy')
+                }}
                 className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-ink transition-colors hover:bg-page"
               >
                 <Shield size={15} className="shrink-0 text-muted" />
                 Privacy Policy
+              </button>
+
+              <div className="my-1 border-t border-line" />
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeSettings()
+                  setChangelogOpen(true)
+                }}
+                className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-page"
+              >
+                <Store size={15} className="mt-0.5 shrink-0 text-muted" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-ink">{brand.shortName}</p>
+                  <p className="mt-0.5 text-xs font-light text-muted">
+                    Version {brand.appVersion}
+                  </p>
+                </div>
               </button>
 
               <div className="my-1 border-t border-line" />
@@ -204,6 +224,11 @@ export function TopBar({
           <span className="hidden sm:inline">Explore Products</span>
         </button>
       </div>
+      <ChangelogModal
+        open={changelogOpen}
+        onClose={() => setChangelogOpen(false)}
+      />
+      <LegalDocModal kind={legalDoc} onClose={() => setLegalDoc(null)} />
     </header>
   )
 }

@@ -14,6 +14,8 @@ interface ItemGridProps {
   onShortCodeSubmit?: () => void
   categoryOptions: { id: string; name: string }[]
   onAddItem: (item: MenuItemRow) => void
+  /** Qty already in cart keyed by menu item id. */
+  selectedQtyByItemId?: Record<string, number>
   /** Show pink heart on cards (Favorite Items section). */
   showFavoriteHeart?: boolean
   /** Show Open Item tile at the end (Favorite Items section). */
@@ -66,6 +68,7 @@ export function ItemGrid({
   onShortCodeSubmit,
   categoryOptions,
   onAddItem,
+  selectedQtyByItemId = {},
   showFavoriteHeart = false,
   showOpenItem = false,
   onOpenItemClick,
@@ -127,17 +130,28 @@ export function ItemGrid({
           <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {items.map((item) => {
               const diet = getDietType(item.tags, item.name)
+              const selectedQty = selectedQtyByItemId[item.id] ?? 0
+              const selected = selectedQty > 0
               return (
                 <li key={item.id}>
                   <button
                     type="button"
                     disabled={!item.available}
                     onClick={() => onAddItem(item)}
-                    className="relative flex min-h-[76px] w-full items-center overflow-hidden rounded-xl border border-line bg-card px-3 py-2.5 text-left active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 sm:h-[72px] sm:py-0"
+                    aria-pressed={selected}
+                    className={`relative flex min-h-[76px] w-full items-center overflow-hidden rounded-xl border px-3 py-2.5 text-left active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 sm:h-[72px] sm:py-0 ${
+                      selected
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                        : 'border-line bg-card hover:border-primary/40'
+                    }`}
                   >
                     <span className="relative flex min-w-0 flex-1 items-center gap-2">
                       <span className="min-w-0 flex-1">
-                        <span className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
+                        <span
+                          className={`line-clamp-2 text-sm font-semibold leading-snug ${
+                            selected ? 'text-primary' : 'text-ink'
+                          }`}
+                        >
                           {item.name}
                         </span>
                         <span className="mt-0.5 block text-xs text-muted">
@@ -145,7 +159,7 @@ export function ItemGrid({
                           {item.shortCode ? ` · ${item.shortCode}` : ''}
                         </span>
                       </span>
-                      <span className="flex shrink-0 flex-col items-center justify-center gap-1.5">
+                      <span className="flex shrink-0 flex-col items-center justify-center gap-1">
                         <DietMark type={diet} />
                         {showFavoriteHeart ? (
                           <span aria-hidden className="text-primary">
@@ -154,6 +168,11 @@ export function ItemGrid({
                               className="fill-primary text-primary"
                               strokeWidth={1.5}
                             />
+                          </span>
+                        ) : null}
+                        {selected ? (
+                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-white">
+                            {selectedQty}
                           </span>
                         ) : null}
                       </span>

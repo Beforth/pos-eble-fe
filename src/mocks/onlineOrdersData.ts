@@ -1,4 +1,5 @@
 import { brand } from '../theme/brand'
+import { addDays, formatDayMonth } from '../utils/format'
 
 export type OnlineAggregator = 'All' | 'Zomato' | 'Swiggy'
 export type OnlineOrderStatus =
@@ -426,4 +427,15 @@ export const onlineOrdersList: OnlineOrderRow[] = [
       },
     ],
   },
+]
+
+const chartAnchor = new Date(2026, 6, 23)
+
+/** Last 5 days order counts for the Online Orders chart. */
+export const onlineOrdersChartSeries = [
+  { label: formatDayMonth(addDays(chartAnchor, -4)), value: 14 },
+  { label: formatDayMonth(addDays(chartAnchor, -3)), value: 21 },
+  { label: formatDayMonth(addDays(chartAnchor, -2)), value: 11 },
+  { label: formatDayMonth(addDays(chartAnchor, -1)), value: 18 },
+  { label: formatDayMonth(chartAnchor), value: 8 },
 ]

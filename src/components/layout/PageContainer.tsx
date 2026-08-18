@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { formatMinutesAgo } from '../../utils/format'
 
@@ -27,6 +27,15 @@ export function PageContainer({
   className = '',
   children,
 }: PageContainerProps) {
+  const [refreshing, setRefreshing] = useState(false)
+
+  function handleRefresh() {
+    if (!onRefresh || refreshing) return
+    setRefreshing(true)
+    onRefresh()
+    window.setTimeout(() => setRefreshing(false), 800)
+  }
+
   return (
     <main className={`px-4 py-4 sm:px-5 ${className}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -37,11 +46,19 @@ export function PageContainer({
           {onRefresh && (
             <button
               type="button"
-              onClick={onRefresh}
+              onClick={handleRefresh}
+              disabled={refreshing}
               aria-label="Refresh data"
-              className="inline-flex size-9 items-center justify-center rounded-lg border border-line bg-card text-muted transition-colors hover:text-ink"
+              className="inline-flex size-9 items-center justify-center rounded-lg border border-line bg-card text-muted transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-80"
             >
-              <RefreshCw size={16} />
+              <RefreshCw
+                size={16}
+                className={
+                  refreshing
+                    ? 'animate-spin'
+                    : 'transition-transform duration-300 hover:rotate-180'
+                }
+              />
             </button>
           )}
         </div>

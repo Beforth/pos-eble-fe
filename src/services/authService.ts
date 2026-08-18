@@ -15,6 +15,8 @@ export interface AuthUser {
   name: string
   identifier: string
   outlet: string
+  phone?: string
+  photoUrl?: string
 }
 
 export interface LoginResult {
@@ -27,6 +29,7 @@ const MOCK_USER: AuthUser = {
   name: 'Rajubhai',
   identifier: 'rajubhai@annapurna.in',
   outlet: "Annapurna's Rajubhai Dabeliwale — Dadar",
+  phone: '9820012345',
 }
 
 export async function loginApi(

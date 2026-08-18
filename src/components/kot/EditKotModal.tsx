@@ -188,10 +188,9 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
             <table className="w-full min-w-[480px] border-collapse text-sm">
               <thead>
                 <tr className="bg-primary/5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  <th className="w-10 px-2 py-2.5" />
-                  <th className="w-10 px-2 py-2.5" />
                   <th className="px-3 py-2.5">Item Name</th>
                   <th className="px-3 py-2.5 text-center">Quantity</th>
+                  <th className="px-3 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -199,36 +198,6 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
                   const isEditing = editingItemId === item.id
                   return (
                     <tr key={item.id} className="border-t border-line">
-                      <td className="px-2 py-2">
-                        <button
-                          type="button"
-                          aria-label={`Remove ${item.name}`}
-                          onClick={() => removeItem(item.id)}
-                          className="flex size-7 items-center justify-center rounded border border-line text-danger hover:bg-page"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </td>
-                      <td className="px-2 py-2">
-                        <button
-                          type="button"
-                          aria-label={
-                            isEditing
-                              ? `Done editing ${item.name}`
-                              : `Edit ${item.name}`
-                          }
-                          onClick={() =>
-                            setEditingItemId(isEditing ? null : item.id)
-                          }
-                          className={`flex size-7 items-center justify-center rounded border transition-colors ${
-                            isEditing
-                              ? 'border-primary bg-primary/5 text-primary'
-                              : 'border-line text-muted hover:bg-page hover:text-ink'
-                          }`}
-                        >
-                          <Pencil size={13} />
-                        </button>
-                      </td>
                       <td className="px-3 py-2 text-ink">
                         {isEditing ? (
                           <input
@@ -260,13 +229,43 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
                           className="mx-auto h-8 w-16 rounded border border-line bg-white px-2 text-center text-sm tabular-nums outline-none focus:border-primary"
                         />
                       </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            aria-label={
+                              isEditing
+                                ? `Done editing ${item.name}`
+                                : `Edit ${item.name}`
+                            }
+                            onClick={() =>
+                              setEditingItemId(isEditing ? null : item.id)
+                            }
+                            className={`flex size-7 items-center justify-center rounded border transition-colors ${
+                              isEditing
+                                ? 'border-primary bg-primary/5 text-primary'
+                                : 'border-line text-muted hover:bg-page hover:text-ink'
+                            }`}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${item.name}`}
+                            onClick={() => removeItem(item.id)}
+                            className="flex size-7 items-center justify-center rounded border border-line text-danger hover:bg-page"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
                 {items.length === 0 && (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={3}
                       className="px-3 py-8 text-center text-sm text-muted"
                     >
                       No items in this KOT.

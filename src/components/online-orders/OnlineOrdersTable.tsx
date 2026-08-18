@@ -1,4 +1,5 @@
-import { useState, type ReactNode, type SVGProps } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Clipboard, History, ReceiptText } from 'lucide-react'
 import type { OnlineOrderRow, OnlineOrderStatus } from '../../mocks/onlineOrdersData'
 import { OnlineOrderActivityDrawer } from './OnlineOrderActivityDrawer'
 import { OnlineOrderBillModal } from './OnlineOrderBillModal'
@@ -16,67 +17,41 @@ const statusStyles: Record<OnlineOrderStatus, string> = {
   Cancelled: 'bg-danger text-white',
 }
 
-function iconProps(props: SVGProps<SVGSVGElement>) {
-  return {
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.75,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true as const,
-    width: 18,
-    height: 18,
-    ...props,
-  }
+/** Clock with history arrow — online order activity */
+function HistoryClockIcon() {
+  return <History size={18} strokeWidth={1.7} />
 }
 
-/** Clipboard with eye badge — view / order details */
-function ClipboardEyeIcon(props: SVGProps<SVGSVGElement>) {
+/** Clipboard with circular eye badge at bottom-right — view / order details */
+function ClipboardEyeIcon() {
   return (
-    <svg {...iconProps(props)}>
-      <rect x="5" y="3" width="12" height="16" rx="1.75" />
-      <path d="M8.5 3h5v2.25h-5z" />
-      <circle cx="16.25" cy="16.25" r="4.1" fill="var(--color-card)" />
-      <circle cx="16.25" cy="16.25" r="4.1" />
-      <ellipse cx="16.25" cy="16.25" rx="2.15" ry="1.35" />
-      <circle
-        cx="16.25"
-        cy="16.25"
-        r="0.7"
-        fill="currentColor"
-        stroke="none"
-      />
-    </svg>
+    <span className="relative inline-flex size-[18px] items-center justify-center text-current">
+      <Clipboard size={18} strokeWidth={1.7} />
+      <svg
+        viewBox="0 0 10 10"
+        width={10}
+        height={10}
+        aria-hidden
+        className="absolute -bottom-px -right-px"
+      >
+        <circle cx="5" cy="5" r="4.35" fill="var(--color-card)" />
+        <circle
+          cx="5"
+          cy="5"
+          r="3.35"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.15"
+        />
+        <circle cx="5" cy="5" r="1.2" fill="currentColor" />
+      </svg>
+    </span>
   )
 }
 
-/** Receipt with serrated bottom + bullet lines — bill */
-function ReceiptJaggedIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...iconProps(props)}>
-      <path d="M7 2.5h10v16l-1.25-1-1.25 1-1.25-1-1.25 1-1.25-1-1.25 1-1.25-1-1.25 1V2.5z" />
-      <circle cx="9.2" cy="7" r="0.75" fill="currentColor" stroke="none" />
-      <path d="M10.85 7H16" />
-      <circle cx="9.2" cy="10.15" r="0.75" fill="currentColor" stroke="none" />
-      <path d="M10.85 10.15H16" />
-      <circle cx="9.2" cy="13.3" r="0.75" fill="currentColor" stroke="none" />
-      <path d="M10.85 13.3H16" />
-      <circle cx="9.2" cy="16.45" r="0.75" fill="currentColor" stroke="none" />
-      <path d="M10.85 16.45h3.5" />
-    </svg>
-  )
-}
-
-/** Clock with history arrow — online order activity / lifecycle */
-function HistoryClockIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...iconProps(props)}>
-      <path d="M3.75 9.5A8.25 8.25 0 1 1 3.5 13.75" />
-      <path d="M3.75 5v4.5H8.25" />
-      <path d="M12 8v4.35l2.85 1.7" />
-    </svg>
-  )
+/** Receipt with torn edge and text lines — bill */
+function ReceiptJaggedIcon() {
+  return <ReceiptText size={18} strokeWidth={1.7} />
 }
 
 function ActionButton({
@@ -94,7 +69,7 @@ function ActionButton({
       title={label}
       aria-label={label}
       onClick={onClick}
-      className="flex size-9 items-center justify-center rounded-md border border-line bg-page text-ink transition-colors hover:border-muted hover:bg-card"
+      className="flex size-9 items-center justify-center rounded-md border border-line bg-card text-muted transition-colors hover:border-muted hover:bg-page hover:text-ink"
     >
       {children}
     </button>
@@ -120,7 +95,7 @@ export function OnlineOrdersTable({ rows }: OnlineOrdersTableProps) {
               <th className="px-3 py-2.5">Customer Details</th>
               <th className="px-3 py-2.5">OTP</th>
               <th className="px-3 py-2.5">Date Time</th>
-              <th className="px-3 py-2.5 text-right">Total</th>
+              <th className="col-total px-3 py-2.5 text-right">Total</th>
               <th className="px-3 py-2.5">Status</th>
               <th className="px-3 py-2.5 text-center">At</th>
               <th className="px-3 py-2.5">Actions</th>
@@ -191,7 +166,7 @@ export function OnlineOrdersTable({ rows }: OnlineOrdersTableProps) {
                   </div>
                 </td>
 
-                <td className="bg-success/10 px-3 py-3 text-right align-top">
+                <td className="col-total px-3 py-3 text-right align-top">
                   <p className="font-bold tabular-nums text-ink">
                     {row.total.toFixed(2)}
                   </p>
