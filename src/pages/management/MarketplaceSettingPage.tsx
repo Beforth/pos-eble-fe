@@ -1,26 +1,106 @@
-import { useState } from 'react'
-import { Plus, Trash2, Shield, Info } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import {
+  Calculator,
+  ChefHat,
+  Info,
+  Link2,
+  MessageSquare,
+  Milk,
+  Package,
+  Plus,
+  RefreshCw,
+  Shield,
+  ShoppingBag,
+  Smartphone,
+  TableProperties,
+  Trash2,
+  Zap,
+} from 'lucide-react'
+import {
+  ConfigFormRow,
+  ConfigSectionCard,
+  MutedHelp,
+} from '../../components/management/ConfigSectionCard'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
-import { PrimaryButton, OutlineButton } from '../../components/menu/MenuActionButtons'
+import {
+  OutlineButton,
+  PrimaryButton,
+} from '../../components/menu/MenuActionButtons'
+import { AggregatorLogo } from '../../components/common/AggregatorLogo'
 
-function AggregatorMark({ name }: { name: 'Zomato' | 'Swiggy' }) {
-  const isSwiggy = name === 'Swiggy'
+const inputClass =
+  'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors focus:border-primary'
+
+function CheckRow({
+  checked,
+  onChange,
+  label,
+  help,
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: string
+  help?: ReactNode
+}) {
   return (
-    <span className="relative inline-flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md">
-      <img
-        src={isSwiggy ? '/swiggy.png' : '/zomato.png'}
-        alt={`${name} logo`}
-        width={isSwiggy ? 44 : 28}
-        height={isSwiggy ? 44 : 28}
-        className={
-          isSwiggy
-            ? 'absolute size-11 max-w-none scale-125 object-cover'
-            : 'size-7 object-contain'
-        }
-      />
-    </span>
+    <div>
+      <label className="flex cursor-pointer select-none items-center gap-3 text-sm font-medium text-ink">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="size-4 shrink-0 cursor-pointer accent-primary"
+        />
+        <span>{label}</span>
+      </label>
+      {help ? (
+        <div className="pl-7">
+          <MutedHelp>{help}</MutedHelp>
+        </div>
+      ) : null}
+    </div>
   )
 }
+
+function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+  icon,
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: string
+  icon?: ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+        {icon}
+        {label}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
+          checked ? 'bg-primary' : 'bg-muted/30'
+        }`}
+      >
+        <span
+          className={`absolute left-1 top-1 size-4 rounded-full bg-white shadow transition-transform ${
+            checked ? 'translate-x-5' : 'translate-x-0'
+          }`}
+        />
+      </button>
+    </div>
+  )
+}
+
+const TIME_FROM_OPTIONS = ['00:00', '03:30', '06:00', '12:00', '18:00']
+const TIME_TO_OPTIONS = ['24:00', '09:30', '12:00', '18:00']
 
 export default function MarketplaceSettingPage() {
   const [activeTab, setActiveTab] = useState<
@@ -109,6 +189,28 @@ export default function MarketplaceSettingPage() {
     }
   }
 
+  function updateTiming(timingId: string, key: 'from' | 'to', value: string) {
+    if (platform === 'zomato') {
+      setZomatoTimings((prev) =>
+        prev.map((t) => (t.id === timingId ? { ...t, [key]: value } : t)),
+      )
+    } else {
+      setSwiggyTimings((prev) =>
+        prev.map((t) => (t.id === timingId ? { ...t, [key]: value } : t)),
+      )
+    }
+  }
+
+  const NAV_ITEMS: Array<{
+    id: typeof activeTab
+    label: string
+    icon: ReactNode
+  }> = [
+    { id: 'pos-subscription', label: 'POS Subscription', icon: <Smartphone size={16} /> },
+    { id: 'online-orders', label: 'Online Orders Integration', icon: <ShoppingBag size={16} /> },
+    { id: 'tally-integration', label: 'Tally Integration', icon: <Calculator size={16} /> },
+  ]
+
   return (
     <ReportsPageShell
       title="Marketplace Settings"
@@ -123,743 +225,601 @@ export default function MarketplaceSettingPage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
         {/* Left Sub-Menu Navigation */}
         <div className="md:col-span-4 lg:col-span-3">
-          <div className="overflow-hidden rounded-xl border border-line bg-card shadow-xs">
+          <div className="overflow-hidden rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             <nav className="flex flex-col divide-y divide-line">
-              <button
-                type="button"
-                onClick={() => setActiveTab('pos-subscription')}
-                className={`flex items-center text-left text-sm transition-all ${
-                  activeTab === 'pos-subscription'
-                    ? 'border-l-4 border-primary bg-primary/10 font-bold text-primary py-3.5 pl-4 pr-3'
-                    : 'border-l-4 border-transparent py-3.5 pl-4 pr-3 font-medium text-muted hover:bg-page hover:text-ink'
-                }`}
-              >
-                POS Subscription
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('online-orders')}
-                className={`flex items-center text-left text-sm transition-all ${
-                  activeTab === 'online-orders'
-                    ? 'border-l-4 border-primary bg-primary/10 font-bold text-primary py-3.5 pl-4 pr-3'
-                    : 'border-l-4 border-transparent py-3.5 pl-4 pr-3 font-medium text-muted hover:bg-page hover:text-ink'
-                }`}
-              >
-                Online Orders Integration
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('tally-integration')}
-                className={`flex items-center text-left text-sm transition-all ${
-                  activeTab === 'tally-integration'
-                    ? 'border-l-4 border-primary bg-primary/10 font-bold text-primary py-3.5 pl-4 pr-3'
-                    : 'border-l-4 border-transparent py-3.5 pl-4 pr-3 font-medium text-muted hover:bg-page hover:text-ink'
-                }`}
-              >
-                Tally Integration
-              </button>
+              {NAV_ITEMS.map((item) => {
+                const active = activeTab === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveTab(item.id)}
+                    className={`flex items-center gap-2.5 py-3.5 pl-4 pr-3 text-left text-sm transition-all ${
+                      active
+                        ? 'border-l-4 border-primary bg-primary/10 font-semibold text-primary'
+                        : 'border-l-4 border-transparent font-medium text-muted hover:bg-page hover:text-ink'
+                    }`}
+                  >
+                    <span className={active ? 'text-primary' : 'text-muted'}>
+                      {item.icon}
+                    </span>
+                    {item.label}
+                  </button>
+                )
+              })}
             </nav>
           </div>
         </div>
 
-        {/* Right Form Details Panel */}
-        <div className="md:col-span-8 lg:col-span-9">
-          <div className="flex flex-col overflow-hidden rounded-xl border border-line bg-card shadow-xs">
-            {/* ONLINE ORDERS INTEGRATION TAB */}
-            {activeTab === 'online-orders' && (
-              <>
-                {/* Platform Header Tabs (Zomato & Swiggy) */}
-                <div className="flex border-b border-line bg-page/40 px-6 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setPlatform('zomato')}
-                    className={`flex items-center gap-2.5 border-b-2 px-5 py-3 text-sm font-bold transition-all ${
-                      platform === 'zomato'
-                        ? 'border-primary text-primary bg-card rounded-t-lg shadow-2xs'
-                        : 'border-transparent text-muted hover:text-ink'
-                    }`}
-                  >
-                    <AggregatorMark name="Zomato" />
-                    <span>Zomato</span>
-                  </button>
+        {/* Right Content Panel */}
+        <div className="min-w-0 md:col-span-8 lg:col-span-9">
+          {/* ONLINE ORDERS INTEGRATION TAB */}
+          {activeTab === 'online-orders' ? (
+            <>
+              {/* Platform Tabs (Zomato & Swiggy) */}
+              <div className="mb-4 flex gap-1 border-b border-line">
+                {(['zomato', 'swiggy'] as const).map((id) => {
+                  const active = platform === id
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setPlatform(id)}
+                      className={`inline-flex items-center gap-2.5 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+                        active
+                          ? 'border-primary text-primary'
+                          : 'border-transparent text-muted hover:text-ink'
+                      }`}
+                    >
+                      <AggregatorLogo name={id === 'zomato' ? 'Zomato' : 'Swiggy'} size="sm" />
+                      <span>{id === 'zomato' ? 'Zomato' : 'Swiggy'}</span>
+                    </button>
+                  )
+                })}
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setPlatform('swiggy')}
-                    className={`flex items-center gap-2.5 border-b-2 px-5 py-3 text-sm font-bold transition-all ${
-                      platform === 'swiggy'
-                        ? 'border-primary text-primary bg-card rounded-t-lg shadow-2xs'
-                        : 'border-transparent text-muted hover:text-ink'
-                    }`}
-                  >
-                    <AggregatorMark name="Swiggy" />
-                    <span>Swiggy</span>
-                  </button>
-                </div>
-
-                {/* Sub-Layout: Left Outlets List & Right Zomato/Swiggy Form */}
-                <div className="grid grid-cols-1 border-b border-line lg:grid-cols-12">
-                  {/* Left Outlet List */}
-                  <div className="border-b border-line p-4 lg:col-span-4 lg:border-b-0 lg:border-r bg-page/20">
+              <ConfigSectionCard
+                icon={<Link2 size={16} />}
+                title="Integration Details"
+                description={`Codes identifying this outlet on ${platform === 'zomato' ? 'Zomato' : 'Swiggy'}.`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
                       onClick={() => setSelectedOutlet("Annapurna's R...")}
-                      className="flex w-full items-center justify-between rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-left transition-colors"
+                      className="flex items-center gap-2.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-left transition-colors"
                     >
-                      <span className="truncate text-sm font-bold text-ink">
+                      <span className="max-w-[160px] truncate text-sm font-semibold text-ink">
                         Annapurna's R...
                       </span>
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                      <span className="rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold text-success">
                         Active
                       </span>
                     </button>
-                  </div>
-
-                  {/* Right Form Fields */}
-                  <div className="p-6 space-y-6 lg:col-span-8">
-                    {/* Header Outlet Code */}
-                    <div className="flex flex-wrap items-center justify-between border-b border-line pb-4">
-                      <div>
-                        {platform === 'zomato' ? (
-                          <>
-                            <h3 className="text-base font-bold text-ink">
-                              Outlet Code : 5sbhwvqj
-                            </h3>
-                            <p className="text-sm font-medium text-muted mt-0.5">
-                              Unique code for each outlet registered on Zomato
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <h3 className="text-base font-bold text-ink">
-                              Restaurant Code : 5sbhwvqj
-                            </h3>
-                            <h3 className="text-base font-bold text-ink">
-                              Vendor Code : 776370
-                            </h3>
-                          </>
-                        )}
-                      </div>
-                      <span className="text-sm font-semibold text-muted">
-                        Identifier :
-                      </span>
-                    </div>
-
-                    {/* 1. GST Register Checkbox */}
-                    <label className="flex items-center gap-3 cursor-pointer text-sm font-bold text-ink select-none">
-                      <input
-                        type="checkbox"
-                        checked={notRegisteredGst}
-                        onChange={(e) => setNotRegisteredGst(e.target.checked)}
-                        className="size-4 rounded accent-primary cursor-pointer"
-                      />
-                      <span>Restaurant Is Not Registered Under GST</span>
-                    </label>
-
-                    {/* 2. GST Information Note On Bill Print */}
-                    <div className="space-y-2">
-                      <label className="block text-sm font-bold text-ink">
-                        GST Information Note On Bill Print
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={gstNote}
-                        onChange={(e) => setGstNote(e.target.value)}
-                        className="w-full rounded-md border border-line bg-card p-3 text-sm text-ink outline-none transition-colors focus:border-primary"
-                      />
-                    </div>
-
-                    {/* 3. Order Type */}
-                    <div className="space-y-2">
-                      <label className="block text-sm font-bold text-ink">
-                        Order Type <span className="text-danger">*</span>
-                      </label>
+                    <div>
                       {platform === 'zomato' ? (
-                        <select
-                          value={zomatoOrderType}
-                          onChange={(e) => setZomatoOrderType(e.target.value)}
-                          className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
-                        >
-                          <option value="Zomato">Zomato</option>
-                          <option value="Swiggy">Swiggy</option>
-                          <option value="Direct Delivery">Direct Delivery</option>
-                        </select>
+                        <>
+                          <p className="text-sm font-semibold text-ink">
+                            Outlet Code : 5sbhwvqj
+                          </p>
+                          <MutedHelp>
+                            Unique code for each outlet registered on Zomato
+                          </MutedHelp>
+                        </>
                       ) : (
-                        <select
-                          value={swiggyOrderType}
-                          onChange={(e) => setSwiggyOrderType(e.target.value)}
-                          className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
-                        >
-                          <option value="Swiggy">Swiggy</option>
-                          <option value="Zomato">Zomato</option>
-                          <option value="Direct Delivery">Direct Delivery</option>
-                        </select>
+                        <>
+                          <p className="text-sm font-semibold text-ink">
+                            Restaurant Code : 5sbhwvqj
+                          </p>
+                          <p className="text-sm font-semibold text-ink">
+                            Vendor Code : 776370
+                          </p>
+                        </>
                       )}
                     </div>
+                  </div>
+                  <span className="text-sm font-semibold text-muted">
+                    Identifier :
+                  </span>
+                </div>
+              </ConfigSectionCard>
 
-                    {/* ZOMATO ONLY: Allow Item Tags */}
-                    {platform === 'zomato' && (
-                      <label className="flex items-center gap-3 cursor-pointer text-sm font-bold text-ink select-none">
-                        <input
-                          type="checkbox"
-                          checked={allowItemTags}
-                          onChange={(e) => setAllowItemTags(e.target.checked)}
-                          className="size-4 rounded accent-primary cursor-pointer"
-                        />
-                        <span>
-                          Allow Item Tags To Participate In Zomato Campaign
-                        </span>
-                      </label>
-                    )}
+              <ConfigSectionCard
+                icon={<MessageSquare size={16} />}
+                title="GST & Billing"
+                description="How GST information and invoices are handled for orders from this platform."
+              >
+                <div className="space-y-4">
+                  <CheckRow
+                    checked={notRegisteredGst}
+                    onChange={setNotRegisteredGst}
+                    label="Restaurant Is Not Registered Under GST"
+                  />
 
-                    {/* 4. Commission Rate */}
-                    <div className="space-y-2">
-                      <label className="block text-sm font-bold text-ink">
-                        Commission Rate %
-                      </label>
-                      <input
-                        type="text"
-                        value={commissionRate}
-                        onChange={(e) => setCommissionRate(e.target.value)}
-                        className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
-                      />
-                    </div>
+                  <ConfigFormRow label="GST Information Note On Bill Print">
+                    <textarea
+                      rows={2}
+                      value={gstNote}
+                      onChange={(e) => setGstNote(e.target.value)}
+                      className="w-full rounded-md border border-line bg-card p-3 text-sm text-ink outline-none transition-colors focus:border-primary"
+                    />
+                  </ConfigFormRow>
 
-                    {/* ZOMATO ONLY: Consider All Discounts */}
-                    {platform === 'zomato' && (
-                      <div className="space-y-1.5">
-                        <label className="flex items-center gap-3 cursor-pointer text-sm font-bold text-ink select-none">
-                          <input
-                            type="checkbox"
-                            checked={considerAllDiscounts}
-                            onChange={(e) => setConsiderAllDiscounts(e.target.checked)}
-                            className="size-4 rounded accent-primary cursor-pointer"
-                          />
-                          <span>Consider All Discounts</span>
-                        </label>
-                        <p className="pl-7 text-xs font-medium text-muted">
-                          Note:- It will take both zomato and restaurants discounts.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* 5. Do Not Print Bill */}
-                    <label className="flex items-center gap-3 cursor-pointer text-sm font-bold text-ink select-none">
-                      <input
-                        type="checkbox"
-                        checked={doNotPrintBill}
-                        onChange={(e) => setDoNotPrintBill(e.target.checked)}
-                        className="size-4 rounded accent-primary cursor-pointer"
-                      />
-                      <span>Do Not Print Bill</span>
-                    </label>
-
-                    {/* 6. Do Not Print Kot */}
-                    <label className="flex items-center gap-3 cursor-pointer text-sm font-bold text-ink select-none">
-                      <input
-                        type="checkbox"
-                        checked={doNotPrintKot}
-                        onChange={(e) => setDoNotPrintKot(e.target.checked)}
-                        className="size-4 rounded accent-primary cursor-pointer"
-                      />
-                      <span>Do Not Print Kot</span>
-                    </label>
-
-                    {/* 7. Do Not Print E-Commerce Operators GST */}
-                    <div className="space-y-1.5">
-                      <label className="flex items-center gap-3 cursor-pointer text-sm font-bold text-ink select-none">
-                        <input
-                          type="checkbox"
-                          checked={doNotPrintEcommerceGst}
-                          onChange={(e) => setDoNotPrintEcommerceGst(e.target.checked)}
-                          className="size-4 rounded accent-primary cursor-pointer"
-                        />
-                        <span>
-                          Do Not Print E-Commerce Operators. GST Levied On The Bills Printed
-                        </span>
-                      </label>
-                      <p className="pl-7 text-xs font-medium text-muted">
-                        Note: If Enabled, The GST Amount Deducted By E-Commerce Operators Will Not Be Included In The Invoices Generated.
-                      </p>
-                    </div>
-
-                    {/* 8. Enable auto mark food ready Box */}
-                    <div className="space-y-4 rounded-xl border border-line bg-page/40 p-4 sm:p-5">
-                      <label className="flex items-start gap-3 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={enableAutoFoodReady}
-                          onChange={(e) => setEnableAutoFoodReady(e.target.checked)}
-                          className="mt-0.5 size-4 rounded accent-primary cursor-pointer"
-                        />
-                        <div>
-                          <span className="text-sm font-bold text-ink block">
-                            Enable auto mark food ready
-                          </span>
-                          <span className="text-xs font-medium text-muted mt-0.5 block">
-                            Recommended specifically for restaurants with pre-packed or fast-packing items only.
-                          </span>
-                        </div>
-                      </label>
-
-                      {/* Nested Order Packing Checklist */}
-                      <div className="rounded-xl border border-line bg-card p-4 space-y-3 shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-sm font-bold text-ink">
-                            <Shield size={18} className="text-primary" />
-                            <span>Order Packing Checklist</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setPackingChecklist(!packingChecklist)}
-                            className={`relative h-6 w-11 rounded-full transition-colors ${
-                              packingChecklist ? 'bg-primary' : 'bg-slate-300'
-                            }`}
-                          >
-                            <span
-                              className={`absolute top-1 left-1 size-4 rounded-full bg-white transition-transform ${
-                                packingChecklist ? 'translate-x-5' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                        <p className="text-xs font-medium text-muted leading-relaxed">
-                          Ensure no items are missed while packing. Staff must confirm each item via checklist before marking order as "Food Ready".
-                        </p>
-                        <div className="flex items-start gap-2 text-xs font-medium text-ink bg-page p-3 rounded-lg border border-line">
-                          <Info size={16} className="shrink-0 text-muted mt-0.5" />
-                          <span>
-                            When enabled, Auto Food Ready will not work for these orders. Orders must be manually marked ready after checklist completion.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ZOMATO ONLY: Packaging Charge Applicable On / Type */}
-                    {platform === 'zomato' && (
+                  <ConfigFormRow
+                    label={
                       <>
-                        <div className="space-y-2">
-                          <label className="block text-sm font-bold text-ink">
-                            Packaging Charge Applicable On
-                          </label>
-                          <div className="flex flex-wrap items-center gap-6">
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="pkg-app"
-                                checked={packagingApplicableOn === 'item'}
-                                onChange={() => setPackagingApplicableOn('item')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>Item</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="pkg-app"
-                                checked={packagingApplicableOn === 'order'}
-                                onChange={() => setPackagingApplicableOn('order')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>Order</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="pkg-app"
-                                checked={packagingApplicableOn === 'none'}
-                                onChange={() => setPackagingApplicableOn('none')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>None</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block text-sm font-bold text-ink">
-                            Packaging Charge Type <span className="text-danger">*</span>
-                          </label>
-                          <div className="flex flex-wrap items-center gap-6">
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="pkg-type"
-                                checked={packagingChargeType === 'item'}
-                                onChange={() => setPackagingChargeType('item')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>Consider from item</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="pkg-type"
-                                checked={packagingChargeType === 'fixed'}
-                                onChange={() => setPackagingChargeType('fixed')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>Fixed</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="pkg-type"
-                                checked={packagingChargeType === 'percentage'}
-                                onChange={() => setPackagingChargeType('percentage')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>Percentage</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="pkg-type"
-                                checked={packagingChargeType === 'slabwise'}
-                                onChange={() => setPackagingChargeType('slabwise')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>Packing charge Slabwise Strictly</span>
-                            </label>
-                          </div>
-                        </div>
+                        Order Type <span className="text-danger">*</span>
                       </>
+                    }
+                    align="center"
+                  >
+                    {platform === 'zomato' ? (
+                      <select
+                        value={zomatoOrderType}
+                        onChange={(e) => setZomatoOrderType(e.target.value)}
+                        className={`${inputClass} max-w-md`}
+                      >
+                        <option value="Zomato">Zomato</option>
+                        <option value="Swiggy">Swiggy</option>
+                        <option value="Direct Delivery">Direct Delivery</option>
+                      </select>
+                    ) : (
+                      <select
+                        value={swiggyOrderType}
+                        onChange={(e) => setSwiggyOrderType(e.target.value)}
+                        className={`${inputClass} max-w-md`}
+                      >
+                        <option value="Swiggy">Swiggy</option>
+                        <option value="Zomato">Zomato</option>
+                        <option value="Direct Delivery">Direct Delivery</option>
+                      </select>
                     )}
+                  </ConfigFormRow>
 
-                    {/* 9. Auto Accept Orders Once Arrived */}
-                    <div className="space-y-2">
-                      <label className="block text-sm font-bold text-ink">
-                        Auto Accept Orders Once Arrived
-                      </label>
-                      <div className="flex items-center gap-6">
-                        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                          <input
-                            type="radio"
-                            name="auto-accept"
-                            checked={autoAcceptOrders === 'on'}
-                            onChange={() => setAutoAcceptOrders('on')}
-                            className="size-4 accent-primary cursor-pointer"
-                          />
-                          <span>On</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                          <input
-                            type="radio"
-                            name="auto-accept"
-                            checked={autoAcceptOrders === 'off'}
-                            onChange={() => setAutoAcceptOrders('off')}
-                            className="size-4 accent-primary cursor-pointer"
-                          />
-                          <span>Off</span>
-                        </label>
-                      </div>
-                      <p className="text-xs font-medium text-muted leading-relaxed">
-                        Note : Make sure, your KOT printer is assigned properly while enabling auto accept flag. If not, this will result into queuing of the KOT print. Change in auto accept flag will take a minute to get reflect once changed.
-                      </p>
+                  {platform === 'zomato' ? (
+                    <CheckRow
+                      checked={allowItemTags}
+                      onChange={setAllowItemTags}
+                      label="Allow Item Tags To Participate In Zomato Campaign"
+                    />
+                  ) : null}
+
+                  <ConfigFormRow label="Commission Rate %" align="center">
+                    <input
+                      type="text"
+                      value={commissionRate}
+                      onChange={(e) => setCommissionRate(e.target.value)}
+                      className={`${inputClass} max-w-md`}
+                    />
+                  </ConfigFormRow>
+
+                  {platform === 'zomato' ? (
+                    <CheckRow
+                      checked={considerAllDiscounts}
+                      onChange={setConsiderAllDiscounts}
+                      label="Consider All Discounts"
+                      help="Note:- It will take both zomato and restaurants discounts."
+                    />
+                  ) : null}
+
+                  <CheckRow
+                    checked={doNotPrintBill}
+                    onChange={setDoNotPrintBill}
+                    label="Do Not Print Bill"
+                  />
+                  <CheckRow
+                    checked={doNotPrintKot}
+                    onChange={setDoNotPrintKot}
+                    label="Do Not Print Kot"
+                  />
+                  <CheckRow
+                    checked={doNotPrintEcommerceGst}
+                    onChange={setDoNotPrintEcommerceGst}
+                    label="Do Not Print E-Commerce Operators. GST Levied On The Bills Printed"
+                    help="Note: If Enabled, The GST Amount Deducted By E-Commerce Operators Will Not Be Included In The Invoices Generated."
+                  />
+                </div>
+              </ConfigSectionCard>
+
+              <ConfigSectionCard
+                icon={<ChefHat size={16} />}
+                title="Food Ready & Packing"
+                description="Automate marking orders ready and confirm packing via checklist."
+              >
+                <div className="space-y-4">
+                  <CheckRow
+                    checked={enableAutoFoodReady}
+                    onChange={setEnableAutoFoodReady}
+                    label="Enable auto mark food ready"
+                    help="Recommended specifically for restaurants with pre-packed or fast-packing items only."
+                  />
+
+                  <div className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                    <ToggleSwitch
+                      checked={packingChecklist}
+                      onChange={setPackingChecklist}
+                      label="Order Packing Checklist"
+                      icon={<Shield size={16} className="text-primary" />}
+                    />
+                    <MutedHelp>
+                      Ensure no items are missed while packing. Staff must confirm
+                      each item via checklist before marking order as "Food Ready".
+                    </MutedHelp>
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs font-medium text-ink">
+                      <Info size={16} className="mt-0.5 shrink-0 text-muted" />
+                      <span>
+                        When enabled, Auto Food Ready will not work for these
+                        orders. Orders must be manually marked ready after
+                        checklist completion.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </ConfigSectionCard>
+
+              <ConfigSectionCard
+                icon={<Zap size={16} />}
+                title="Auto Accept Orders"
+                description="Accept incoming platform orders automatically within chosen time windows."
+              >
+                <div className="space-y-4">
+                  <div className="flex items-center gap-6">
+                    <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink">
+                      <input
+                        type="radio"
+                        name="auto-accept"
+                        checked={autoAcceptOrders === 'on'}
+                        onChange={() => setAutoAcceptOrders('on')}
+                        className="size-4 cursor-pointer accent-primary"
+                      />
+                      On
+                    </label>
+                    <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink">
+                      <input
+                        type="radio"
+                        name="auto-accept"
+                        checked={autoAcceptOrders === 'off'}
+                        onChange={() => setAutoAcceptOrders('off')}
+                        className="size-4 cursor-pointer accent-primary"
+                      />
+                      Off
+                    </label>
+                  </div>
+                  <MutedHelp>
+                    Note : Make sure, your KOT printer is assigned properly while
+                    enabling auto accept flag. If not, this will result into
+                    queuing of the KOT print. Change in auto accept flag will take
+                    a minute to get reflect once changed.
+                  </MutedHelp>
+
+                  <div className="rounded-xl border border-line p-4">
+                    <div className="flex items-center justify-between border-b border-line pb-3">
+                      <h4 className="text-sm font-semibold text-ink">
+                        Auto Accept Timing
+                      </h4>
+                      <OutlineButton variant="primary" onClick={addTimingRow}>
+                        <Plus size={15} />
+                        <span>Add new</span>
+                      </OutlineButton>
                     </div>
 
-                    {/* 10. Auto Accept Timing */}
-                    <div className="space-y-3 rounded-xl border border-line p-4 sm:p-5">
-                      <div className="flex items-center justify-between border-b border-line pb-3">
-                        <h4 className="text-sm font-bold text-ink">Auto Accept Timing</h4>
-                        <OutlineButton variant="primary" onClick={addTimingRow}>
-                          <Plus size={15} />
-                          <span>Add new</span>
+                    <div className="space-y-3 pt-3">
+                      {(platform === 'zomato' ? zomatoTimings : swiggyTimings).map(
+                        (timing) => (
+                          <div
+                            key={timing.id}
+                            className="flex flex-wrap items-end gap-3 rounded-lg bg-page/60 p-3.5"
+                          >
+                            <label className="min-w-[140px] flex-1 text-xs font-semibold text-muted">
+                              From <span className="text-danger">*</span>
+                              <select
+                                value={timing.from}
+                                onChange={(e) =>
+                                  updateTiming(timing.id, 'from', e.target.value)
+                                }
+                                className="mt-1 h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+                              >
+                                {TIME_FROM_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="min-w-[140px] flex-1 text-xs font-semibold text-muted">
+                              To <span className="text-danger">*</span>
+                              <select
+                                value={timing.to}
+                                onChange={(e) =>
+                                  updateTiming(timing.id, 'to', e.target.value)
+                                }
+                                className="mt-1 h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+                              >
+                                {TIME_TO_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            {(platform === 'zomato'
+                              ? zomatoTimings.length
+                              : swiggyTimings.length) > 1 ? (
+                              <button
+                                type="button"
+                                aria-label="Remove timing window"
+                                onClick={() => removeTimingRow(timing.id)}
+                                className="inline-flex h-10 w-10 items-center justify-center text-muted hover:text-danger"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            ) : null}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </ConfigSectionCard>
+
+              <ConfigSectionCard
+                icon={<Package size={16} />}
+                title="Packaging Charges"
+                description="Configure how packaging charges apply to platform orders."
+              >
+                {platform === 'zomato' ? (
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-ink">
+                        Packaging Charge Applicable On
+                      </p>
+                      <div className="flex flex-wrap items-center gap-6">
+                        {(
+                          [
+                            ['item', 'Item'],
+                            ['order', 'Order'],
+                            ['none', 'None'],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <label
+                            key={value}
+                            className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink"
+                          >
+                            <input
+                              type="radio"
+                              name="pkg-app"
+                              checked={packagingApplicableOn === value}
+                              onChange={() => setPackagingApplicableOn(value)}
+                              className="size-4 cursor-pointer accent-primary"
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-ink">
+                        Packaging Charge Type <span className="text-danger">*</span>
+                      </p>
+                      <div className="flex flex-wrap items-center gap-6">
+                        {(
+                          [
+                            ['item', 'Consider from item'],
+                            ['fixed', 'Fixed'],
+                            ['percentage', 'Percentage'],
+                            ['slabwise', 'Packing charge Slabwise Strictly'],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <label
+                            key={value}
+                            className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink"
+                          >
+                            <input
+                              type="radio"
+                              name="pkg-type"
+                              checked={packagingChargeType === value}
+                              onChange={() => setPackagingChargeType(value)}
+                              className="size-4 cursor-pointer accent-primary"
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-6">
+                    <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink">
+                      <input
+                        type="radio"
+                        name="apply-pkg"
+                        checked={applyPackagingCharge === 'no'}
+                        onChange={() => setApplyPackagingCharge('no')}
+                        className="size-4 cursor-pointer accent-primary"
+                      />
+                      No
+                    </label>
+                    <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink">
+                      <input
+                        type="radio"
+                        name="apply-pkg"
+                        checked={applyPackagingCharge === 'yes'}
+                        onChange={() => setApplyPackagingCharge('yes')}
+                        className="size-4 cursor-pointer accent-primary"
+                      />
+                      Yes
+                    </label>
+                  </div>
+                )}
+              </ConfigSectionCard>
+
+              {platform === 'zomato' ? (
+                <ConfigSectionCard
+                  icon={<Milk size={16} />}
+                  title="Paneer/Cheese Declaration"
+                  description="Declare the type of paneer or cheese used before pushing the menu."
+                >
+                  <div className="space-y-3">
+                    <CheckRow
+                      checked={naturalPaneer}
+                      onChange={setNaturalPaneer}
+                      label="Natural (Paneer / Cheese)"
+                    />
+                    <CheckRow
+                      checked={analoguePaneer}
+                      onChange={setAnaloguePaneer}
+                      label="Analogue Paneer"
+                    />
+                    <CheckRow
+                      checked={analogueCheese}
+                      onChange={setAnalogueCheese}
+                      label="Analogue Cheese"
+                    />
+                    <MutedHelp>
+                      Note : As per government guidelines, restaurants using
+                      paneer or cheese must declare whether the product used is
+                      Regular (Dairy) or Analogue before pushing the menu to
+                      Zomato.
+                    </MutedHelp>
+                  </div>
+                </ConfigSectionCard>
+              ) : null}
+
+              <ConfigSectionCard
+                icon={<RefreshCw size={16} />}
+                title={
+                  platform === 'zomato'
+                    ? 'Zomato Status & Actions'
+                    : 'Swiggy Status & Actions'
+                }
+                description="Sync availability status and timings with the platform."
+              >
+                {platform === 'swiggy' ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-line bg-card p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+                        <h4 className="text-sm font-semibold text-ink">
+                          Change Status On Swiggy
+                        </h4>
+                        <OutlineButton
+                          variant="gray"
+                          onClick={() => showToast('Updating Swiggy status…')}
+                        >
+                          <span>Update Status</span>
                         </OutlineButton>
                       </div>
 
-                      <div className="space-y-3">
-                        {(platform === 'zomato' ? zomatoTimings : swiggyTimings).map(
-                          (timing) => (
-                            <div
-                              key={timing.id}
-                              className="flex flex-wrap items-center gap-4 rounded-lg bg-page/60 p-3.5"
-                            >
-                              <label className="flex-1 text-sm font-semibold text-muted">
-                                From <span className="text-danger">*</span>
-                                <select
-                                  value={timing.from}
-                                  onChange={(e) => {
-                                    const val = e.target.value
-                                    if (platform === 'zomato') {
-                                      setZomatoTimings((prev) =>
-                                        prev.map((t) =>
-                                          t.id === timing.id
-                                            ? { ...t, from: val }
-                                            : t,
-                                        ),
-                                      )
-                                    } else {
-                                      setSwiggyTimings((prev) =>
-                                        prev.map((t) =>
-                                          t.id === timing.id
-                                            ? { ...t, from: val }
-                                            : t,
-                                        ),
-                                      )
-                                    }
-                                  }}
-                                  className="mt-1 h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
-                                >
-                                  <option value="00:00">00:00</option>
-                                  <option value="03:30">03:30</option>
-                                  <option value="06:00">06:00</option>
-                                  <option value="12:00">12:00</option>
-                                  <option value="18:00">18:00</option>
-                                </select>
-                              </label>
-
-                              <label className="flex-1 text-sm font-semibold text-muted">
-                                To <span className="text-danger">*</span>
-                                <select
-                                  value={timing.to}
-                                  onChange={(e) => {
-                                    const val = e.target.value
-                                    if (platform === 'zomato') {
-                                      setZomatoTimings((prev) =>
-                                        prev.map((t) =>
-                                          t.id === timing.id ? { ...t, to: val } : t,
-                                        ),
-                                      )
-                                    } else {
-                                      setSwiggyTimings((prev) =>
-                                        prev.map((t) =>
-                                          t.id === timing.id ? { ...t, to: val } : t,
-                                        ),
-                                      )
-                                    }
-                                  }}
-                                  className="mt-1 h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
-                                >
-                                  <option value="24:00">24:00</option>
-                                  <option value="09:30">09:30</option>
-                                  <option value="12:00">12:00</option>
-                                  <option value="18:00">18:00</option>
-                                </select>
-                              </label>
-
-                              {(platform === 'zomato'
-                                ? zomatoTimings.length
-                                : swiggyTimings.length) > 1 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => removeTimingRow(timing.id)}
-                                  className="mt-6 text-muted hover:text-danger"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                              ) : null}
-                            </div>
-                          ),
-                        )}
+                      <div className="space-y-2 pt-3">
+                        <p className="text-sm font-semibold text-ink">
+                          Change The Status To Mark Your Restaurant Status On
+                          Swiggy
+                        </p>
+                        <div className="space-y-2 pt-1">
+                          <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink">
+                            <input
+                              type="radio"
+                              name="swiggy-deliv-status"
+                              checked={swiggyDeliveryStatus === 'open'}
+                              onChange={() => setSwiggyDeliveryStatus('open')}
+                              className="size-4 cursor-pointer accent-primary"
+                            />
+                            Open for Delivery
+                          </label>
+                          <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink">
+                            <input
+                              type="radio"
+                              name="swiggy-deliv-status"
+                              checked={swiggyDeliveryStatus === 'closed'}
+                              onChange={() => setSwiggyDeliveryStatus('closed')}
+                              className="size-4 cursor-pointer accent-primary"
+                            />
+                            Closed for Delivery
+                          </label>
+                        </div>
+                        <MutedHelp>
+                          NOTE Select the above option to change the availability
+                          for Swiggy Online Order acceptance. If you select 'Closed
+                          for Delivery' will change the Swiggy status as 'Closed'
+                          so you won't get any online order from Swiggy for today
+                        </MutedHelp>
                       </div>
                     </div>
 
-                    {/* SWIGGY ONLY: Apply Packaging Charge */}
-                    {platform === 'swiggy' && (
-                      <div className="space-y-2">
-                        <label className="block text-sm font-bold text-ink">
-                          Apply Packaging Charge
-                        </label>
-                        <div className="flex items-center gap-6">
-                          <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                            <input
-                              type="radio"
-                              name="apply-pkg"
-                              checked={applyPackagingCharge === 'no'}
-                              onChange={() => setApplyPackagingCharge('no')}
-                              className="size-4 accent-primary cursor-pointer"
-                            />
-                            <span>No</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                            <input
-                              type="radio"
-                              name="apply-pkg"
-                              checked={applyPackagingCharge === 'yes'}
-                              onChange={() => setApplyPackagingCharge('yes')}
-                              className="size-4 accent-primary cursor-pointer"
-                            />
-                            <span>Yes</span>
-                          </label>
-                        </div>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-page/40 p-4">
+                      <span className="text-sm font-semibold text-ink">
+                        Change Opening Timing On Swiggy
+                      </span>
+                      <OutlineButton
+                        variant="gray"
+                        onClick={() => showToast('Checking opening timing status…')}
+                      >
+                        <span>Check Status</span>
+                      </OutlineButton>
+                    </div>
 
-                    {/* SWIGGY ONLY: Change Status On Swiggy Container */}
-                    {platform === 'swiggy' && (
-                      <div className="rounded-xl border border-line bg-card p-5 space-y-4 shadow-xs">
-                        <div className="flex items-center justify-between border-b border-line pb-3">
-                          <h4 className="text-sm font-bold text-ink">
-                            Change Status On Swiggy
-                          </h4>
-                          <OutlineButton
-                            variant="gray"
-                            onClick={() => showToast('Updating Swiggy status…')}
-                          >
-                            <span>Update Status</span>
-                          </OutlineButton>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block text-sm font-bold text-ink">
-                            Change The Status To Mark Your Restaurant Status On Swiggy
-                          </label>
-                          <div className="space-y-2 pt-1">
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="swiggy-deliv-status"
-                                checked={swiggyDeliveryStatus === 'open'}
-                                onChange={() => setSwiggyDeliveryStatus('open')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>Open for Delivery</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="radio"
-                                name="swiggy-deliv-status"
-                                checked={swiggyDeliveryStatus === 'closed'}
-                                onChange={() => setSwiggyDeliveryStatus('closed')}
-                                className="size-4 accent-primary cursor-pointer"
-                              />
-                              <span>Closed for Delivery</span>
-                            </label>
-                          </div>
-                          <p className="text-xs font-medium text-muted leading-relaxed pt-1">
-                            NOTE Select the above option to change the availability for Swiggy Online Order acceptance. If you select 'Closed for Delivery' will change the Swiggy status as 'Closed' so you won't get any online order from Swiggy for today
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* SWIGGY ONLY: Change Opening Timing On Swiggy */}
-                    {platform === 'swiggy' && (
-                      <div className="flex items-center justify-between rounded-xl border border-line bg-page/40 p-4">
-                        <span className="text-sm font-bold text-ink">
-                          Change Opening Timing On Swiggy
+                    <div className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <h4 className="mb-3 border-b border-line pb-3 text-sm font-semibold text-ink">
+                        Self Delivery
+                      </h4>
+                      <ToggleSwitch
+                        checked={enableSelfDelivery}
+                        onChange={setEnableSelfDelivery}
+                        label="Enable Self Delivery"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {[
+                      'Change Status On Zomato',
+                      'Check Outlet Logistics Status On Zomato',
+                      'Change Outlet Takeaway Status On Zomato',
+                      'Change Outlet Delivery Timings On Zomato',
+                      'Change Outlet Self Delivery Timings On Zomato',
+                      'Change Outlet Takeaway Timings On Zomato',
+                    ].map((actionTitle) => (
+                      <div
+                        key={actionTitle}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-page/40 p-4"
+                      >
+                        <span className="text-sm font-semibold text-ink">
+                          {actionTitle}
                         </span>
                         <OutlineButton
                           variant="gray"
-                          onClick={() => showToast('Checking opening timing status…')}
+                          onClick={() =>
+                            showToast(`Checking status for ${actionTitle}…`)
+                          }
                         >
                           <span>Check Status</span>
                         </OutlineButton>
                       </div>
-                    )}
-
-                    {/* SWIGGY ONLY: Self Delivery Box */}
-                    {platform === 'swiggy' && (
-                      <div className="rounded-xl border border-line bg-card p-5 space-y-4 shadow-xs">
-                        <h4 className="text-sm font-bold text-ink border-b border-line pb-3">
-                          Self Delivery
-                        </h4>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-ink">
-                            Enable Self Delivery
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setEnableSelfDelivery(!enableSelfDelivery)}
-                            className={`relative h-6 w-11 rounded-full transition-colors ${
-                              enableSelfDelivery ? 'bg-primary' : 'bg-slate-300'
-                            }`}
-                          >
-                            <span
-                              className={`absolute top-1 left-1 size-4 rounded-full bg-white transition-transform ${
-                                enableSelfDelivery ? 'translate-x-5' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ZOMATO ONLY: Paneer/Cheese & Action Cards */}
-                    {platform === 'zomato' && (
-                      <>
-                        <div className="space-y-2">
-                          <label className="block text-sm font-bold text-ink">
-                            Paneer/Cheese Declaration Configuration
-                          </label>
-                          <div className="flex flex-wrap items-center gap-6">
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="checkbox"
-                                checked={naturalPaneer}
-                                onChange={(e) => setNaturalPaneer(e.target.checked)}
-                                className="size-4 rounded accent-primary cursor-pointer"
-                              />
-                              <span>Natural (Paneer / Cheese)</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="checkbox"
-                                checked={analoguePaneer}
-                                onChange={(e) => setAnaloguePaneer(e.target.checked)}
-                                className="size-4 rounded accent-primary cursor-pointer"
-                              />
-                              <span>Analogue Paneer</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
-                              <input
-                                type="checkbox"
-                                checked={analogueCheese}
-                                onChange={(e) => setAnalogueCheese(e.target.checked)}
-                                className="size-4 rounded accent-primary cursor-pointer"
-                              />
-                              <span>Analogue Cheese</span>
-                            </label>
-                          </div>
-                          <p className="text-xs font-medium text-muted leading-relaxed">
-                            Note : As per government guidelines, restaurants using paneer or cheese must declare whether the product used is Regular (Dairy) or Analogue before pushing the menu to Zomato.
-                          </p>
-                        </div>
-
-                        <div className="space-y-3 pt-2">
-                          {[
-                            'Change Status On Zomato',
-                            'Check Outlet Logistics Status On Zomato',
-                            'Change Outlet Takeaway Status On Zomato',
-                            'Change Outlet Delivery Timings On Zomato',
-                            'Change Outlet Self Delivery Timings On Zomato',
-                            'Change Outlet Takeaway Timings On Zomato',
-                          ].map((actionTitle) => (
-                            <div
-                              key={actionTitle}
-                              className="flex items-center justify-between rounded-xl border border-line bg-page/40 p-4"
-                            >
-                              <span className="text-sm font-bold text-ink">
-                                {actionTitle}
-                              </span>
-                              <OutlineButton
-                                variant="gray"
-                                onClick={() => showToast(`Checking status for ${actionTitle}…`)}
-                              >
-                                <span>Check Status</span>
-                              </OutlineButton>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                    ))}
                   </div>
-                </div>
-              </>
-            )}
+                )}
+              </ConfigSectionCard>
 
-            {/* POS SUBSCRIPTION TAB */}
-            {activeTab === 'pos-subscription' && (
-              <div className="p-6 space-y-6 flex-1">
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold text-ink">
-                    How Would You Like To Send The Ebill Messages To You Customers?
-                  </label>
-                  <div className="flex items-center gap-6 pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
+              <div className="sticky bottom-0 z-20 -mx-1 mt-4 flex justify-end border-t border-line bg-page/95 px-1 py-3 backdrop-blur">
+                <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+              </div>
+            </>
+          ) : null}
+
+          {/* POS SUBSCRIPTION TAB */}
+          {activeTab === 'pos-subscription' ? (
+            <>
+              <ConfigSectionCard
+                icon={<MessageSquare size={16} />}
+                title="Ebill Messages"
+                description="Choose how eBill messages reach your customers."
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center gap-6">
+                    <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink">
                       <input
                         type="radio"
                         name="ebill-type-pos"
@@ -867,9 +827,9 @@ export default function MarketplaceSettingPage() {
                         onChange={() => setMessageType('text')}
                         className="size-4 cursor-pointer accent-primary"
                       />
-                      <span>Text message</span>
+                      Text message
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-ink select-none">
+                    <label className="inline-flex cursor-pointer select-none items-center gap-2 text-sm text-ink">
                       <input
                         type="radio"
                         name="ebill-type-pos"
@@ -877,82 +837,95 @@ export default function MarketplaceSettingPage() {
                         onChange={() => setMessageType('whatsapp')}
                         className="size-4 cursor-pointer accent-primary"
                       />
-                      <span>WhatsApp Message</span>
+                      WhatsApp Message
                     </label>
                   </div>
-                  <p className="text-xs text-muted font-medium pt-1">
-                    [Note: This configuration would not work if you have an active WhatsApp campaign or Green Receipt to send the ebill to customers.]
-                  </p>
+                  <MutedHelp>
+                    [Note: This configuration would not work if you have an active
+                    WhatsApp campaign or Green Receipt to send the ebill to
+                    customers.]
+                  </MutedHelp>
                 </div>
+              </ConfigSectionCard>
 
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold text-ink">
-                    Provide No. Of Days To Set As POS Subscription Link Expiry Time.
-                  </label>
-                  <input
-                    type="text"
-                    value={expiryDays}
-                    onChange={(e) => setExpiryDays(e.target.value)}
-                    className="h-10 w-full max-w-xl rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
-                  />
-                  <p className="text-xs text-muted font-medium">
-                    [Mentioning " 0 " days will consider as Link will not to expire ever.]
-                  </p>
+              <ConfigSectionCard
+                icon={<Link2 size={16} />}
+                title="Subscription Link"
+                description="Control expiry and sender identity of POS subscription links."
+              >
+                <div className="space-y-4">
+                  <ConfigFormRow label="POS Subscription Link Expiry Time (Days)" align="center">
+                    <>
+                      <input
+                        type="text"
+                        value={expiryDays}
+                        onChange={(e) => setExpiryDays(e.target.value)}
+                        className={`${inputClass} max-w-md`}
+                      />
+                      <MutedHelp>
+                        [Mentioning " 0 " days will consider as Link will not to
+                        expire ever.]
+                      </MutedHelp>
+                    </>
+                  </ConfigFormRow>
+
+                  <ConfigFormRow label="Sender ID" align="center">
+                    <>
+                      <input
+                        type="text"
+                        value={senderId}
+                        onChange={(e) => setSenderId(e.target.value)}
+                        className={`${inputClass} max-w-md`}
+                      />
+                      <MutedHelp>
+                        [Enter your 6 characters Sender ID. The sender ID is the
+                        name of the eBill sender which will display on the
+                        customer's phone eg. DM-PPOOJA or MD-PTPOOJ.]
+                      </MutedHelp>
+                    </>
+                  </ConfigFormRow>
                 </div>
+              </ConfigSectionCard>
 
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold text-ink">
-                    Sender ID
-                  </label>
-                  <input
-                    type="text"
-                    value={senderId}
-                    onChange={(e) => setSenderId(e.target.value)}
-                    placeholder=""
-                    className="h-10 w-full max-w-xl rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
-                  />
-                  <p className="text-xs text-muted font-medium max-w-xl">
-                    [Enter your 6 characters Sender ID. The sender ID is the name of the eBill sender which will display on the customer's phone eg. DM-PPOOJA or MD-PTPOOJ.]
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* TALLY INTEGRATION TAB */}
-            {activeTab === 'tally-integration' && (
-              <div className="p-6 space-y-5 flex-1">
-                <h3 className="text-sm font-bold text-ink">Active Plan</h3>
-
-                <div className="overflow-hidden rounded-xl border border-line">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-sky-50/50 border-b border-line text-xs font-bold text-ink">
-                      <tr>
-                        <th className="px-4 py-3 font-bold w-24">Sr No.</th>
-                        <th className="px-4 py-3 font-bold">Plan</th>
-                        <th className="px-4 py-3 font-bold">Range</th>
-                        <th className="px-4 py-3 font-bold">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line bg-card">
-                      <tr>
-                        <td className="px-4 py-3 font-semibold text-ink">1</td>
-                        <td className="px-4 py-3 font-semibold text-ink">Custom plan</td>
-                        <td className="px-4 py-3 font-semibold text-ink">16 Mar 2024 To 4 Aug 2024</td>
-                        <td className="px-4 py-3 text-ink"></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Action Footer Bar */}
-            {activeTab !== 'tally-integration' && (
-              <div className="flex items-center justify-end border-t border-line bg-page p-4">
+              <div className="sticky bottom-0 z-20 -mx-1 mt-4 flex justify-end border-t border-line bg-page/95 px-1 py-3 backdrop-blur">
                 <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
               </div>
-            )}
-          </div>
+            </>
+          ) : null}
+
+          {/* TALLY INTEGRATION TAB */}
+          {activeTab === 'tally-integration' ? (
+            <ConfigSectionCard
+              icon={<TableProperties size={16} />}
+              title="Active Plan"
+              description="Your current Tally integration plan."
+            >
+              <div className="overflow-hidden rounded-xl border border-line">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-line bg-primary/5 text-xs font-semibold text-ink">
+                    <tr>
+                      <th className="w-24 px-4 py-3 font-semibold">Sr No.</th>
+                      <th className="px-4 py-3 font-semibold">Plan</th>
+                      <th className="px-4 py-3 font-semibold">Range</th>
+                      <th className="px-4 py-3 font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line bg-card">
+                    <tr>
+                      <td className="px-4 py-3 font-semibold text-ink">1</td>
+                      <td className="px-4 py-3 font-semibold text-ink">
+                        Custom plan
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-ink">
+                        16 Mar 2024 To 4 Aug 2024
+                      </td>
+                      <td className="px-4 py-3 text-ink"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </ConfigSectionCard>
+          ) : null}
         </div>
       </div>
     </ReportsPageShell>

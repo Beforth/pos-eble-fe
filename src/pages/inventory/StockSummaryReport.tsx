@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, FileText, Info } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ChevronDown,
+  FileText,
+  Info,
+  Package,
+  TrendingDown,
+} from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
@@ -200,6 +208,20 @@ export default function StockSummaryReport() {
     return ALL_ROWS.filter((row) => row.rawMaterial.toLowerCase().includes(q))
   }, [appliedQuery])
 
+  const summary = useMemo(() => {
+    let totalIn = 0
+    let totalOut = 0
+    let closingStock = 0
+    let difference = 0
+    for (const row of filteredRows) {
+      totalIn += Number.parseFloat(row.totalIn) || 0
+      totalOut += Number.parseFloat(row.totalOut) || 0
+      closingStock += Number.parseFloat(row.closingStock) || 0
+      difference += Number.parseFloat(row.difference) || 0
+    }
+    return { totalIn, totalOut, closingStock, difference }
+  }, [filteredRows])
+
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
   const pageRows = filteredRows.slice(
@@ -251,79 +273,134 @@ export default function StockSummaryReport() {
         </div>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-bold text-ink">Stock Summary Report</h1>
-        <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
-          onExportPagePdf={() => showToast('Exported current page to PDF')}
-          onExportAllPdf={() => showToast('Exported all to PDF')}
-        />
+      <h1 className="mb-5 text-lg font-bold text-ink">Stock Summary Report</h1>
+
+      {/* KPI Summary */}
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <article className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-8 items-center justify-center rounded-lg bg-success/10">
+              <ArrowDownToLine size={16} className="text-success" />
+            </span>
+            <p className="text-xs font-medium text-muted">Total Inbound</p>
+          </div>
+          <p className="mt-3 text-xl font-bold text-ink">{summary.totalIn.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</p>
+        </article>
+        <article className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <ArrowUpFromLine size={16} className="text-primary" />
+            </span>
+            <p className="text-xs font-medium text-muted">Total Outbound</p>
+          </div>
+          <p className="mt-3 text-xl font-bold text-ink">{summary.totalOut.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</p>
+        </article>
+        <article className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-8 items-center justify-center rounded-lg bg-accent/10">
+              <Package size={16} className="text-accent" />
+            </span>
+            <p className="text-xs font-medium text-muted">Closing Stock</p>
+          </div>
+          <p className="mt-3 text-xl font-bold text-ink">{summary.closingStock.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</p>
+        </article>
+        <article className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-8 items-center justify-center rounded-lg bg-secondary/30">
+              <TrendingDown size={16} className="text-deep" />
+            </span>
+            <p className="text-xs font-medium text-muted">Difference</p>
+          </div>
+          <p className="mt-3 text-xl font-bold text-ink">{summary.difference.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</p>
+        </article>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
-        <div className="min-w-[160px] flex-1">
-          <label className="mb-1.5 block text-sm font-medium text-ink">
-            Raw Material
-          </label>
-          <input
-            type="text"
-            value={rawMaterial}
-            onChange={(event) => setRawMaterial(event.target.value)}
-            className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
-          />
+      {/* Filters */}
+      <section className="mb-5 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
+        <div className="mb-4">
+          <h2 className="text-sm font-bold text-ink">Filters</h2>
+          <p className="mt-0.5 text-xs text-muted">Filter by raw material, category, unit type, or date range.</p>
         </div>
-        <div className="min-w-[150px]">
-          <SearchableSelect
-            label="Category"
-            value={category}
-            options={CATEGORY_OPTIONS}
-            placeholder="All"
-            searchPlaceholder="Search"
-            includePlaceholderOption={false}
-            onChange={setCategory}
-          />
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[160px] flex-1">
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              Raw Material
+            </label>
+            <input
+              type="text"
+              value={rawMaterial}
+              onChange={(event) => setRawMaterial(event.target.value)}
+              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
+          <div className="min-w-[150px]">
+            <SearchableSelect
+              label="Category"
+              value={category}
+              options={CATEGORY_OPTIONS}
+              placeholder="All"
+              searchPlaceholder="Search"
+              includePlaceholderOption={false}
+              onChange={setCategory}
+            />
+          </div>
+          <div className="min-w-[150px]">
+            <SearchableSelect
+              label="Unit Type"
+              value={unitType}
+              options={UNIT_TYPE_OPTIONS}
+              placeholder="Purchase Unit"
+              searchPlaceholder="Search"
+              includePlaceholderOption={false}
+              onChange={setUnitType}
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              From Date
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(event) => setFromDate(event.target.value)}
+              className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              To Date
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(event) => setToDate(event.target.value)}
+              className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            />
+          </div>
+          <OutlineButton onClick={handleSearch}>Search</OutlineButton>
+          <OutlineButton variant="gray" onClick={handleClear}>
+            Clear
+          </OutlineButton>
         </div>
-        <div className="min-w-[150px]">
-          <SearchableSelect
-            label="Unit Type"
-            value={unitType}
-            options={UNIT_TYPE_OPTIONS}
-            placeholder="Purchase Unit"
-            searchPlaceholder="Search"
-            includePlaceholderOption={false}
-            onChange={setUnitType}
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink">
-            From Date
-          </label>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(event) => setFromDate(event.target.value)}
-            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink">
-            To Date
-          </label>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(event) => setToDate(event.target.value)}
-            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
-          />
-        </div>
-        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
-        <OutlineButton variant="gray" onClick={handleClear}>
-          Clear
-        </OutlineButton>
-      </div>
+      </section>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
+      {/* Table */}
+      <section className="rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+          <div>
+            <h2 className="text-sm font-bold text-ink">Stock Summary</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              {filteredRows.length} raw materials &middot; {fromRecord}–{toRecord} shown
+            </p>
+          </div>
+          <ExportMenu
+            onExportPage={() => showToast('Exported current page')}
+            onExportAll={() => showToast('Exported all')}
+            onExportPagePdf={() => showToast('Exported current page to PDF')}
+            onExportAllPdf={() => showToast('Exported all to PDF')}
+          />
+        </div>
+
         <div className="overflow-x-auto">
           <table className="min-w-[1400px] w-full text-left text-sm">
             <thead className="border-b border-line bg-page text-xs">
@@ -453,7 +530,7 @@ export default function StockSummaryReport() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
     </InventoryPageShell>
   )
 }

@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { FileSpreadsheet, Grid3x3, Plus, X } from 'lucide-react'
 
 interface AddNewItemsModalProps {
   open: boolean
   onClose: () => void
+  onSingleItem?: () => void
   onGrid?: () => void
   onSheet?: () => void
   onAddCombo?: () => void
@@ -13,6 +14,7 @@ interface AddNewItemsModalProps {
 export function AddNewItemsModal({
   open,
   onClose,
+  onSingleItem,
   onGrid,
   onSheet,
   onAddCombo,
@@ -45,7 +47,7 @@ export function AddNewItemsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-new-items-title"
-        className="relative z-10 w-full max-w-xl overflow-hidden rounded-lg border border-line bg-card shadow-xl"
+        className="relative z-10 w-full max-w-lg overflow-hidden rounded-lg border border-line bg-card shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2
@@ -64,53 +66,98 @@ export function AddNewItemsModal({
           </button>
         </div>
 
-        <div className="space-y-6 px-5 py-6">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p className="min-w-[160px] text-sm font-medium text-ink">
-              Add New Item(S) Using
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                onGrid?.()
-                onClose()
-              }}
-              className="inline-flex h-9 min-w-[88px] cursor-pointer items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
-            >
-              Grid
-            </button>
-            <span className="text-sm font-medium text-ink">OR</span>
-            <button
-              type="button"
-              onClick={() => {
-                onSheet?.()
-                onClose()
-              }}
-              className="inline-flex h-9 min-w-[88px] cursor-pointer items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
-            >
-              Sheet
-            </button>
-          </div>
+        <div className="space-y-3 px-5 py-5">
+          <button
+            type="button"
+            onClick={() => {
+              onSingleItem?.()
+              onClose()
+            }}
+            className="flex w-full cursor-pointer items-start gap-3 rounded-xl border border-line bg-card p-4 text-left transition-colors hover:border-primary/35 hover:bg-page/50"
+          >
+            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+              <Plus size={20} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-ink">
+                Single Item
+              </span>
+              <span className="mt-1 block text-xs leading-relaxed text-muted">
+                Add one item with full details — name, price, tags &amp; more
+              </span>
+            </span>
+          </button>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <p className="min-w-[160px] text-sm font-medium text-ink sm:min-w-[200px]">
-              Add Combo Item(S) To Your Menu
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                onAddCombo?.()
-                onClose()
-              }}
-              className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
-            >
-              Add New Combo
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onGrid?.()
+              onClose()
+            }}
+            className="flex w-full cursor-pointer items-start gap-3 rounded-xl border border-line bg-card p-4 text-left transition-colors hover:border-primary/35 hover:bg-page/50"
+          >
+            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Grid3x3 size={20} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-ink">
+                Grid
+              </span>
+              <span className="mt-1 block text-xs leading-relaxed text-muted">
+                Add items in a spreadsheet-style table with inline editing
+              </span>
+            </span>
+          </button>
 
-          <p className="text-sm leading-relaxed text-primary">
-            The Item(S) Will Be Added To The Basemenu And Will Be In Inactive
-            Status In All Areas Until You Mark Them Activated.
+          <button
+            type="button"
+            onClick={() => {
+              onSheet?.()
+              onClose()
+            }}
+            className="flex w-full cursor-pointer items-start gap-3 rounded-xl border border-line bg-card p-4 text-left transition-colors hover:border-primary/35 hover:bg-page/50"
+          >
+            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <FileSpreadsheet size={20} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-ink">
+                Import via Sheet (CSV)
+              </span>
+              <span className="mt-1 block text-xs leading-relaxed text-muted">
+                Download a CSV template, fill it in, and upload to bulk-add
+                items
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onAddCombo?.()
+              onClose()
+            }}
+            className="flex w-full cursor-pointer items-start gap-3 rounded-xl border border-line bg-card p-4 text-left transition-colors hover:border-primary/35 hover:bg-page/50"
+          >
+            <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+              <Grid3x3 size={20} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-ink">
+                Create Combo
+              </span>
+              <span className="mt-1 block text-xs leading-relaxed text-muted">
+                Bundle multiple items into a combo with a single price
+              </span>
+            </span>
+          </button>
+        </div>
+
+        <div className="border-t border-line px-5 py-3.5">
+          <p className="text-xs leading-relaxed text-muted">
+            Items will be added to the base menu in{' '}
+            <span className="font-semibold text-ink">inactive</span> status
+            until you mark them activated.
           </p>
         </div>
       </div>

@@ -104,7 +104,7 @@ export default function FinanceExpenses() {
       ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-ink">Expenses</h1>
+          <h1 className="text-lg font-bold text-ink">Expenses</h1>
         <button
           type="button"
           onClick={() => showToast('Download started')}
@@ -121,7 +121,6 @@ export default function FinanceExpenses() {
           amount={EXPENSE_SUMMARY.expense.amount}
           count={EXPENSE_SUMMARY.expense.count}
           icon={<Receipt size={18} />}
-          accent="border-l-primary"
           iconClass="bg-primary/10 text-primary"
         />
         <SummaryCard
@@ -129,7 +128,6 @@ export default function FinanceExpenses() {
           amount={EXPENSE_SUMMARY.withdrawal.amount}
           count={EXPENSE_SUMMARY.withdrawal.count}
           icon={<Banknote size={18} />}
-          accent="border-l-secondary"
           iconClass="bg-secondary/40 text-deep"
         />
         <SummaryCard
@@ -137,7 +135,6 @@ export default function FinanceExpenses() {
           amount={EXPENSE_SUMMARY.cashTopUp.amount}
           count={EXPENSE_SUMMARY.cashTopUp.count}
           icon={<PiggyBank size={18} />}
-          accent="border-l-success"
           iconClass="bg-success/10 text-success"
         />
       </div>
@@ -238,7 +235,7 @@ export default function FinanceExpenses() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
+      <div className="overflow-hidden rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto">
           <table className="min-w-[900px] w-full text-left text-sm">
             <thead className="border-b border-line bg-page text-xs font-semibold text-ink">
@@ -337,19 +334,17 @@ function SummaryCard({
   amount,
   count,
   icon,
-  accent,
   iconClass,
 }: {
   title: string
   amount: number
   count: number
   icon: ReactNode
-  accent: string
   iconClass: string
 }) {
   return (
     <div
-      className={`rounded-xl border border-line border-l-4 bg-card p-4 ${accent}`}
+      className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
     >
       <div className="mb-3 flex items-start justify-between gap-2">
         <span

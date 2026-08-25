@@ -46,11 +46,18 @@ export function MenuPageShell({
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
 
   useEffect(() => {
     if (shouldAutoCollapse) setCollapsed(true)
   }, [shouldAutoCollapse])
+
+  function handleSync() {
+    if (syncing) return
+    setSyncing(true)
+    window.setTimeout(() => setSyncing(false), 1500)
+  }
 
   const closeOtherDrawers = () => {
     setSupportOpen(false)
@@ -101,8 +108,8 @@ export function MenuPageShell({
           title={title}
           actions={
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-muted">
-                <RefreshCw size={13} className="text-accent" />
+              <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm text-muted">
+                <RefreshCw size={14} className="text-accent" />
                 Last Menu Sync{' '}
                 <span className="rounded bg-accent/15 px-1.5 py-0.5 font-semibold text-accent">
                   12 hr ago
@@ -110,9 +117,10 @@ export function MenuPageShell({
               </span>
               <button
                 type="button"
+                onClick={handleSync}
                 className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-3 text-sm font-semibold text-white hover:brightness-95"
               >
-                <RefreshCw size={14} />
+                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
                 Sync POS
               </button>
               <button

@@ -8,30 +8,12 @@ import {
 } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
+import { AggregatorLogo } from '../components/common/AggregatorLogo'
 
 interface ChannelCard {
   id: string
   label: string
   icon: ReactNode
-}
-
-function AggregatorLogo({ name }: { name: 'Zomato' | 'Swiggy' }) {
-  const isSwiggy = name === 'Swiggy'
-  return (
-    <span className="relative inline-flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-page">
-      <img
-        src={isSwiggy ? '/swiggy.png' : '/zomato.png'}
-        alt={`${name} logo`}
-        width={isSwiggy ? 36 : 28}
-        height={isSwiggy ? 36 : 28}
-        className={
-          isSwiggy
-            ? 'absolute size-9 max-w-none scale-110 object-cover'
-            : 'size-7 object-contain'
-        }
-      />
-    </span>
-  )
 }
 
 const CHANNELS: ChannelCard[] = [

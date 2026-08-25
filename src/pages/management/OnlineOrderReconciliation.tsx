@@ -8,6 +8,7 @@ import {
   Search,
 } from 'lucide-react'
 import { DatePickerPill, type DateRangeOption } from '../../components/common/DatePickerPill'
+import { AggregatorLogo } from '../../components/common/AggregatorLogo'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { ActionDropdown } from '../../components/menu/MenuActionButtons'
 import { formatDayMonth, parseInputDate } from '../../utils/format'
@@ -34,24 +35,9 @@ interface ReconRow {
 
 const OUTLET_CODE = '5sbhwvqj'
 
-const PLATFORMS: Array<{
-  id: PlatformId
-  name: string
-  logo: string
-  accent: string
-}> = [
-  {
-    id: 'zomato',
-    name: 'Zomato',
-    logo: '/zomato.png',
-    accent: '#e23744',
-  },
-  {
-    id: 'swiggy',
-    name: 'Swiggy',
-    logo: '/swiggy.png',
-    accent: '#fc8019',
-  },
+const PLATFORMS: Array<{ id: PlatformId; name: 'Zomato' | 'Swiggy' }> = [
+  { id: 'zomato', name: 'Zomato' },
+  { id: 'swiggy', name: 'Swiggy' },
 ]
 
 const RECON_TABS: Array<{ id: ReconTabId; label: string }> = [
@@ -224,7 +210,7 @@ function PayoutUploadHistoryDropdown({
                               <Check
                                 size={15}
                                 strokeWidth={2.5}
-                                className="shrink-0 text-emerald-600"
+                                className="shrink-0 text-success"
                               />
                             ) : null}
                           </button>
@@ -457,22 +443,19 @@ export default function OnlineOrderReconciliation() {
               key={item.id}
               type="button"
               onClick={() => setPlatform(item.id)}
-              className={`flex min-w-[160px] items-center gap-3 rounded-xl border bg-card px-4 py-3 text-left transition-colors ${
+              aria-pressed={selected}
+              className={`relative flex min-w-[180px] items-center gap-3 rounded-xl border bg-card px-4 py-3 text-left transition-all ${
                 selected
                   ? 'border-primary shadow-[0_0_0_1px_var(--color-primary)]'
-                  : 'border-line hover:border-muted'
+                  : 'border-line shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-muted'
               }`}
             >
-              <span
-                className="flex size-10 items-center justify-center rounded-lg"
-                style={{ backgroundColor: `${item.accent}14` }}
-              >
-                <img
-                  src={item.logo}
-                  alt=""
-                  className="h-6 w-6 object-contain"
-                />
-              </span>
+              {selected ? (
+                <span className="absolute -right-1.5 -top-1.5 inline-flex size-5 items-center justify-center rounded-full bg-primary text-white shadow">
+                  <Check size={12} strokeWidth={3} />
+                </span>
+              ) : null}
+              <AggregatorLogo name={item.name} />
               <span>
                 <span className="block text-sm font-bold text-ink">
                   {item.name}
@@ -484,7 +467,7 @@ export default function OnlineOrderReconciliation() {
         })}
       </div>
 
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-3">
+      <div className="mb-4 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         <DatePickerPill
           options={DATE_OPTIONS}
           value={dateRange}
@@ -514,7 +497,7 @@ export default function OnlineOrderReconciliation() {
             <CloudUpload size={16} className="text-primary" />
             Upload
           </button>
-          <span className="text-xs text-muted">
+          <span className="max-w-[200px] truncate text-xs text-muted">
             {uploadName || 'Please upload a file'}
           </span>
         </div>
@@ -533,7 +516,7 @@ export default function OnlineOrderReconciliation() {
         />
       </div>
 
-      <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
+      <div className="mb-3 rounded-lg border border-success/25 bg-success/10 px-4 py-2.5 text-sm text-success">
         Last payout sheet uploaded for the period from{' '}
         {selectedPayout.bannerFrom} to {selectedPayout.bannerTo}.
       </div>
@@ -544,22 +527,22 @@ export default function OnlineOrderReconciliation() {
           return (
             <div
               key={tab.id}
-              className={`inline-flex items-center gap-1.5 px-3 py-2.5 text-sm ${
+              className={`group relative inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm transition-colors ${
                 active
-                  ? 'border-b-2 border-sky-600 font-semibold text-sky-700'
-                  : 'border-b-2 border-transparent text-muted'
+                  ? 'border-primary font-semibold text-primary'
+                  : 'border-transparent text-muted hover:text-ink'
               }`}
             >
               <button
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={`transition-colors ${
-                  active ? 'text-sky-700' : 'text-muted hover:text-ink'
+                  active ? 'text-primary' : 'text-muted hover:text-ink'
                 }`}
               >
                 {tab.label}
               </button>
-              <span className="group relative inline-flex">
+              <span className="relative inline-flex">
                 <button
                   type="button"
                   aria-label={`${tab.label} info`}
@@ -569,7 +552,7 @@ export default function OnlineOrderReconciliation() {
                 </button>
                 <span
                   role="tooltip"
-                  className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-72 -translate-x-1/2 rounded-md bg-ink px-3 py-2 text-left text-xs font-normal leading-relaxed text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                  className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-72 -translate-x-1/2 rounded-md bg-ink px-3 py-2 text-left text-xs font-normal leading-relaxed text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 focus-within:opacity-100"
                 >
                   {TAB_INFO[tab.id]}
                 </span>
@@ -596,11 +579,11 @@ export default function OnlineOrderReconciliation() {
       ) : null}
 
       {showEmptyState ? (
-        <div className="overflow-hidden rounded-xl border border-line bg-card">
+        <div className="overflow-hidden rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
           <RecordsNotFound />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-line bg-card">
+        <div className="overflow-hidden rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
             <h2 className="text-sm font-bold text-ink">Order Mismatch List</h2>
             <div className="flex flex-wrap items-center gap-2">

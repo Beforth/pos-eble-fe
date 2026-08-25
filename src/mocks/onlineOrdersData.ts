@@ -429,7 +429,7 @@ export const onlineOrdersList: OnlineOrderRow[] = [
   },
 ]
 
-const chartAnchor = new Date(2026, 6, 23)
+const chartAnchor = new Date()
 
 /** Last 5 days order counts for the Online Orders chart. */
 export const onlineOrdersChartSeries = [

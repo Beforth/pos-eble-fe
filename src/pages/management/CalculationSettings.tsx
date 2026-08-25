@@ -1,65 +1,28 @@
-import { useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useState } from 'react'
 import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
+  BadgePercent,
+  Bike,
+  Gift,
+  Package,
+  Percent,
+  Printer,
+  StickyNote,
+  Tag,
+  Utensils,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import {
+  ConfigBreadcrumb,
+  ConfigFormRow,
+  ConfigSaveBar,
+  ConfigSectionCard,
+  MutedHelp,
+} from '../../components/management/ConfigSectionCard'
+import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 
 const inputClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
 const selectClass = inputClass
-
-function Section({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <section className="space-y-4 border-b border-line pb-8 last:border-b-0 last:pb-0">
-      <div>
-        <h2 className="text-base font-bold text-ink">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm text-muted">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function FormRow({
-  label,
-  required,
-  children,
-  align = 'start',
-}: {
-  label: string
-  required?: boolean
-  children: ReactNode
-  align?: 'start' | 'center'
-}) {
-  return (
-    <div
-      className={`grid gap-2 sm:grid-cols-[280px_minmax(0,1fr)] sm:gap-4 ${
-        align === 'center' ? 'sm:items-center' : 'sm:items-start'
-      }`}
-    >
-      <div className="text-sm font-medium text-ink sm:pt-2">
-        {label} {required ? <span className="text-primary">*</span> : null}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
-}
-
-function Help({ children }: { children: ReactNode }) {
-  return <p className="mt-1.5 text-xs leading-relaxed text-muted">{children}</p>
-}
 
 function RadioGroup({
   name,
@@ -114,7 +77,7 @@ function CheckRow({
       />
       <span>
         <span className="font-medium">{label}</span>
-        {help ? <Help>{help}</Help> : null}
+        {help ? <MutedHelp>{help}</MutedHelp> : null}
       </span>
     </label>
   )
@@ -212,7 +175,7 @@ export default function CalculationSettings() {
   }
 
   return (
-    <ReportsPageShell title="Outlet Configuration" activeItem="config-outlet">
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Calculations" />} activeItem="config-outlet">
       {toast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
           {toast}
@@ -224,25 +187,30 @@ export default function CalculationSettings() {
         Attributes In The Billing Screen.
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="space-y-8 p-5 sm:p-6">
-          <Section title="Round-Off Options">
-            <FormRow label="Round off options for billing">
-              <RadioGroup
-                name="round-off"
-                value={roundOff}
-                options={['Normal', 'Round off up', 'Round off down', 'None']}
-                onChange={setRoundOff}
-              />
-            </FormRow>
-            <FormRow
-              label="Round the number to the increments of"
-              required
-            >
+      <ConfigSectionCard
+        icon={<Percent size={16} />}
+        title="Round-Off Options"
+        description="Rounding behaviour applied to bill totals and menu price inputs."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Round off options for billing" align="center">
+            <RadioGroup
+              name="round-off"
+              value={roundOff}
+              options={['Normal', 'Round off up', 'Round off down', 'None']}
+              onChange={setRoundOff}
+            />
+          </ConfigFormRow>
+          <ConfigFormRow
+            label="Round the number to the increments of"
+            required
+            align="center"
+          >
+            <>
               <select
                 value={roundIncrement}
                 onChange={(event) => setRoundIncrement(event.target.value)}
-                className={selectClass}
+                className={`${selectClass} max-w-xs`}
               >
                 {['1 (Default)', '0.5', '0.25', '0.1', '5', '10'].map(
                   (option) => (
@@ -252,19 +220,22 @@ export default function CalculationSettings() {
                   ),
                 )}
               </select>
-              <Help>
+              <MutedHelp>
                 The number is rounded to the selected increment (e.g. if 0.25 is
                 selected, 2.20 rounds to 2.25).
-              </Help>
-            </FormRow>
-            <FormRow
-              label="Select decimal points for invoice calculation and Menu price input"
-              required
-            >
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+          <ConfigFormRow
+            label="Select decimal points for invoice calculation and Menu price input"
+            required
+            align="center"
+          >
+            <>
               <select
                 value={decimalPoints}
                 onChange={(event) => setDecimalPoints(event.target.value)}
-                className={selectClass}
+                className={`${selectClass} max-w-xs`}
               >
                 {['0', '1', '2', '3'].map((option) => (
                   <option key={option} value={option}>
@@ -272,59 +243,67 @@ export default function CalculationSettings() {
                   </option>
                 ))}
               </select>
-              <Help>
+              <MutedHelp>
                 Rounding is based on the selected decimal points (e.g. if 1 is
                 selected, 0.9277 rounds to 1.0).
-              </Help>
-            </FormRow>
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Service Charge"
-            description="The following settings describes the settings related to the service charge in the billing screen."
-          >
-            <CheckRow
-              checked={displayServiceCharge}
-              onChange={setDisplayServiceCharge}
-              label="Display & Calculate Service Charge"
-            />
-            <Help>
-              According to Central Consumer Protection Authority guidelines,
-              service charges cannot be added by default and outlets cannot
-              charge taxes on service charges.
-            </Help>
-          </Section>
+      <ConfigSectionCard
+        icon={<Utensils size={16} />}
+        title="Service Charge"
+        description="The following settings describes the settings related to the service charge in the billing screen."
+      >
+        <CheckRow
+          checked={displayServiceCharge}
+          onChange={setDisplayServiceCharge}
+          label="Display & Calculate Service Charge"
+        />
+        <MutedHelp>
+          According to Central Consumer Protection Authority guidelines,
+          service charges cannot be added by default and outlets cannot
+          charge taxes on service charges.
+        </MutedHelp>
+      </ConfigSectionCard>
 
-          <Section
-            title="Container Charge"
-            description="The following settings describes the settings related to the container charge in the billing screen."
-          >
-            <CheckRow
-              checked={showContainerCharge}
-              onChange={setShowContainerCharge}
-              label="Show Container Charge On Billing Screen"
+      <ConfigSectionCard
+        icon={<Package size={16} />}
+        title="Container Charge"
+        description="The following settings describes the settings related to the container charge in the billing screen."
+      >
+        <div className="space-y-4">
+          <CheckRow
+            checked={showContainerCharge}
+            onChange={setShowContainerCharge}
+            label="Show Container Charge On Billing Screen"
+          />
+          <ConfigFormRow label="Container Charge Label" required align="center">
+            <input
+              type="text"
+              value={containerLabel}
+              onChange={(event) => setContainerLabel(event.target.value)}
+              className={`${inputClass} max-w-xs`}
             />
-            <FormRow label="Container Charge Label" required>
-              <input
-                type="text"
-                value={containerLabel}
-                onChange={(event) => setContainerLabel(event.target.value)}
-                className={inputClass}
-              />
-            </FormRow>
-            <FormRow label="Container Charge (Calculation Mode)">
+          </ConfigFormRow>
+          <ConfigFormRow label="Container Charge (Calculation Mode)" align="center">
+            <>
               <RadioGroup
                 name="container-mode"
                 value={containerMode}
                 options={['Item Wise', 'Order Wise', 'Fix Per Item']}
                 onChange={setContainerMode}
               />
-              <Help>
+              <MutedHelp>
                 This setting defines whether the container charge is item wise
                 and order wise.
-              </Help>
-            </FormRow>
-            <FormRow label="Calculate Container Charge Automatically" align="start">
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+          <ConfigFormRow label="Calculate Container Charge Automatically">
+            <>
               <div className="flex flex-wrap gap-x-5 gap-y-2">
                 {['PARCEL', 'DINE IN', 'Dine In'].map((option) => (
                   <label
@@ -343,239 +322,251 @@ export default function CalculationSettings() {
                   </label>
                 ))}
               </div>
-              <Help>
+              <MutedHelp>
                 This setting enables container charge without pressing a button
                 beside the label in billing screen.
-              </Help>
-            </FormRow>
-            <CheckRow
-              checked={taxOnContainer}
-              onChange={setTaxOnContainer}
-              label="Calculate tax on Container Charge"
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+          <CheckRow
+            checked={taxOnContainer}
+            onChange={setTaxOnContainer}
+            label="Calculate tax on Container Charge"
+          />
+          <ConfigFormRow label="Set a specific amount to calculate" align="center">
+            <RadioGroup
+              name="container-amount-rule"
+              value={containerAmountRule}
+              options={['Greater Than', 'Less Than', 'None']}
+              onChange={setContainerAmountRule}
             />
-            <FormRow label="Set a specific amount to calculate">
-              <RadioGroup
-                name="container-amount-rule"
-                value={containerAmountRule}
-                options={['Greater Than', 'Less Than', 'None']}
-                onChange={setContainerAmountRule}
-              />
-            </FormRow>
-            <FormRow label="Amount">
-              <input
-                type="text"
-                value={containerAmount}
-                onChange={(event) => setContainerAmount(event.target.value)}
-                className={inputClass}
-              />
-            </FormRow>
-          </Section>
+          </ConfigFormRow>
+          <ConfigFormRow label="Amount" align="center">
+            <input
+              type="text"
+              value={containerAmount}
+              onChange={(event) => setContainerAmount(event.target.value)}
+              className={`${inputClass} max-w-xs`}
+            />
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Delivery Charge"
-            description="The following settings describes the settings related to the delivery charge in the billing screen."
+      <ConfigSectionCard
+        icon={<Bike size={16} />}
+        title="Delivery Charge"
+        description="The following settings describes the settings related to the delivery charge in the billing screen."
+      >
+        <div className="space-y-4">
+          <CheckRow
+            checked={showDeliveryCharge}
+            onChange={setShowDeliveryCharge}
+            label="Show Delivery Charge On Billing Screen"
+            help="This setting would describe what would the delivery charge would be displayed as."
+          />
+          <ConfigFormRow
+            label="Default Delivery Charge (Only for Delivery)"
+            required
+            align="center"
           >
-            <CheckRow
-              checked={showDeliveryCharge}
-              onChange={setShowDeliveryCharge}
-              label="Show Delivery Charge On Billing Screen"
-              help="This setting would describe what would the delivery charge would be displayed as."
+            <input
+              type="text"
+              value={defaultDeliveryCharge}
+              onChange={(event) =>
+                setDefaultDeliveryCharge(event.target.value)
+              }
+              className={`${inputClass} max-w-xs`}
             />
-            <FormRow
-              label="Default Delivery Charge (Only for Delivery)"
-              required
-            >
-              <input
-                type="text"
-                value={defaultDeliveryCharge}
-                onChange={(event) =>
-                  setDefaultDeliveryCharge(event.target.value)
-                }
-                className={inputClass}
-              />
-            </FormRow>
-            <CheckRow
-              checked={taxOnDelivery}
-              onChange={setTaxOnDelivery}
-              label="Calculate tax on Delivery Charge."
+          </ConfigFormRow>
+          <CheckRow
+            checked={taxOnDelivery}
+            onChange={setTaxOnDelivery}
+            label="Calculate tax on Delivery Charge."
+          />
+          <ConfigFormRow label="Set a specific amount to calculate" align="center">
+            <RadioGroup
+              name="delivery-amount-rule"
+              value={deliveryAmountRule}
+              options={['Greater Than', 'Less Than', 'None']}
+              onChange={setDeliveryAmountRule}
             />
-            <FormRow label="Set a specific amount to calculate">
-              <RadioGroup
-                name="delivery-amount-rule"
-                value={deliveryAmountRule}
-                options={['Greater Than', 'Less Than', 'None']}
-                onChange={setDeliveryAmountRule}
-              />
-            </FormRow>
-            <FormRow label="Amount">
-              <input
-                type="text"
-                value={deliveryAmount}
-                onChange={(event) => setDeliveryAmount(event.target.value)}
-                className={inputClass}
-              />
-            </FormRow>
-          </Section>
+          </ConfigFormRow>
+          <ConfigFormRow label="Amount" align="center">
+            <input
+              type="text"
+              value={deliveryAmount}
+              onChange={(event) => setDeliveryAmount(event.target.value)}
+              className={`${inputClass} max-w-xs`}
+            />
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Discount"
-            description="The following settings help in describing the discount in the billing screen."
-          >
-            <div className="space-y-3">
-              <CheckRow
-                checked={taxBeforeDiscount}
-                onChange={setTaxBeforeDiscount}
-                label="Calculate Tax Before Discount Calculation"
-              />
-              <CheckRow
-                checked={backwardTaxAfterDiscount}
-                onChange={setBackwardTaxAfterDiscount}
-                label="Calculate Backward Tax After Discount"
-                help="Note:- Ignore this settings if you are using Forward Tax configuration for your outlet."
-              />
-            </div>
-            <FormRow label="Special Discount Calculation On">
+      <ConfigSectionCard
+        icon={<Tag size={16} />}
+        title="Discount"
+        description="The following settings help in describing the discount in the billing screen."
+      >
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <CheckRow
+              checked={taxBeforeDiscount}
+              onChange={setTaxBeforeDiscount}
+              label="Calculate Tax Before Discount Calculation"
+            />
+            <CheckRow
+              checked={backwardTaxAfterDiscount}
+              onChange={setBackwardTaxAfterDiscount}
+              label="Calculate Backward Tax After Discount"
+              help="Note:- Ignore this settings if you are using Forward Tax configuration for your outlet."
+            />
+          </div>
+          <ConfigFormRow label="Special Discount Calculation On" align="center">
+            <>
               <RadioGroup
                 name="special-discount-on"
                 value={specialDiscountOn}
                 options={['Total', 'Core']}
                 onChange={setSpecialDiscountOn}
               />
-              <Help>
+              <MutedHelp>
                 This setting defines whether the discount is on core or total.
-              </Help>
-            </FormRow>
-            <div className="space-y-3">
-              <CheckRow
-                checked={autoItemCategoryDiscount}
-                onChange={setAutoItemCategoryDiscount}
-                label="Item/ Category discount auto-applied"
-                help="This setting enables discount without pressing a button beside the label in billing screen."
-              />
-              <CheckRow
-                checked={showItemCategoryDiscountBox}
-                onChange={setShowItemCategoryDiscountBox}
-                label="Show Item/Category wise discount box while adding an item"
-              />
-              <CheckRow
-                checked={applyBogoAuto}
-                onChange={setApplyBogoAuto}
-                label="Apply Bogo Automatically"
-                help="This setting enables Bogo discount without pressing a button in billing screen."
-              />
-              <CheckRow
-                checked={commonCoupon}
-                onChange={setCommonCoupon}
-                label="Common Coupon Discount"
-                help="This setting enables the coupon(s) configured by HO/Chain outlet to be applicable in the outlet."
-              />
-              <CheckRow
-                checked={ignoreAddonInDiscount}
-                onChange={setIgnoreAddonInDiscount}
-                label="Ignore add-on price while calculating discount (works for all types for discount)"
-              />
-              <CheckRow
-                checked={specialDiscountReasonMandatory}
-                onChange={setSpecialDiscountReasonMandatory}
-                label="Special discount reason mandatory"
-              />
-            </div>
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+          <div className="space-y-3">
+            <CheckRow
+              checked={autoItemCategoryDiscount}
+              onChange={setAutoItemCategoryDiscount}
+              label="Item/ Category discount auto-applied"
+              help="This setting enables discount without pressing a button beside the label in billing screen."
+            />
+            <CheckRow
+              checked={showItemCategoryDiscountBox}
+              onChange={setShowItemCategoryDiscountBox}
+              label="Show Item/Category wise discount box while adding an item"
+            />
+            <CheckRow
+              checked={applyBogoAuto}
+              onChange={setApplyBogoAuto}
+              label="Apply Bogo Automatically"
+              help="This setting enables Bogo discount without pressing a button in billing screen."
+            />
+            <CheckRow
+              checked={commonCoupon}
+              onChange={setCommonCoupon}
+              label="Common Coupon Discount"
+              help="This setting enables the coupon(s) configured by HO/Chain outlet to be applicable in the outlet."
+            />
+            <CheckRow
+              checked={ignoreAddonInDiscount}
+              onChange={setIgnoreAddonInDiscount}
+              label="Ignore add-on price while calculating discount (works for all types for discount)"
+            />
+            <CheckRow
+              checked={specialDiscountReasonMandatory}
+              onChange={setSpecialDiscountReasonMandatory}
+              label="Special discount reason mandatory"
+            />
+          </div>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="KOT/Bill"
-            description="The following settings describes the settings related to the KOT/Bill in the billing screen."
-          >
-            <div className="space-y-3">
-              <CheckRow
-                checked={assignBillToKotUser}
-                onChange={setAssignBillToKotUser}
-                label="Assign Bill sales to KOT punched user"
-                help="When this setting is enabled, the bill sales would be assigned to the user who punched the KOT in the relevant reports."
-              />
-              <CheckRow
-                checked={saveKotOnSaveBill}
-                onChange={setSaveKotOnSaveBill}
-                label="Save KOT On Save Bill (Only first time not in edit)"
-              />
-              <CheckRow
-                checked={considerNonPreparedKot}
-                onChange={setConsiderNonPreparedKot}
-                label="Consider Non Prepared KOT in Bill"
-                help="When this setting is enabled, even the KOT which is not marked as prepared in the system would be considered while printing bill."
-              />
-              <CheckRow
-                checked={mergeDuplicateItems}
-                onChange={setMergeDuplicateItems}
-                label="Merge duplicate items"
-                help="This setting enables merging same items on billing screen."
-              />
-              <CheckRow
-                checked={splitBillMultiGroups}
-                onChange={setSplitBillMultiGroups}
-                label="Split a bill when multiple groups are present"
-              />
-              <CheckRow
-                checked={autoFinalizeOrder}
-                onChange={setAutoFinalizeOrder}
-                label="Auto Finalize Order"
-              />
-            </div>
-            <FormRow label="Everyday reset KOT number from" required>
+      <ConfigSectionCard
+        icon={<Printer size={16} />}
+        title="KOT/Bill"
+        description="The following settings describes the settings related to the KOT/Bill in the billing screen."
+      >
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <CheckRow
+              checked={assignBillToKotUser}
+              onChange={setAssignBillToKotUser}
+              label="Assign Bill sales to KOT punched user"
+              help="When this setting is enabled, the bill sales would be assigned to the user who punched the KOT in the relevant reports."
+            />
+            <CheckRow
+              checked={saveKotOnSaveBill}
+              onChange={setSaveKotOnSaveBill}
+              label="Save KOT On Save Bill (Only first time not in edit)"
+            />
+            <CheckRow
+              checked={considerNonPreparedKot}
+              onChange={setConsiderNonPreparedKot}
+              label="Consider Non Prepared KOT in Bill"
+              help="When this setting is enabled, even the KOT which is not marked as prepared in the system would be considered while printing bill."
+            />
+            <CheckRow
+              checked={mergeDuplicateItems}
+              onChange={setMergeDuplicateItems}
+              label="Merge duplicate items"
+              help="This setting enables merging same items on billing screen."
+            />
+            <CheckRow
+              checked={splitBillMultiGroups}
+              onChange={setSplitBillMultiGroups}
+              label="Split a bill when multiple groups are present"
+            />
+            <CheckRow
+              checked={autoFinalizeOrder}
+              onChange={setAutoFinalizeOrder}
+              label="Auto Finalize Order"
+            />
+          </div>
+          <ConfigFormRow label="Everyday reset KOT number from" required align="center">
+            <>
               <input
                 type="text"
                 value={kotResetFrom}
                 onChange={(event) => setKotResetFrom(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-xs`}
               />
-              <Help>
+              <MutedHelp>
                 When this setting is enabled, the KOT number would reset to this
                 particular number at the start of every day.
-              </Help>
-            </FormRow>
-          </Section>
-
-          <Section
-            title="Complimentary Bill"
-            description="The following settings describes the settings related to complimentary bills."
-          >
-            <CheckRow
-              checked={disableChargesOnComp}
-              onChange={setDisableChargesOnComp}
-              label="Disable Taxes and other Charges (Packing Charge, Delivery charge, Service charge) on Complimentary Bill"
-            />
-          </Section>
-
-          <Section
-            title="Special Notes"
-            description="The following settings describes the settings related to special notes."
-          >
-            <CheckRow
-              checked={saveSpecialNoteMaster}
-              onChange={setSaveSpecialNoteMaster}
-              label="Save special note into special notes master while saving kot / orders."
-            />
-          </Section>
-
-          <Section
-            title="Surcharge"
-            description="The following settings describes the settings related to surcharge."
-          >
-            <CheckRow
-              checked={displaySurcharge}
-              onChange={setDisplaySurcharge}
-              label="Display & Calculate Surcharge"
-            />
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
         </div>
+      </ConfigSectionCard>
 
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-line bg-card/95 px-5 py-4 backdrop-blur sm:px-6">
-          <OutlineButton variant="gray" onClick={goBack}>
-            Cancel
-          </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
-        </div>
-      </div>
+      <ConfigSectionCard
+        icon={<Gift size={16} />}
+        title="Complimentary Bill"
+        description="The following settings describes the settings related to complimentary bills."
+      >
+        <CheckRow
+          checked={disableChargesOnComp}
+          onChange={setDisableChargesOnComp}
+          label="Disable Taxes and other Charges (Packing Charge, Delivery charge, Service charge) on Complimentary Bill"
+        />
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<StickyNote size={16} />}
+        title="Special Notes"
+        description="The following settings describes the settings related to special notes."
+      >
+        <CheckRow
+          checked={saveSpecialNoteMaster}
+          onChange={setSaveSpecialNoteMaster}
+          label="Save special note into special notes master while saving kot / orders."
+        />
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<BadgePercent size={16} />}
+        title="Surcharge"
+        description="The following settings describes the settings related to surcharge."
+      >
+        <CheckRow
+          checked={displaySurcharge}
+          onChange={setDisplaySurcharge}
+          label="Display & Calculate Surcharge"
+        />
+      </ConfigSectionCard>
+
+      <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
     </ReportsPageShell>
   )
 }

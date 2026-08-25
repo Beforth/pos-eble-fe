@@ -1,11 +1,12 @@
-import { useEffect } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Printer, X } from 'lucide-react'
 import {
   headerClassForOrderType,
   kotTicketAmount,
   labelForOrderType,
   type KotTicket,
 } from '../../mocks/kotViewData'
+import { KOTPrintTemplate } from './KOTPrintTemplate'
 
 interface KotTicketViewModalProps {
   open: boolean
@@ -25,6 +26,8 @@ export function KotTicketViewModal({
   ticket,
   onClose,
 }: KotTicketViewModalProps) {
+  const [printTicket, setPrintTicket] = useState<KotTicket | null>(null)
+
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
@@ -132,7 +135,15 @@ export function KotTicketViewModal({
           </div>
         </div>
 
-        <footer className="flex justify-end border-t border-line px-5 py-3">
+        <footer className="flex justify-end gap-3 border-t border-line px-5 py-3">
+          <button
+            type="button"
+            onClick={() => setPrintTicket(ticket)}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-page"
+          >
+            <Printer size={15} />
+            Print KOT
+          </button>
           <button
             type="button"
             onClick={onClose}
@@ -142,6 +153,13 @@ export function KotTicketViewModal({
           </button>
         </footer>
       </div>
+
+      {printTicket && (
+        <KOTPrintTemplate
+          ticket={printTicket}
+          onClose={() => setPrintTicket(null)}
+        />
+      )}
     </div>
   )
 }

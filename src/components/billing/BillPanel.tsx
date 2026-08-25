@@ -614,14 +614,24 @@ export function BillPanel({
                 </button>
                 <button
                   type="button"
-                  title="List"
+                  title="Order list"
+                  onClick={() => setHistoryOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
                   <List size={14} />
                 </button>
                 <button
                   type="button"
-                  title="Wallet"
+                  title="Wallet balance"
+                  onClick={() => {
+                    if (!customer.mobile.trim()) {
+                      setHistoryNotice('Enter a mobile number first')
+                      window.setTimeout(() => setHistoryNotice(null), 2200)
+                      return
+                    }
+                    setHistoryNotice('Wallet — coming soon')
+                    window.setTimeout(() => setHistoryNotice(null), 2200)
+                  }}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
                   <Wallet size={14} />

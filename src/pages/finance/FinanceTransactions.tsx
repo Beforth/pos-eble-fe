@@ -325,14 +325,14 @@ export default function FinanceTransactions() {
           <button
             type="button"
             onClick={() => setFiltersOpen((prev) => !prev)}
-            className="flex h-11 w-full items-center gap-2 rounded-xl border border-line bg-card px-3 text-left text-sm text-muted hover:bg-page"
+            className="flex h-11 w-full items-center gap-2 rounded-xl border border-line bg-card px-3 text-left text-sm text-muted shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-page"
           >
             <Search size={16} />
             <span className="flex-1">Search and filters</span>
             <span className="text-xs">{filtersOpen ? 'Hide' : 'Show'}</span>
           </button>
           {filtersOpen ? (
-            <div className="mt-2 rounded-xl border border-line bg-card p-4">
+            <div className="mt-2 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="min-w-[180px] flex-1">
                   <label className="mb-1.5 block text-xs font-semibold text-ink">
@@ -356,7 +356,7 @@ export default function FinanceTransactions() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
+      <div className="overflow-hidden rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto">
           <table className="min-w-[980px] w-full text-left text-sm">
             <thead className="border-b border-line bg-page text-xs font-semibold text-ink">

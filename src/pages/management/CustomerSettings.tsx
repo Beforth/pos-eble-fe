@@ -1,66 +1,19 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
+import { Users, Wallet } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
+  ConfigBreadcrumb,
+  ConfigFormRow,
+  ConfigSaveBar,
+  ConfigSectionCard,
+  MutedHelp,
+} from '../../components/management/ConfigSectionCard'
+import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 
 const inputClass =
   'h-10 w-full max-w-xs rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
 
 const ORDER_TYPES = ['Delivery', 'Pick Up', 'Dine In'] as const
-
-function Section({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <section className="space-y-4 border-b border-line pb-8 last:border-b-0 last:pb-0">
-      <div>
-        <h2 className="text-base font-bold text-ink">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm text-muted">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function FormRow({
-  label,
-  required,
-  children,
-  align = 'start',
-}: {
-  label: string
-  required?: boolean
-  children: ReactNode
-  align?: 'start' | 'center'
-}) {
-  return (
-    <div
-      className={`grid gap-2 sm:grid-cols-[280px_minmax(0,1fr)] sm:gap-4 ${
-        align === 'center' ? 'sm:items-center' : 'sm:items-start'
-      }`}
-    >
-      <div className="text-sm font-medium text-ink sm:pt-2">
-        {label} {required ? <span className="text-primary">*</span> : null}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
-}
-
-function Help({ children }: { children: ReactNode }) {
-  return <p className="mt-1.5 text-xs leading-relaxed text-muted">{children}</p>
-}
 
 function CheckRow({
   checked,
@@ -83,7 +36,7 @@ function CheckRow({
       />
       <span>
         <span className="font-medium">{label}</span>
-        {help ? <Help>{help}</Help> : null}
+        {help ? <MutedHelp>{help}</MutedHelp> : null}
       </span>
     </label>
   )
@@ -135,7 +88,7 @@ export default function CustomerSettings() {
   }
 
   return (
-    <ReportsPageShell title="Outlet Configuration" activeItem="config-outlet">
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Customer" />} activeItem="config-outlet">
       {toast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
           {toast}
@@ -146,13 +99,14 @@ export default function CustomerSettings() {
         The Following Settings Can Be Used To Configure Customer Settings.
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="space-y-8 p-5 sm:p-6">
-          <Section
-            title="Customer Settings"
-            description="Configure the customer entry on billing screen."
-          >
-            <FormRow label="Customer phone validation on billing screen" align="start">
+      <ConfigSectionCard
+        icon={<Users size={16} />}
+        title="Customer Settings"
+        description="Configure the customer entry on billing screen."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Customer phone validation on billing screen">
+            <>
               <div className="flex flex-wrap gap-x-5 gap-y-2">
                 {ORDER_TYPES.map((type) => (
                   <label
@@ -169,74 +123,70 @@ export default function CustomerSettings() {
                   </label>
                 ))}
               </div>
-              <Help>
+              <MutedHelp>
                 This settings enables validation of phone number of customer.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow
-              label="Minimum length for phone number (in digits)"
-              required
-            >
-              <input
-                type="text"
-                inputMode="numeric"
-                value={minPhoneLength}
-                onChange={(event) =>
-                  setMinPhoneLength(event.target.value.replace(/[^\d]/g, ''))
-                }
-                className={inputClass}
-              />
-            </FormRow>
-
-            <FormRow
-              label="Maximum length for phone number (in digits)"
-              required
-            >
-              <input
-                type="text"
-                inputMode="numeric"
-                value={maxPhoneLength}
-                onChange={(event) =>
-                  setMaxPhoneLength(event.target.value.replace(/[^\d]/g, ''))
-                }
-                className={inputClass}
-              />
-            </FormRow>
-
-            <div className="space-y-3">
-              <CheckRow
-                checked={showCustomerEmail}
-                onChange={setShowCustomerEmail}
-                label="Show customer email on billing screen"
-              />
-              <CheckRow
-                checked={createBillsWithTaxId}
-                onChange={setCreateBillsWithTaxId}
-                label="Create bills with the tax authority with the TAX ID number available"
-              />
-            </div>
-          </Section>
-
-          <Section
-            title="Due Payment Settings"
-            description="Configures the Due Payment module in billing screen."
+          <ConfigFormRow
+            label="Minimum length for phone number (in digits)"
+            required
           >
-            <CheckRow
-              checked={phoneMandatoryOnDue}
-              onChange={setPhoneMandatoryOnDue}
-              label="Customer Phone number mandatory when the due payment is selected"
+            <input
+              type="text"
+              inputMode="numeric"
+              value={minPhoneLength}
+              onChange={(event) =>
+                setMinPhoneLength(event.target.value.replace(/[^\d]/g, ''))
+              }
+              className={inputClass}
             />
-          </Section>
-        </div>
+          </ConfigFormRow>
 
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-line bg-card/95 px-5 py-4 backdrop-blur sm:px-6">
-          <OutlineButton variant="gray" onClick={goBack}>
-            Cancel
-          </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          <ConfigFormRow
+            label="Maximum length for phone number (in digits)"
+            required
+          >
+            <input
+              type="text"
+              inputMode="numeric"
+              value={maxPhoneLength}
+              onChange={(event) =>
+                setMaxPhoneLength(event.target.value.replace(/[^\d]/g, ''))
+              }
+              className={inputClass}
+            />
+          </ConfigFormRow>
+
+          <div className="space-y-3">
+            <CheckRow
+              checked={showCustomerEmail}
+              onChange={setShowCustomerEmail}
+              label="Show customer email on billing screen"
+            />
+            <CheckRow
+              checked={createBillsWithTaxId}
+              onChange={setCreateBillsWithTaxId}
+              label="Create bills with the tax authority with the TAX ID number available"
+            />
+          </div>
         </div>
-      </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<Wallet size={16} />}
+        title="Due Payment Settings"
+        description="Configures the Due Payment module in billing screen."
+      >
+        <CheckRow
+          checked={phoneMandatoryOnDue}
+          onChange={setPhoneMandatoryOnDue}
+          label="Customer Phone number mandatory when the due payment is selected"
+        />
+      </ConfigSectionCard>
+
+      <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
     </ReportsPageShell>
   )
 }

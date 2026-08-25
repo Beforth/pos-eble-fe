@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export type MenuSectionTab =
   | 'items'
@@ -51,6 +51,37 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
   const itemsBtnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  function updateScrollState() {
+    const el = scrollerRef.current
+    if (!el) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    setCanScrollLeft(el.scrollLeft > 2)
+    setCanScrollRight(el.scrollLeft < maxScroll - 2)
+  }
+
+  useEffect(() => {
+    const el = scrollerRef.current
+    if (!el) return
+    updateScrollState()
+    const onScroll = () => updateScrollState()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', updateScrollState)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', updateScrollState)
+    }
+  }, [])
+
+  function scrollBy(direction: -1 | 1) {
+    scrollerRef.current?.scrollBy({
+      left: direction * 220,
+      behavior: 'smooth',
+    })
+  }
 
   useEffect(() => {
     if (!itemsOpen) return
@@ -115,11 +146,22 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
 
   return (
     <>
-      <div className="relative z-20 mb-4 rounded-lg border border-line bg-primary/5">
+      <div className="relative z-20 mb-4 flex h-[90px] items-center gap-1">
+        <button
+          type="button"
+          aria-label="Scroll tabs left"
+          disabled={!canScrollLeft}
+          onClick={() => scrollBy(-1)}
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-ink disabled:cursor-default disabled:opacity-30"
+        >
+          <ChevronLeft size={16} />
+        </button>
+
         <div
+          ref={scrollerRef}
           role="tablist"
           aria-label="Menu sections"
-          className="flex w-full flex-wrap items-center justify-between gap-y-1 px-2 py-1 sm:px-4"
+          className="category-tab-scroller flex min-w-0 flex-1 items-stretch gap-[90px] overflow-x-auto overflow-y-hidden"
         >
           {TABS.map((tab) => {
             const active = activeTab === tab.id
@@ -136,16 +178,16 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
                   aria-expanded={itemsOpen}
                   aria-haspopup="menu"
                   onClick={() => handleTabClick('items')}
-                  className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-3.5 py-2 text-sm transition-colors ${
                     active
-                      ? 'border border-primary bg-card text-ink shadow-sm'
-                      : 'text-ink hover:bg-card/50'
+                      ? 'bg-primary font-semibold text-white'
+                      : 'font-medium text-muted hover:text-ink'
                   }`}
                 >
                   Items
                   <ChevronDown
                     size={14}
-                    className={`text-muted transition-transform duration-200 ${
+                    className={`transition-transform duration-200 ${
                       itemsOpen ? 'rotate-180' : ''
                     }`}
                   />
@@ -160,10 +202,10 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
                 role="tab"
                 aria-selected={active}
                 onClick={() => handleTabClick(tab.id)}
-                className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                className={`inline-flex shrink-0 cursor-pointer items-center rounded-lg px-3.5 py-2 text-sm transition-colors ${
                   active
-                    ? 'border border-primary bg-card text-ink shadow-sm'
-                    : 'text-ink hover:bg-card/50'
+                    ? 'bg-primary font-semibold text-white'
+                    : 'font-medium text-muted hover:text-ink'
                 }`}
               >
                 {tab.label}
@@ -171,6 +213,16 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
             )
           })}
         </div>
+
+        <button
+          type="button"
+          aria-label="Scroll tabs right"
+          disabled={!canScrollRight}
+          onClick={() => scrollBy(1)}
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-ink disabled:cursor-default disabled:opacity-30"
+        >
+          <ChevronRight size={16} />
+        </button>
       </div>
 
       {itemsOpen

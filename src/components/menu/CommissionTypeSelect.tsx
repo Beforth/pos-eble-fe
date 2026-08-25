@@ -14,11 +14,13 @@ export type CommissionTypeFilterValue =
 interface CommissionTypeSelectProps {
   value: string
   onChange: (value: string) => void
+  exclude?: string[]
 }
 
 export function CommissionTypeSelect({
   value,
   onChange,
+  exclude,
 }: CommissionTypeSelectProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -29,12 +31,16 @@ export function CommissionTypeSelect({
     'All'
 
   const filtered = useMemo(() => {
+    let list: { value: string; label: string }[] = [...COMMISSION_TYPE_OPTIONS]
+    if (exclude && exclude.length > 0) {
+      list = list.filter((option) => !exclude.includes(option.value))
+    }
     const q = query.trim().toLowerCase()
-    if (!q) return COMMISSION_TYPE_OPTIONS
-    return COMMISSION_TYPE_OPTIONS.filter((option) =>
+    if (!q) return list
+    return list.filter((option) =>
       option.label.toLowerCase().includes(q),
     )
-  }, [query])
+  }, [query, exclude])
 
   useEffect(() => {
     if (!open) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, Lock, Search } from 'lucide-react'
+import { Calendar, Lock, Megaphone, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { PrimaryButton, OutlineButton } from '../../components/menu/MenuActionButtons'
 
@@ -66,25 +66,19 @@ export default function CrmCampaignPage() {
       <div className="space-y-6">
         {/* Top Header Row */}
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-xl font-extrabold text-ink sm:text-2xl">
-            {activeTab === 'sms_balance'
-              ? 'SMS Balance'
-              : activeTab === 'whatsapp_balance'
-                ? 'WhatsApp Balance'
-                : 'Campaigns'}
-          </h1>
+          <div />
 
           <div className="flex flex-wrap items-center gap-3">
             {activeTab === 'campaigns' && (
               <>
                 {/* SMS Balance Pill */}
-                <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-2xs">
+                <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-xs">
                   <span className="size-2 rounded-full bg-sky-500" />
                   <span>SMS Balance : 0</span>
                 </div>
 
                 {/* WhatsApp Balance Pill */}
-                <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-2xs">
+                <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-xs">
                   <span className="size-2 rounded-full bg-emerald-500" />
                   <span>WhatsApp Balance : 0</span>
                 </div>
@@ -92,7 +86,7 @@ export default function CrmCampaignPage() {
                 {/* Unlock Button */}
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 shadow-2xs hover:bg-emerald-100 transition-colors"
+                  className="flex items-center gap-1.5 rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-xs font-bold text-success shadow-xs hover:bg-success/15 transition-colors"
                 >
                   <Lock size={14} />
                   <span>Unlock</span>
@@ -106,14 +100,14 @@ export default function CrmCampaignPage() {
             )}
 
             {activeTab === 'sms_balance' && (
-              <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-2xs">
+              <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-xs">
                 <span className="size-2 rounded-full bg-sky-500" />
                 <span>SMS Balance : 0</span>
               </div>
             )}
 
             {activeTab === 'whatsapp_balance' && (
-              <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-2xs">
+              <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-xs">
                 <span className="size-2 rounded-full bg-emerald-500" />
                 <span>WhatsApp Balance : 0.00</span>
               </div>
@@ -268,13 +262,9 @@ export default function CrmCampaignPage() {
                 </select>
               </div>
 
-              <button
-                type="button"
-                onClick={handleSearch}
-                className="h-10 rounded-md border border-primary bg-card px-6 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
-              >
+              <PrimaryButton onClick={handleSearch}>
                 Search
-              </button>
+              </PrimaryButton>
 
               <OutlineButton variant="gray" onClick={handleShowAll}>
                 Show All
@@ -283,7 +273,7 @@ export default function CrmCampaignPage() {
           </div>
         )}
 
-        {/* Filter Controls Bar for SMS Balance (Matching Screenshot 5425) */}
+        {/* Filter Controls Bar for SMS Balance */}
         {activeTab === 'sms_balance' && (
           <div className="flex flex-wrap items-end gap-3.5 rounded-xl border border-line bg-card p-4 sm:p-5 shadow-xs">
             {/* Start Date */}
@@ -356,13 +346,9 @@ export default function CrmCampaignPage() {
               </select>
             </div>
 
-            <button
-              type="button"
-              onClick={handleSearch}
-              className="h-10 rounded-md border border-primary bg-card px-6 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
-            >
+            <PrimaryButton onClick={handleSearch}>
               Search
-            </button>
+            </PrimaryButton>
 
             <OutlineButton variant="gray" onClick={handleShowAll}>
               Show All
@@ -370,7 +356,7 @@ export default function CrmCampaignPage() {
           </div>
         )}
 
-        {/* Filter Controls Bar for WhatsApp Balance (Matching Screenshot 5426) */}
+        {/* Filter Controls Bar for WhatsApp Balance */}
         {activeTab === 'whatsapp_balance' && (
           <div className="flex flex-wrap items-end gap-3.5 rounded-xl border border-line bg-card p-4 sm:p-5 shadow-xs">
             {/* Start Date */}
@@ -427,13 +413,9 @@ export default function CrmCampaignPage() {
               </select>
             </div>
 
-            <button
-              type="button"
-              onClick={handleSearch}
-              className="h-10 rounded-md border border-primary bg-card px-6 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
-            >
+            <PrimaryButton onClick={handleSearch}>
               Search
-            </button>
+            </PrimaryButton>
 
             <OutlineButton variant="gray" onClick={handleShowAll}>
               Show All
@@ -441,19 +423,25 @@ export default function CrmCampaignPage() {
           </div>
         )}
 
-        {/* Empty State Graphic Container */}
+        {/* Enhanced Empty State */}
         <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-line bg-card p-8 text-center shadow-xs">
-          <div className="flex size-14 items-center justify-center rounded-full border border-line bg-page text-muted shadow-2xs">
-            <Search size={26} />
+          <div className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Megaphone size={30} />
           </div>
 
-          <h2 className="mt-4 text-lg font-bold tracking-tight text-ink">
-            No Results Found.
+          <h2 className="mt-5 text-lg font-bold tracking-tight text-ink">
+            No campaigns yet
           </h2>
 
-          <p className="mt-1 text-sm font-medium text-muted">
-            We couldn't find a match for your search.
+          <p className="mt-2 max-w-sm text-sm font-medium text-muted leading-relaxed">
+            Create your first campaign to start reaching customers via SMS, WhatsApp, or Email.
           </p>
+
+          <div className="mt-6">
+            <PrimaryButton onClick={() => navigate('/crm/campaign/create')}>
+              Create Campaign
+            </PrimaryButton>
+          </div>
         </div>
       </div>
     </ReportsPageShell>

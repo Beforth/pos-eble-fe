@@ -3,10 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import {
   Calendar,
   ChevronDown,
-  Edit2,
+  Download,
+  Filter,
   Lock,
   Plus,
+  RefreshCw,
   Rocket,
+  Search,
+  UserRoundX,
+  Users,
 } from 'lucide-react'
 import {
   Bar,
@@ -89,13 +94,11 @@ const CUSTOMERS_DATA: CustomerRecord[] = [
   },
 ]
 
-// Donut Chart Data
 const DONUT_DATA = [
-  { name: 'Without Customer', value: 2749, color: '#a78bfa' },
-  { name: 'With Customer', value: 1, color: '#38bdf8' },
+  { name: 'Without Customer', value: 2749, color: 'var(--color-primary)' },
+  { name: 'With Customer', value: 1, color: 'var(--color-secondary)' },
 ]
 
-// New Customers Bar Chart Data
 const NEW_CUSTOMERS_DATA = [
   { day: '7th Aug', count: 0 },
   { day: '8th Aug', count: 0 },
@@ -106,6 +109,8 @@ const NEW_CUSTOMERS_DATA = [
   { day: '13th Aug', count: 0 },
 ]
 
+const LOG_PAGE_SIZE = 15
+
 export default function CrmCustomersPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'customers' | 'tags'>('customers')
@@ -113,18 +118,20 @@ export default function CrmCustomersPage() {
   const [endDate, setEndDate] = useState('')
   const [fromWhereFilter, setFromWhereFilter] = useState('All')
 
+  const totalRecords = CUSTOMERS_DATA.length
+
   return (
     <ReportsPageShell title="Customers" activeItem="crm-customers">
       <div className="space-y-6">
-        {/* Top Announcement Banner (Matching Screenshot 5429) */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 shadow-2xs">
+        {/* Announcement Banner */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 shadow-xs">
           <div className="flex items-start gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Rocket size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-md bg-primary px-2 py-0.5 text-[10px] font-extrabold text-white tracking-wider uppercase">
+                <span className="rounded-md bg-primary px-2 py-0.5 text-[11px] font-extrabold text-white tracking-wider uppercase">
                   New
                 </span>
                 <h3 className="text-sm font-bold text-ink">
@@ -132,7 +139,8 @@ export default function CrmCustomersPage() {
                 </h3>
               </div>
               <p className="mt-1 text-xs font-medium text-muted">
-                View customer profiles, manage tags, and create segments from one unified portal — with richer insights and smarter targeting.
+                View customer profiles, manage tags, and create segments from one
+                unified portal — with richer insights and smarter targeting.
               </p>
             </div>
           </div>
@@ -143,6 +151,65 @@ export default function CrmCustomersPage() {
           >
             Explore Now
           </OutlineButton>
+        </div>
+
+        {/* Summary Stats */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Users size={18} />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                  Total Customers
+                </p>
+                <p className="text-xl font-extrabold text-ink">211</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+                <Users size={18} />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                  New This Week
+                </p>
+                <p className="text-xl font-extrabold text-ink">1</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-deep">
+                <UserRoundX size={18} />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                  Without Phone
+                </p>
+                <p className="text-xl font-extrabold text-ink">0</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                <Lock size={18} />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                  DND Enrolled
+                </p>
+                <p className="text-xl font-extrabold text-ink">0</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Page Title & Top Actions */}
@@ -164,25 +231,18 @@ export default function CrmCustomersPage() {
               <span>Add New Customer</span>
             </PrimaryButton>
 
-            <button
-              type="button"
-              className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 shadow-2xs hover:bg-emerald-100 transition-colors"
-            >
-              <Lock size={14} />
-              <span>Unlock</span>
-            </button>
-
             <OutlineButton
               variant="gray"
               onClick={() => alert('Exporting customers...')}
             >
+              <Download size={14} />
               <span>Export</span>
               <ChevronDown size={14} />
             </OutlineButton>
           </div>
         </div>
 
-        {/* Tab Navigation Line */}
+        {/* Tab Navigation */}
         <div className="flex items-center gap-8 border-b border-line">
           <button
             type="button"
@@ -209,14 +269,13 @@ export default function CrmCustomersPage() {
           </button>
         </div>
 
-        {/* Charts Section Grid (Matching Screenshot 5429) */}
+        {/* Charts Section */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Card 1: Last 7 Days Orders Donut Chart */}
+          {/* Donut Chart */}
           <div className="rounded-xl border border-line bg-card p-5 shadow-xs">
             <h3 className="text-sm font-bold text-ink">Last 7 Days Orders</h3>
 
             <div className="mt-4 flex flex-col sm:flex-row items-center justify-around gap-4 min-h-[180px]">
-              {/* Donut graphic */}
               <div className="relative flex size-40 items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -240,24 +299,23 @@ export default function CrmCustomersPage() {
                 </div>
               </div>
 
-              {/* Chart Legend */}
               <div className="space-y-2 text-xs font-semibold text-muted">
                 <div className="flex items-center gap-2">
-                  <span className="size-3 rounded-full bg-sky-400" />
+                  <span className="size-3 rounded-full bg-secondary" />
                   <span>With Customer</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="size-3 rounded-full bg-violet-400" />
+                  <span className="size-3 rounded-full bg-primary" />
                   <span>Without Customer</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Last 7 Days - New Customers Bar Chart */}
+          {/* Bar Chart */}
           <div className="rounded-xl border border-line bg-card p-5 shadow-xs">
             <h3 className="text-sm font-bold text-ink">
-              Last 7 Days - New Customers
+              Last 7 Days — New Customers
             </h3>
 
             <div className="mt-4 h-[180px] w-full">
@@ -267,20 +325,23 @@ export default function CrmCustomersPage() {
                     dataKey="day"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
                   />
                   <YAxis hide />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--color-primary)"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        {/* Filter Controls Bar */}
+        {/* Filter Controls */}
         <div className="flex flex-wrap items-end gap-3.5 rounded-xl border border-line bg-card p-4 sm:p-5 shadow-xs">
-          {/* Start Date */}
           <div className="space-y-1.5">
             <label className="block text-sm font-bold text-muted">
               Start Date
@@ -299,7 +360,6 @@ export default function CrmCustomersPage() {
             </div>
           </div>
 
-          {/* End Date */}
           <div className="space-y-1.5">
             <label className="block text-sm font-bold text-muted">
               End Date
@@ -318,7 +378,6 @@ export default function CrmCustomersPage() {
             </div>
           </div>
 
-          {/* From Where */}
           <div className="space-y-1.5">
             <label className="block text-sm font-bold text-muted">
               From Where
@@ -335,15 +394,17 @@ export default function CrmCustomersPage() {
           </div>
 
           <OutlineButton variant="gray" onClick={() => alert('More filters...')}>
+            <Filter size={14} />
             More Filters
           </OutlineButton>
 
-          <button
-            type="button"
-            className="h-10 rounded-md border border-primary bg-card px-6 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
+          <OutlineButton
+            variant="primary"
+            onClick={() => alert('Searching...')}
           >
+            <Search size={14} />
             Search
-          </button>
+          </OutlineButton>
 
           <OutlineButton
             variant="gray"
@@ -357,7 +418,7 @@ export default function CrmCustomersPage() {
           </OutlineButton>
         </div>
 
-        {/* Customer Data Table (Matching Screenshots 5429 & 5430) */}
+        {/* Customer Data Table */}
         <div className="overflow-hidden rounded-xl border border-line bg-card shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-ink border-collapse">
@@ -391,14 +452,28 @@ export default function CrmCustomersPage() {
                       {cust.fromWhere}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/crm/customers/edit/${cust.id}`)}
-                        className="rounded-lg border border-line p-2 text-muted hover:bg-page hover:text-ink transition-colors shadow-2xs"
-                        title="Edit Customer"
+                      <OutlineButton
+                        variant="gray"
+                        onClick={() =>
+                          navigate(`/crm/customers/edit/${cust.id}`)
+                        }
                       >
-                        <Edit2 size={15} />
-                      </button>
+                        <span className="sr-only">Edit</span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                          <path d="m15 5 4 4" />
+                        </svg>
+                      </OutlineButton>
                     </td>
                   </tr>
                 ))}
@@ -406,15 +481,16 @@ export default function CrmCustomersPage() {
             </table>
           </div>
 
-          {/* Table Pagination & Footer Bar */}
+          {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-line bg-page/30 p-4 text-xs font-semibold text-muted">
-            <div>Showing 1 to 15 of 211 records</div>
+            <div>
+              Showing 1 to {LOG_PAGE_SIZE} of {totalRecords} records
+            </div>
 
-            {/* Pagination Controls */}
             <div className="flex flex-wrap items-center gap-1">
               <button
                 type="button"
-                className="size-8 rounded-lg border border-line bg-card text-ink shadow-2xs font-bold"
+                className="size-8 rounded-lg border border-line bg-card text-ink shadow-xs font-bold"
               >
                 1
               </button>
@@ -441,9 +517,8 @@ export default function CrmCustomersPage() {
               </button>
             </div>
 
-            {/* DND Note */}
             <div className="flex items-center gap-2">
-              <span className="rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+              <span className="rounded bg-accent px-1.5 py-0.5 text-[11px] font-extrabold text-white">
                 DND
               </span>
               <button
@@ -455,6 +530,12 @@ export default function CrmCustomersPage() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Data Freshness */}
+        <div className="flex items-center justify-end gap-1.5 text-[11px] text-muted">
+          <RefreshCw size={12} />
+          <span>Data refreshed on page load</span>
         </div>
       </div>
     </ReportsPageShell>

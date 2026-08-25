@@ -1,11 +1,20 @@
-import { useState, type ReactNode } from 'react'
-import { Check } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useState } from 'react'
 import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
+  Check,
+  CreditCard,
+  IndianRupee,
+  Smartphone,
+  Wallet,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import {
+  ConfigBreadcrumb,
+  ConfigFormRow,
+  ConfigSaveBar,
+  ConfigSectionCard,
+  MutedHelp,
+} from '../../components/management/ConfigSectionCard'
+import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 
 const CURRENCY_OPTIONS = [
   'India rupee - INR - ₹',
@@ -40,43 +49,6 @@ const inputClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
 const selectClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
-
-function HelpText({ children }: { children: string }) {
-  return (
-    <p className="mt-1.5 text-xs leading-relaxed text-primary/90">{children}</p>
-  )
-}
-
-function MutedHelp({ children }: { children: string }) {
-  return <p className="mt-1.5 text-xs leading-relaxed text-muted">{children}</p>
-}
-
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <div className="border-b border-line pb-3">
-      <h2 className="text-base font-bold text-ink">{title}</h2>
-    </div>
-  )
-}
-
-function FormRow({
-  label,
-  required,
-  children,
-}: {
-  label: string
-  required?: boolean
-  children: ReactNode
-}) {
-  return (
-    <div className="grid gap-2 sm:grid-cols-[200px_minmax(0,1fr)] sm:items-start sm:gap-4">
-      <label className="text-sm font-medium text-ink sm:pt-2.5">
-        {label} {required ? <span className="text-primary">*</span> : null}
-      </label>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
-}
 
 function ToggleChip({
   label,
@@ -241,213 +213,231 @@ export default function OutletPayment() {
   const uniqueUpiChips = [...new Set(upiChipLabels)]
 
   return (
-    <ReportsPageShell title="Outlet Configuration" activeItem="config-outlet">
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Payment" />} activeItem="config-outlet">
       {toast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
           {toast}
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="space-y-8 p-5 sm:p-6">
-          <section className="space-y-5">
-            <SectionTitle title="Payment Information" />
-            <FormRow label="Currency" required>
-              <select
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value)}
-                className={selectClass}
-              >
-                {CURRENCY_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <HelpText>
-                Choose Currency for your outlet. Based on the same, every amount
-                will be displayed along with the currency chosen on Dashboard
-                &amp; POS bill and reports.
-              </HelpText>
-            </FormRow>
-          </section>
+      <ConfigSectionCard
+        icon={<IndianRupee size={16} />}
+        title="Payment Information"
+        description="Currency used across billing screen, reports and dashboard."
+      >
+        <ConfigFormRow label="Currency" required align="center">
+          <>
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              className={`${selectClass} max-w-xs`}
+            >
+              {CURRENCY_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <MutedHelp>
+              Choose Currency for your outlet. Based on the same, every amount
+              will be displayed along with the currency chosen on Dashboard
+              &amp; POS bill and reports.
+            </MutedHelp>
+          </>
+        </ConfigFormRow>
+      </ConfigSectionCard>
 
-          <section className="space-y-4">
-            <FormRow label="Payment Types">
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    type="text"
-                    value={paymentTypeDraft}
-                    onChange={(event) => setPaymentTypeDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        addPaymentType()
-                      }
-                    }}
-                    className={`${inputClass} max-w-md flex-1`}
-                    placeholder="Enter payment type"
-                  />
-                  <PrimaryButton onClick={addPaymentType}>Add</PrimaryButton>
-                </div>
-                <MutedHelp>
-                  Select Payment Type to add on POS in Other section of Payment.
-                </MutedHelp>
+      <ConfigSectionCard
+        icon={<Wallet size={16} />}
+        title="Payment Types"
+        description="Payment types available on the POS payment section."
+      >
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              value={paymentTypeDraft}
+              onChange={(event) => setPaymentTypeDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  addPaymentType()
+                }
+              }}
+              className={`${inputClass} max-w-md flex-1`}
+              placeholder="Enter payment type"
+            />
+            <button
+              type="button"
+              onClick={addPaymentType}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
+            >
+              Add
+            </button>
+          </div>
+          <MutedHelp>
+            Select Payment Type to add on POS in Other section of Payment.
+          </MutedHelp>
 
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {paymentTypes.map((type) => (
-                    <ToggleChip
-                      key={type}
-                      label={type}
-                      active={Boolean(enabledTypes[type])}
-                      onToggle={() => togglePaymentType(type)}
-                    />
+          <div className="flex flex-wrap gap-2 pt-1">
+            {paymentTypes.map((type) => (
+              <ToggleChip
+                key={type}
+                label={type}
+                active={Boolean(enabledTypes[type])}
+                onToggle={() => togglePaymentType(type)}
+              />
+            ))}
+          </div>
+
+          {enabledTypes.UPI ? (
+            <div className="flex flex-wrap gap-2 border-l-2 border-line pl-3">
+              {uniqueUpiChips.map((label) => (
+                <ToggleChip
+                  key={label}
+                  label={label}
+                  active={Boolean(upiSubTypes[label])}
+                  onToggle={() =>
+                    setUpiSubTypes((prev) => ({
+                      ...prev,
+                      [label]: !prev[label],
+                    }))
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+
+          <MutedHelp>
+            Note: By disabling the Cash, Part Payment will be disabled too.
+          </MutedHelp>
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<CreditCard size={16} />}
+        title="Payment Card Option"
+        description="Card options available on the POS card payment section."
+      >
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              value={cardOptionDraft}
+              onChange={(event) => setCardOptionDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  addCardOption()
+                }
+              }}
+              className={`${inputClass} max-w-md flex-1`}
+              placeholder="Enter card option"
+            />
+            <button
+              type="button"
+              onClick={addCardOption}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
+            >
+              Add
+            </button>
+          </div>
+          <MutedHelp>
+            Select Payment card options to add on POS in Card section of
+            Payment.
+          </MutedHelp>
+          {cardOptions.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {cardOptions.map((option) => (
+                <ToggleChip
+                  key={option}
+                  label={option}
+                  active={Boolean(enabledCards[option])}
+                  onToggle={() =>
+                    setEnabledCards((prev) => ({
+                      ...prev,
+                      [option]: !prev[option],
+                    }))
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<Smartphone size={16} />}
+        title="UPI Provider"
+        description="UPI providers available on the POS UPI payment section."
+      >
+        <div className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+            <select
+              value={upiProvider}
+              onChange={(event) => setUpiProvider(event.target.value)}
+              className={`${selectClass} sm:max-w-[220px]`}
+              aria-label="Select UPI Provider"
+            >
+              {UPI_PROVIDER_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <div className="min-w-0 flex-1 sm:max-w-xs">
+              <input
+                type="text"
+                value={upiCustomName}
+                onChange={(event) => setUpiCustomName(event.target.value)}
+                placeholder="UPI custom name"
+                className={inputClass}
+              />
+              <MutedHelp>
+                This custom name will be reflected in all the relevant reports.
+              </MutedHelp>
+            </div>
+            <button
+              type="button"
+              onClick={addUpiProvider}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
+            >
+              Add
+            </button>
+          </div>
+          <MutedHelp>
+            Select UPI Provider to add on POS in UPI section of Payment.
+          </MutedHelp>
+          {upiProviders.length > 0 ? (
+            <div className="overflow-x-auto rounded-lg border border-line">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-page/80">
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted">
+                      Provider
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted">
+                      Custom Name
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {upiProviders.map((row) => (
+                    <tr key={row.id} className="border-t border-line">
+                      <td className="px-3 py-2 font-medium text-ink">
+                        {row.provider}
+                      </td>
+                      <td className="px-3 py-2 text-ink">{row.customName}</td>
+                    </tr>
                   ))}
-                </div>
-
-                {enabledTypes.UPI ? (
-                  <div className="flex flex-wrap gap-2 border-l-2 border-line pl-3">
-                    {uniqueUpiChips.map((label) => (
-                      <ToggleChip
-                        key={label}
-                        label={label}
-                        active={Boolean(upiSubTypes[label])}
-                        onToggle={() =>
-                          setUpiSubTypes((prev) => ({
-                            ...prev,
-                            [label]: !prev[label],
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
-                ) : null}
-
-                <MutedHelp>
-                  Note: By disabling the Cash, Part Payment will be disabled
-                  too.
-                </MutedHelp>
-              </div>
-            </FormRow>
-          </section>
-
-          <section className="space-y-4">
-            <FormRow label="Payment Card Option">
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    type="text"
-                    value={cardOptionDraft}
-                    onChange={(event) => setCardOptionDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        addCardOption()
-                      }
-                    }}
-                    className={`${inputClass} max-w-md flex-1`}
-                    placeholder="Enter card option"
-                  />
-                  <PrimaryButton onClick={addCardOption}>Add</PrimaryButton>
-                </div>
-                <MutedHelp>
-                  Select Payment card options to add on POS in Card section of
-                  Payment.
-                </MutedHelp>
-                {cardOptions.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {cardOptions.map((option) => (
-                      <ToggleChip
-                        key={option}
-                        label={option}
-                        active={Boolean(enabledCards[option])}
-                        onToggle={() =>
-                          setEnabledCards((prev) => ({
-                            ...prev,
-                            [option]: !prev[option],
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </FormRow>
-          </section>
-
-          <section className="space-y-4">
-            <FormRow label="UPI Provider">
-              <div className="space-y-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
-                  <select
-                    value={upiProvider}
-                    onChange={(event) => setUpiProvider(event.target.value)}
-                    className={`${selectClass} sm:max-w-[220px]`}
-                    aria-label="Select UPI Provider"
-                  >
-                    {UPI_PROVIDER_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="min-w-0 flex-1 sm:max-w-xs">
-                    <input
-                      type="text"
-                      value={upiCustomName}
-                      onChange={(event) => setUpiCustomName(event.target.value)}
-                      placeholder="UPI custom name"
-                      className={inputClass}
-                    />
-                    <MutedHelp>
-                      This custom name will be reflected in all the relevant
-                      reports.
-                    </MutedHelp>
-                  </div>
-                  <PrimaryButton onClick={addUpiProvider}>Add</PrimaryButton>
-                </div>
-                <MutedHelp>
-                  Select UPI Provider to add on POS in UPI section of Payment.
-                </MutedHelp>
-                {upiProviders.length > 0 ? (
-                  <div className="overflow-x-auto rounded-lg border border-line">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="bg-page/80">
-                          <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted">
-                            Provider
-                          </th>
-                          <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-muted">
-                            Custom Name
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {upiProviders.map((row) => (
-                          <tr key={row.id} className="border-t border-line">
-                            <td className="px-3 py-2 text-ink">{row.provider}</td>
-                            <td className="px-3 py-2 text-ink">
-                              {row.customName}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : null}
-              </div>
-            </FormRow>
-          </section>
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
+      </ConfigSectionCard>
 
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-line bg-card/95 px-5 py-4 backdrop-blur sm:px-6">
-          <OutlineButton variant="gray" onClick={goBack}>
-            Cancel
-          </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
-        </div>
-      </div>
+      <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
     </ReportsPageShell>
   )
 }

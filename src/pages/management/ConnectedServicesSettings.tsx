@@ -1,10 +1,24 @@
 import { useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
+  Archive,
+  Barcode,
+  CalendarDays,
+  ChefHat,
+  Monitor,
+  ReceiptText,
+  Smartphone,
+  Star,
+  Wallet,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import {
+  ConfigBreadcrumb,
+  ConfigFormRow,
+  ConfigSaveBar,
+  ConfigSectionCard,
+  MutedHelp,
+} from '../../components/management/ConfigSectionCard'
+import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { brand } from '../../theme/brand'
 
 const inputClass =
@@ -19,53 +33,6 @@ const SEND_LOYALTY_TYPES = [
   `${brand.shortName} Scan & Order`,
   'Online Order',
 ] as const
-
-function Section({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <section className="space-y-4 border-b border-line pb-8 last:border-b-0 last:pb-0">
-      <div>
-        <h2 className="text-base font-bold text-ink">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm text-muted">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function FormRow({
-  label,
-  children,
-  align = 'start',
-}: {
-  label: string
-  children: ReactNode
-  align?: 'start' | 'center'
-}) {
-  return (
-    <div
-      className={`grid gap-2 sm:grid-cols-[280px_minmax(0,1fr)] sm:gap-4 ${
-        align === 'center' ? 'sm:items-center' : 'sm:items-start'
-      }`}
-    >
-      <div className="text-sm font-medium text-ink sm:pt-2">{label}</div>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
-}
-
-function Help({ children }: { children: ReactNode }) {
-  return <p className="mt-1.5 text-xs leading-relaxed text-muted">{children}</p>
-}
 
 function PrimaryHelp({ children }: { children: ReactNode }) {
   return (
@@ -134,7 +101,7 @@ function CheckRow({
       />
       <span>
         <span className="font-medium">{label}</span>
-        {help ? <Help>{help}</Help> : null}
+        {help ? <MutedHelp>{help}</MutedHelp> : null}
       </span>
     </label>
   )
@@ -235,7 +202,7 @@ export default function ConnectedServicesSettings() {
   }
 
   return (
-    <ReportsPageShell title="Outlet Configuration" activeItem="config-outlet">
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Connected Services" />} activeItem="config-outlet">
       {toast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
           {toast}
@@ -247,55 +214,57 @@ export default function ConnectedServicesSettings() {
         Services With The System.
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="space-y-8 p-5 sm:p-6">
-          <Section
-            title="Day End Settings"
-            description="The following settings helps in configures enabling Day End module in billing screen"
-          >
-            <div className="space-y-3">
-              <CheckRow
-                checked={manualDayEnd}
-                onChange={setManualDayEnd}
-                label="Enable Manual Day End"
-              />
-              <CheckRow
-                checked={blockDayEndActiveTables}
-                onChange={setBlockDayEndActiveTables}
-                label="Don't allow Day End if there is any active table on Table View Screen."
-              />
-              <CheckRow
-                checked={blockDayEndUnsync}
-                onChange={setBlockDayEndUnsync}
-                label="Don't allow Day End if there is any un-sync orders data"
-              />
-              <CheckRow
-                checked={restrictEditAfterDayEnd}
-                onChange={setRestrictEditAfterDayEnd}
-                label="Restrict editing the order once the manual day end operation has been completed"
-              />
-            </div>
-          </Section>
+      <ConfigSectionCard
+        icon={<CalendarDays size={16} />}
+        title="Day End Settings"
+        description="The following settings helps in configures enabling Day End module in billing screen"
+      >
+        <div className="space-y-3">
+          <CheckRow
+            checked={manualDayEnd}
+            onChange={setManualDayEnd}
+            label="Enable Manual Day End"
+          />
+          <CheckRow
+            checked={blockDayEndActiveTables}
+            onChange={setBlockDayEndActiveTables}
+            label="Don't allow Day End if there is any active table on Table View Screen."
+          />
+          <CheckRow
+            checked={blockDayEndUnsync}
+            onChange={setBlockDayEndUnsync}
+            label="Don't allow Day End if there is any un-sync orders data"
+          />
+          <CheckRow
+            checked={restrictEditAfterDayEnd}
+            onChange={setRestrictEditAfterDayEnd}
+            label="Restrict editing the order once the manual day end operation has been completed"
+          />
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Loyalty Settings"
-            description="The following settings pertains to configuring the loyalty settings in the billing screen"
-          >
-            <CheckRow
-              checked={sendLoyaltyDefault}
-              onChange={setSendLoyaltyDefault}
-              label="Make 'Send Loyalty' option set as default on Billing screen."
+      <ConfigSectionCard
+        icon={<Star size={16} />}
+        title="Loyalty Settings"
+        description="The following settings pertains to configuring the loyalty settings in the billing screen"
+      >
+        <div className="space-y-4">
+          <CheckRow
+            checked={sendLoyaltyDefault}
+            onChange={setSendLoyaltyDefault}
+            label="Make 'Send Loyalty' option set as default on Billing screen."
+          />
+          <ConfigFormRow label="Apply Loyalty points when order punched as">
+            <CheckGroup
+              options={APPLY_LOYALTY_TYPES}
+              values={applyLoyaltyTypes}
+              onToggle={(value) =>
+                toggleIn(applyLoyaltyTypes, value, setApplyLoyaltyTypes)
+              }
             />
-            <FormRow label="Apply Loyalty points when order punched as" align="start">
-              <CheckGroup
-                options={APPLY_LOYALTY_TYPES}
-                values={applyLoyaltyTypes}
-                onToggle={(value) =>
-                  toggleIn(applyLoyaltyTypes, value, setApplyLoyaltyTypes)
-                }
-              />
-            </FormRow>
-            <FormRow label="Send Loyalty Data when order punched as" align="start">
+          </ConfigFormRow>
+          <ConfigFormRow label="Send Loyalty Data when order punched as">
+            <>
               <CheckGroup
                 options={SEND_LOYALTY_TYPES}
                 values={sendLoyaltyTypes}
@@ -303,203 +272,215 @@ export default function ConnectedServicesSettings() {
                   toggleIn(sendLoyaltyTypes, value, setSendLoyaltyTypes)
                 }
               />
-              <Help>
+              <MutedHelp>
                 This settings describe on which order types the data will be
                 send to Loyalty Partners.
-              </Help>
-            </FormRow>
-            <CheckRow
-              checked={loyaltyOnDiscounted}
-              onChange={setLoyaltyOnDiscounted}
-              label="Customers to gain loyalty points for discounted orders."
-            />
-            <FormRow label="Send Loyalty Data (Only for Table Order)">
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+          <CheckRow
+            checked={loyaltyOnDiscounted}
+            onChange={setLoyaltyOnDiscounted}
+            label="Customers to gain loyalty points for discounted orders."
+          />
+          <ConfigFormRow label="Send Loyalty Data (Only for Table Order)" align="center">
+            <>
               <RadioGroup
                 name="send-loyalty-when"
                 value={sendLoyaltyWhen}
                 options={['Print Bill', 'Settle & Save']}
                 onChange={setSendLoyaltyWhen}
               />
-              <Help>
+              <MutedHelp>
                 This settings describe when the Loyalty data will be send to
                 Loyalty Partners.
-              </Help>
-            </FormRow>
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Cash Drawer Settings"
-            description="The following settings pertains to configuring the cash drawer in the billing screen"
-          >
+      <ConfigSectionCard
+        icon={<Archive size={16} />}
+        title="Cash Drawer Settings"
+        description="The following settings pertains to configuring the cash drawer in the billing screen"
+      >
+        <CheckRow
+          checked={cashDrawerCashOnly}
+          onChange={setCashDrawerCashOnly}
+          label="Open cashdrawer for cash payment only"
+        />
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<ChefHat size={16} />}
+        title="KDS Settings"
+        description="The following settings would be used to configure the Kitchen Display System or KDS"
+      >
+        <div className="space-y-3">
+          <CheckRow
+            checked={kdsUpdateOrderScreen}
+            onChange={setKdsUpdateOrderScreen}
+            label="From KDS/KOT live screen send update to order screen."
+            help="In case of any update (like marking an item/order ready) in KDS or KOT live view, the update would be also be present in Order screen."
+          />
+          <CheckRow
+            checked={kdsMarkKotDone}
+            onChange={setKdsMarkKotDone}
+            label="On marking done all items on KDS, Mark KOT as done."
+            help="Enabling the setting would mark the full KOT done at all places (including online aggregators) when all the items are marked done."
+          />
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<Smartphone size={16} />}
+        title="Captain App Settings"
+        description="The following settings pertains to configuring the Captain App print settings."
+      >
+        <div className="space-y-4">
+          <div className="space-y-3">
             <CheckRow
-              checked={cashDrawerCashOnly}
-              onChange={setCashDrawerCashOnly}
-              label="Open cashdrawer for cash payment only"
+              checked={printKotCaptain}
+              onChange={setPrintKotCaptain}
+              label="Print KOT from Captain App"
             />
-          </Section>
-
-          <Section
-            title="KDS Settings"
-            description="The following settings would be used to configure the Kitchen Display System or KDS"
-          >
-            <div className="space-y-3">
-              <CheckRow
-                checked={kdsUpdateOrderScreen}
-                onChange={setKdsUpdateOrderScreen}
-                label="From KDS/KOT live screen send update to order screen."
-                help="In case of any update (like marking an item/order ready) in KDS or KOT live view, the update would be also be present in Order screen."
-              />
-              <CheckRow
-                checked={kdsMarkKotDone}
-                onChange={setKdsMarkKotDone}
-                label="On marking done all items on KDS, Mark KOT as done."
-                help="Enabling the setting would mark the full KOT done at all places (including online aggregators) when all the items are marked done."
-              />
-            </div>
-          </Section>
-
-          <Section
-            title="Captain App Settings"
-            description="The following settings pertains to configuring the Captain App print settings."
-          >
-            <div className="space-y-3">
-              <CheckRow
-                checked={printKotCaptain}
-                onChange={setPrintKotCaptain}
-                label="Print KOT from Captain App"
-              />
-              <CheckRow
-                checked={discountCaptain}
-                onChange={setDiscountCaptain}
-                label="Allow Discount from Captain APP (Applicable for Dine-in orders only)"
-              />
-            </div>
-            <FormRow label="Notify captain users once the food ready is marked">
-              <RadioGroup
-                name="notify-captain"
-                value={notifyCaptain}
-                options={['Item Ready', 'KOT Ready', 'None']}
-                onChange={setNotifyCaptain}
-              />
-            </FormRow>
-          </Section>
-
-          <Section
-            title="Display Settings"
-            description="The following settings would be used to configure the display settings of the PoS"
-          >
-            <FormRow label="Default Restaurant PIN reset">
-              <RadioGroup
-                name="pin-reset"
-                value={pinReset}
-                options={['On Print Bill', 'On Settle & Save']}
-                onChange={setPinReset}
-              />
-            </FormRow>
-          </Section>
-
-          <Section
-            title="E-Invoice Settings"
-            description="The following settings pertains to configuring the e-Invoice settings."
-          >
             <CheckRow
-              checked={enableEInvoice}
-              onChange={setEnableEInvoice}
-              label="Enable e-Invoice"
+              checked={discountCaptain}
+              onChange={setDiscountCaptain}
+              label="Allow Discount from Captain APP (Applicable for Dine-in orders only)"
             />
-            <InfoBox>
-              <p className="mb-2 font-medium text-ink">
-                Requirements to generate e-Invoices:
-              </p>
-              <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
-                <li>Outlet GST information must be configured.</li>
-                <li>Customer GST number is required on the bill.</li>
-                <li>CGST/SGST tax configuration must be set for items.</li>
-                <li>HSN numbers should be configured for items.</li>
-                <li>Valid buyer address and state code are required.</li>
-                <li>Invoice sequence and numbering must be active.</li>
-                <li>Recharge e-Invoice credits if balance is low.</li>
-                <li>Ensure biller has permission to generate e-Invoice.</li>
-                <li>Note: IGST is not supported in this configuration.</li>
-              </ol>
-            </InfoBox>
-          </Section>
+          </div>
+          <ConfigFormRow label="Notify captain users once the food ready is marked" align="center">
+            <RadioGroup
+              name="notify-captain"
+              value={notifyCaptain}
+              options={['Item Ready', 'KOT Ready', 'None']}
+              onChange={setNotifyCaptain}
+            />
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Barcode Settings"
-            description="The following settings pertains to configuring the Barcode settings."
-          >
-            <FormRow label="Prefix for Barcode">
+      <ConfigSectionCard
+        icon={<Monitor size={16} />}
+        title="Display Settings"
+        description="The following settings would be used to configure the display settings of the PoS"
+      >
+        <ConfigFormRow label="Default Restaurant PIN reset" align="center">
+          <RadioGroup
+            name="pin-reset"
+            value={pinReset}
+            options={['On Print Bill', 'On Settle & Save']}
+            onChange={setPinReset}
+          />
+        </ConfigFormRow>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<ReceiptText size={16} />}
+        title="E-Invoice Settings"
+        description="The following settings pertains to configuring the e-Invoice settings."
+      >
+        <div className="space-y-4">
+          <CheckRow
+            checked={enableEInvoice}
+            onChange={setEnableEInvoice}
+            label="Enable e-Invoice"
+          />
+          <InfoBox>
+            <p className="mb-2 font-medium text-ink">
+              Requirements to generate e-Invoices:
+            </p>
+            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
+              <li>Outlet GST information must be configured.</li>
+              <li>Customer GST number is required on the bill.</li>
+              <li>CGST/SGST tax configuration must be set for items.</li>
+              <li>HSN numbers should be configured for items.</li>
+              <li>Valid buyer address and state code are required.</li>
+              <li>Invoice sequence and numbering must be active.</li>
+              <li>Recharge e-Invoice credits if balance is low.</li>
+              <li>Ensure biller has permission to generate e-Invoice.</li>
+              <li>Note: IGST is not supported in this configuration.</li>
+            </ol>
+          </InfoBox>
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<Barcode size={16} />}
+        title="Barcode Settings"
+        description="The following settings pertains to configuring the Barcode settings."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Prefix for Barcode" align="center">
+            <>
               <input
                 type="text"
                 value={barcodePrefix}
                 onChange={(event) => setBarcodePrefix(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-xs`}
               />
               <PrimaryHelp>
                 This field is required if want to activate this service settings
                 in POS.
               </PrimaryHelp>
-            </FormRow>
-            <FormRow label="No. of Characters to calculate Weight">
-              <input
-                type="text"
-                value={weightChars}
-                onChange={(event) => setWeightChars(event.target.value)}
-                className={inputClass}
-              />
-            </FormRow>
-            <FormRow label="Weight Denominator">
-              <input
-                type="text"
-                value={weightDenominator}
-                onChange={(event) => setWeightDenominator(event.target.value)}
-                className={inputClass}
-              />
-            </FormRow>
-            <CheckRow
-              checked={multiItemBarcode}
-              onChange={setMultiItemBarcode}
-              label="Allow entries of multiple items in single barcode/ QR code"
+            </>
+          </ConfigFormRow>
+          <ConfigFormRow label="No. of Characters to calculate Weight" align="center">
+            <input
+              type="text"
+              value={weightChars}
+              onChange={(event) => setWeightChars(event.target.value)}
+              className={`${inputClass} max-w-xs`}
             />
-            <div className="rounded-lg border border-line bg-page/50 px-4 py-3">
-              <p className="text-sm font-semibold text-primary">
-                How to configure?
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                Example: For barcode <span className="font-medium text-ink">9002200048</span>,
-                if Prefix is <span className="font-medium text-ink">900</span>,
-                product code length is remaining middle digits, and weight uses{' '}
-                {weightChars || '5'} characters with denominator{' '}
-                {weightDenominator || '1000'}, then weight is calculated as{' '}
-                <span className="font-medium text-ink">
-                  00048 / {weightDenominator || '1000'}
-                </span>
-                .
-              </p>
-            </div>
-          </Section>
-
-          <Section
-            title="Expense Settings"
-            description="The following settings pertains to configuring the Expense settings."
-          >
-            <CheckRow
-              checked={restrictExpenseToday}
-              onChange={setRestrictExpenseToday}
-              label="Restrict users to add expense and withdrawal for current date only."
-              help="If the configuration is enabled then the users would only be able to add expense and withdrawal for current date."
+          </ConfigFormRow>
+          <ConfigFormRow label="Weight Denominator" align="center">
+            <input
+              type="text"
+              value={weightDenominator}
+              onChange={(event) => setWeightDenominator(event.target.value)}
+              className={`${inputClass} max-w-xs`}
             />
-          </Section>
+          </ConfigFormRow>
+          <CheckRow
+            checked={multiItemBarcode}
+            onChange={setMultiItemBarcode}
+            label="Allow entries of multiple items in single barcode/ QR code"
+          />
+          <div className="rounded-lg border border-line bg-page/50 px-4 py-3">
+            <p className="text-sm font-semibold text-primary">
+              How to configure?
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Example: For barcode <span className="font-medium text-ink">9002200048</span>,
+              if Prefix is <span className="font-medium text-ink">900</span>,
+              product code length is remaining middle digits, and weight uses{' '}
+              {weightChars || '5'} characters with denominator{' '}
+              {weightDenominator || '1000'}, then weight is calculated as{' '}
+              <span className="font-medium text-ink">
+                00048 / {weightDenominator || '1000'}
+              </span>
+              .
+            </p>
+          </div>
         </div>
+      </ConfigSectionCard>
 
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-line bg-card/95 px-5 py-4 backdrop-blur sm:px-6">
-          <OutlineButton variant="gray" onClick={goBack}>
-            Cancel
-          </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
-        </div>
-      </div>
+      <ConfigSectionCard
+        icon={<Wallet size={16} />}
+        title="Expense Settings"
+        description="The following settings pertains to configuring the Expense settings."
+      >
+        <CheckRow
+          checked={restrictExpenseToday}
+          onChange={setRestrictExpenseToday}
+          label="Restrict users to add expense and withdrawal for current date only."
+          help="If the configuration is enabled then the users would only be able to add expense and withdrawal for current date."
+        />
+      </ConfigSectionCard>
+
+      <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
     </ReportsPageShell>
   )
 }

@@ -62,7 +62,7 @@ const KPI_TONES: Record<string, string> = {
   card: 'bg-accent/15 text-accent',
   wallet: 'bg-secondary/40 text-deep',
   cash: 'bg-success/10 text-success',
-  online: 'bg-sky-100 text-sky-700',
+  online: 'bg-accent/15 text-accent',
   due: 'bg-accent/15 text-accent',
   other: 'bg-page text-muted',
 }
@@ -178,7 +178,7 @@ function UnlockCard({
   description: string
 }) {
   return (
-    <div className="flex min-h-[180px] flex-1 flex-col items-start rounded-xl border border-line bg-card p-5">
+    <div className="flex min-h-[180px] flex-1 flex-col items-start rounded-xl border border-line bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
       <span className="mb-3 inline-flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
         <Lock size={18} />
       </span>
@@ -221,7 +221,7 @@ export default function FinanceDashboard() {
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-ink">Dashboard</h1>
+          <h1 className="text-lg font-bold text-ink">Dashboard</h1>
           <p className="mt-0.5 text-sm text-muted">
             Track your business financial performance in real-time.
           </p>
@@ -244,7 +244,7 @@ export default function FinanceDashboard() {
         {FINANCE_KPIS.map((kpi) => (
           <div
             key={kpi.id}
-            className="rounded-xl border border-line bg-card p-4"
+            className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
           >
             <div className="mb-3 flex items-start justify-between gap-2">
               <span
@@ -254,13 +254,13 @@ export default function FinanceDashboard() {
               </span>
               <InfoTip text={`${kpi.label} collection for selected period`} />
             </div>
-            <p className="text-sm font-medium text-muted">{kpi.label}</p>
+            <p className="text-xs font-medium text-muted">{kpi.label}</p>
             {kpi.value == null ? (
               <p className="mt-1 text-2xl font-bold text-muted">—</p>
             ) : (
               <p className="mt-1 flex flex-wrap items-baseline gap-1.5 text-2xl font-bold text-ink">
                 {formatNumber(kpi.value)}
-                <ArrowUpRight size={16} className="text-sky-600" />
+                <ArrowUpRight size={16} className="text-success" />
                 {kpi.bills != null ? (
                   <span className="text-xs font-medium text-muted">
                     ({kpi.bills} Bills)
@@ -273,7 +273,7 @@ export default function FinanceDashboard() {
       </div>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-line bg-card p-4">
+        <div className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
           <h2 className="mb-3 text-sm font-bold text-ink">
             Payment Distribution
           </h2>
@@ -325,7 +325,7 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-line bg-card p-4">
+        <div className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-ink">
               Month Wise Payment Trends
@@ -402,7 +402,7 @@ export default function FinanceDashboard() {
                     activeDot={{
                       r: 5.5,
                       fill: series.color,
-                      stroke: '#fff',
+                      stroke: 'var(--color-card)',
                       strokeWidth: 2,
                     }}
                   />
@@ -413,7 +413,7 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      <div className="mb-4 rounded-xl border border-line bg-card p-4">
+      <div className="mb-4 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         <h2 className="mb-3 text-sm font-bold text-ink">Deductions & Tips</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -468,7 +468,7 @@ export default function FinanceDashboard() {
 
       {activeTab === 'card-upi' ? (
         <div className="space-y-4">
-          <section className="rounded-xl border border-line bg-card p-4">
+          <section className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-ink">
@@ -495,7 +495,7 @@ export default function FinanceDashboard() {
                   empty
                 />
               </div>
-              <div className="hidden items-center text-sky-500 lg:flex">→</div>
+              <div className="hidden items-center text-muted lg:flex">→</div>
               <div className="flex w-full max-w-[220px] items-center">
                 <FlowCard
                   icon={<HandCoins size={18} />}
@@ -503,7 +503,7 @@ export default function FinanceDashboard() {
                   empty
                 />
               </div>
-              <div className="hidden items-center text-sky-500 lg:flex">→</div>
+              <div className="hidden items-center text-muted lg:flex">→</div>
               <div className="flex w-full max-w-[220px] items-center">
                 <FlowCard
                   icon={<Landmark size={18} />}
@@ -525,7 +525,7 @@ export default function FinanceDashboard() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-line bg-card p-4">
+          <section className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-ink">
@@ -550,7 +550,7 @@ export default function FinanceDashboard() {
 
       {activeTab === 'cash' ? (
         <div className="space-y-4">
-          <section className="rounded-xl border border-line bg-card p-4">
+          <section className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-ink">Cash</h2>
@@ -614,13 +614,13 @@ export default function FinanceDashboard() {
                   <Bar
                     dataKey="lastWeek"
                     name="Last Week"
-                    fill="#93c5fd"
+                    fill="var(--color-line)"
                     radius={[4, 4, 0, 0]}
                   />
                   <Bar
                     dataKey="currentWeek"
                     name="Current Week"
-                    fill="#2563eb"
+                    fill="var(--color-accent)"
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
@@ -631,7 +631,7 @@ export default function FinanceDashboard() {
       ) : null}
 
       {activeTab === 'online-recon' ? (
-        <section className="rounded-xl border border-line bg-card p-4">
+        <section className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-ink">
@@ -701,9 +701,9 @@ function FlowCard({
   empty?: boolean
 }) {
   return (
-    <div className="w-full rounded-xl border border-line bg-card p-3 shadow-sm">
+    <div className="w-full rounded-xl border border-line bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <span className="inline-flex size-8 items-center justify-center rounded-md bg-sky-50 text-sky-600">
+        <span className="inline-flex size-8 items-center justify-center rounded-md bg-accent/15 text-accent">
           {icon}
         </span>
         <InfoTip text={title} />
@@ -735,10 +735,10 @@ function CashStatCard({
       ? 'bg-success/10 text-success'
       : tone === 'danger'
         ? 'bg-primary/10 text-primary'
-        : 'bg-sky-100 text-sky-700'
+        : 'bg-accent/15 text-accent'
 
   return (
-    <div className="rounded-xl border border-line bg-card p-4">
+    <div className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
       <div className="mb-2 flex items-start justify-between gap-2">
         <span
           className={`inline-flex size-9 items-center justify-center rounded-lg ${toneClass}`}

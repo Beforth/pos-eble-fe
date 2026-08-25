@@ -1,31 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Calendar, ChevronDown, Grid, MessageSquare, Rocket, Search, Star } from 'lucide-react'
+import {
+  Calendar,
+  ChevronDown,
+  Download,
+  Filter,
+  Grid,
+  MessageSquare,
+  RefreshCw,
+  Rocket,
+  Search,
+  Star,
+  TrendingUp,
+} from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
-import { OutlineButton } from '../../components/menu/MenuActionButtons'
+import { PrimaryButton, OutlineButton } from '../../components/menu/MenuActionButtons'
+import { AggregatorLogo } from '../../components/common/AggregatorLogo'
 
 type PrimaryTab = 'petpooja_feedback' | 'complaints' | 'ratings_reviews'
 type SubTab = 'customer_wise' | 'feedback_wise'
 type PlatformFilter = 'all' | 'zomato' | 'swiggy'
-
-function AggregatorMark({ name }: { name: 'Zomato' | 'Swiggy' }) {
-  const isSwiggy = name === 'Swiggy'
-  return (
-    <span className="relative inline-flex size-6 shrink-0 items-center justify-center overflow-hidden rounded">
-      <img
-        src={isSwiggy ? '/swiggy.png' : '/zomato.png'}
-        alt={`${name} logo`}
-        width={isSwiggy ? 40 : 24}
-        height={isSwiggy ? 40 : 24}
-        className={
-          isSwiggy
-            ? 'absolute size-10 max-w-none scale-110 object-cover'
-            : 'size-6 object-contain'
-        }
-      />
-    </span>
-  )
-}
 
 export default function CrmFeedbackPage() {
   const location = useLocation()
@@ -34,19 +28,16 @@ export default function CrmFeedbackPage() {
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>('all')
   const [ratingsPlatform, setRatingsPlatform] = useState<'zomato' | 'swiggy'>('zomato')
 
-  // Feedback filters
-  const [fromDate, setFromDate] = useState('2026-08-13')
-  const [toDate, setToDate] = useState('2026-08-13')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [orderType, setOrderType] = useState('All')
 
-  // Complaints filters
-  const [complaintFromDate, setComplaintFromDate] = useState('2026-08-08')
-  const [complaintToDate, setComplaintToDate] = useState('2026-08-13')
+  const [complaintFromDate, setComplaintFromDate] = useState('')
+  const [complaintToDate, setComplaintToDate] = useState('')
   const [onlineOrderNo, setOnlineOrderNo] = useState('')
   const [complaintStatus, setComplaintStatus] = useState('All')
 
-  // Ratings filters
-  const [ratingsDate, setRatingsDate] = useState('Today')
+  const [ratingsDate, setRatingsDate] = useState('')
   const [ratingsOrderNo, setRatingsOrderNo] = useState('')
 
   useEffect(() => {
@@ -63,19 +54,17 @@ export default function CrmFeedbackPage() {
     }
   }, [location.pathname])
 
-  function handleSearch() {
-    // Search action
-  }
+  function handleSearch() {}
 
   function handleShowAll() {
-    setFromDate('2026-08-13')
-    setToDate('2026-08-13')
+    setFromDate('')
+    setToDate('')
     setOrderType('All')
-    setComplaintFromDate('2026-08-08')
-    setComplaintToDate('2026-08-13')
+    setComplaintFromDate('')
+    setComplaintToDate('')
     setOnlineOrderNo('')
     setComplaintStatus('All')
-    setRatingsDate('Today')
+    setRatingsDate('')
     setRatingsOrderNo('')
   }
 
@@ -91,16 +80,16 @@ export default function CrmFeedbackPage() {
       activeItem="crm-feedback"
     >
       <div className="space-y-6">
-        {/* Top Announcement Hero Banner (Only in Petpooja Feedback Customer Wise view) */}
+        {/* Announcement Banner */}
         {primaryTab === 'petpooja_feedback' && subTab === 'customer_wise' && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 shadow-2xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 shadow-xs">
             <div className="flex items-start gap-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Rocket size={20} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-primary px-2 py-0.5 text-[10px] font-extrabold text-white tracking-wider uppercase">
+                  <span className="rounded-md bg-primary px-2 py-0.5 text-[11px] font-extrabold text-white tracking-wider uppercase">
                     New
                   </span>
                   <h3 className="text-sm font-bold text-ink">
@@ -108,7 +97,9 @@ export default function CrmFeedbackPage() {
                   </h3>
                 </div>
                 <p className="mt-1 text-xs font-medium text-muted">
-                  View and manage all customer feedback, track ratings, and respond smarter — now from one unified portal with deeper insights.
+                  View and manage all customer feedback, track ratings, and
+                  respond smarter — now from one unified portal with deeper
+                  insights.
                 </p>
               </div>
             </div>
@@ -122,34 +113,167 @@ export default function CrmFeedbackPage() {
           </div>
         )}
 
-        {/* Top Actions Row for Petpooja Feedback */}
+        {/* Summary Stats — Petpooja Feedback */}
         {primaryTab === 'petpooja_feedback' && (
-          <div className="flex items-center justify-end gap-3">
-            <div className="flex items-center gap-1.5 rounded-full border border-line bg-page px-3.5 py-1.5 text-xs font-bold text-ink shadow-2xs">
-              <span className="size-2 rounded-full bg-slate-400" />
-              <span>
-                {subTab === 'feedback_wise'
-                  ? 'Total No. of Feedback : 0'
-                  : 'Total No. Of Feedback : 0'}
-              </span>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Total Feedback
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0</p>
+                </div>
+              </div>
             </div>
 
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+                  <TrendingUp size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    This Week
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-deep">
+                  <Star size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Avg Rating
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0.0</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Stats — Complaints */}
+        {primaryTab === 'complaints' && (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Total Complaints
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger">
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Open
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Resolved
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Stats — Ratings */}
+        {primaryTab === 'ratings_reviews' && (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Star size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Total Reviews
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary/20 text-deep">
+                  <Star size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Avg Rating
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0.0</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+                  <TrendingUp size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    5-Star Reviews
+                  </p>
+                  <p className="text-xl font-extrabold text-ink">0</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Top Actions Row */}
+        {primaryTab === 'petpooja_feedback' && (
+          <div className="flex items-center justify-end gap-3">
             <OutlineButton
               variant="gray"
               onClick={() => alert('Exporting feedback excel...')}
             >
+              <Download size={14} />
               <span>Export Excel</span>
               <ChevronDown size={14} />
             </OutlineButton>
           </div>
         )}
 
-        {/* Primary Tabs Navigation Line */}
-        <div className="flex items-center gap-8 border-b border-line">
+        {/* Primary Tabs Navigation */}
+        <div className="flex items-center gap-8 overflow-x-auto border-b border-line">
           <button
             type="button"
             onClick={() => setPrimaryTab('petpooja_feedback')}
-            className={`pb-3 text-sm font-bold transition-all relative ${
+            className={`whitespace-nowrap pb-3 text-sm font-bold transition-all relative ${
               primaryTab === 'petpooja_feedback'
                 ? 'text-ink after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2.5px] after:rounded-t after:bg-primary'
                 : 'text-muted hover:text-ink'
@@ -161,7 +285,7 @@ export default function CrmFeedbackPage() {
           <button
             type="button"
             onClick={() => setPrimaryTab('complaints')}
-            className={`pb-3 text-sm font-bold transition-all relative ${
+            className={`whitespace-nowrap pb-3 text-sm font-bold transition-all relative ${
               primaryTab === 'complaints'
                 ? 'text-ink after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2.5px] after:rounded-t after:bg-primary'
                 : 'text-muted hover:text-ink'
@@ -173,7 +297,7 @@ export default function CrmFeedbackPage() {
           <button
             type="button"
             onClick={() => setPrimaryTab('ratings_reviews')}
-            className={`pb-3 text-sm font-bold transition-all relative ${
+            className={`whitespace-nowrap pb-3 text-sm font-bold transition-all relative ${
               primaryTab === 'ratings_reviews'
                 ? 'text-ink after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2.5px] after:rounded-t after:bg-primary'
                 : 'text-muted hover:text-ink'
@@ -183,17 +307,17 @@ export default function CrmFeedbackPage() {
           </button>
         </div>
 
-        {/* CONTENT FOR PETPOOJA FEEDBACK */}
+        {/* ─── PETPOOJA FEEDBACK CONTENT ─── */}
         {primaryTab === 'petpooja_feedback' && (
           <>
-            {/* Sub-Tab Toggle Buttons */}
+            {/* Sub-Tab Toggle */}
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setSubTab('customer_wise')}
                 className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${
                   subTab === 'customer_wise'
-                    ? 'border border-primary bg-card text-primary shadow-2xs'
+                    ? 'border border-primary bg-primary/5 text-primary shadow-xs'
                     : 'border border-line bg-card text-muted hover:text-ink'
                 }`}
               >
@@ -205,7 +329,7 @@ export default function CrmFeedbackPage() {
                 onClick={() => setSubTab('feedback_wise')}
                 className={`rounded-lg px-4 py-2 text-xs font-bold transition-all ${
                   subTab === 'feedback_wise'
-                    ? 'border border-primary bg-card text-primary shadow-2xs'
+                    ? 'border border-primary bg-primary/5 text-primary shadow-xs'
                     : 'border border-line bg-card text-muted hover:text-ink'
                 }`}
               >
@@ -213,37 +337,41 @@ export default function CrmFeedbackPage() {
               </button>
             </div>
 
-            {/* Filter Controls Bar for Customer Wise */}
+            {/* Customer Wise Filter Bar */}
             {subTab === 'customer_wise' && (
               <div className="flex flex-wrap items-end gap-3.5 rounded-xl border border-line bg-card p-4 sm:p-5 shadow-xs">
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-muted">From</label>
+                  <label className="block text-sm font-bold text-muted">
+                    From
+                  </label>
                   <div className="relative">
-                    <Calendar
-                      size={16}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-                    />
                     <input
                       type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
-                      className="h-10 rounded-md border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                      className="h-10 rounded-md border border-line bg-card pl-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    />
+                    <Calendar
+                      size={16}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-muted">To</label>
+                  <label className="block text-sm font-bold text-muted">
+                    To
+                  </label>
                   <div className="relative">
-                    <Calendar
-                      size={16}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-                    />
                     <input
                       type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
-                      className="h-10 rounded-md border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                      className="h-10 rounded-md border border-line bg-card pl-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    />
+                    <Calendar
+                      size={16}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
                     />
                   </div>
                 </div>
@@ -264,17 +392,21 @@ export default function CrmFeedbackPage() {
                   </select>
                 </div>
 
-                <OutlineButton variant="gray" onClick={() => alert('More filters...')}>
+                <OutlineButton
+                  variant="gray"
+                  onClick={() => alert('More filters...')}
+                >
+                  <Filter size={14} />
                   More Filters
                 </OutlineButton>
 
-                <button
-                  type="button"
+                <OutlineButton
+                  variant="primary"
                   onClick={handleSearch}
-                  className="h-10 rounded-md border border-primary bg-card px-6 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
                 >
+                  <Search size={14} />
                   Search
-                </button>
+                </OutlineButton>
 
                 <OutlineButton variant="gray" onClick={handleShowAll}>
                   Show All
@@ -282,32 +414,109 @@ export default function CrmFeedbackPage() {
               </div>
             )}
 
-            {/* Empty State Container */}
+            {/* Feedback Wise Filter Bar */}
+            {subTab === 'feedback_wise' && (
+              <div className="flex flex-wrap items-end gap-3.5 rounded-xl border border-line bg-card p-4 sm:p-5 shadow-xs">
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-bold text-muted">
+                    From
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="h-10 rounded-md border border-line bg-card pl-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    />
+                    <Calendar
+                      size={16}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-bold text-muted">
+                    To
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="h-10 rounded-md border border-line bg-card pl-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    />
+                    <Calendar
+                      size={16}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-bold text-muted">
+                    Order Type
+                  </label>
+                  <select
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value)}
+                    className="h-10 min-w-[160px] rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
+                  >
+                    <option value="All">All</option>
+                    <option value="Dine In">Dine In</option>
+                    <option value="Takeaway">Takeaway</option>
+                    <option value="Delivery">Delivery</option>
+                  </select>
+                </div>
+
+                <OutlineButton
+                  variant="primary"
+                  onClick={handleSearch}
+                >
+                  <Search size={14} />
+                  Search
+                </OutlineButton>
+
+                <OutlineButton variant="gray" onClick={handleShowAll}>
+                  Show All
+                </OutlineButton>
+              </div>
+            )}
+
+            {/* Empty State */}
             <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-line bg-card p-8 text-center shadow-xs">
-              <div className="flex size-14 items-center justify-center rounded-full border border-line bg-page text-muted shadow-2xs">
+              <div className="flex size-14 items-center justify-center rounded-full border border-line bg-page text-muted shadow-xs">
                 <Search size={26} />
               </div>
               <h2 className="mt-4 text-lg font-bold tracking-tight text-ink">
                 No Results Found.
               </h2>
               <p className="mt-1 text-sm font-medium text-muted">
-                We couldn't find a match for your search.
+                We couldn't find a match for your search. Try adjusting your
+                filters or date range.
               </p>
+              <OutlineButton
+                variant="gray"
+                onClick={handleShowAll}
+                className="mt-4"
+              >
+                Reset Filters
+              </OutlineButton>
             </div>
           </>
         )}
 
-        {/* CONTENT FOR COMPLAINTS (Matching Screenshot 5436 & 5438) */}
+        {/* ─── COMPLAINTS CONTENT ─── */}
         {primaryTab === 'complaints' && (
           <>
-            {/* Aggregator Source Filter Pills with OnlineOrders logo sizing */}
+            {/* Platform Filter Pills */}
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setPlatformFilter('all')}
                 className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all ${
                   platformFilter === 'all'
-                    ? 'border border-primary bg-card text-primary shadow-2xs'
+                    ? 'border border-primary bg-primary/5 text-primary shadow-xs'
                     : 'border border-line bg-card text-muted hover:text-ink'
                 }`}
               >
@@ -320,11 +529,11 @@ export default function CrmFeedbackPage() {
                 onClick={() => setPlatformFilter('zomato')}
                 className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all ${
                   platformFilter === 'zomato'
-                    ? 'border border-rose-500 bg-rose-50 text-rose-700 shadow-2xs'
+                    ? 'border border-danger/40 bg-danger/5 text-danger shadow-xs'
                     : 'border border-line bg-card text-muted hover:text-ink'
                 }`}
               >
-                <AggregatorMark name="Zomato" />
+                <AggregatorLogo name="Zomato" size="xs" />
                 <span>Zomato</span>
               </button>
 
@@ -333,45 +542,49 @@ export default function CrmFeedbackPage() {
                 onClick={() => setPlatformFilter('swiggy')}
                 className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all ${
                   platformFilter === 'swiggy'
-                    ? 'border border-amber-500 bg-amber-50 text-amber-700 shadow-2xs'
+                    ? 'border border-accent/40 bg-accent/5 text-accent shadow-xs'
                     : 'border border-line bg-card text-muted hover:text-ink'
                 }`}
               >
-                <AggregatorMark name="Swiggy" />
+                <AggregatorLogo name="Swiggy" size="xs" />
                 <span>Swiggy</span>
               </button>
             </div>
 
-            {/* Filter Bar for Complaints */}
+            {/* Complaints Filter Bar */}
             <div className="flex flex-wrap items-end gap-3.5 rounded-xl border border-line bg-card p-4 sm:p-5 shadow-xs">
               <div className="space-y-1.5">
-                <label className="block text-sm font-bold text-muted">From</label>
+                <label className="block text-sm font-bold text-muted">
+                  From
+                </label>
                 <div className="relative">
-                  <Calendar
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-                  />
                   <input
                     type="date"
                     value={complaintFromDate}
                     onChange={(e) => setComplaintFromDate(e.target.value)}
-                    className="h-10 rounded-md border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    className="h-10 rounded-md border border-line bg-card pl-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  />
+                  <Calendar
+                    size={16}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-sm font-bold text-muted">To</label>
+                <label className="block text-sm font-bold text-muted">
+                  To
+                </label>
                 <div className="relative">
-                  <Calendar
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-                  />
                   <input
                     type="date"
                     value={complaintToDate}
                     onChange={(e) => setComplaintToDate(e.target.value)}
-                    className="h-10 rounded-md border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    className="h-10 rounded-md border border-line bg-card pl-3 pr-9 text-sm text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  />
+                  <Calendar
+                    size={16}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
                   />
                 </div>
               </div>
@@ -384,7 +597,6 @@ export default function CrmFeedbackPage() {
                   type="text"
                   value={onlineOrderNo}
                   onChange={(e) => setOnlineOrderNo(e.target.value)}
-                  placeholder=""
                   className="h-10 w-full min-w-[180px] rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
                 />
               </div>
@@ -405,13 +617,13 @@ export default function CrmFeedbackPage() {
                 </select>
               </div>
 
-              <button
-                type="button"
+              <OutlineButton
+                variant="primary"
                 onClick={handleSearch}
-                className="h-10 rounded-md border border-primary bg-card px-6 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
               >
+                <Search size={14} />
                 Show
-              </button>
+              </OutlineButton>
 
               <OutlineButton variant="gray" onClick={handleShowAll}>
                 Clear
@@ -421,82 +633,82 @@ export default function CrmFeedbackPage() {
                 variant="gray"
                 onClick={() => alert('Exporting complaints...')}
               >
+                <Download size={14} />
                 Export
               </OutlineButton>
             </div>
 
-            {/* Empty State Area */}
+            {/* Empty State */}
             <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border border-line bg-card p-8 text-center shadow-xs">
-              <div className="relative flex items-center justify-center py-4">
-                <div className="absolute -top-1 -left-4 size-4 rounded-full bg-rose-200/60" />
-                <div className="absolute top-0 right-1 size-5 rounded-full bg-rose-300/60" />
-                <div className="absolute -bottom-2 -left-2 size-3.5 rounded-full bg-rose-200/60" />
-                <div className="absolute -bottom-1 right-2 size-3 rounded-full bg-rose-200/60" />
-
-                <div className="relative flex size-16 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-400 shadow-2xs">
-                  <MessageSquare size={30} />
-                  <Search
-                    size={16}
-                    className="absolute -bottom-1 -right-1 text-slate-500"
-                  />
-                </div>
+              <div className="flex size-16 items-center justify-center rounded-full border border-line bg-page text-muted shadow-xs">
+                <MessageSquare size={30} />
               </div>
-
               <h2 className="mt-4 text-base font-bold text-ink sm:text-lg">
                 No Complaints Found.
               </h2>
+              <p className="mt-1 text-sm font-medium text-muted">
+                No complaints match your current filters. Try a different date
+                range or status.
+              </p>
+              <OutlineButton
+                variant="gray"
+                onClick={handleShowAll}
+                className="mt-4"
+              >
+                Reset Filters
+              </OutlineButton>
             </div>
           </>
         )}
 
-        {/* CONTENT FOR RATINGS & REVIEWS (Matching Screenshot 5437) */}
+        {/* ─── RATINGS & REVIEWS CONTENT ─── */}
         {primaryTab === 'ratings_reviews' && (
           <div className="space-y-6">
-            {/* Platform Sub-Tabs (Zomato & Swiggy with AggregatorMark sizing) */}
-            <div className="flex items-center gap-6 border-b border-line pb-0">
+            {/* Platform Sub-Tabs */}
+            <div className="flex items-center gap-6 border-b border-line pb-0 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setRatingsPlatform('zomato')}
-                className={`flex items-center gap-2 pb-3 text-sm font-bold transition-all relative ${
+                className={`flex items-center gap-2 whitespace-nowrap pb-3 text-sm font-bold transition-all relative ${
                   ratingsPlatform === 'zomato'
                     ? 'text-ink after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2.5px] after:rounded-t after:bg-primary'
                     : 'text-muted hover:text-ink'
                 }`}
               >
-                <AggregatorMark name="Zomato" />
+                <AggregatorLogo name="Zomato" size="xs" />
                 <span>Zomato</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setRatingsPlatform('swiggy')}
-                className={`flex items-center gap-2 pb-3 text-sm font-bold transition-all relative ${
+                className={`flex items-center gap-2 whitespace-nowrap pb-3 text-sm font-bold transition-all relative ${
                   ratingsPlatform === 'swiggy'
                     ? 'text-ink after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2.5px] after:rounded-t after:bg-primary'
                     : 'text-muted hover:text-ink'
                 }`}
               >
-                <AggregatorMark name="Swiggy" />
+                <AggregatorLogo name="Swiggy" size="xs" />
                 <span>Swiggy</span>
               </button>
             </div>
 
-            {/* Filter Bar for Ratings */}
+            {/* Ratings Filter Bar */}
             <div className="flex flex-wrap items-end gap-3.5 rounded-xl border border-line bg-card p-4 sm:p-5 shadow-xs">
               <div className="space-y-1.5 min-w-[200px]">
                 <label className="block text-sm font-bold text-muted">
                   Date
                 </label>
                 <div className="relative">
-                  <Calendar
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-                  />
                   <input
-                    type="text"
+                    type="date"
                     value={ratingsDate}
                     onChange={(e) => setRatingsDate(e.target.value)}
-                    className="h-10 w-full rounded-md border border-line bg-card pl-9 pr-3 text-sm font-semibold text-ink outline-none transition-colors focus:border-primary"
+                    className="h-10 w-full rounded-md border border-line bg-card pl-3 pr-9 text-sm font-semibold text-ink outline-none transition-colors focus:border-primary [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-8 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  />
+                  <Calendar
+                    size={16}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
                   />
                 </div>
               </div>
@@ -509,18 +721,17 @@ export default function CrmFeedbackPage() {
                   type="text"
                   value={ratingsOrderNo}
                   onChange={(e) => setRatingsOrderNo(e.target.value)}
-                  placeholder=""
                   className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none transition-colors focus:border-primary"
                 />
               </div>
 
-              <button
-                type="button"
+              <OutlineButton
+                variant="primary"
                 onClick={handleSearch}
-                className="h-10 rounded-md border border-primary bg-card px-6 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
               >
+                <Search size={14} />
                 Show
-              </button>
+              </OutlineButton>
 
               <OutlineButton variant="gray" onClick={handleShowAll}>
                 Clear
@@ -530,6 +741,7 @@ export default function CrmFeedbackPage() {
                 variant="gray"
                 onClick={() => alert('Exporting ratings...')}
               >
+                <Download size={14} />
                 Export
               </OutlineButton>
             </div>
@@ -538,7 +750,7 @@ export default function CrmFeedbackPage() {
             <div className="rounded-xl border border-line bg-card p-6 shadow-xs">
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-4 items-center">
                 <div className="flex flex-col items-center justify-center border-b sm:border-b-0 sm:border-r border-line pb-6 sm:pb-0 pr-0 sm:pr-6 text-center">
-                  <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
+                  <span className="text-[11px] font-extrabold text-muted uppercase tracking-wider">
                     TOTAL REVIEWS
                   </span>
                   <span className="mt-1 text-4xl font-extrabold text-ink">
@@ -554,7 +766,10 @@ export default function CrmFeedbackPage() {
                     >
                       <div className="flex items-center gap-1 w-8 shrink-0">
                         <span>{stars}</span>
-                        <Star size={12} className="fill-amber-400 text-amber-400" />
+                        <Star
+                          size={12}
+                          className="fill-secondary text-secondary"
+                        />
                       </div>
 
                       <div className="h-2 w-full overflow-hidden rounded-full bg-page border border-line">
@@ -570,9 +785,32 @@ export default function CrmFeedbackPage() {
               </div>
             </div>
 
-            <p className="text-center text-sm font-semibold text-ink pt-4">
-              No reviews found for the selected filters.
-            </p>
+            {/* Empty State */}
+            <div className="flex flex-col items-center justify-center rounded-xl border border-line bg-card p-8 text-center shadow-xs">
+              <div className="flex size-16 items-center justify-center rounded-full border border-line bg-page text-muted shadow-xs">
+                <Star size={30} />
+              </div>
+              <h2 className="mt-4 text-base font-bold text-ink sm:text-lg">
+                No Reviews Found.
+              </h2>
+              <p className="mt-1 text-sm font-medium text-muted">
+                No reviews match your current filters. Try selecting a different
+                date or platform.
+              </p>
+              <OutlineButton
+                variant="gray"
+                onClick={handleShowAll}
+                className="mt-4"
+              >
+                Reset Filters
+              </OutlineButton>
+            </div>
+
+            {/* Data Freshness */}
+            <div className="flex items-center justify-end gap-1.5 text-[11px] text-muted">
+              <RefreshCw size={12} />
+              <span>Data refreshed on page load</span>
+            </div>
           </div>
         )}
       </div>

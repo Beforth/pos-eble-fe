@@ -110,6 +110,10 @@ function buildRows(): ItemCommissionRow[] {
 
 export const itemCommissionRows: ItemCommissionRow[] = buildRows()
 
+export function addCommissionRow(row: ItemCommissionRow) {
+  itemCommissionRows.push(row)
+}
+
 export interface AddonCommissionRow {
   id: string
   addonName: string

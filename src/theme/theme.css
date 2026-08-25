@@ -344,15 +344,12 @@ body {
   color: var(--color-deep);
 }
 
-/* Highlighted amount column (Online Orders Total, etc.) */
+/* Highlighted amount column (Online Orders Total, Due Payment Total Due) */
 .col-total {
   background-color: color-mix(in srgb, var(--color-secondary) 35%, var(--color-card));
 }
 
-/* Highlighted amount column (Online Orders Total, etc.) */
-.col-total {
-  background-color: color-mix(in srgb, var(--color-secondary) 35%, var(--color-card));
-}
+
 
 /*
  * Dark mode blueprint (uncomment when ready):

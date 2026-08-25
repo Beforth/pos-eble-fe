@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Calendar } from 'lucide-react'
+import { ArrowLeft, Calendar, FileText, Info } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { PrimaryButton, OutlineButton } from '../../components/menu/MenuActionButtons'
 
@@ -24,21 +24,21 @@ export default function CreateCampaignPage() {
   return (
     <ReportsPageShell title="Create Campaign" activeItem="crm-campaign">
       <div className="space-y-6">
-        {/* Back Button & Header */}
+        {/* Back Button */}
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={handleCancel}
-            className="flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs font-bold text-ink shadow-2xs hover:bg-page transition-colors"
+            className="flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs font-bold text-ink shadow-xs hover:bg-page transition-colors"
           >
             <ArrowLeft size={16} />
             <span>Back to Campaigns</span>
           </button>
         </div>
 
-        {/* Top Expiration Banner (Matching Screenshot 5427) */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50/80 p-4 shadow-2xs">
-          <p className="text-xs font-semibold text-rose-800">
+        {/* Expiration Banner */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-accent/20 bg-accent/5 p-4 shadow-xs">
+          <p className="text-xs font-semibold text-accent">
             This page will expire soon. To visit the new and improved Campaign flow for enhanced functionality.
           </p>
           <OutlineButton variant="gray" onClick={() => alert('Navigating to new Campaign flow...')}>
@@ -54,21 +54,26 @@ export default function CreateCampaignPage() {
               Campaign Details
             </h2>
 
-            <div className="space-y-2 text-xs font-medium text-muted leading-relaxed">
-              <p>
-                In compliance to a TRAI Regulation, the telecom operators will not share the status of the SMS delivered. So, Petpooja will also not be able to share such a status report with you. To have the least SMS delivery failure, kindly ensure below before firing SMS campaigns:
-              </p>
+            <div className="rounded-lg bg-page p-4 space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <Info size={16} className="mt-0.5 shrink-0 text-muted" />
+                <div className="space-y-2 text-xs font-medium text-muted leading-relaxed">
+                  <p>
+                    In compliance to a TRAI Regulation, the telecom operators will not share the status of the SMS delivered. So, Petpooja will also not be able to share such a status report with you. To have the least SMS delivery failure, kindly ensure below before firing SMS campaigns:
+                  </p>
 
-              <ul className="ml-2 space-y-1 list-disc list-inside font-semibold text-ink">
-                <li>Your sender ID is registered with TRAI, &</li>
-                <li>
-                  Your promotional SMS template is registered with TRAI (every single change in the template would require you to get it approved from TRAI)
-                </li>
-              </ul>
+                  <ul className="ml-4 space-y-1 list-disc list-inside font-semibold text-ink">
+                    <li>Your sender ID is registered with TRAI, &</li>
+                    <li>
+                      Your promotional SMS template is registered with TRAI (every single change in the template would require you to get it approved from TRAI)
+                    </li>
+                  </ul>
 
-              <p className="pt-1 font-semibold text-ink">
-                Petpooja will not be responsible for SMS delivery failure.
-              </p>
+                  <p className="pt-1 font-semibold text-ink">
+                    Petpooja will not be responsible for SMS delivery failure.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -115,8 +120,8 @@ export default function CreateCampaignPage() {
               >
                 <option value="">Select Sender ID</option>
               </select>
-              <p className="text-xs font-semibold text-primary">
-                Note:- Your sms balance is zero.Please buy any sms plan to request sms sender id.
+              <p className="text-xs font-medium text-muted">
+                Note: Your SMS balance is zero. Please buy any SMS plan to request SMS sender ID.
               </p>
             </div>
 
@@ -138,7 +143,7 @@ export default function CreateCampaignPage() {
                 />
               </div>
               <p className="text-xs font-medium text-muted">
-                Note:- Please schedule at least 30 minutes in advance.
+                Note: Please schedule at least 30 minutes in advance.
               </p>
             </div>
 
@@ -170,20 +175,35 @@ export default function CreateCampaignPage() {
               </PrimaryButton>
             </div>
 
-            <p className="text-xs font-medium text-primary leading-relaxed">
-              Note:- You can either choose a template from the predefined choices or use "Request Template" to get your personal template approved. Once approved, it will be added to the choose template list. Please take a look at the predefined templates or call us on 07969 223344 for details.
+            <p className="text-xs font-medium text-muted leading-relaxed">
+              You can either choose a template from the predefined choices or use "Request Template" to get your personal template approved. Once approved, it will be added to the choose template list. Please take a look at the predefined templates or call us on 07969 223344 for details.
             </p>
 
-            <OutlineButton variant="gray" onClick={() => alert('Choosing template...')}>
-              Choose Template
-            </OutlineButton>
+            <button
+              type="button"
+              onClick={() => alert('Choosing template...')}
+              className="flex items-center gap-3 w-full rounded-xl border-2 border-dashed border-line bg-page p-5 text-left transition-all hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
+            >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <FileText size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-ink">Choose Template</p>
+                <p className="text-xs font-medium text-muted">
+                  Select from predefined SMS templates or request a custom one
+                </p>
+              </div>
+            </button>
           </div>
 
           {/* Bottom Warning & Action Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-t border-line pt-6">
-            <p className="max-w-xl text-xs font-semibold text-primary leading-relaxed">
-              Note:-Sending promotional SMSes for a large number of customer could take atleast 2 hours to execute,so please plan the campaign accordingly
-            </p>
+            <div className="flex items-start gap-2 max-w-xl rounded-lg bg-page p-3">
+              <Info size={14} className="mt-0.5 shrink-0 text-muted" />
+              <p className="text-xs font-medium text-muted leading-relaxed">
+                Sending promotional SMSes for a large number of customers could take at least 2 hours to execute, so please plan the campaign accordingly.
+              </p>
+            </div>
 
             <div className="flex items-center gap-3">
               <OutlineButton variant="gray" onClick={handleCancel}>

@@ -9,6 +9,7 @@ export interface MenuItemRow {
   available: boolean
   tags: string[]
   hasImage: boolean
+  rank?: number
 }
 
 /** Full category sidebar list for Base Menu / Dine In / Parcel. */
@@ -363,4 +364,26 @@ export const menuItems: MenuItemRow[] = [
 
 export function getMenuItemById(id: string) {
   return menuItems.find((row) => row.id === id)
+}
+
+const ITEMS_STORAGE_KEY = 'menu_items_store'
+
+export function getStoredMenuItems(): MenuItemRow[] {
+  try {
+    const raw = localStorage.getItem(ITEMS_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export function addMenuItem(item: MenuItemRow) {
+  const items = getStoredMenuItems()
+  items.push(item)
+  localStorage.setItem(ITEMS_STORAGE_KEY, JSON.stringify(items))
+}
+
+export function deleteMenuItem(id: string) {
+  const items = getStoredMenuItems().filter((i) => i.id !== id)
+  localStorage.setItem(ITEMS_STORAGE_KEY, JSON.stringify(items))
 }

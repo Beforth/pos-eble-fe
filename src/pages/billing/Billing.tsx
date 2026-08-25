@@ -21,6 +21,7 @@ import { DraftBillsModal } from '../../components/billing/DraftBillsModal'
 import { SaveDraftNameModal } from '../../components/billing/SaveDraftNameModal'
 import { PartPaymentView } from '../../components/billing/PartPaymentView'
 import { SplitBillModal } from '../../components/billing/SplitBillModal'
+import { KOTPrintTemplate } from '../../components/billing/KOTPrintTemplate'
 import {
   baseMenuCategories,
   menuItems,
@@ -200,6 +201,7 @@ export default function Billing() {
   const [draftCount, setDraftCount] = useState(() => loadDraftBills().length)
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null)
   const [saveDraftOpen, setSaveDraftOpen] = useState(false)
+  const [printTicket, setPrintTicket] = useState<KotTicket | null>(null)
 
   useEffect(() => {
     const nextTableId = searchParams.get('tableId')
@@ -812,13 +814,16 @@ export default function Billing() {
       setKotTickets(next)
       setLines([])
       setOrderNote('')
+      if (action === 'KOT & Print') {
+        setPrintTicket(ticket)
+      }
       const destLabel = ticket.tableNo ? `${ticket.tableNo}` : labelForOrderType(ticket.orderType)
       showToast(
         action === 'KOT & Print'
-          ? `${destLabel} · KOT ${ticket.kotNo} sent · Print started`
+          ? `${destLabel} · KOT ${ticket.kotNo} sent · Print preview ready`
           : `${destLabel} · KOT ${ticket.kotNo} sent`,
       )
-      if (hasTableSelected) {
+      if (hasTableSelected && action !== 'KOT & Print') {
         navigate('/table-view')
       }
       return
@@ -1168,6 +1173,13 @@ export default function Billing() {
         onClose={() => setSaveDraftOpen(false)}
         onConfirm={saveCurrentAsDraft}
       />
+
+      {printTicket && (
+        <KOTPrintTemplate
+          ticket={printTicket}
+          onClose={() => setPrintTicket(null)}
+        />
+      )}
     </div>
   )
 }

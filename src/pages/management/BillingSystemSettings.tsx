@@ -1,10 +1,20 @@
-import { useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useState } from 'react'
 import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
+  CreditCard,
+  History,
+  Monitor,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import {
+  ConfigBreadcrumb,
+  ConfigFormRow,
+  ConfigSaveBar,
+  ConfigSectionCard,
+  MutedHelp,
+} from '../../components/management/ConfigSectionCard'
+import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 
 const inputClass =
   'h-10 w-full max-w-xs rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
@@ -13,57 +23,6 @@ const selectClass = inputClass
 const BATCH_SIZES = ['10', '20', '30', '50', '100']
 const SYNC_MINUTES = ['1', '2', '3', '5', '10', '15', '30']
 const SYNC_SECONDS = ['1', '2', '3', '5', '10', '15', '30']
-
-function Section({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <section className="space-y-4 border-b border-line pb-8 last:border-b-0 last:pb-0">
-      <div>
-        <h2 className="text-base font-bold text-ink">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm text-muted">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function FormRow({
-  label,
-  required,
-  children,
-  align = 'start',
-}: {
-  label: string
-  required?: boolean
-  children: ReactNode
-  align?: 'start' | 'center'
-}) {
-  return (
-    <div
-      className={`grid gap-2 sm:grid-cols-[300px_minmax(0,1fr)] sm:gap-4 ${
-        align === 'center' ? 'sm:items-center' : 'sm:items-start'
-      }`}
-    >
-      <div className="text-sm font-medium text-ink sm:pt-2">
-        {label} {required ? <span className="text-primary">*</span> : null}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
-}
-
-function Help({ children }: { children: ReactNode }) {
-  return <p className="mt-1.5 text-xs leading-relaxed text-muted">{children}</p>
-}
 
 function CheckRow({
   checked,
@@ -86,7 +45,7 @@ function CheckRow({
       />
       <span>
         <span className="font-medium">{label}</span>
-        {help ? <Help>{help}</Help> : null}
+        {help ? <MutedHelp>{help}</MutedHelp> : null}
       </span>
     </label>
   )
@@ -180,7 +139,7 @@ export default function BillingSystemSettings() {
   }
 
   return (
-    <ReportsPageShell title="Outlet Configuration" activeItem="config-outlet">
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Billing System" />} activeItem="config-outlet">
       {toast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
           {toast}
@@ -193,10 +152,14 @@ export default function BillingSystemSettings() {
         Like KDS.
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="space-y-8 p-5 sm:p-6">
-          <Section title="Order And Order Sync Settings">
-            <FormRow label="Sync Batch Packet Size">
+      <ConfigSectionCard
+        icon={<RefreshCw size={16} />}
+        title="Order And Order Sync Settings"
+        description="Order limits and synchronization intervals with the dashboard."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Sync Batch Packet Size" align="center">
+            <>
               <select
                 value={batchSize}
                 onChange={(event) => setBatchSize(event.target.value)}
@@ -208,22 +171,28 @@ export default function BillingSystemSettings() {
                   </option>
                 ))}
               </select>
-              <Help>The number of orders that would be synced in one packet.</Help>
-            </FormRow>
+              <MutedHelp>
+                The number of orders that would be synced in one packet.
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Default Order Limit" required>
+          <ConfigFormRow label="Default Order Limit" required align="center">
+            <>
               <input
                 type="text"
                 value={orderLimit}
                 onChange={(event) => setOrderLimit(event.target.value)}
                 className={inputClass}
               />
-              <Help>
+              <MutedHelp>
                 The maximum number of orders that would be displayed in PoS.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Default Auto Sync Time">
+          <ConfigFormRow label="Default Auto Sync Time" align="center">
+            <>
               <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={autoSyncTime}
@@ -238,14 +207,16 @@ export default function BillingSystemSettings() {
                 </select>
                 <span className="text-sm text-muted">min</span>
               </div>
-              <Help>
+              <MutedHelp>
                 The time taken for the orders to be synced with the dashboard
                 automatically. Please note internet must be connected to enable
                 auto-sync.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Default Pending Order Sync Time">
+          <ConfigFormRow label="Default Pending Order Sync Time" align="center">
+            <>
               <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={pendingSyncTime}
@@ -260,183 +231,195 @@ export default function BillingSystemSettings() {
                 </select>
                 <span className="text-sm text-muted">sec</span>
               </div>
-              <Help>
+              <MutedHelp>
                 The time taken for the pending orders to be synced with the
                 dashboard. Please note internet must be connected to enable
                 auto-sync.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Default Captain Order Intranet Sync Time">
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={captainIntranetSync}
-                  onChange={(event) =>
-                    setCaptainIntranetSync(event.target.value)
-                  }
-                  className={selectClass}
-                >
-                  {SYNC_SECONDS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-sm text-muted">sec</span>
-              </div>
-            </FormRow>
+          <ConfigFormRow label="Default Captain Order Intranet Sync Time" align="center">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={captainIntranetSync}
+                onChange={(event) =>
+                  setCaptainIntranetSync(event.target.value)
+                }
+                className={selectClass}
+              >
+                {SYNC_SECONDS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              <span className="text-sm text-muted">sec</span>
+            </div>
+          </ConfigFormRow>
 
-            <FormRow label="No. of Minutes to Edit Orders" required>
-              <input
-                type="text"
-                value={editOrdersMinutes}
-                onChange={(event) => setEditOrdersMinutes(event.target.value)}
-                className={inputClass}
-              />
-            </FormRow>
+          <ConfigFormRow label="No. of Minutes to Edit Orders" required align="center">
+            <input
+              type="text"
+              value={editOrdersMinutes}
+              onChange={(event) => setEditOrdersMinutes(event.target.value)}
+              className={inputClass}
+            />
+          </ConfigFormRow>
 
-            <FormRow label="No. of Minutes to Auto Settle After Print">
+          <ConfigFormRow label="No. of Minutes to Auto Settle After Print" align="center">
+            <>
               <input
                 type="text"
                 value={autoSettleAfterPrint}
                 onChange={(event) => setAutoSettleAfterPrint(event.target.value)}
                 className={inputClass}
               />
-              <Help>
+              <MutedHelp>
                 Note: The order cannot be modified once it is auto settled,
                 despite the relevant rights to modify order is given.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="For sync use">
-              <RadioGroup
-                name="sync-use"
-                value={syncUse}
-                options={['Secured', 'Normal']}
-                onChange={setSyncUse}
-              />
-            </FormRow>
+          <ConfigFormRow label="For sync use" align="center">
+            <RadioGroup
+              name="sync-use"
+              value={syncUse}
+              options={['Secured', 'Normal']}
+              onChange={setSyncUse}
+            />
+          </ConfigFormRow>
 
-            <FormRow label="Number of hours for which the order can be cancelled from the dashboard">
+          <ConfigFormRow label="Number of hours for which the order can be cancelled from the dashboard" align="center">
+            <>
               <input
                 type="text"
                 value={cancelHours}
                 onChange={(event) => setCancelHours(event.target.value)}
                 className={inputClass}
               />
-              <Help>
+              <MutedHelp>
                 Note: The user can select a maximum of 744 hours for cancellation
                 (31 days), the default selection if of 168 hours (7 days).
-              </Help>
-            </FormRow>
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Payment Sync Settings"
-            description="The following settings are related to Payment synchronization settings"
-          >
-            <FormRow label="Payment request sync time" required>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  value={paymentRequestSync}
-                  onChange={(event) => setPaymentRequestSync(event.target.value)}
-                  className={inputClass}
-                />
-                <span className="text-sm text-muted">secs</span>
-              </div>
-            </FormRow>
-            <FormRow label="Check payment request sync time" required>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  value={checkPaymentRequestSync}
-                  onChange={(event) =>
-                    setCheckPaymentRequestSync(event.target.value)
-                  }
-                  className={inputClass}
-                />
-                <span className="text-sm text-muted">secs</span>
-              </div>
-            </FormRow>
-            <CheckRow
-              checked={voiceQrPayments}
-              onChange={setVoiceQrPayments}
-              label="Enable voice notification on received Static QR payments"
-            />
-          </Section>
-
-          <Section
-            title="Display Settings"
-            description="The following settings would be used to configure the display settings of the PoS"
-          >
-            <FormRow label="Billing Screen Refresh After No. Of Bill Print" required>
+      <ConfigSectionCard
+        icon={<CreditCard size={16} />}
+        title="Payment Sync Settings"
+        description="The following settings are related to Payment synchronization settings"
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Payment request sync time" required align="center">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
-                value={refreshAfterBillPrint}
+                value={paymentRequestSync}
+                onChange={(event) => setPaymentRequestSync(event.target.value)}
+                className={inputClass}
+              />
+              <span className="text-sm text-muted">secs</span>
+            </div>
+          </ConfigFormRow>
+          <ConfigFormRow label="Check payment request sync time" required align="center">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={checkPaymentRequestSync}
                 onChange={(event) =>
-                  setRefreshAfterBillPrint(event.target.value)
+                  setCheckPaymentRequestSync(event.target.value)
                 }
                 className={inputClass}
               />
-              <Help>
-                This setting describes after how many bill prints would the
-                screen refreshes.
-              </Help>
-            </FormRow>
-          </Section>
-
-          <Section
-            title="Security Setting"
-            description="The following settings help in determining the settings related to security of the application."
-          >
-            <FormRow label="Default Manager Password for Desktop Use">
-              <input
-                type="password"
-                value={managerPassword}
-                onChange={(event) => setManagerPassword(event.target.value)}
-                className={inputClass}
-                autoComplete="new-password"
-              />
-            </FormRow>
-            <FormRow label="User Idle time for Logout" required>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  value={idleLogoutMins}
-                  onChange={(event) => setIdleLogoutMins(event.target.value)}
-                  className={inputClass}
-                />
-                <span className="text-sm text-muted">mins</span>
-              </div>
-            </FormRow>
-          </Section>
-
-          <Section title="Logging Settings">
-            <div className="space-y-3">
-              <CheckRow
-                checked={logsModifiedAfterPrint}
-                onChange={setLogsModifiedAfterPrint}
-                label="Display logs for orders modified after bill print"
-                help="Once enabled the logs of orders are modified post bill print, either through POS or web, would be displayed."
-              />
-              <CheckRow
-                checked={logsOrdersUpdated}
-                onChange={setLogsOrdersUpdated}
-                label="Display Logs for orders updated"
-                help="Once enabled the logs of orders are updated post bill print, either through POS or web, would be displayed."
-              />
+              <span className="text-sm text-muted">secs</span>
             </div>
-          </Section>
+          </ConfigFormRow>
+          <CheckRow
+            checked={voiceQrPayments}
+            onChange={setVoiceQrPayments}
+            label="Enable voice notification on received Static QR payments"
+          />
         </div>
+      </ConfigSectionCard>
 
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-line bg-card/95 px-5 py-4 backdrop-blur sm:px-6">
-          <OutlineButton variant="gray" onClick={goBack}>
-            Cancel
-          </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+      <ConfigSectionCard
+        icon={<Monitor size={16} />}
+        title="Display Settings"
+        description="The following settings would be used to configure the display settings of the PoS"
+      >
+        <ConfigFormRow label="Billing Screen Refresh After No. Of Bill Print" required align="center">
+          <>
+            <input
+              type="text"
+              value={refreshAfterBillPrint}
+              onChange={(event) =>
+                setRefreshAfterBillPrint(event.target.value)
+              }
+              className={inputClass}
+            />
+            <MutedHelp>
+              This setting describes after how many bill prints would the
+              screen refreshes.
+            </MutedHelp>
+          </>
+        </ConfigFormRow>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<ShieldCheck size={16} />}
+        title="Security Setting"
+        description="The following settings help in determining the settings related to security of the application."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Default Manager Password for Desktop Use" align="center">
+            <input
+              type="password"
+              value={managerPassword}
+              onChange={(event) => setManagerPassword(event.target.value)}
+              className={inputClass}
+              autoComplete="new-password"
+            />
+          </ConfigFormRow>
+          <ConfigFormRow label="User Idle time for Logout" required align="center">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={idleLogoutMins}
+                onChange={(event) => setIdleLogoutMins(event.target.value)}
+                className={inputClass}
+              />
+              <span className="text-sm text-muted">mins</span>
+            </div>
+          </ConfigFormRow>
         </div>
-      </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<History size={16} />}
+        title="Logging Settings"
+        description="Control which order modification logs are recorded and displayed."
+      >
+        <div className="space-y-3">
+          <CheckRow
+            checked={logsModifiedAfterPrint}
+            onChange={setLogsModifiedAfterPrint}
+            label="Display logs for orders modified after bill print"
+            help="Once enabled the logs of orders are modified post bill print, either through POS or web, would be displayed."
+          />
+          <CheckRow
+            checked={logsOrdersUpdated}
+            onChange={setLogsOrdersUpdated}
+            label="Display Logs for orders updated"
+            help="Once enabled the logs of orders are updated post bill print, either through POS or web, would be displayed."
+          />
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
     </ReportsPageShell>
   )
 }

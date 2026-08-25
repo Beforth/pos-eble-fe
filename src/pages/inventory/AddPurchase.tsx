@@ -9,6 +9,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
+import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
   PrimaryButton,
@@ -29,6 +30,10 @@ interface LineItem {
 }
 
 const SUPPLIERS = ['The Bandhan', 'Fresh Mart', 'Daily Dairy', 'Veggie Hub']
+const RESTAURANTS = [
+  "Annapurna's Rajubhai Dabeliwale — Dadar",
+  "Annapurna's Rajubhai Dabeliwale — Andheri",
+]
 const RAW_MATERIALS = [
   { name: 'Tomatoes', unit: 'Kg' },
   { name: 'Onion', unit: 'Kg' },
@@ -70,6 +75,7 @@ export default function AddPurchase() {
     'supplier',
   )
   const [supplier, setSupplier] = useState('')
+  const [restaurant, setRestaurant] = useState('')
   const [invoiceDate, setInvoiceDate] = useState('2026-08-10')
   const [invoiceNo, setInvoiceNo] = useState('')
   const [lines, setLines] = useState<LineItem[]>([emptyLine()])
@@ -194,30 +200,31 @@ export default function AddPurchase() {
       <div className="mb-4 grid gap-4 rounded-xl border border-line bg-card p-4 sm:grid-cols-3">
         {purchaseFrom === 'supplier' ? (
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink">
-              Supplier <span className="text-primary">*</span>
-            </label>
-            <select
+            <SearchableSelect
+              label={
+                <>Supplier <span className="text-primary">*</span></>
+              }
+              required
               value={supplier}
-              onChange={(event) => setSupplier(event.target.value)}
-              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
-            >
-              <option value="">Select Supplier</option>
-              {SUPPLIERS.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+              options={SUPPLIERS}
+              placeholder="Select Supplier"
+              searchPlaceholder="Search suppliers..."
+              onChange={setSupplier}
+            />
           </div>
         ) : (
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink">
-              Restaurant <span className="text-primary">*</span>
-            </label>
-            <select className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary">
-              <option>Annapurna&apos;s Rajubhai Dabeliwale — Dadar</option>
-            </select>
+            <SearchableSelect
+              label={
+                <>Restaurant <span className="text-primary">*</span></>
+              }
+              required
+              value={restaurant}
+              options={RESTAURANTS}
+              placeholder="Select Restaurant"
+              searchPlaceholder="Search restaurants..."
+              onChange={setRestaurant}
+            />
           </div>
         )}
         <div>
@@ -269,7 +276,7 @@ export default function AddPurchase() {
         </OutlineButton>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-card">
+      <div className="overflow-x-auto rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:overflow-visible">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
             <tr>
@@ -311,27 +318,22 @@ export default function AddPurchase() {
                     aria-label="Select row"
                   />
                 </td>
-                <td className="px-3 py-2.5">
-                  <select
+                <td className="px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                  <SearchableSelect
                     value={line.rawMaterial}
-                    onChange={(event) => {
-                      const material = RAW_MATERIALS.find(
-                        (m) => m.name === event.target.value,
-                      )
+                    options={RAW_MATERIALS.map((m) => m.name)}
+                    placeholder="Select/Add Raw Material"
+                    searchPlaceholder="Search materials..."
+                    compact
+                    dropdownPlacement="auto"
+                    onChange={(value) => {
+                      const material = RAW_MATERIALS.find((m) => m.name === value)
                       updateLine(line.id, {
-                        rawMaterial: event.target.value,
+                        rawMaterial: value,
                         unit: material?.unit ?? line.unit,
                       })
                     }}
-                    className="h-9 w-full min-w-[180px] rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">Select/Add Raw Material</option>
-                    {RAW_MATERIALS.map((material) => (
-                      <option key={material.name} value={material.name}>
-                        {material.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 <td className="px-3 py-2.5">
                   <input

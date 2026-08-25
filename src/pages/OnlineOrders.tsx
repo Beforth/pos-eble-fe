@@ -8,6 +8,7 @@ import {
 import { AllOrdersChart } from '../components/all-orders/AllOrdersChart'
 import { OnlineOrdersTable } from '../components/online-orders/OnlineOrdersTable'
 import { AggregatorHelpCenterModal } from '../components/online-orders/AggregatorHelpCenterModal'
+import { AggregatorLogo } from '../components/common/AggregatorLogo'
 import { ActionCenterDrawer } from '../components/layout/ActionCenterDrawer'
 import { NotificationsDrawer } from '../components/layout/NotificationsDrawer'
 import { Sidebar } from '../components/layout/Sidebar'
@@ -87,27 +88,7 @@ function matchesRecordType(row: OnlineOrderRow, recordType: string): boolean {
   return true
 }
 
-function AggregatorMark({ name }: { name: 'Zomato' | 'Swiggy' }) {
-  const isSwiggy = name === 'Swiggy'
-  return (
-    <span className="relative inline-flex size-6 shrink-0 items-center justify-center overflow-hidden rounded">
-      <img
-        src={isSwiggy ? '/swiggy.png' : '/zomato.png'}
-        alt={`${name} logo`}
-        width={isSwiggy ? 40 : 24}
-        height={isSwiggy ? 40 : 24}
-        className={
-          isSwiggy
-            ? 'absolute size-10 max-w-none scale-110 object-cover'
-            : 'size-6 object-contain'
-        }
-      />
-    </span>
-  )
-}
-
-export default function OnlineOrders() {
-  const [collapsed, setCollapsed] = useState(false)
+export default function OnlineOrders() {  const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -295,7 +276,7 @@ export default function OnlineOrders() {
                   {'icon' in option && option.icon ? (
                     <LayoutGrid size={15} />
                   ) : (
-                    <AggregatorMark name={option.value as 'Zomato' | 'Swiggy'} />
+                    <AggregatorLogo name={option.value as 'Zomato' | 'Swiggy'} size="xs" />
                   )}
                   {option.label}
                 </button>

@@ -13,10 +13,13 @@ import {
   FileText,
   Globe,
   History,
+  IndianRupee,
   LayoutDashboard,
   LogOut,
   Megaphone,
   MessageSquare,
+  Network,
+  Package,
   Settings,
   ShoppingBag,
   SlidersHorizontal,
@@ -95,12 +98,12 @@ const NAV: NavEntry[] = [
   { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'inventory', label: 'Inventory' },
+    item: { id: 'inventory', label: 'Inventory', icon: Package },
   },
   { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'finance', label: 'Finance' },
+    item: { id: 'finance', label: 'Finance', icon: IndianRupee },
   },
   { kind: 'divider' },
   {
@@ -108,6 +111,7 @@ const NAV: NavEntry[] = [
     item: {
       id: 'reports',
       label: 'Reports',
+      icon: BarChart3,
       chevron: true,
       children: [
         {
@@ -139,6 +143,7 @@ const NAV: NavEntry[] = [
     item: {
       id: 'management',
       label: 'Management',
+      icon: Settings,
       chevron: true,
       children: [
         {
@@ -315,6 +320,7 @@ const NAV: NavEntry[] = [
     item: {
       id: 'crm',
       label: 'CRM',
+      icon: Users,
       chevron: true,
       children: [
         {
@@ -348,7 +354,7 @@ const NAV: NavEntry[] = [
   { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'aggregator', label: 'Aggregator Center', chevron: true },
+    item: { id: 'aggregator', label: 'Aggregator Center', icon: Network, chevron: true },
   },
 ]
 
@@ -358,6 +364,7 @@ const ROUTES: Record<string, string> = {
   'all-orders': '/all-orders',
   'online-orders': '/online-orders',
   kot: '/kot',
+  'due-payments': '/due-payments',
   'menu-discounts': '/menu',
   'menu-images-upload': '/menu/multi-item-images',
   inventory: '/inventory',
@@ -615,6 +622,7 @@ export function Sidebar({
                   <SidebarNavItem
                     key={entry.item.id}
                     item={entry.item}
+                    to={ROUTES[entry.item.id]}
                     active={
                       activeItem === entry.item.id ||
                       Boolean(
@@ -657,6 +665,7 @@ export function Sidebar({
                       <SidebarNavItem
                         key={item.id}
                         item={item}
+                        to={ROUTES[item.id]}
                         active={activeItem === item.id}
                         collapsed={collapsed}
                         nested

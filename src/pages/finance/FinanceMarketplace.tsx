@@ -16,7 +16,7 @@ const SERVICES: MarketplaceService[] = [
     id: 'icici',
     name: 'ICICI Bank EDC',
     logoLabel: 'ICICI Bank',
-    logoTone: 'bg-[#f97316]/10 text-[#ea580c]',
+    logoTone: 'bg-accent/15 text-accent',
     description:
       'ICICI Bank EDC devices come with smart Petpooja Payment and an EDC device. Collect payments directly from the billing screen with automatic order settlement.',
   },
@@ -24,7 +24,7 @@ const SERVICES: MarketplaceService[] = [
     id: 'pine-labs',
     name: 'Pine Labs EDC',
     logoLabel: 'Pine Labs',
-    logoTone: 'bg-[#0ea5e9]/10 text-[#0284c7]',
+    logoTone: 'bg-accent/15 text-accent',
     description:
       'Pine Labs EDC machine integrates with Petpooja so you can collect card and UPI payments from the billing screen and settle orders automatically.',
   },
@@ -32,7 +32,7 @@ const SERVICES: MarketplaceService[] = [
     id: 'bharatpe',
     name: 'BharatPe EDC',
     logoLabel: 'BharatPe',
-    logoTone: 'bg-[#22c55e]/10 text-[#15803d]',
+    logoTone: 'bg-success/10 text-success',
     description:
       'BharatPe EDC devices come with smart Petpooja Payment and an EDC device. This combo lets you collect payments from all modes on a single terminal.',
   },
@@ -40,7 +40,7 @@ const SERVICES: MarketplaceService[] = [
     id: 'mosambee',
     name: 'Mosambee EDC',
     logoLabel: 'Mosambee',
-    logoTone: 'bg-[#a855f7]/10 text-[#7e22ce]',
+    logoTone: 'bg-primary/10 text-primary',
     description:
       'Mosambee EDC devices come with smart Petpooja Payment and an EDC device. Collect payments from all modes on a single terminal with automatic settlement.',
   },
@@ -48,7 +48,7 @@ const SERVICES: MarketplaceService[] = [
     id: 'razorpay',
     name: 'Razorpay EDC',
     logoLabel: 'Razorpay',
-    logoTone: 'bg-[#3b82f6]/10 text-[#1d4ed8]',
+    logoTone: 'bg-deep/10 text-deep',
     description:
       'Razorpay EDC devices come with a smart Petpooja Payment and an EDC device. This smart combo allows you to collect payments from all modes on a single terminal.',
   },
@@ -56,7 +56,7 @@ const SERVICES: MarketplaceService[] = [
     id: 'paytm',
     name: 'Paytm EDC',
     logoLabel: 'Paytm',
-    logoTone: 'bg-[#38bdf8]/10 text-[#0369a1]',
+    logoTone: 'bg-accent/15 text-accent',
     description:
       'Paytm EDC devices come with a smart Petpooja Payment and an EDC device. This smart combo allows you to collect payments from all modes on a single terminal.',
   },
@@ -95,17 +95,17 @@ export default function FinanceMarketplace() {
         {SERVICES.map((service) => (
           <article
             key={service.id}
-            className="flex flex-col overflow-hidden rounded-xl border border-line bg-card"
+            className="flex flex-col overflow-hidden rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
           >
             <div
               className={`flex h-28 items-center justify-center border-b border-line ${service.logoTone}`}
             >
-              <span className="text-lg font-bold tracking-tight">
+              <span className="text-base font-semibold tracking-tight">
                 {service.logoLabel}
               </span>
             </div>
             <div className="flex flex-1 flex-col p-4">
-              <h2 className="text-base font-bold text-ink">{service.name}</h2>
+              <h2 className="text-base font-semibold text-ink">{service.name}</h2>
               <p className="mt-2 flex-1 text-sm leading-relaxed text-muted">
                 {service.description}
               </p>
@@ -139,7 +139,7 @@ export default function FinanceMarketplace() {
             className="absolute inset-0 bg-ink/40"
             onClick={() => setDetailsId(null)}
           />
-          <div className="relative z-10 w-full max-w-lg rounded-xl border border-line bg-card p-5 shadow-xl [background-color:var(--color-card)]">
+          <div className="relative z-10 w-full max-w-lg rounded-xl border border-line bg-card p-5 shadow-xl">
             <h2 className="text-lg font-bold text-ink">{details.name}</h2>
             <p className="mt-3 text-sm leading-relaxed text-muted">
               {details.description}

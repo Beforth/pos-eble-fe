@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { ChevronRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export interface NavItemDef {
   id: string
@@ -19,6 +20,8 @@ interface SidebarNavItemProps {
   active: boolean
   collapsed: boolean
   onClick: (id: string) => void
+  /** React Router path — used so the item always navigates. */
+  to?: string
   /** Indent under a section group (Daily Operations children). */
   nested?: boolean
   expanded?: boolean
@@ -134,6 +137,7 @@ export function SidebarNavItem({
   active,
   collapsed,
   onClick,
+  to,
   nested = false,
   expanded = false,
   onToggleExpand,
@@ -152,52 +156,72 @@ export function SidebarNavItem({
     onClick(item.id)
   }
 
+  const className = `group flex w-full items-center gap-2.5 rounded-lg text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+    collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'
+  } ${nested && !collapsed ? 'pl-3' : ''} ${
+    active
+      ? 'bg-primary/10 font-semibold text-primary'
+      : item.accent
+        ? 'border border-dashed border-accent/60 text-accent hover:bg-accent/5'
+        : 'text-ink hover:bg-page'
+  }`
+
+  const content = (
+    <>
+      {Icon ? (
+        <Icon
+          size={18}
+          strokeWidth={active ? 2.2 : 1.75}
+          className={`shrink-0 ${active ? 'text-primary' : 'text-muted'}`}
+        />
+      ) : (
+        !collapsed && <span className="w-[18px] shrink-0" />
+      )}
+      {!collapsed && (
+        <>
+          <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+          {item.badge ? (
+            <span className="shrink-0 rounded-md bg-[#e8e0f5] px-1.5 py-0.5 text-[10px] font-semibold text-[#5b4fcf]">
+              {item.badge}
+            </span>
+          ) : null}
+          {isExpandable ? (
+            <ChevronRight
+              size={16}
+              className={`shrink-0 text-muted transition-transform duration-200 ${
+                expanded ? 'rotate-90' : ''
+              }`}
+            />
+          ) : null}
+        </>
+      )}
+    </>
+  )
+
   return (
     <li>
-      <button
-        type="button"
-        title={collapsed ? item.label : undefined}
-        aria-current={active ? 'page' : undefined}
-        aria-expanded={item.children?.length ? expanded : undefined}
-        onClick={handleClick}
-        className={`group flex w-full items-center gap-2.5 rounded-lg text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
-          collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'
-        } ${nested && !collapsed ? 'pl-3' : ''} ${
-          active
-            ? 'bg-primary/10 font-semibold text-primary'
-            : item.accent
-              ? 'border border-dashed border-accent/60 text-accent hover:bg-accent/5'
-              : 'text-ink hover:bg-page'
-        }`}
-      >
-        {Icon ? (
-          <Icon
-            size={18}
-            strokeWidth={active ? 2.2 : 1.75}
-            className={`shrink-0 ${active ? 'text-primary' : 'text-muted'}`}
-          />
-        ) : (
-          !collapsed && <span className="w-[18px] shrink-0" />
-        )}
-        {!collapsed && (
-          <>
-            <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
-            {item.badge ? (
-              <span className="shrink-0 rounded-md bg-[#e8e0f5] px-1.5 py-0.5 text-[10px] font-semibold text-[#5b4fcf]">
-                {item.badge}
-              </span>
-            ) : null}
-            {isExpandable ? (
-              <ChevronRight
-                size={16}
-                className={`shrink-0 text-muted transition-transform duration-200 ${
-                  expanded ? 'rotate-90' : ''
-                }`}
-              />
-            ) : null}
-          </>
-        )}
-      </button>
+      {to && !isExpandable ? (
+        <Link
+          to={to}
+          title={collapsed ? item.label : undefined}
+          aria-current={active ? 'page' : undefined}
+          onClick={() => onClick(item.id)}
+          className={className}
+        >
+          {content}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          title={collapsed ? item.label : undefined}
+          aria-current={active ? 'page' : undefined}
+          aria-expanded={item.children?.length ? expanded : undefined}
+          onClick={handleClick}
+          className={className}
+        >
+          {content}
+        </button>
+      )}
 
       {!collapsed && expanded && item.children && item.children.length > 0 ? (
         <NestedNavList

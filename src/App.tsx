@@ -16,6 +16,10 @@ import AddonsManagement from './pages/AddonsManagement'
 import AddTable from './pages/AddTable'
 import AddTax from './pages/AddTax'
 import AllInOneMenu from './pages/AllInOneMenu'
+import AddOutlet from './pages/AddOutlet'
+import AddCombo from './pages/AddCombo'
+import AddCommission from './pages/AddCommission'
+import AddMenuItem from './pages/AddMenuItem'
 import BackwardTaxPrintingSettings from './pages/BackwardTaxPrintingSettings'
 import BaseMenu from './pages/BaseMenu'
 import Billing from './pages/billing/Billing'
@@ -33,6 +37,8 @@ import ItemOrderWiseTaxSettings from './pages/ItemOrderWiseTaxSettings'
 import MenuManagement from './pages/MenuManagement'
 import MultiItemImagesUpload from './pages/MultiItemImagesUpload'
 import OnlineOrders from './pages/OnlineOrders'
+import DuePayments from './pages/due-payments/DuePayments'
+import DuePaymentClient from './pages/due-payments/DuePaymentClient'
 import ParcelMenu from './pages/ParcelMenu'
 import PlaceholderPage from './pages/PlaceholderPage'
 import Configuration from './pages/Configuration'
@@ -195,6 +201,21 @@ import OnlineOrderReport from './pages/reports/OnlineOrderReport'
 import DiscountedOrdersReport from './pages/reports/DiscountedOrdersReport'
 import TagWiseReport from './pages/reports/TagWiseReport'
 import AdvanceOrdersSummaryReport from './pages/reports/AdvanceOrdersSummaryReport'
+import LogsPage from './pages/LogsPage'
+import CategorySummaryReport from './pages/reports/CategorySummaryReport'
+import ItemSummaryReport from './pages/reports/ItemSummaryReport'
+import SalesSummaryReport from './pages/reports/SalesSummaryReport'
+import OrderSummaryReport from './pages/reports/OrderSummaryReport'
+import ExecutiveSalesSummaryReport from './pages/reports/ExecutiveSalesSummaryReport'
+import EmployeeSummaryReport from './pages/reports/EmployeeSummaryReport'
+import GroupSummaryReport from './pages/reports/GroupSummaryReport'
+import VariationSummaryReport from './pages/reports/VariationSummaryReport'
+import TaxSummaryReport from './pages/reports/TaxSummaryReport'
+import CounterSummaryReport from './pages/reports/CounterSummaryReport'
+import BillingAllOrders from './pages/billing/BillingAllOrders'
+import BillingLiveOrders from './pages/billing/BillingLiveOrders'
+import BillingKot from './pages/billing/BillingKot'
+import BillingDayEnd from './pages/billing/BillingDayEnd'
 import ZomatoMenu from './pages/ZomatoMenu'
 import TablesAreasManagement from './pages/TablesAreasManagement'
 import TaxesManagement from './pages/TaxesManagement'
@@ -463,10 +484,58 @@ export default function App() {
             }
           />
           <Route
+            path="/due-payments"
+            element={
+              <ProtectedRoute>
+                <DuePayments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/due-payments/:clientId"
+            element={
+              <ProtectedRoute>
+                <DuePaymentClient />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/billing"
             element={
               <ProtectedRoute>
                 <Billing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/all-orders"
+            element={
+              <ProtectedRoute>
+                <BillingAllOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/live-orders"
+            element={
+              <ProtectedRoute>
+                <BillingLiveOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/kot"
+            element={
+              <ProtectedRoute>
+                <BillingKot />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/day-end"
+            element={
+              <ProtectedRoute>
+                <BillingDayEnd />
               </ProtectedRoute>
             }
           />
@@ -1042,6 +1111,38 @@ export default function App() {
             }
           />
           <Route
+            path="/menu/add-outlet"
+            element={
+              <ProtectedRoute>
+                <AddOutlet />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/menu/add-combo"
+            element={
+              <ProtectedRoute>
+                <AddCombo />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/menu/add-item"
+            element={
+              <ProtectedRoute>
+                <AddMenuItem />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/menu/add-commission"
+            element={
+              <ProtectedRoute>
+                <AddCommission />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/menu/base-menu"
             element={
               <ProtectedRoute>
@@ -1277,7 +1378,7 @@ export default function App() {
             path="/day-end"
             element={
               <ProtectedRoute>
-                <PlaceholderPage />
+                <DayEndSummary />
               </ProtectedRoute>
             }
           />
@@ -1285,7 +1386,7 @@ export default function App() {
             path="/logs"
             element={
               <ProtectedRoute>
-                <PlaceholderPage />
+                <LogsPage />
               </ProtectedRoute>
             }
           />
@@ -1298,10 +1399,82 @@ export default function App() {
             }
           />
           <Route
-            path="/reports/:reportId"
+            path="/reports/category-summary"
             element={
               <ProtectedRoute>
-                <PlaceholderPage />
+                <CategorySummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/item-summary"
+            element={
+              <ProtectedRoute>
+                <ItemSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/sales-summary"
+            element={
+              <ProtectedRoute>
+                <SalesSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/order-summary"
+            element={
+              <ProtectedRoute>
+                <OrderSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/executive-sales-summary"
+            element={
+              <ProtectedRoute>
+                <ExecutiveSalesSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/employee-summary"
+            element={
+              <ProtectedRoute>
+                <EmployeeSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/group-summary"
+            element={
+              <ProtectedRoute>
+                <GroupSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/variation-summary"
+            element={
+              <ProtectedRoute>
+                <VariationSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/tax-summary"
+            element={
+              <ProtectedRoute>
+                <TaxSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/counter-summary"
+            element={
+              <ProtectedRoute>
+                <CounterSummaryReport />
               </ProtectedRoute>
             }
           />

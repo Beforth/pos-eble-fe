@@ -121,6 +121,7 @@ const CONFIG_TILES: ConfigTile[] = [
     id: 'due-payment',
     label: 'Due Payment',
     icon: <HandCoins size={28} strokeWidth={1.5} />,
+    to: '/due-payments',
   },
   {
     id: 'language-profiles',

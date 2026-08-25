@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ExternalLink, Phone, X } from 'lucide-react'
+import { AggregatorLogo, type AggregatorName } from '../common/AggregatorLogo'
 import { brand } from '../../theme/brand'
 
 interface AggregatorHelpCenterModalProps {
@@ -13,8 +14,7 @@ type HelpTab = 'swiggy' | 'zomato'
 const HELP: Record<
   HelpTab,
   {
-    name: string
-    logo: string
+    name: AggregatorName
     partnerUrl: string
     partnerLabel: string
     phone: string
@@ -24,7 +24,6 @@ const HELP: Record<
 > = {
   swiggy: {
     name: 'Swiggy',
-    logo: '/swiggy.png',
     partnerUrl: 'https://partner.swiggy.com/',
     partnerLabel: 'Open Swiggy Partner dashboard',
     phone: '080-67466729',
@@ -50,7 +49,6 @@ const HELP: Record<
   },
   zomato: {
     name: 'Zomato',
-    logo: '/zomato.png',
     partnerUrl: 'https://www.zomato.com/partners',
     partnerLabel: 'Open Zomato Partner dashboard',
     phone: '080-67466729',
@@ -155,17 +153,7 @@ export function AggregatorHelpCenterModal({
                     : 'border-transparent text-muted hover:text-ink'
                 }`}
               >
-                <span className="relative inline-flex size-5 items-center justify-center overflow-hidden rounded">
-                  <img
-                    src={item.logo}
-                    alt=""
-                    className={
-                      id === 'swiggy'
-                        ? 'absolute size-8 max-w-none object-cover'
-                        : 'size-5 object-contain'
-                    }
-                  />
-                </span>
+                <AggregatorLogo name={item.name} size="2xs" />
                 {item.name}
               </button>
             )

@@ -1,10 +1,48 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Bell, Mail } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
-import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
+import { PrimaryButton } from '../../components/menu/MenuActionButtons'
+import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+
+function FieldLabel({
+  children,
+  required,
+}: {
+  children: ReactNode
+  required?: boolean
+}) {
+  return (
+    <label className="mb-1.5 block text-sm font-medium text-ink">
+      {children}
+      {required ? <span className="text-primary"> *</span> : null}
+    </label>
+  )
+}
+
+function SectionCard({
+  icon,
+  title,
+  children,
+}: {
+  icon: ReactNode
+  title: string
+  children?: ReactNode
+}) {
+  return (
+    <section className="relative z-0 mb-4 rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)] [&:has([aria-expanded=true])]:z-30">
+      <div className="flex items-center gap-2.5 px-4 py-3">
+        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          {icon}
+        </span>
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      </div>
+      {children ? (
+        <div className="border-t border-line px-4 py-4">{children}</div>
+      ) : null}
+    </section>
+  )
+}
 
 const REPORT_OPTIONS = [
   'Item Wise Report With Bill No.',
@@ -39,6 +77,9 @@ function formatExampleDate(date: Date) {
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
+
+const selectClass =
+  'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
 
 export default function AddReportNotification() {
   const navigate = useNavigate()
@@ -80,7 +121,25 @@ export default function AddReportNotification() {
 
   return (
     <ReportsPageShell
-      title="Add Report Notification"
+      title={
+        <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate('/reports/report-notification')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') navigate('/reports/report-notification')
+            }}
+            className="cursor-pointer text-primary hover:underline"
+          >
+            Report Notification
+          </span>
+          <span className="font-normal text-muted">&gt;</span>
+          <span className="font-semibold text-ink">
+            Add Report Notification
+          </span>
+        </span>
+      }
       activeItem="report-notification"
     >
       {toast ? (
@@ -89,29 +148,28 @@ export default function AddReportNotification() {
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-line bg-card p-5 sm:p-6">
-        <div className="mx-auto max-w-3xl space-y-5">
-          <label className="block text-sm font-medium text-ink">
-            Reports <span className="text-primary">*</span>
-            <select
+      <SectionCard icon={<Bell size={16} />} title="Notification Settings">
+        <div className="space-y-4">
+          <div>
+            <SearchableSelect
+              label="Report"
+              required
               value={report}
-              onChange={(event) => setReport(event.target.value)}
-              className="mt-1.5 block h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
-            >
-              {REPORT_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+              options={REPORT_OPTIONS}
+              placeholder="Select a report"
+              searchPlaceholder="Search reports..."
+              compact
+              dropdownPlacement="auto"
+              onChange={setReport}
+            />
+          </div>
 
-          <label className="block text-sm font-medium text-ink">
-            Time (In 24 hours) <span className="text-primary">*</span>
+          <div>
+            <FieldLabel required>Time (24-hour)</FieldLabel>
             <select
               value={time}
               onChange={(event) => setTime(event.target.value)}
-              className="mt-1.5 block h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+              className={selectClass}
             >
               {timeOptions.map((option) => (
                 <option key={option} value={option}>
@@ -120,14 +178,24 @@ export default function AddReportNotification() {
               ))}
             </select>
             <p className="mt-1.5 text-xs text-muted">
-              Ex. you will get email on next day(
-              {formatExampleDate(tomorrow)} {time}) for today(
-              {formatExampleDate(today)}) sales.
+              You will receive the email on{' '}
+              <span className="font-medium text-ink">
+                {formatExampleDate(tomorrow)} at {time}
+              </span>{' '}
+              for{' '}
+              <span className="font-medium text-ink">
+                {formatExampleDate(today)}
+              </span>{' '}
+              sales data.
             </p>
-          </label>
+          </div>
+        </div>
+      </SectionCard>
 
-          <label className="block text-sm font-medium text-ink">
-            Email <span className="text-primary">*</span>
+      <SectionCard icon={<Mail size={16} />} title="Recipient">
+        <div className="space-y-4">
+          <div>
+            <FieldLabel required>Email Address</FieldLabel>
             <input
               type="email"
               value={email}
@@ -135,22 +203,20 @@ export default function AddReportNotification() {
                 setEmail(event.target.value)
                 if (errors.email) setErrors({})
               }}
-              placeholder="Enter email"
-              className={`mt-1.5 block h-10 w-full rounded-md border bg-card px-3 text-sm text-ink outline-none focus:border-primary ${
-                errors.email ? 'border-primary' : 'border-line'
-              }`}
+              placeholder="Enter email address"
+              className={`${selectClass} ${errors.email ? 'border-primary' : ''}`}
             />
             {errors.email ? (
               <p className="mt-1 text-xs text-primary">{errors.email}</p>
             ) : null}
-          </label>
+          </div>
 
-          <label className="block text-sm font-medium text-ink">
-            Status
+          <div>
+            <FieldLabel>Status</FieldLabel>
             <select
               value={status}
               onChange={(event) => setStatus(event.target.value)}
-              className="mt-1.5 block h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+              className={selectClass}
             >
               {STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -158,18 +224,19 @@ export default function AddReportNotification() {
                 </option>
               ))}
             </select>
-          </label>
-
-          <div className="flex flex-wrap justify-end gap-2 pt-2">
-            <OutlineButton
-              variant="gray"
-              onClick={() => navigate('/reports/report-notification')}
-            >
-              Cancel
-            </OutlineButton>
-            <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
           </div>
         </div>
+      </SectionCard>
+
+      <div className="sticky bottom-0 z-20 -mx-1 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-page/95 px-1 py-3 backdrop-blur">
+        <button
+          type="button"
+          onClick={() => navigate('/reports/report-notification')}
+          className="inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
+        >
+          Cancel
+        </button>
+        <PrimaryButton onClick={handleSave}>Save Notification</PrimaryButton>
       </div>
     </ReportsPageShell>
   )

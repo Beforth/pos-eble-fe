@@ -1,10 +1,22 @@
-import { useState, type ReactNode } from 'react'
-import { AlertCircle, CheckCircle2 } from 'lucide-react'
-import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useState } from 'react'
 import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  Hash,
+  MapPin,
+  ReceiptText,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import {
+  ConfigBreadcrumb,
+  ConfigFormRow,
+  ConfigSaveBar,
+  ConfigSectionCard,
+  MutedHelp,
+} from '../../components/management/ConfigSectionCard'
+import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { OutlineButton } from '../../components/menu/MenuActionButtons'
 import { brand } from '../../theme/brand'
 
 const STATE_OPTIONS = [
@@ -35,29 +47,6 @@ const textareaClass =
 const selectClass =
   'h-10 w-full max-w-md rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
 
-function FormRow({
-  label,
-  children,
-  align = 'center',
-}: {
-  label: string
-  children: ReactNode
-  align?: 'center' | 'start'
-}) {
-  return (
-    <div
-      className={`grid gap-2 sm:grid-cols-[240px_minmax(0,1fr)] sm:gap-4 ${
-        align === 'start' ? 'sm:items-start' : 'sm:items-center'
-      }`}
-    >
-      <label className={`text-sm font-medium text-ink ${align === 'start' ? 'sm:pt-2.5' : ''}`}>
-        {label}
-      </label>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
-}
-
 const INITIAL = {
   hasGst: true as boolean,
   gstNo: '27BHFPJ0010E1Z4',
@@ -74,6 +63,7 @@ const INITIAL = {
 }
 
 export default function GstInformation() {
+  const navigate = useNavigate()
   const [toast, setToast] = useState<string | null>(null)
   const [hasGst, setHasGst] = useState(INITIAL.hasGst)
   const [gstNo, setGstNo] = useState(INITIAL.gstNo)
@@ -94,6 +84,10 @@ export default function GstInformation() {
   function showToast(message: string) {
     setToast(message)
     window.setTimeout(() => setToast(null), 2200)
+  }
+
+  function goBack() {
+    navigate('/management/accounting')
   }
 
   function handleCancel() {
@@ -133,7 +127,13 @@ export default function GstInformation() {
 
   return (
     <ReportsPageShell
-      title="Update GST Information"
+      title={
+        <ConfigBreadcrumb
+          onNavigate={goBack}
+          current="GST Information"
+          parent="Accounting"
+        />
+      }
       activeItem="acct-gst-information"
     >
       {toast ? (
@@ -152,9 +152,13 @@ export default function GstInformation() {
         </select>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="space-y-5 p-5 sm:p-6">
-          <FormRow label="Do you have GST No?">
+      <ConfigSectionCard
+        icon={<ReceiptText size={16} />}
+        title="GST Registration"
+        description="Configure whether your outlet is registered under GST."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Do you have GST No?" align="center">
             <div className="flex flex-wrap items-center gap-5">
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
                 <input
@@ -177,45 +181,59 @@ export default function GstInformation() {
                 No
               </label>
             </div>
-          </FormRow>
+          </ConfigFormRow>
 
           {hasGst ? (
-            <FormRow label="GST No" align="start">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[220px] flex-1 max-w-md">
-                  <input
-                    type="text"
-                    value={gstNo}
-                    onChange={(event) => setGstNo(event.target.value.toUpperCase())}
-                    disabled={!gstEditable}
-                    className={`${inputClass} pr-16`}
-                  />
-                  <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-1">
-                    {!gstVerified ? (
-                      <AlertCircle size={16} className="text-muted" />
-                    ) : null}
-                    {gstVerified ? (
-                      <CheckCircle2 size={18} className="text-emerald-600" />
-                    ) : null}
-                  </span>
+            <ConfigFormRow label="GST No">
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-[220px] flex-1 max-w-md">
+                    <input
+                      type="text"
+                      value={gstNo}
+                      onChange={(event) =>
+                        setGstNo(event.target.value.toUpperCase())
+                      }
+                      disabled={!gstEditable}
+                      className={`${inputClass} pr-16`}
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-1">
+                      {!gstVerified ? (
+                        <AlertCircle size={16} className="text-muted" />
+                      ) : null}
+                      {gstVerified ? (
+                        <CheckCircle2 size={18} className="text-success" />
+                      ) : null}
+                    </span>
+                  </div>
+                  <OutlineButton onClick={handleEditGst}>
+                    Edit GST No
+                  </OutlineButton>
                 </div>
-                <OutlineButton onClick={handleEditGst}>Edit GST No</OutlineButton>
-              </div>
-              <p className="mt-1.5 text-xs text-muted">
-                Note:- Your GST No is verified.{' '}
-                <button
-                  type="button"
-                  onClick={handleEditGst}
-                  className="font-medium text-primary hover:underline"
-                >
-                  Click here
-                </button>{' '}
-                to edit and re-verify.
-              </p>
-            </FormRow>
+                <MutedHelp>
+                  Note:- Your GST No is verified.{' '}
+                  <button
+                    type="button"
+                    onClick={handleEditGst}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Click here
+                  </button>{' '}
+                  to edit and re-verify.
+                </MutedHelp>
+              </>
+            </ConfigFormRow>
           ) : null}
+        </div>
+      </ConfigSectionCard>
 
-          <FormRow label="Registered Name For Invoice">
+      <ConfigSectionCard
+        icon={<Building2 size={16} />}
+        title="Registered Details"
+        description="These details appear on invoices generated for your customers."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Registered Name For Invoice" align="center">
             <input
               type="text"
               value={registeredName}
@@ -223,9 +241,9 @@ export default function GstInformation() {
               disabled={hasGst && gstVerified && !gstEditable}
               className={`${inputClass} max-w-xl`}
             />
-          </FormRow>
+          </ConfigFormRow>
 
-          <FormRow label="Registered Address For Invoice" align="start">
+          <ConfigFormRow label="Registered Address For Invoice">
             <textarea
               value={registeredAddress}
               onChange={(event) => setRegisteredAddress(event.target.value)}
@@ -233,9 +251,16 @@ export default function GstInformation() {
               className={`${textareaClass} max-w-xl`}
               rows={3}
             />
-          </FormRow>
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <FormRow label="State">
+      <ConfigSectionCard
+        icon={<MapPin size={16} />}
+        title="Location"
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="State" align="center">
             <select
               value={state}
               onChange={(event) => setState(event.target.value)}
@@ -247,9 +272,9 @@ export default function GstInformation() {
                 </option>
               ))}
             </select>
-          </FormRow>
+          </ConfigFormRow>
 
-          <FormRow label="City">
+          <ConfigFormRow label="City" align="center">
             <select
               value={city}
               onChange={(event) => setCity(event.target.value)}
@@ -261,61 +286,64 @@ export default function GstInformation() {
                 </option>
               ))}
             </select>
-          </FormRow>
+          </ConfigFormRow>
 
-          <FormRow label="Vat Number (If Any)">
-            <input
-              type="text"
-              value={vatNumber}
-              onChange={(event) => setVatNumber(event.target.value)}
-              className={`${inputClass} max-w-md`}
-            />
-          </FormRow>
-
-          <FormRow label="PAN">
-            <input
-              type="text"
-              value={pan}
-              onChange={(event) => setPan(event.target.value.toUpperCase())}
-              className={`${inputClass} max-w-md`}
-            />
-          </FormRow>
-
-          <FormRow label="CIN">
-            <input
-              type="text"
-              value={cin}
-              onChange={(event) => setCin(event.target.value.toUpperCase())}
-              className={`${inputClass} max-w-md`}
-            />
-          </FormRow>
-
-          <FormRow label="Location">
+          <ConfigFormRow label="Location" align="center">
             <input
               type="text"
               value={location}
               onChange={(event) => setLocation(event.target.value)}
               className={`${inputClass} max-w-md`}
             />
-          </FormRow>
+          </ConfigFormRow>
 
-          <FormRow label="Zip Code">
+          <ConfigFormRow label="Zip Code" align="center">
             <input
               type="text"
               value={zipCode}
               onChange={(event) => setZipCode(event.target.value)}
               className={`${inputClass} max-w-md`}
             />
-          </FormRow>
+          </ConfigFormRow>
         </div>
+      </ConfigSectionCard>
 
-        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-line bg-card px-5 py-3 sm:px-6">
-          <OutlineButton variant="gray" onClick={handleCancel}>
-            Cancel
-          </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+      <ConfigSectionCard
+        icon={<Hash size={16} />}
+        title="Other Tax Identifiers"
+        description="Optional registration numbers, if applicable to your business."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Vat Number (If Any)" align="center">
+            <input
+              type="text"
+              value={vatNumber}
+              onChange={(event) => setVatNumber(event.target.value)}
+              className={`${inputClass} max-w-md`}
+            />
+          </ConfigFormRow>
+
+          <ConfigFormRow label="PAN" align="center">
+            <input
+              type="text"
+              value={pan}
+              onChange={(event) => setPan(event.target.value.toUpperCase())}
+              className={`${inputClass} max-w-md`}
+            />
+          </ConfigFormRow>
+
+          <ConfigFormRow label="CIN" align="center">
+            <input
+              type="text"
+              value={cin}
+              onChange={(event) => setCin(event.target.value.toUpperCase())}
+              className={`${inputClass} max-w-md`}
+            />
+          </ConfigFormRow>
         </div>
-      </div>
+      </ConfigSectionCard>
+
+      <ConfigSaveBar onCancel={handleCancel} onSave={handleSave} />
     </ReportsPageShell>
   )
 }

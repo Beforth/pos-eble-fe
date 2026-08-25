@@ -503,7 +503,7 @@ export default function AddSales() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-card">
+      <div className="overflow-x-auto rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:overflow-visible">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
             <tr>
@@ -545,27 +545,22 @@ export default function AddSales() {
                     aria-label="Select row"
                   />
                 </td>
-                <td className="px-3 py-2.5">
-                  <select
+                <td className="min-w-[200px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                  <SearchableSelect
                     value={line.rawMaterial}
-                    onChange={(event) => {
-                      const material = RAW_MATERIALS.find(
-                        (m) => m.name === event.target.value,
-                      )
+                    options={RAW_MATERIALS.map((m) => m.name)}
+                    placeholder="Select/Add Raw Material"
+                    searchPlaceholder="Search materials..."
+                    compact
+                    dropdownPlacement="auto"
+                    onChange={(value) => {
+                      const material = RAW_MATERIALS.find((m) => m.name === value)
                       updateLine(line.id, {
-                        rawMaterial: event.target.value,
+                        rawMaterial: value,
                         unit: material?.unit ?? line.unit,
                       })
                     }}
-                    className="h-9 w-full min-w-[180px] rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">Select/Add Raw Material</option>
-                    {RAW_MATERIALS.map((material) => (
-                      <option key={material.name} value={material.name}>
-                        {material.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -654,19 +649,6 @@ export default function AddSales() {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      aria-label="Remove row"
-                      onClick={() =>
-                        setLines((prev) => {
-                          const next = prev.filter((row) => row.id !== line.id)
-                          return next.length > 0 ? next : [emptyLine()]
-                        })
-                      }
-                      className="rounded p-1.5 text-primary hover:bg-primary/10"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                    <button
-                      type="button"
                       aria-label="Add note"
                       onClick={() => {
                         if (!line.rawMaterial.trim()) {
@@ -682,6 +664,19 @@ export default function AddSales() {
                       }`}
                     >
                       <FilePenLine size={15} strokeWidth={1.75} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Remove row"
+                      onClick={() =>
+                        setLines((prev) => {
+                          const next = prev.filter((row) => row.id !== line.id)
+                          return next.length > 0 ? next : [emptyLine()]
+                        })
+                      }
+                      className="rounded p-1.5 text-primary hover:bg-primary/10"
+                    >
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </td>

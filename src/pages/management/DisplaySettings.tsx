@@ -1,10 +1,35 @@
-import { useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useState } from 'react'
 import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
+  Armchair,
+  BadgePercent,
+  Ban,
+  CircleDollarSign,
+  ClipboardList,
+  Gift,
+  IndianRupee,
+  LayoutDashboard,
+  LayoutGrid,
+  ListChecks,
+  Minus,
+  Monitor,
+  Pencil,
+  Printer,
+  Scale,
+  Tag,
+  Undo2,
+  Wallet,
+  XCircle,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import {
+  ConfigBreadcrumb,
+  ConfigFormRow,
+  ConfigSaveBar,
+  ConfigSectionCard,
+  MutedHelp,
+} from '../../components/management/ConfigSectionCard'
+import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { PrimaryButton } from '../../components/menu/MenuActionButtons'
 import { brand } from '../../theme/brand'
 
 const inputClass =
@@ -22,57 +47,6 @@ const PAYMENT_OPTIONS = [
 ]
 
 const ORDER_TYPES = ['Delivery', 'Pick Up', 'Dine In'] as const
-
-function Section({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children: ReactNode
-}) {
-  return (
-    <section className="space-y-4 border-b border-line pb-8 last:border-b-0 last:pb-0">
-      <div>
-        <h2 className="text-base font-bold text-ink">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm text-muted">{description}</p>
-        ) : null}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function FormRow({
-  label,
-  required,
-  children,
-  align = 'start',
-}: {
-  label: string
-  required?: boolean
-  children: ReactNode
-  align?: 'start' | 'center'
-}) {
-  return (
-    <div
-      className={`grid gap-2 sm:grid-cols-[260px_minmax(0,1fr)] sm:gap-4 ${
-        align === 'center' ? 'sm:items-center' : 'sm:items-start'
-      }`}
-    >
-      <div className="text-sm font-medium text-ink sm:pt-2">
-        {label} {required ? <span className="text-primary">*</span> : null}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
-}
-
-function Help({ children }: { children: ReactNode }) {
-  return <p className="mt-1.5 text-xs leading-relaxed text-muted">{children}</p>
-}
 
 function RadioGroup({
   name,
@@ -127,9 +101,38 @@ function CheckRow({
       />
       <span>
         <span className="font-medium">{label}</span>
-        {help ? <Help>{help}</Help> : null}
+        {help ? <MutedHelp>{help}</MutedHelp> : null}
       </span>
     </label>
+  )
+}
+
+function CheckboxList({
+  options,
+  values,
+  onToggle,
+}: {
+  options: readonly string[]
+  values: string[]
+  onToggle: (value: string) => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-x-5 gap-y-2">
+      {options.map((option) => (
+        <label
+          key={option}
+          className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
+        >
+          <input
+            type="checkbox"
+            checked={values.includes(option)}
+            onChange={() => onToggle(option)}
+            className="size-4 cursor-pointer accent-primary"
+          />
+          {option}
+        </label>
+      ))}
+    </div>
   )
 }
 
@@ -315,7 +318,7 @@ export default function DisplaySettings() {
   }
 
   return (
-    <ReportsPageShell title="Outlet Configuration" activeItem="config-outlet">
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Display" />} activeItem="config-outlet">
       {toast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
           {toast}
@@ -327,376 +330,469 @@ export default function DisplaySettings() {
         its components.
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="space-y-8 p-5 sm:p-6">
-          <Section
-            title="Display Settings"
-            description="The following setting defines the default value for the components of billing screen."
-          >
-            <FormRow label="Layout for Billing Screen">
+      <ConfigSectionCard
+        icon={<LayoutDashboard size={16} />}
+        title="Display Settings"
+        description="The following setting defines the default value for the components of billing screen."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Layout for Billing Screen">
+            <>
               <RadioGroup
                 name="layout"
                 value={layout}
                 options={['Keyboard', 'Touch Screen']}
                 onChange={setLayout}
               />
-              <Help>
+              <MutedHelp>
                 Configure the type of display between a touch based or keyboard
                 based.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Display preference for the Menu">
+          <ConfigFormRow label="Display preference for the Menu">
+            <>
               <RadioGroup
                 name="menu-side"
                 value={menuSide}
                 options={['On the Left', 'On the Right']}
                 onChange={setMenuSide}
               />
-              <Help>Note: Only for Touch Screen</Help>
-            </FormRow>
+              <MutedHelp>Note: Only for Touch Screen</MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Default Screen to Display">
+          <ConfigFormRow label="Default Screen to Display">
+            <>
               <RadioGroup
                 name="default-screen"
                 value={defaultScreen}
                 options={['Billing', 'Table Management']}
                 onChange={setDefaultScreen}
               />
-              <Help>
+              <MutedHelp>
                 Choose which Layout to get display while opening the POS.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Order Live View">
+          <ConfigFormRow label="Order Live View">
+            <>
               <RadioGroup
                 name="order-live"
                 value={orderLiveView}
                 options={['Ascending', 'Descending']}
                 onChange={setOrderLiveView}
               />
-              <Help>
+              <MutedHelp>
                 This settings describe how would the orders be displayed in
                 Order live view.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="KOT Live View">
+          <ConfigFormRow label="KOT Live View">
+            <>
               <RadioGroup
                 name="kot-live"
                 value={kotLiveView}
                 options={['Ascending', 'Descending']}
                 onChange={setKotLiveView}
               />
-              <Help>
+              <MutedHelp>
                 This settings describe how would the orders be displayed in KOT
                 live view.
-              </Help>
-            </FormRow>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Add New Item In Cart">
-              <RadioGroup
-                name="add-item"
-                value={addItemPosition}
-                options={['In Bottom', 'On Top']}
-                onChange={setAddItemPosition}
-              />
-            </FormRow>
-          </Section>
+          <ConfigFormRow label="Add New Item In Cart">
+            <RadioGroup
+              name="add-item"
+              value={addItemPosition}
+              options={['In Bottom', 'On Top']}
+              onChange={setAddItemPosition}
+            />
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section title="Billing Display Settings">
-            <div className="space-y-3">
-              <CheckRow
-                checked={virtualKeyboard}
-                onChange={setVirtualKeyboard}
-                label="Enable virtual keyboard in touch"
-              />
-              <CheckRow
-                checked={vkOrderNumber}
-                onChange={setVkOrderNumber}
-                label="Open virtual keyboard while entering order number in online order food ready text box"
-              />
-              <CheckRow
-                checked={itemImages}
-                onChange={setItemImages}
-                label="Display item images on the billing screen"
-              />
-              <CheckRow
-                checked={autoAddItems}
-                onChange={setAutoAddItems}
-                label="Auto add items to billing screen on select"
-              />
-              <CheckRow
-                checked={vkShortCode}
-                onChange={setVkShortCode}
-                label="Open virtual keyboard for short code search on billing screen"
-                help="Only applicable when virtual keyboard is enabled."
-              />
-              <CheckRow
-                checked={autoAddVariation}
-                onChange={setAutoAddVariation}
-                label="Auto add items to billing screen from variation/addon popup"
-              />
-              <CheckRow
-                checked={displaySearch}
-                onChange={setDisplaySearch}
-                label="Display Search Item option on billing screen (Only for Touch view)"
-              />
-              <CheckRow
-                checked={addonMinMax}
-                onChange={setAddonMinMax}
-                label="Addon Min-Max Validation"
-              />
-              <CheckRow
-                checked={displayItemPrice}
-                onChange={setDisplayItemPrice}
-                label="Display item price"
-              />
-              <CheckRow
-                checked={displaySettleAmount}
-                onChange={setDisplaySettleAmount}
-                label="Display settle amount Textbox"
-              />
-              <CheckRow
-                checked={settleMandatory}
-                onChange={setSettleMandatory}
-                label="Make settlement amount mandatory"
-                help="Applicable for billers with settlement rights."
-              />
-              <CheckRow
-                checked={allowLowerSettle}
-                onChange={setAllowLowerSettle}
-                label="Allow user to settle an order with a lower amount"
-              />
-            </div>
-          </Section>
+      <ConfigSectionCard
+        icon={<Monitor size={16} />}
+        title="Billing Display Settings"
+      >
+        <div className="space-y-3">
+          <CheckRow
+            checked={virtualKeyboard}
+            onChange={setVirtualKeyboard}
+            label="Enable virtual keyboard in touch"
+          />
+          <CheckRow
+            checked={vkOrderNumber}
+            onChange={setVkOrderNumber}
+            label="Open virtual keyboard while entering order number in online order food ready text box"
+          />
+          <CheckRow
+            checked={itemImages}
+            onChange={setItemImages}
+            label="Display item images on the billing screen"
+          />
+          <CheckRow
+            checked={autoAddItems}
+            onChange={setAutoAddItems}
+            label="Auto add items to billing screen on select"
+          />
+          <CheckRow
+            checked={vkShortCode}
+            onChange={setVkShortCode}
+            label="Open virtual keyboard for short code search on billing screen"
+            help="Only applicable when virtual keyboard is enabled."
+          />
+          <CheckRow
+            checked={autoAddVariation}
+            onChange={setAutoAddVariation}
+            label="Auto add items to billing screen from variation/addon popup"
+          />
+          <CheckRow
+            checked={displaySearch}
+            onChange={setDisplaySearch}
+            label="Display Search Item option on billing screen (Only for Touch view)"
+          />
+          <CheckRow
+            checked={addonMinMax}
+            onChange={setAddonMinMax}
+            label="Addon Min-Max Validation"
+          />
+          <CheckRow
+            checked={displayItemPrice}
+            onChange={setDisplayItemPrice}
+            label="Display item price"
+          />
+          <CheckRow
+            checked={displaySettleAmount}
+            onChange={setDisplaySettleAmount}
+            label="Display settle amount Textbox"
+          />
+          <CheckRow
+            checked={settleMandatory}
+            onChange={setSettleMandatory}
+            label="Make settlement amount mandatory"
+            help="Applicable for billers with settlement rights."
+          />
+          <CheckRow
+            checked={allowLowerSettle}
+            onChange={setAllowLowerSettle}
+            label="Allow user to settle an order with a lower amount"
+          />
+        </div>
+      </ConfigSectionCard>
 
-          <Section title="Tip Configuration">
-            <CheckRow checked={showTip} onChange={setShowTip} label="Show Tip" />
-            <FormRow label="Set Tip selection as">
+      <ConfigSectionCard
+        icon={<CircleDollarSign size={16} />}
+        title="Tip Configuration"
+      >
+        <div className="space-y-4">
+          <CheckRow checked={showTip} onChange={setShowTip} label="Show Tip" />
+          <ConfigFormRow label="Set Tip selection as">
+            <>
               <RadioGroup
                 name="tip-selection"
                 value={tipSelection}
                 options={['None', 'Percentage', 'Fixed']}
                 onChange={setTipSelection}
               />
-              <Help>For customer tip selection in a Kiosk.</Help>
-            </FormRow>
-            <FormRow label="Set Tip value">
+              <MutedHelp>For customer tip selection in a Kiosk.</MutedHelp>
+            </>
+          </ConfigFormRow>
+          <ConfigFormRow label="Set Tip value" align="center">
+            <input
+              type="text"
+              value={tipValue}
+              onChange={(event) => setTipValue(event.target.value)}
+              className={`${inputClass} max-w-xs`}
+              placeholder="Comma separated values"
+            />
+          </ConfigFormRow>
+          <ConfigFormRow label="Tip calculation on">
+            <RadioGroup
+              name="tip-calc"
+              value={tipCalcOn}
+              options={['Core (Sub Total)', 'Total (Total Bill Value)']}
+              onChange={setTipCalcOn}
+            />
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<Printer size={16} />}
+        title="Display & Printing Preferences"
+      >
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <CheckRow
+              checked={showCwt}
+              onChange={setShowCwt}
+              label="Show CWT (Category Wise Taxes) Bifurcation On Billing Screen"
+            />
+            <CheckRow
+              checked={taxAreaOpen}
+              onChange={setTaxAreaOpen}
+              label="By default make tax area open"
+              help="Enables default display of the tax area on the billing screen."
+            />
+            <CheckRow
+              checked={showKotDetails}
+              onChange={setShowKotDetails}
+              label="Show KOT details (KOT ID and Time) while View/Merge KOT"
+            />
+            <CheckRow
+              checked={mergeEbill}
+              onChange={setMergeEbill}
+              label="Merge ebill and print bill"
+              help="Sends an e-bill when the bill is printed."
+            />
+            <CheckRow
+              checked={personsMandatory}
+              onChange={setPersonsMandatory}
+              label="No. of Persons Mandatory"
+            />
+            <CheckRow
+              checked={showAddonQty}
+              onChange={setShowAddonQty}
+              label="Show Addon Quantity with the total item quantity (multiplication) to prepare in Bill"
+            />
+            <CheckRow
+              checked={printerErrors}
+              onChange={setPrinterErrors}
+              label="Display errors while checking printer status"
+            />
+            <CheckRow
+              checked={customPaymentMandatory}
+              onChange={setCustomPaymentMandatory}
+              label="Custom Payment Information Mandatory"
+            />
+            <CheckRow
+              checked={noDecimalQty}
+              onChange={setNoDecimalQty}
+              label="Do not allow the biller to punch item quantity in decimal"
+            />
+            <CheckRow
+              checked={categoryScheduling}
+              onChange={setCategoryScheduling}
+              label="Consider category scheduling for offline billing"
+            />
+            <CheckRow
+              checked={suggestedItems}
+              onChange={setSuggestedItems}
+              label="Show suggested items against the item selected on billing"
+            />
+          </div>
+
+          <ConfigFormRow label="Assign to validation on billing screen">
+            <CheckboxList
+              options={ORDER_TYPES}
+              values={assignValidation}
+              onToggle={(value) =>
+                toggleList(assignValidation, value, setAssignValidation)
+              }
+            />
+          </ConfigFormRow>
+
+          <ConfigFormRow label="Mark Order and KOT as completed once the bill is settled">
+            <CheckboxList
+              options={ORDER_TYPES}
+              values={markCompleted}
+              onToggle={(value) =>
+                toggleList(markCompleted, value, setMarkCompleted)
+              }
+            />
+          </ConfigFormRow>
+
+          <ConfigFormRow label="Item Sorting" align="center">
+            <select
+              value={itemSorting}
+              onChange={(event) => setItemSorting(event.target.value)}
+              className={`${selectClass} max-w-xs`}
+            >
+              {['A-Z', 'Z-A', 'Category', 'Custom'].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </ConfigFormRow>
+
+          <CheckRow
+            checked={showTableStartBy}
+            onChange={setShowTableStartBy}
+            label="Show table start by / bill created by information on billing screen (Touch Screen)"
+          />
+
+          <ConfigFormRow label="Display Menu">
+            <RadioGroup
+              name="display-menu"
+              value={displayMenu}
+              options={['None', 'Group Wise']}
+              onChange={setDisplayMenu}
+            />
+          </ConfigFormRow>
+
+          <CheckRow
+            checked={openEditAfterPrint}
+            onChange={setOpenEditAfterPrint}
+            label="Open order in Edit Mode after Save & Print (Everytime)"
+          />
+
+          <ConfigFormRow label="Order Type Selection">
+            <CheckboxList
+              options={ORDER_TYPES}
+              values={orderTypeSelection}
+              onToggle={(value) =>
+                toggleList(orderTypeSelection, value, setOrderTypeSelection)
+              }
+            />
+          </ConfigFormRow>
+
+          <CheckRow
+            checked={autoOpenSettlement}
+            onChange={setAutoOpenSettlement}
+            label="Auto Open Settlement Popup"
+          />
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<ListChecks size={16} />}
+        title="Default Values"
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Default Order Type" align="center">
+            <select
+              value={defaultOrderType}
+              onChange={(event) => setDefaultOrderType(event.target.value)}
+              className={`${selectClass} max-w-xs`}
+            >
+              {['DINE IN', 'Delivery', 'Pick Up', 'Takeaway'].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </ConfigFormRow>
+          <ConfigFormRow label="Default Payment Type" align="center">
+            <select
+              value={defaultPaymentType}
+              onChange={(event) => setDefaultPaymentType(event.target.value)}
+              className={`${selectClass} max-w-xs`}
+            >
+              {PAYMENT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </ConfigFormRow>
+          <ConfigFormRow label="Default Custom Payment Type" align="center">
+            <select
+              value={defaultCustomPayment}
+              onChange={(event) =>
+                setDefaultCustomPayment(event.target.value)
+              }
+              className={`${selectClass} max-w-xs`}
+            >
+              {['UPI', 'HDFC UPI', 'Card', 'Other'].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </ConfigFormRow>
+          <ConfigFormRow label="Default Table No." align="center">
+            <input
+              type="text"
+              value={defaultTableNo}
+              onChange={(event) => setDefaultTableNo(event.target.value)}
+              className={`${inputClass} max-w-xs`}
+            />
+          </ConfigFormRow>
+          <ConfigFormRow label={`Default Petty Cash Amount (${brand.currency})`} align="center">
+            <>
               <input
                 type="text"
-                value={tipValue}
-                onChange={(event) => setTipValue(event.target.value)}
-                className={inputClass}
-                placeholder="Comma separated values"
+                value={pettyCash}
+                onChange={(event) => setPettyCash(event.target.value)}
+                className={`${inputClass} max-w-xs`}
               />
-            </FormRow>
-            <FormRow label="Tip calculation on">
-              <RadioGroup
-                name="tip-calc"
-                value={tipCalcOn}
-                options={['Core (Sub Total)', 'Total (Total Bill Value)']}
-                onChange={setTipCalcOn}
+              <MutedHelp>
+                This would be the amount of petty cash that would be populated
+                unless another amount is entered.
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+          <ConfigFormRow label="Item Quantity" align="center">
+            <>
+              <input
+                type="text"
+                value={itemQuantityPresets}
+                onChange={(event) => setItemQuantityPresets(event.target.value)}
+                className={`${inputClass} max-w-xs`}
               />
-            </FormRow>
-          </Section>
+              <MutedHelp>(Comma separated numeric values only.)</MutedHelp>
+            </>
+          </ConfigFormRow>
+          <ConfigFormRow label="Item Price" align="center">
+            <>
+              <input
+                type="text"
+                value={itemPricePresets}
+                onChange={(event) => setItemPricePresets(event.target.value)}
+                className={`${inputClass} max-w-xs`}
+              />
+              <MutedHelp>(Comma separated numeric values only.)</MutedHelp>
+            </>
+          </ConfigFormRow>
+          <ConfigFormRow label="Default Quantity" align="center">
+            <>
+              <input
+                type="text"
+                value={defaultQuantity}
+                onChange={(event) => setDefaultQuantity(event.target.value)}
+                className={`${inputClass} max-w-xs`}
+              />
+              <MutedHelp>
+                Default Quantity while adding item to cart. Leave it blank if
+                the quantity would be entered manually by the user (In Keyboard
+                Layout).
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+          <CheckRow
+            checked={finalizeOrder}
+            onChange={setFinalizeOrder}
+            label="Finalize Order"
+          />
+        </div>
+      </ConfigSectionCard>
 
-          <Section title="Display & Printing Preferences">
-            <div className="space-y-3">
-              <CheckRow
-                checked={showCwt}
-                onChange={setShowCwt}
-                label="Show CWT (Category Wise Taxes) Bifurcation On Billing Screen"
-              />
-              <CheckRow
-                checked={taxAreaOpen}
-                onChange={setTaxAreaOpen}
-                label="By default make tax area open"
-                help="Enables default display of the tax area on the billing screen."
-              />
-              <CheckRow
-                checked={showKotDetails}
-                onChange={setShowKotDetails}
-                label="Show KOT details (KOT ID and Time) while View/Merge KOT"
-              />
-              <CheckRow
-                checked={mergeEbill}
-                onChange={setMergeEbill}
-                label="Merge ebill and print bill"
-                help="Sends an e-bill when the bill is printed."
-              />
-              <CheckRow
-                checked={personsMandatory}
-                onChange={setPersonsMandatory}
-                label="No. of Persons Mandatory"
-              />
-              <CheckRow
-                checked={showAddonQty}
-                onChange={setShowAddonQty}
-                label="Show Addon Quantity with the total item quantity (multiplication) to prepare in Bill"
-              />
-              <CheckRow
-                checked={printerErrors}
-                onChange={setPrinterErrors}
-                label="Display errors while checking printer status"
-              />
-              <CheckRow
-                checked={customPaymentMandatory}
-                onChange={setCustomPaymentMandatory}
-                label="Custom Payment Information Mandatory"
-              />
-              <CheckRow
-                checked={noDecimalQty}
-                onChange={setNoDecimalQty}
-                label="Do not allow the biller to punch item quantity in decimal"
-              />
-              <CheckRow
-                checked={categoryScheduling}
-                onChange={setCategoryScheduling}
-                label="Consider category scheduling for offline billing"
-              />
-              <CheckRow
-                checked={suggestedItems}
-                onChange={setSuggestedItems}
-                label="Show suggested items against the item selected on billing"
-              />
-            </div>
-
-            <FormRow label="Assign to validation on billing screen" align="start">
-              <div className="flex flex-wrap gap-x-5 gap-y-2">
-                {ORDER_TYPES.map((type) => (
-                  <label
-                    key={type}
-                    className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={assignValidation.includes(type)}
-                      onChange={() =>
-                        toggleList(assignValidation, type, setAssignValidation)
-                      }
-                      className="size-4 cursor-pointer accent-primary"
-                    />
-                    {type}
-                  </label>
-                ))}
-              </div>
-            </FormRow>
-
-            <FormRow
-              label="Mark Order and KOT as completed once the bill is settled"
-              align="start"
-            >
-              <div className="flex flex-wrap gap-x-5 gap-y-2">
-                {ORDER_TYPES.map((type) => (
-                  <label
-                    key={type}
-                    className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={markCompleted.includes(type)}
-                      onChange={() =>
-                        toggleList(markCompleted, type, setMarkCompleted)
-                      }
-                      className="size-4 cursor-pointer accent-primary"
-                    />
-                    {type}
-                  </label>
-                ))}
-              </div>
-            </FormRow>
-
-            <FormRow label="Item Sorting">
+      <ConfigSectionCard
+        icon={<Wallet size={16} />}
+        title="Payment Options In Billing Screen"
+        description="The selected payment options would be displayed by default in the billing screen, the remaining payment options would be displayed by clicking More."
+      >
+        <div className="space-y-4">
+          {([
+            ['Payment Option 1', payOpt1, setPayOpt1],
+            ['Payment Option 2', payOpt2, setPayOpt2],
+            ['Payment Option 3', payOpt3, setPayOpt3],
+            ['Payment Option 4', payOpt4, setPayOpt4],
+          ] as const).map(([label, value, setter]) => (
+            <ConfigFormRow key={label} label={label} align="center">
               <select
-                value={itemSorting}
-                onChange={(event) => setItemSorting(event.target.value)}
-                className={selectClass}
-              >
-                {['A-Z', 'Z-A', 'Category', 'Custom'].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </FormRow>
-
-            <div className="space-y-3">
-              <CheckRow
-                checked={showTableStartBy}
-                onChange={setShowTableStartBy}
-                label="Show table start by / bill created by information on billing screen (Touch Screen)"
-              />
-            </div>
-
-            <FormRow label="Display Menu">
-              <RadioGroup
-                name="display-menu"
-                value={displayMenu}
-                options={['None', 'Group Wise']}
-                onChange={setDisplayMenu}
-              />
-            </FormRow>
-
-            <div className="space-y-3">
-              <CheckRow
-                checked={openEditAfterPrint}
-                onChange={setOpenEditAfterPrint}
-                label="Open order in Edit Mode after Save & Print (Everytime)"
-              />
-            </div>
-
-            <FormRow label="Order Type Selection" align="start">
-              <div className="flex flex-wrap gap-x-5 gap-y-2">
-                {ORDER_TYPES.map((type) => (
-                  <label
-                    key={type}
-                    className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={orderTypeSelection.includes(type)}
-                      onChange={() =>
-                        toggleList(
-                          orderTypeSelection,
-                          type,
-                          setOrderTypeSelection,
-                        )
-                      }
-                      className="size-4 cursor-pointer accent-primary"
-                    />
-                    {type}
-                  </label>
-                ))}
-              </div>
-            </FormRow>
-
-            <CheckRow
-              checked={autoOpenSettlement}
-              onChange={setAutoOpenSettlement}
-              label="Auto Open Settlement Popup"
-            />
-          </Section>
-
-          <Section title="Default Values">
-            <FormRow label="Default Order Type">
-              <select
-                value={defaultOrderType}
-                onChange={(event) => setDefaultOrderType(event.target.value)}
-                className={selectClass}
-              >
-                {['DINE IN', 'Delivery', 'Pick Up', 'Takeaway'].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </FormRow>
-            <FormRow label="Default Payment Type">
-              <select
-                value={defaultPaymentType}
-                onChange={(event) => setDefaultPaymentType(event.target.value)}
-                className={selectClass}
+                value={value}
+                onChange={(event) => setter(event.target.value)}
+                className={`${selectClass} max-w-xs`}
               >
                 {PAYMENT_OPTIONS.map((option) => (
                   <option key={option} value={option}>
@@ -704,449 +800,406 @@ export default function DisplaySettings() {
                   </option>
                 ))}
               </select>
-            </FormRow>
-            <FormRow label="Default Custom Payment Type">
-              <select
-                value={defaultCustomPayment}
-                onChange={(event) =>
-                  setDefaultCustomPayment(event.target.value)
-                }
-                className={selectClass}
-              >
-                {['UPI', 'HDFC UPI', 'Card', 'Other'].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </FormRow>
-            <FormRow label="Default Table No.">
-              <input
-                type="text"
-                value={defaultTableNo}
-                onChange={(event) => setDefaultTableNo(event.target.value)}
-                className={inputClass}
-              />
-            </FormRow>
-            <FormRow label={`Default Petty Cash Amount (${brand.currency})`}>
-              <input
-                type="text"
-                value={pettyCash}
-                onChange={(event) => setPettyCash(event.target.value)}
-                className={inputClass}
-              />
-              <Help>
-                This would be the amount of petty cash that would be populated
-                unless another amount is entered.
-              </Help>
-            </FormRow>
-            <FormRow label="Item Quantity">
-              <input
-                type="text"
-                value={itemQuantityPresets}
-                onChange={(event) => setItemQuantityPresets(event.target.value)}
-                className={inputClass}
-              />
-              <Help>(Comma separated numeric values only.)</Help>
-            </FormRow>
-            <FormRow label="Item Price">
-              <input
-                type="text"
-                value={itemPricePresets}
-                onChange={(event) => setItemPricePresets(event.target.value)}
-                className={inputClass}
-              />
-              <Help>(Comma separated numeric values only.)</Help>
-            </FormRow>
-            <FormRow label="Default Quantity">
-              <input
-                type="text"
-                value={defaultQuantity}
-                onChange={(event) => setDefaultQuantity(event.target.value)}
-                className={inputClass}
-              />
-              <Help>
-                Default Quantity while adding item to cart. Leave it blank if
-                the quantity would be entered manually by the user (In Keyboard
-                Layout).
-              </Help>
-            </FormRow>
-            <CheckRow
-              checked={finalizeOrder}
-              onChange={setFinalizeOrder}
-              label="Finalize Order"
-            />
-          </Section>
+            </ConfigFormRow>
+          ))}
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Payment Options In Billing Screen"
-            description="The selected payment options would be displayed by default in the billing screen, the remaining payment options would be displayed by clicking More."
-          >
-            {([
-              ['Payment Option 1', payOpt1, setPayOpt1],
-              ['Payment Option 2', payOpt2, setPayOpt2],
-              ['Payment Option 3', payOpt3, setPayOpt3],
-              ['Payment Option 4', payOpt4, setPayOpt4],
-            ] as const).map(([label, value, setter]) => (
-              <FormRow key={label} label={label}>
-                <select
-                  value={value}
-                  onChange={(event) => setter(event.target.value)}
-                  className={selectClass}
-                >
-                  {PAYMENT_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </FormRow>
-            ))}
-          </Section>
-
-          <Section
-            title="Section Configuration"
-            description="The following settings are used to configure the settings related to different sections of the billing screen."
-          >
-            <FormRow label="Delivery" required>
+      <ConfigSectionCard
+        icon={<LayoutGrid size={16} />}
+        title="Section Configuration"
+        description="The following settings are used to configure the settings related to different sections of the billing screen."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Delivery" required>
+            <>
               <input
                 type="text"
                 value={deliveryName}
                 onChange={(event) => setDeliveryName(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-md`}
               />
-              <Help>
+              <MutedHelp>
                 Above name will be reflected on the billing screen in place of
                 Home Delivery. Best seen with 8 characters.
-              </Help>
-              <div className="mt-2">
+              </MutedHelp>
+              <div className="pt-1">
                 <CheckRow
                   checked={deliveryEnabled}
                   onChange={setDeliveryEnabled}
                   label="Enable this option in the billing screen"
                 />
               </div>
-            </FormRow>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Pick Up" required>
+          <ConfigFormRow label="Pick Up" required>
+            <>
               <input
                 type="text"
                 value={pickupName}
                 onChange={(event) => setPickupName(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-md`}
               />
-              <Help>
+              <MutedHelp>
                 Assign a name to see on the Pickup section. Best seen with 8
                 characters.
-              </Help>
-              <div className="mt-2">
+              </MutedHelp>
+              <div className="pt-1">
                 <CheckRow
                   checked={pickupEnabled}
                   onChange={setPickupEnabled}
                   label="Enable this option in the billing screen"
                 />
               </div>
-            </FormRow>
+            </>
+          </ConfigFormRow>
 
-            <FormRow label="Dine In" required>
+          <ConfigFormRow label="Dine In" required>
+            <>
               <input
                 type="text"
                 value={dineInName}
                 onChange={(event) => setDineInName(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-md`}
               />
-              <Help>
+              <MutedHelp>
                 Assign a name for the Dine In section on the billing UI.
-              </Help>
-              <div className="mt-2">
+              </MutedHelp>
+              <div className="pt-1">
                 <CheckRow
                   checked={dineInEnabled}
                   onChange={setDineInEnabled}
                   label="Enable this option in the billing screen"
                 />
               </div>
-            </FormRow>
+            </>
+          </ConfigFormRow>
 
-            <CheckRow
-              checked={extraSectionEnabled}
-              onChange={setExtraSectionEnabled}
-              label="Enable this option in the billing screen"
-              help="Additional custom section slot."
+          <CheckRow
+            checked={extraSectionEnabled}
+            onChange={setExtraSectionEnabled}
+            label="Enable this option in the billing screen"
+            help="Additional custom section slot."
+          />
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<Armchair size={16} />}
+        title="Table Settlement"
+      >
+        <div className="space-y-4">
+          <MutedHelp>
+            Note:- This configuration will only work with 105.1.0.0 and above.
+          </MutedHelp>
+          <ConfigFormRow label="Lock Active Table">
+            <RadioGroup
+              name="lock-table"
+              value={lockActiveTable}
+              options={['Save & Print', 'Settle & Save', 'None']}
+              onChange={setLockActiveTable}
             />
-          </Section>
+          </ConfigFormRow>
+          <ConfigFormRow label="Release Table On">
+            <RadioGroup
+              name="release-table"
+              value={releaseTableOn}
+              options={['Print Bill', 'Settle & Save']}
+              onChange={setReleaseTableOn}
+            />
+          </ConfigFormRow>
+          <ConfigFormRow label="Release Recent Section On">
+            <RadioGroup
+              name="release-section"
+              value={releaseSectionOn}
+              options={['Print Bill', 'Settle & Save']}
+              onChange={setReleaseSectionOn}
+            />
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section title="Table Settlement">
-            <Help>
-              Note:- This configuration will only work with 105.1.0.0 and above.
-            </Help>
-            <FormRow label="Lock Active Table">
-              <RadioGroup
-                name="lock-table"
-                value={lockActiveTable}
-                options={['Save & Print', 'Settle & Save', 'None']}
-                onChange={setLockActiveTable}
-              />
-            </FormRow>
-            <FormRow label="Release Table On">
-              <RadioGroup
-                name="release-table"
-                value={releaseTableOn}
-                options={['Print Bill', 'Settle & Save']}
-                onChange={setReleaseTableOn}
-              />
-            </FormRow>
-            <FormRow label="Release Recent Section On">
-              <RadioGroup
-                name="release-section"
-                value={releaseSectionOn}
-                options={['Print Bill', 'Settle & Save']}
-                onChange={setReleaseSectionOn}
-              />
-            </FormRow>
-          </Section>
-
-          <Section title="Discount Section">
-            <FormRow label="Discount Label">
+      <ConfigSectionCard
+        icon={<Tag size={16} />}
+        title="Discount Section"
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Discount Label" align="center">
+            <>
               <input
                 type="text"
                 value={discountLabel}
                 onChange={(event) => setDiscountLabel(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-md`}
               />
-              <Help>
+              <MutedHelp>
                 This setting would describe what the discount would be displayed
                 as.
-              </Help>
-            </FormRow>
-            <FormRow label="Discount Calculate Button Text" required>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+          <ConfigFormRow label="Discount Calculate Button Text" required align="center">
+            <input
+              type="text"
+              value={discountButtonText}
+              onChange={(event) => setDiscountButtonText(event.target.value)}
+              className={`${inputClass} max-w-xs`}
+            />
+          </ConfigFormRow>
+          <div className="space-y-3">
+            <CheckRow
+              checked={showLeaveNoDiscount}
+              onChange={setShowLeaveNoDiscount}
+              label="Display 'Leave as it is. (No Discount)' on Discount Screen?"
+            />
+            <CheckRow
+              checked={discountAreaOpen}
+              onChange={setDiscountAreaOpen}
+              label="By default make discount area open"
+              help="This settings enables default display of discount area in billing screen."
+            />
+          </div>
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<ClipboardList size={16} />}
+        title="Order Wise Information"
+      >
+        <CheckRow
+          checked={orderWiseInfo}
+          onChange={setOrderWiseInfo}
+          label="Enable Order wise information"
+          help="Configure how order-specific info is captured."
+        />
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<Minus size={16} />}
+        title="Negative Quantity Settings"
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="Negative Quantity Reason">
+            <div className="flex flex-wrap gap-2">
               <input
                 type="text"
-                value={discountButtonText}
-                onChange={(event) => setDiscountButtonText(event.target.value)}
-                className={inputClass}
+                value={negativeQtyReason}
+                onChange={(event) => setNegativeQtyReason(event.target.value)}
+                className={`${inputClass} max-w-md flex-1`}
               />
-            </FormRow>
-            <div className="space-y-3">
-              <CheckRow
-                checked={showLeaveNoDiscount}
-                onChange={setShowLeaveNoDiscount}
-                label="Display 'Leave as it is. (No Discount)' on Discount Screen?"
-              />
-              <CheckRow
-                checked={discountAreaOpen}
-                onChange={setDiscountAreaOpen}
-                label="By default make discount area open"
-                help="This settings enables default display of discount area in billing screen."
-              />
+              <PrimaryButton
+                onClick={() => {
+                  if (!negativeQtyReason.trim()) {
+                    showToast('Enter a reason first')
+                    return
+                  }
+                  showToast('Negative quantity reason added')
+                  setNegativeQtyReason('')
+                }}
+              >
+                Add
+              </PrimaryButton>
             </div>
-          </Section>
+          </ConfigFormRow>
+          <CheckRow
+            checked={allowNegativeQty}
+            onChange={setAllowNegativeQty}
+            label="Allow negative quantity."
+          />
+        </div>
+      </ConfigSectionCard>
 
-          <Section title="Order Wise Information">
-            <CheckRow
-              checked={orderWiseInfo}
-              onChange={setOrderWiseInfo}
-              label="Enable Order wise information"
-              help="Configure how order-specific info is captured."
-            />
-          </Section>
-
-          <Section title="Negative Quantity Settings">
-            <FormRow label="Negative Quantity Reason">
-              <div className="flex flex-wrap gap-2">
-                <input
-                  type="text"
-                  value={negativeQtyReason}
-                  onChange={(event) => setNegativeQtyReason(event.target.value)}
-                  className={`${inputClass} max-w-md flex-1`}
-                />
-                <PrimaryButton
-                  onClick={() => {
-                    if (!negativeQtyReason.trim()) {
-                      showToast('Enter a reason first')
-                      return
-                    }
-                    showToast('Negative quantity reason added')
-                    setNegativeQtyReason('')
-                  }}
-                >
-                  Add
-                </PrimaryButton>
-              </div>
-            </FormRow>
-            <CheckRow
-              checked={allowNegativeQty}
-              onChange={setAllowNegativeQty}
-              label="Allow negative quantity."
-            />
-          </Section>
-
-          <Section
-            title="Order Cancel Reason Settings"
-            description="The following settings pertains to configuring the order cancel settings in the billing screen."
-          >
-            <ReasonFields
-              labelPrefix="Order Cancel Reason"
-              values={cancelReasons}
-              onChange={(index, value) =>
-                updateReasons(setCancelReasons, cancelReasons, index, value)
-              }
-            />
-            <CheckRow
-              checked={releaseKotsOnCancel}
-              onChange={setReleaseKotsOnCancel}
-              label="Show Biller an option to release used KOTs while cancelling a bill. (within same day KOTs only.) (So, biller can create new Bill using the older KOTs.)"
-            />
-            <FormRow label="Order Cancel OTP">
+      <ConfigSectionCard
+        icon={<Ban size={16} />}
+        title="Order Cancel Reason Settings"
+        description="The following settings pertains to configuring the order cancel settings in the billing screen."
+      >
+        <div className="space-y-4">
+          <ReasonFields
+            labelPrefix="Order Cancel Reason"
+            values={cancelReasons}
+            onChange={(index, value) =>
+              updateReasons(setCancelReasons, cancelReasons, index, value)
+            }
+          />
+          <CheckRow
+            checked={releaseKotsOnCancel}
+            onChange={setReleaseKotsOnCancel}
+            label="Show Biller an option to release used KOTs while cancelling a bill. (within same day KOTs only.) (So, biller can create new Bill using the older KOTs.)"
+          />
+          <ConfigFormRow label="Order Cancel OTP" align="center">
+            <>
               <input
                 type="text"
                 value={cancelOtpEmails}
                 onChange={(event) => setCancelOtpEmails(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-md`}
               />
-              <Help>
+              <MutedHelp>
                 Enter Email ID through which you will receive OTP while cancel
                 order. You can add more than one with , separated.
-              </Help>
-            </FormRow>
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Order Edit Reason Settings"
-            description="The following settings pertains to configuring the order edit settings in the billing screen"
-          >
-            <ReasonFields
-              labelPrefix="Order edit Reason"
-              values={editReasons}
-              onChange={(index, value) =>
-                updateReasons(setEditReasons, editReasons, index, value)
-              }
-            />
-            <FormRow label="Order edit OTP">
+      <ConfigSectionCard
+        icon={<Pencil size={16} />}
+        title="Order Edit Reason Settings"
+        description="The following settings pertains to configuring the order edit settings in the billing screen"
+      >
+        <div className="space-y-4">
+          <ReasonFields
+            labelPrefix="Order edit Reason"
+            values={editReasons}
+            onChange={(index, value) =>
+              updateReasons(setEditReasons, editReasons, index, value)
+            }
+          />
+          <ConfigFormRow label="Order edit OTP" align="center">
+            <>
               <input
                 type="text"
                 value={editOtpEmails}
                 onChange={(event) => setEditOtpEmails(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-md`}
               />
-              <Help>
+              <MutedHelp>
                 Enter Email ID through which you will receive OTP while edit
                 order after print. You can add more than one with , separated.
-              </Help>
-            </FormRow>
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Order Complimentary Reason Settings"
-            description="The following settings pertains to configuring the order complimentary settings in the billing screen."
-          >
-            <ReasonFields
-              labelPrefix="Order complimentary Reason"
-              values={compReasons}
-              onChange={(index, value) =>
-                updateReasons(setCompReasons, compReasons, index, value)
-              }
-            />
-            <FormRow label="Order Complimentary OTP">
+      <ConfigSectionCard
+        icon={<Gift size={16} />}
+        title="Order Complimentary Reason Settings"
+        description="The following settings pertains to configuring the order complimentary settings in the billing screen."
+      >
+        <div className="space-y-4">
+          <ReasonFields
+            labelPrefix="Order complimentary Reason"
+            values={compReasons}
+            onChange={(index, value) =>
+              updateReasons(setCompReasons, compReasons, index, value)
+            }
+          />
+          <ConfigFormRow label="Order Complimentary OTP" align="center">
+            <>
               <input
                 type="text"
                 value={compOtpEmails}
                 onChange={(event) => setCompOtpEmails(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-md`}
               />
-              <Help>
+              <MutedHelp>
                 Enter Email ID through which you will receive OTP while
                 complimentary order. You can add more than one with , separated.
-              </Help>
-            </FormRow>
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
+        </div>
+      </ConfigSectionCard>
 
-          <Section
-            title="Order Sales Return Reason Settings"
-            description="The following settings pertains to configuring the order sales return settings in the billing screen."
-          >
-            <ReasonFields
-              labelPrefix="Order sales return Reason"
-              values={returnReasons}
-              onChange={(index, value) =>
-                updateReasons(setReturnReasons, returnReasons, index, value)
-              }
-            />
-            <FormRow label="Order Sales Return OTP">
+      <ConfigSectionCard
+        icon={<Undo2 size={16} />}
+        title="Order Sales Return Reason Settings"
+        description="The following settings pertains to configuring the order sales return settings in the billing screen."
+      >
+        <div className="space-y-4">
+          <ReasonFields
+            labelPrefix="Order sales return Reason"
+            values={returnReasons}
+            onChange={(index, value) =>
+              updateReasons(setReturnReasons, returnReasons, index, value)
+            }
+          />
+          <ConfigFormRow label="Order Sales Return OTP" align="center">
+            <>
               <input
                 type="text"
                 value={returnOtpEmails}
                 onChange={(event) => setReturnOtpEmails(event.target.value)}
-                className={inputClass}
+                className={`${inputClass} max-w-md`}
               />
-              <Help>
+              <MutedHelp>
                 Enter Email ID through which you will receive OTP while sales
                 return order. You can add more than one with , separated.
-              </Help>
-            </FormRow>
-          </Section>
-
-          <Section
-            title="Lower / Higher Order Settlement Amount Reason Settings"
-            description="The following settings pertains to configuring the order settlement settings in the billing screen."
-          >
-            <CheckRow
-              checked={settlementReasonRequired}
-              onChange={setSettlementReasonRequired}
-              label="Reason for settling order amount other than the invoice total."
-            />
-          </Section>
-
-          <Section title="Special Order Discount Settings">
-            <FormRow label="Special Discount OTP">
-              <input
-                type="text"
-                value={specialDiscountOtp}
-                onChange={(event) => setSpecialDiscountOtp(event.target.value)}
-                className={inputClass}
-              />
-              <Help>
-                Enter Email ID through which you will receive OTP while Special
-                order discount. You can add more than one with , separated.
-              </Help>
-            </FormRow>
-          </Section>
-
-          <Section title="Item price change (NC) Reason Settings">
-            <ReasonFields
-              labelPrefix="Item price change (NC) Reason"
-              values={ncReasons}
-              onChange={(index, value) =>
-                updateReasons(setNcReasons, ncReasons, index, value)
-              }
-            />
-          </Section>
-
-          <Section
-            title="KOT Cancel Reason Settings"
-            description="The following settings pertains to configuring the KOT cancel settings in the billing screen."
-          >
-            <ReasonFields
-              labelPrefix="KOT cancel Reason"
-              values={kotCancelReasons}
-              onChange={(index, value) =>
-                updateReasons(
-                  setKotCancelReasons,
-                  kotCancelReasons,
-                  index,
-                  value,
-                )
-              }
-            />
-          </Section>
+              </MutedHelp>
+            </>
+          </ConfigFormRow>
         </div>
+      </ConfigSectionCard>
 
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-line bg-card/95 px-5 py-4 backdrop-blur sm:px-6">
-          <OutlineButton variant="gray" onClick={goBack}>
-            Cancel
-          </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
-        </div>
-      </div>
+      <ConfigSectionCard
+        icon={<Scale size={16} />}
+        title="Lower / Higher Order Settlement Amount Reason Settings"
+        description="The following settings pertains to configuring the order settlement settings in the billing screen."
+      >
+        <CheckRow
+          checked={settlementReasonRequired}
+          onChange={setSettlementReasonRequired}
+          label="Reason for settling order amount other than the invoice total."
+        />
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<BadgePercent size={16} />}
+        title="Special Order Discount Settings"
+      >
+        <ConfigFormRow label="Special Discount OTP" align="center">
+          <>
+            <input
+              type="text"
+              value={specialDiscountOtp}
+              onChange={(event) => setSpecialDiscountOtp(event.target.value)}
+              className={`${inputClass} max-w-md`}
+            />
+            <MutedHelp>
+              Enter Email ID through which you will receive OTP while Special
+              order discount. You can add more than one with , separated.
+            </MutedHelp>
+          </>
+        </ConfigFormRow>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<IndianRupee size={16} />}
+        title="Item price change (NC) Reason Settings"
+      >
+        <ReasonFields
+          labelPrefix="Item price change (NC) Reason"
+          values={ncReasons}
+          onChange={(index, value) =>
+            updateReasons(setNcReasons, ncReasons, index, value)
+          }
+        />
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<XCircle size={16} />}
+        title="KOT Cancel Reason Settings"
+        description="The following settings pertains to configuring the KOT cancel settings in the billing screen."
+      >
+        <ReasonFields
+          labelPrefix="KOT cancel Reason"
+          values={kotCancelReasons}
+          onChange={(index, value) =>
+            updateReasons(
+              setKotCancelReasons,
+              kotCancelReasons,
+              index,
+              value,
+            )
+          }
+        />
+      </ConfigSectionCard>
+
+      <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
     </ReportsPageShell>
   )
 }

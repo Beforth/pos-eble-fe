@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { FileUp, Pencil, Plus } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import {
@@ -23,6 +23,7 @@ type TabId = 'item' | 'addon'
 const PAGE_SIZE = 50
 
 export default function SetItemCommission() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState<TabId>('item')
   const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [itemQuery, setItemQuery] = useState('')
@@ -170,7 +171,7 @@ export default function SetItemCommission() {
         </div>
       ) : null}
       <div className="mb-4 flex flex-wrap justify-end gap-2">
-        <PrimaryButton>
+        <PrimaryButton onClick={() => navigate('/menu/add-commission')}>
           <Plus size={15} />
           Add Menu Commission
         </PrimaryButton>

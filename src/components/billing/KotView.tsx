@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Ban,
   Eye,
+  Printer,
   Save,
   ShoppingCart,
   Ticket,
@@ -21,6 +22,7 @@ import {
 import { CancelKotModal } from './CancelKotModal'
 import { KotTicketViewModal } from './KotTicketViewModal'
 import { SettleSaveModal, type SettleSaveResult } from './SettleSaveModal'
+import { KOTPrintTemplate } from './KOTPrintTemplate'
 
 interface KotViewProps {
   tickets: KotTicket[]
@@ -49,6 +51,7 @@ function KotCard({
   onView,
   onSettle,
   onCancelOrder,
+  onPrint,
 }: {
   ticket: KotTicket
   now: number
@@ -57,6 +60,7 @@ function KotCard({
   onView: (ticket: KotTicket) => void
   onSettle: (ticket: KotTicket) => void
   onCancelOrder: (ticket: KotTicket) => void
+  onPrint: (ticket: KotTicket) => void
 }) {
   const isReady = ticket.status === 'ready'
 
@@ -100,6 +104,15 @@ function KotCard({
               className="inline-flex size-7 items-center justify-center rounded border border-black/15 bg-white/80 text-primary hover:bg-white"
             >
               <Ban size={14} />
+            </button>
+            <button
+              type="button"
+              title="Print KOT"
+              aria-label="Print KOT"
+              onClick={() => onPrint(ticket)}
+              className="inline-flex size-7 items-center justify-center rounded border border-black/15 bg-white/80 text-ink hover:bg-white"
+            >
+              <Printer size={14} />
             </button>
           </div>
         </div>
@@ -187,6 +200,7 @@ export function KotView({
   const [viewTicket, setViewTicket] = useState<KotTicket | null>(null)
   const [settleTicket, setSettleTicket] = useState<KotTicket | null>(null)
   const [cancelTicket, setCancelTicket] = useState<KotTicket | null>(null)
+  const [printTicket, setPrintTicket] = useState<KotTicket | null>(null)
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
@@ -251,6 +265,13 @@ export function KotView({
           setSettleTicket(null)
         }}
       />
+
+      {printTicket && (
+        <KOTPrintTemplate
+          ticket={printTicket}
+          onClose={() => setPrintTicket(null)}
+        />
+      )}
 
       {/* Tabs */}
       <div className="flex items-center justify-between gap-3 border-b border-line px-4">
@@ -337,6 +358,7 @@ export function KotView({
                 onView={setViewTicket}
                 onSettle={setSettleTicket}
                 onCancelOrder={setCancelTicket}
+                onPrint={setPrintTicket}
               />
             ))}
           </div>

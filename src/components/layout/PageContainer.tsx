@@ -14,6 +14,8 @@ interface PageContainerProps {
   syncActions?: ReactNode
   syncStatus?: SyncStatusItem[]
   onRefresh?: () => void
+  /** When false, the refresh icon spins only on click (no hover rotate). */
+  refreshHoverRotate?: boolean
   className?: string
   children: ReactNode
 }
@@ -24,6 +26,7 @@ export function PageContainer({
   syncActions,
   syncStatus,
   onRefresh,
+  refreshHoverRotate = true,
   className = '',
   children,
 }: PageContainerProps) {
@@ -56,7 +59,9 @@ export function PageContainer({
                 className={
                   refreshing
                     ? 'animate-spin'
-                    : 'transition-transform duration-300 hover:rotate-180'
+                    : refreshHoverRotate
+                      ? 'transition-transform duration-300 hover:rotate-180'
+                      : undefined
                 }
               />
             </button>

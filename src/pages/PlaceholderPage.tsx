@@ -3,20 +3,7 @@ import { ArrowLeft } from 'lucide-react'
 import { BrandLogo } from '../components/brand/BrandLogo'
 import { brand } from '../theme/brand'
 
-const TITLES: Record<string, string> = {
-  '/day-end': 'Day End',
-  '/logs': 'Logs',
-  '/reports/category-summary': 'Category Summary',
-  '/reports/item-summary': 'Item Summary',
-  '/reports/sales-summary': 'Sales Summary',
-  '/reports/order-summary': 'Order Summary',
-  '/reports/executive-sales-summary': 'Executive Sales Summary',
-  '/reports/employee-summary': 'Employee Summary',
-  '/reports/group-summary': 'Group Summary',
-  '/reports/variation-summary': 'Variation Summary',
-  '/reports/tax-summary': 'Tax Summary',
-  '/reports/counter-summary': 'Counter Summary',
-}
+const TITLES: Record<string, string> = {}
 
 export default function PlaceholderPage() {
   const { pathname } = useLocation()

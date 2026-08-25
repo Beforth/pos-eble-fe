@@ -11,7 +11,7 @@ interface SearchableSelectProps {
   /** Show placeholder as a selectable list row (clears value) */
   includePlaceholderOption?: boolean
   /** Prefer opening the menu above the trigger (useful near page bottom). */
-  dropdownPlacement?: 'below' | 'above'
+  dropdownPlacement?: 'below' | 'above' | 'auto'
   /** Compact trigger height for dense tables/forms. */
   compact?: boolean
   onChange: (value: string) => void
@@ -31,6 +31,7 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [resolvedPlacement, setResolvedPlacement] = useState<'below' | 'above'>('below')
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -48,6 +49,11 @@ export function SearchableSelect({
     if (!open) {
       setQuery('')
       return
+    }
+    if (dropdownPlacement === 'auto' && rootRef.current) {
+      const rect = rootRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      setResolvedPlacement(spaceBelow < 300 ? 'above' : 'below')
     }
     const timer = window.setTimeout(() => inputRef.current?.focus(), 0)
     const onPointerDown = (event: MouseEvent) => {
@@ -126,7 +132,9 @@ export function SearchableSelect({
         {open ? (
           <div
             className={`absolute left-0 right-0 z-40 overflow-hidden rounded-md border border-line bg-card shadow-lg ${
-              dropdownPlacement === 'above' ? 'bottom-full mb-1' : 'top-full mt-1'
+              (dropdownPlacement === 'auto' ? resolvedPlacement : dropdownPlacement) === 'above'
+                ? 'bottom-full mb-1'
+                : 'top-full mt-1'
             }`}
           >
             <div className="border-b border-line p-2">

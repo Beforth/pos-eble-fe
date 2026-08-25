@@ -31,9 +31,11 @@ import { SelectRecordAlert } from '../components/menu/SelectRecordAlert'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
 import {
   baseMenuCategories,
+  getStoredMenuItems,
   menuItems,
   type MenuItemRow,
 } from '../mocks/menuItemsData'
+import { getComboItems } from '../mocks/comboStore'
 import {
   MENU_CHANNELS,
   type MenuChannelId,
@@ -141,6 +143,19 @@ export default function BaseMenu({
   const [changesName, setChangesName] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
+  useEffect(() => {
+    const stored = getStoredMenuItems()
+    const combos = getComboItems()
+    const allNew = [...stored, ...combos]
+    if (allNew.length > 0) {
+      setItems((prev) => {
+        const baseIds = new Set(menuItems.map((i) => i.id))
+        const newItems = allNew.filter((i) => !baseIds.has(i.id))
+        return newItems.length > 0 ? [...newItems, ...prev] : prev
+      })
+    }
+  }, [])
+
   const categories = useMemo(() => {
     if (!hideEmpty) return baseMenuCategories
     return baseMenuCategories.filter((category) =>
@@ -150,7 +165,7 @@ export default function BaseMenu({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return items.filter((item) => {
+    const result = items.filter((item) => {
       if (item.categoryId !== categoryId) return false
       if (!q) return true
       return (
@@ -159,7 +174,15 @@ export default function BaseMenu({
         item.shortCode.includes(q)
       )
     })
-  }, [categoryId, items, query])
+    if (rankWise) {
+      result.sort((a, b) => {
+        const ra = a.rank ?? Number.MAX_SAFE_INTEGER
+        const rb = b.rank ?? Number.MAX_SAFE_INTEGER
+        return ra - rb
+      })
+    }
+    return result
+  }, [categoryId, items, query, rankWise])
 
   const totalRecords = filtered.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
@@ -434,6 +457,7 @@ export default function BaseMenu({
                       className="cursor-pointer accent-primary"
                     />
                   </th>
+                  {rankWise ? <th className="w-16 px-3 py-3">Rank *</th> : null}
                   <th className="min-w-[180px] px-3 py-3">Name *</th>
                   <th className="px-3 py-3">Short Code*</th>
                   <th className="min-w-[150px] px-3 py-3">Online Display Name</th>
@@ -481,6 +505,25 @@ export default function BaseMenu({
                           />
                         </div>
                       </td>
+                      {rankWise ? (
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={row.rank ?? ''}
+                            onChange={(event) => {
+                              const val = event.target.value.replace(/\D/g, '')
+                              setItems((prev) =>
+                                updateItem(prev, row.id, {
+                                  rank: val ? Number(val) : undefined,
+                                }),
+                              )
+                            }}
+                            className="h-8 w-14 rounded border border-line px-2 text-center text-sm outline-none focus:border-primary"
+                            placeholder="#"
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-3 py-2.5">
                         <div className="font-medium text-ink">{row.name}</div>
                         {row.tags.length > 0 ? (
@@ -726,6 +769,8 @@ export default function BaseMenu({
         open={addItemsOpen}
         onClose={() => setAddItemsOpen(false)}
         onGrid={() => setAddGridOpen(true)}
+        onSingleItem={() => navigate('/menu/add-item')}
+        onAddCombo={() => navigate('/menu/add-combo')}
         onSheet={() => {
           const header =
             'Name,Short Code,Online Display Name,Price,Description\n'

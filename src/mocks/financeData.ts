@@ -35,9 +35,9 @@ export const FINANCE_KPIS: FinanceKpi[] = [
 ]
 
 export const PAYMENT_DISTRIBUTION: PaymentSlice[] = [
-  { name: 'Other', value: 41, amount: 20435, color: '#9ca3af' },
-  { name: 'Online', value: 32.8, amount: 16372, color: '#3b82f6' },
-  { name: 'Cash', value: 26.2, amount: 13050, color: '#22c55e' },
+  { name: 'Other', value: 41, amount: 20435, color: 'var(--color-muted)' },
+  { name: 'Online', value: 32.8, amount: 16372, color: 'var(--color-accent)' },
+  { name: 'Cash', value: 26.2, amount: 13050, color: 'var(--color-success)' },
 ]
 
 export const MONTH_TRENDS: MonthTrendPoint[] = [
@@ -114,13 +114,13 @@ export const MONTH_TRENDS: MonthTrendPoint[] = [
 ]
 
 export const TREND_SERIES = [
-  { key: 'Cash', color: '#16a34a' },
-  { key: 'Online', color: '#2563eb' },
-  { key: 'Other', color: '#6b7280' },
-  { key: 'Card', color: '#d97706' },
-  { key: 'UPI', color: '#7c3aed' },
-  { key: 'Wallet', color: '#db2777' },
-  { key: 'Due', color: '#ff0917' },
+  { key: 'Cash', color: 'var(--color-success)' },
+  { key: 'Online', color: 'var(--color-accent)' },
+  { key: 'Other', color: 'var(--color-muted)' },
+  { key: 'Card', color: 'var(--color-deep)' },
+  { key: 'UPI', color: 'var(--color-primary)' },
+  { key: 'Wallet', color: 'var(--color-danger)' },
+  { key: 'Due', color: 'var(--color-secondary)' },
 ] as const
 
 export const DEDUCTIONS = {

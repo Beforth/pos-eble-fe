@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import {
+  ArrowRight,
+  ChevronDown,
   Eye,
   FileSpreadsheet,
   Info,
@@ -28,15 +30,15 @@ export default function CrmMarketingPage() {
   return (
     <ReportsPageShell title="Marketing" activeItem="crm-marketing">
       <div className="space-y-6">
-        {/* Top Announcement Banner (Marketing Automation Moved - Using Theme.css Tokens) */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 shadow-2xs">
+        {/* Announcement Banner */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 shadow-xs hover:shadow-md transition-shadow">
           <div className="flex items-start gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Rocket size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-md bg-primary px-2 py-0.5 text-[10px] font-extrabold text-white tracking-wider uppercase">
+                <span className="rounded-md bg-primary px-2 py-0.5 text-[11px] font-extrabold text-white uppercase">
                   New
                 </span>
                 <h3 className="text-sm font-bold text-ink">
@@ -59,63 +61,61 @@ export default function CrmMarketingPage() {
 
         {/* Page Title & Lock Button */}
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-extrabold text-ink sm:text-2xl">
-            Marketing
-          </h1>
+          <div />
 
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-2xs hover:bg-emerald-100 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-success/20 bg-success/10 px-3 py-1.5 text-xs font-bold text-success shadow-xs hover:bg-success/15 transition-colors"
           >
             <Lock size={14} />
             <span>Unlock</span>
           </button>
         </div>
 
-        {/* 3 Step Wizard Flow Box (Using Theme.css Page & Card Tokens) */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-xl border border-line bg-page p-4 sm:p-5 shadow-2xs">
+        {/* 3 Step Wizard Flow Box */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-xl border border-line bg-card p-4 sm:p-5 shadow-xs">
           {/* Left Step Badges */}
           <div className="flex flex-wrap items-center gap-3">
             {/* Step 1 */}
             <div className="space-y-1">
-              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-muted">
+              <span className="block text-[11px] font-extrabold uppercase tracking-wider text-muted">
                 STEP 1
               </span>
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-xs font-bold text-ink shadow-2xs hover:bg-page transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-xs font-bold text-ink shadow-xs hover:bg-page transition-colors"
               >
                 <Plus size={14} className="text-primary" />
                 <span>Add Channel</span>
-                <span className="text-muted">▾</span>
+                <ChevronDown size={12} className="text-muted" />
               </button>
             </div>
 
             {/* Step 2 */}
             <div className="space-y-1">
-              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-muted">
+              <span className="block text-[11px] font-extrabold uppercase tracking-wider text-muted">
                 STEP 2
               </span>
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-xs font-bold text-ink shadow-2xs hover:bg-page transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-xs font-bold text-ink shadow-xs hover:bg-page transition-colors"
               >
                 <span>Create Segment</span>
-                <span>➔</span>
+                <ArrowRight size={14} className="text-muted" />
               </button>
             </div>
 
             {/* Step 3 */}
             <div className="space-y-1">
-              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-muted">
+              <span className="block text-[11px] font-extrabold uppercase tracking-wider text-muted">
                 STEP 3
               </span>
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-xs font-bold text-ink shadow-2xs hover:bg-page transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-line bg-card px-3.5 py-2 text-xs font-bold text-ink shadow-xs hover:bg-page transition-colors"
               >
                 <span>Create Campaign</span>
-                <span>➔</span>
+                <ArrowRight size={14} className="text-muted" />
               </button>
             </div>
           </div>
@@ -129,7 +129,7 @@ export default function CrmMarketingPage() {
         {/* Segment Cards Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Card 1: All Users */}
-          <div className="flex flex-col justify-between rounded-xl border border-line bg-card p-5 shadow-xs transition-all hover:shadow-md">
+          <div className="flex flex-col justify-between rounded-xl border border-line bg-card p-5 shadow-sm transition-all hover:shadow-md">
             {/* Top Bar */}
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-ink">All Users</h3>
@@ -179,7 +179,7 @@ export default function CrmMarketingPage() {
                 <span>View</span>
               </button>
 
-              <span className="text-line">|</span>
+              <div className="h-4 w-px bg-line" />
 
               <button
                 type="button"
@@ -189,7 +189,7 @@ export default function CrmMarketingPage() {
                 <span>Excel</span>
               </button>
 
-              <span className="text-line">|</span>
+              <div className="h-4 w-px bg-line" />
 
               <button
                 type="button"
@@ -201,10 +201,10 @@ export default function CrmMarketingPage() {
             </div>
           </div>
 
-          {/* Card 2: Add Segment (Styled strictly with theme.css brand tokens) */}
+          {/* Card 2: Add Segment */}
           <div
             onClick={() => alert('Add segment clicked')}
-            className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary/30 bg-card p-6 text-center shadow-2xs transition-all hover:border-primary hover:bg-primary/5"
+            className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary/30 bg-card p-6 text-center shadow-xs transition-all hover:border-primary hover:bg-primary/5"
           >
             <div className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary shadow-xs">
               <Plus size={28} className="text-primary" />

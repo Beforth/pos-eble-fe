@@ -240,7 +240,7 @@ export default function AddWastage() {
         </OutlineButton>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-line bg-card">
+      <div className="overflow-x-auto rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:overflow-visible">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
             <tr>
@@ -287,36 +287,27 @@ export default function AddWastage() {
                     aria-label="Select row"
                   />
                 </td>
-                <td className="px-3 py-2.5">
-                  <select
+                <td className="min-w-[200px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                  <SearchableSelect
                     value={line.rawMaterial}
-                    onChange={(event) => {
-                      const material = catalog.find(
-                        (m) => m.name === event.target.value,
-                      )
+                    options={catalog.map((m) => m.name)}
+                    placeholder={`Select ${materialLabel}`}
+                    searchPlaceholder="Search..."
+                    compact
+                    dropdownPlacement="auto"
+                    onChange={(value) => {
+                      const material = catalog.find((m) => m.name === value)
                       updateLine(line.id, {
-                        rawMaterial: event.target.value,
+                        rawMaterial: value,
                         unit: material?.unit ?? line.unit,
-                        avgPurchasePrice:
-                          material?.avgPrice ?? line.avgPurchasePrice,
+                        avgPurchasePrice: material?.avgPrice ?? line.avgPurchasePrice,
                         amount:
                           material && toNumber(line.qty) > 0
-                            ? formatAmount(
-                                toNumber(line.qty) *
-                                  toNumber(material.avgPrice),
-                              )
+                            ? formatAmount(toNumber(line.qty) * toNumber(material.avgPrice))
                             : line.amount,
                       })
                     }}
-                    className="h-9 w-full min-w-[180px] rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">Select {materialLabel}</option>
-                    {catalog.map((material) => (
-                      <option key={material.name} value={material.name}>
-                        {material.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 <td className="px-3 py-2.5">
                   <input
