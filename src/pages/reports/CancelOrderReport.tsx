@@ -147,7 +147,7 @@ export default function CancelOrderReport() {
       toDate: '2026-08-12',
       restaurant: '',
     })
-    showToast('Showing all records')
+    showToast('Filters cleared')
   }
 
   return (
@@ -198,7 +198,7 @@ export default function CancelOrderReport() {
       }
     >
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -238,7 +238,7 @@ export default function CancelOrderReport() {
           onClick={handleShowAll}
           className="inline-flex h-9 items-center rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
         >
-          Show All
+          Clear Filter
         </button>
       </div>
 

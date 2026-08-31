@@ -6,10 +6,12 @@ export function OutlineButton({
   children,
   onClick,
   variant = 'primary',
+  className = '',
 }: {
   children: ReactNode
   onClick?: () => void
   variant?: 'primary' | 'gray'
+  className?: string
 }) {
   return (
     <button
@@ -19,7 +21,7 @@ export function OutlineButton({
         variant === 'primary'
           ? 'border-primary text-primary hover:bg-primary/5'
           : 'border-line text-ink'
-      }`}
+      } ${className}`}
     >
       {children}
     </button>

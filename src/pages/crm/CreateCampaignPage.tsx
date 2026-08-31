@@ -59,7 +59,7 @@ export default function CreateCampaignPage() {
                 <Info size={16} className="mt-0.5 shrink-0 text-muted" />
                 <div className="space-y-2 text-xs font-medium text-muted leading-relaxed">
                   <p>
-                    In compliance to a TRAI Regulation, the telecom operators will not share the status of the SMS delivered. So, Petpooja will also not be able to share such a status report with you. To have the least SMS delivery failure, kindly ensure below before firing SMS campaigns:
+                    In compliance to a TRAI Regulation, the telecom operators will not share the status of the SMS delivered. So, POS-Eble will also not be able to share such a status report with you. To have the least SMS delivery failure, kindly ensure below before firing SMS campaigns:
                   </p>
 
                   <ul className="ml-4 space-y-1 list-disc list-inside font-semibold text-ink">
@@ -70,7 +70,7 @@ export default function CreateCampaignPage() {
                   </ul>
 
                   <p className="pt-1 font-semibold text-ink">
-                    Petpooja will not be responsible for SMS delivery failure.
+                    POS-Eble will not be responsible for SMS delivery failure.
                   </p>
                 </div>
               </div>

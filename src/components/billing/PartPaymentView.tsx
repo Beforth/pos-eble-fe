@@ -26,7 +26,6 @@ interface PartPaymentViewProps {
   onBackToOrder: () => void
   onNewOrder: () => void
   onPrint?: () => void
-  onEBill?: () => void
 }
 
 const OTHER_OPTIONS = [
@@ -64,7 +63,6 @@ export function PartPaymentView({
   onBackToOrder,
   onNewOrder,
   onPrint,
-  onEBill,
 }: PartPaymentViewProps) {
   const [tab, setTab] = useState<PartMethodTab>('card')
   const [amount, setAmount] = useState(String(payableAmount || ''))
@@ -443,13 +441,6 @@ export function PartPaymentView({
           className="h-9 rounded bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
         >
           Print
-        </button>
-        <button
-          type="button"
-          onClick={onEBill}
-          className="h-9 rounded bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
-        >
-          EBill
         </button>
       </div>
     </div>

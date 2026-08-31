@@ -41,7 +41,7 @@ const THIRDPARTY_USER_OPTIONS = [
   'Zomato Integration API',
   'Swiggy UrbanPiper Webhook',
   'Magicpin Direct Sync',
-  'Petpooja POS Callback Engine',
+  'POS-Eble POS Callback Engine',
 ]
 
 export default function MenuTriggerLogs() {

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Printer, Search } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
-import { OUTLET_ITEM_WISE_ROWS, summarizeOutletItemWise } from '../../mocks/outletItemWiseData'
+import { OUTLET_ITEM_WISE_ROWS } from '../../mocks/outletItemWiseData'
 
 export default function VariationSummaryReport() {
   const navigate = useNavigate()

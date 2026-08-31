@@ -57,6 +57,7 @@ export default function BillingDayEnd() {
     setAppliedEnd('')
     setIgnoreDates(true)
     setPage(1)
+    showToast('Filters cleared')
   }
 
   function handleExport() {
@@ -88,7 +89,7 @@ export default function BillingDayEnd() {
       />
 
       {toast ? (
-        <div className="fixed bottom-4 right-4 z-[80] rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div className="fixed bottom-4 right-4 z-[80] rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -145,7 +146,7 @@ export default function BillingDayEnd() {
               onClick={handleShowAll}
               className="inline-flex h-9 items-center rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
             >
-              Show All
+              Clear Filter
             </button>
           </div>
         </div>

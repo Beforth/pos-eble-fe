@@ -32,6 +32,12 @@ export default function AddonsManagement() {
     useState<SearchByFilterValue>('all')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [changesName, setChangesName] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+
+function showToast(message: string) {
+  setToast(message)
+  window.setTimeout(() => setToast(null), 2200)
+}
 
   const rows = useMemo(() => {
     const dept = appliedDept.trim().toLowerCase()
@@ -91,6 +97,7 @@ export default function AddonsManagement() {
     setAppliedItem('')
     setSearchBy('all')
     setAppliedSearchBy('all')
+    showToast('Filters cleared')
   }
 
   function handleDownloadSample() {
@@ -194,7 +201,7 @@ export default function AddonsManagement() {
         <div className="mt-3 flex flex-wrap gap-2">
           <OutlineButton onClick={handleSearch}>Search</OutlineButton>
           <OutlineButton variant="gray" onClick={handleShowAll}>
-            Show All
+            Clear Filter
           </OutlineButton>
           <OutlineButton>Update Rank</OutlineButton>
           <OutlineButton>Assign Addons</OutlineButton>
@@ -304,6 +311,11 @@ export default function AddonsManagement() {
         name={changesName}
         onClose={() => setChangesName(null)}
       />
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </MenuPageShell>
   )
 }

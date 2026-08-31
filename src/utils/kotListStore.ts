@@ -2,6 +2,8 @@ import { kotList, parseKotDate, type KotOrderType, type KotRow } from '../mocks/
 import type { KotTicket } from '../mocks/kotViewData'
 import { loadAllKotTickets } from './tableStatusStore'
 
+export type { KotRow } from '../mocks/kotData'
+
 const MONTHS_SHORT = [
   'Jan',
   'Feb',

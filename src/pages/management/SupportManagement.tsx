@@ -83,7 +83,7 @@ export default function SupportManagement() {
     setEndDate('')
     setTickets(SAMPLE_TICKETS)
     setIsSearched(true)
-    showToast('Showing all support tickets')
+    showToast('Filters cleared')
   }
 
   return (
@@ -92,7 +92,7 @@ export default function SupportManagement() {
       activeItem="user-logs-support-mgmt"
     >
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -167,7 +167,7 @@ export default function SupportManagement() {
               </PrimaryButton>
               <OutlineButton variant="gray" onClick={handleShowAll}>
                 <RotateCcw size={15} />
-                Show All
+                Clear Filter
               </OutlineButton>
             </div>
           </div>

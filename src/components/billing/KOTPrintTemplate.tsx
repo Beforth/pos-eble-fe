@@ -1,6 +1,6 @@
 import React from 'react'
 import { X } from 'lucide-react'
-import { labelForOrderType, type KotTicket } from '../../mocks/kotViewData'
+import { type KotTicket } from '../../mocks/kotViewData'
 import { brand } from '../../theme/brand'
 
 interface KOTPrintTemplateProps {

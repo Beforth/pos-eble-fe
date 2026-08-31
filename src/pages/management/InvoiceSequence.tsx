@@ -78,6 +78,12 @@ export default function InvoiceSequence() {
     'active',
   )
   const [sequences] = useState<InvoiceSequenceRow[]>([])
+  const [toast, setToast] = useState<string | null>(null)
+
+function showToast(message: string) {
+  setToast(message)
+  window.setTimeout(() => setToast(null), 2200)
+}
 
   const filtered = useMemo(() => {
     const q = appliedQuery.trim().toLowerCase()
@@ -96,6 +102,7 @@ export default function InvoiceSequence() {
   function handleShowAll() {
     setNameQuery('')
     setAppliedQuery('')
+    showToast('Filters cleared')
   }
 
   return (
@@ -136,7 +143,7 @@ export default function InvoiceSequence() {
             />
             <PrimaryButton onClick={handleSearch}>Search</PrimaryButton>
             <OutlineButton variant="gray" onClick={handleShowAll}>
-              Show All
+              Clear Filter
             </OutlineButton>
           </div>
         </div>
@@ -182,6 +189,11 @@ export default function InvoiceSequence() {
           </div>
         )}
       </div>
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </ReportsPageShell>
   )
 }

@@ -180,7 +180,7 @@ export default function BillingKot() {
               onClick={handleShowAll}
               className="inline-flex h-9 items-center rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
             >
-              Show All
+              Clear Filter
             </button>
           </div>
         </div>
@@ -195,7 +195,7 @@ export default function BillingKot() {
         ) : filtered.length === 0 ? (
           <div className="flex min-h-[300px] flex-col items-center justify-center gap-2 rounded-xl border border-line bg-card text-center">
             <p className="text-sm font-medium text-muted">
-              No results found. Try adjusting dates or click Show All.
+              No results found. Try adjusting dates or click Clear Filter.
             </p>
           </div>
         ) : (

@@ -156,7 +156,7 @@ export function ShowChangesModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <p className="text-sm leading-relaxed text-ink">
             &ldquo;{name}&rdquo; added by Sagan Parth
-            (parth.sagan@petpooja.com) using Chrome (IP-49.36.71.137)
+            (parth.sagan@pos-eble.com) using Chrome (IP-49.36.71.137)
           </p>
         </div>
       </div>

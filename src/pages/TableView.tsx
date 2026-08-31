@@ -145,24 +145,7 @@ export default function TableView() {
 
       <main className="flex-1 overflow-y-auto bg-white px-4 py-4 sm:px-5">
         <div className="mb-5 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => showToast('Table Reservation — coming soon')}
-            className="inline-flex h-9 items-center gap-1 rounded bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            Table Reservation
-          </button>
-          <button
-            type="button"
-            onClick={() => showToast('Contactless — coming soon')}
-            className="inline-flex h-9 items-center gap-1 rounded bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            Contactless
-          </button>
-
-          <label className="ml-1 inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
             <span
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                 moveKot ? 'bg-primary' : 'bg-[#cfcfcf]'

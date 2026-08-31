@@ -19,6 +19,7 @@ const AUTO_COLLAPSE_PATHS = [
   '/menu/swiggy',
   '/menu/channel',
   '/menu/schedule-changes',
+  '/menu/menu-on-off',
 ]
 
 interface MenuPageShellProps {

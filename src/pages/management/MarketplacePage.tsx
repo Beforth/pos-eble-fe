@@ -42,7 +42,7 @@ const PRODUCTS: ProductCard[] = [
   },
   {
     id: 'p-2',
-    name: 'Petpooja - Growth Plan',
+    name: 'POS-Eble - Growth Plan',
     category: 'pos-plans',
     status: 'Inactive',
     shield: true,
@@ -50,21 +50,21 @@ const PRODUCTS: ProductCard[] = [
   },
   {
     id: 'p-3',
-    name: 'Petpooja - Scale Plan',
+    name: 'POS-Eble - Scale Plan',
     category: 'pos-plans',
     shield: true,
     description: 'Enterprise chain tools, API access & dedicated support',
   },
   {
     id: 'p-4',
-    name: 'Petpooja POS + Growth Plan',
+    name: 'POS-Eble POS + Growth Plan',
     category: 'pos-plans',
     shield: true,
     description: 'Combined POS license + Growth suite package',
   },
   {
     id: 'p-5',
-    name: 'Petpooja POS + Scale Plan',
+    name: 'POS-Eble POS + Scale Plan',
     category: 'pos-plans',
     shield: true,
     description: 'Complete all-in-one POS + Scale enterprise bundle',
@@ -99,7 +99,7 @@ const PRODUCTS: ProductCard[] = [
   },
   {
     id: 'p-10',
-    name: 'Petpooja Business Loan',
+    name: 'POS-Eble Business Loan',
     category: 'loan',
     shield: true,
     description: 'Collateral-free working capital loan up to ₹10 Lakhs',
@@ -121,7 +121,7 @@ export default function MarketplacePage() {
     { id: 'easy-ops', label: 'Easy Operations' },
     { id: 'crm', label: 'CRM' },
     { id: 'customer-acq', label: 'Customer Acquisition' },
-    { id: 'loan', label: 'Petpooja Loan' },
+    { id: 'loan', label: 'POS-Eble Loan' },
   ] as const
 
   const filteredProducts = PRODUCTS.filter((p) => p.category === activeSubPill)

@@ -52,6 +52,7 @@ export default function DayEndSummary() {
     setAppliedEnd('2026-08-12')
     setIgnoreDates(true)
     setPage(1)
+    showToast('Filters cleared')
   }
 
   return (
@@ -66,7 +67,7 @@ export default function DayEndSummary() {
       }
     >
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -102,7 +103,7 @@ export default function DayEndSummary() {
           onClick={handleShowAll}
           className="inline-flex h-9 items-center rounded-lg border border-line px-4 text-sm font-medium text-ink transition-colors hover:bg-page"
         >
-          Show All
+          Clear Filter
         </button>
       </div>
 

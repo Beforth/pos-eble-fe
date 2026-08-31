@@ -29,7 +29,7 @@ function formatDisplayDate(year: number, monthIndex: number, day: number) {
   return `${pad(day)} ${months[monthIndex]} ${year}`
 }
 
-/** 30 mock day-end rows ending 11 Aug 2026 (matches Petpooja sample). */
+/** 30 mock day-end rows ending 11 Aug 2026 (matches POS-Eble sample). */
 export const DAY_END_SUMMARY_ROWS: DayEndSummaryRow[] = (() => {
   const end = new Date(2026, 7, 11)
   const samples: Array<{ orders: number; total: number }> = [

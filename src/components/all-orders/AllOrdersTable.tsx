@@ -5,7 +5,7 @@ import { formatINR } from '../../utils/format'
 import { Badge } from '../common/Badge'
 import { Table, type Column } from '../common/Table'
 
-/** Credit card + edit mark — matches Petpooja “Change Payment Type” action. */
+/** Credit card + edit mark — matches POS-Eble “Change Payment Type” action. */
 function ChangePaymentIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -132,7 +132,7 @@ export function AllOrdersTable({
       header: 'My Amount (₹)',
       align: 'right',
       render: (row) => (
-        <span className="tabular-nums">{formatINR(row.myAmount, 2)}</span>
+        <span className="whitespace-nowrap tabular-nums">{formatINR(row.myAmount, 2)}</span>
       ),
     },
     {
@@ -140,7 +140,7 @@ export function AllOrdersTable({
       header: 'Tax (₹)',
       align: 'right',
       render: (row) => (
-        <span className="tabular-nums">{formatINR(row.tax, 2)}</span>
+        <span className="whitespace-nowrap tabular-nums">{formatINR(row.tax, 2)}</span>
       ),
     },
     {
@@ -148,7 +148,7 @@ export function AllOrdersTable({
       header: 'Discount (₹)',
       align: 'right',
       render: (row) => (
-        <span className="tabular-nums">{formatINR(row.discount, 2)}</span>
+        <span className="whitespace-nowrap tabular-nums">{formatINR(row.discount, 2)}</span>
       ),
     },
     {
@@ -156,7 +156,7 @@ export function AllOrdersTable({
       header: 'Grand Total [Round Off] (₹)',
       align: 'right',
       render: (row) => (
-        <span className="font-semibold tabular-nums">
+        <span className="whitespace-nowrap font-semibold tabular-nums">
           {formatINR(row.grandTotal, 2)}
         </span>
       ),

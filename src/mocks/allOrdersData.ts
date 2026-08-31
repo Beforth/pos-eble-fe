@@ -35,7 +35,7 @@ function chartLabel(daysAgo: number): string {
   return formatDayMonth(addDays(today, -daysAgo))
 }
 
-/** Last ~15 days series for the All Orders chart (Petpooja-style peaks). */
+/** Last ~15 days series for the All Orders chart (POS-Eble-style peaks). */
 export const allOrdersChartSeries: OrdersChartPoint[] = [
   { label: chartLabel(14), value: 52_754 },
   { label: chartLabel(13), value: 63_000 },

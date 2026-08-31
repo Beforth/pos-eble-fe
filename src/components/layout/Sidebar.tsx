@@ -18,7 +18,6 @@ import {
   LogOut,
   Megaphone,
   MessageSquare,
-  Network,
   Package,
   Settings,
   ShoppingBag,
@@ -344,17 +343,12 @@ const NAV: NavEntry[] = [
           icon: MessageSquare,
         },
         {
-          id: 'crm-petpooja-loyalty',
-          label: 'Petpooja Loyalty',
+          id: 'crm-pos-eble-loyalty',
+          label: 'POS-Eble Loyalty',
           icon: Star,
         },
       ],
     },
-  },
-  { kind: 'divider' },
-  {
-    kind: 'link',
-    item: { id: 'aggregator', label: 'Aggregator Center', icon: Network, chevron: true },
   },
 ]
 
@@ -416,7 +410,7 @@ const ROUTES: Record<string, string> = {
   'crm-campaign': '/crm/campaign',
   'crm-customers': '/crm/customers',
   'crm-feedback': '/crm/feedback',
-  'crm-petpooja-loyalty': '/crm/petpooja-loyalty',
+  'crm-pos-eble-loyalty': '/crm/pos-eble-loyalty',
 }
 
 const AUTO_EXPAND_PARENTS: Record<string, string[]> = {
@@ -424,7 +418,7 @@ const AUTO_EXPAND_PARENTS: Record<string, string[]> = {
   'crm-campaign': ['crm'],
   'crm-customers': ['crm'],
   'crm-feedback': ['crm'],
-  'crm-petpooja-loyalty': ['crm'],
+  'crm-pos-eble-loyalty': ['crm'],
   'menu-discounts': ['menu'],
   'menu-images-upload': ['menu'],
   'menu-on-off': ['menu'],

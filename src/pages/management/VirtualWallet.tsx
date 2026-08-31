@@ -76,13 +76,13 @@ export default function VirtualWallet() {
     setStartDate('')
     setEndDate('')
     setAppliedMobile('')
-    showToast('Showing all records')
+    showToast('Filters cleared')
   }
 
   return (
     <ReportsPageShell title="Virtual Wallet" activeItem="acct-virtual-wallet">
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -116,7 +116,7 @@ export default function VirtualWallet() {
           />
         </label>
         <PrimaryButton onClick={handleSearch}>Search</PrimaryButton>
-        <OutlineButton onClick={handleShowAll}>Show All</OutlineButton>
+        <OutlineButton onClick={handleShowAll}>Clear Filter</OutlineButton>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">

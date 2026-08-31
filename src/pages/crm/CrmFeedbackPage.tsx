@@ -14,16 +14,16 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
-import { PrimaryButton, OutlineButton } from '../../components/menu/MenuActionButtons'
+import { OutlineButton } from '../../components/menu/MenuActionButtons'
 import { AggregatorLogo } from '../../components/common/AggregatorLogo'
 
-type PrimaryTab = 'petpooja_feedback' | 'complaints' | 'ratings_reviews'
+type PrimaryTab = 'pos_eble_feedback' | 'complaints' | 'ratings_reviews'
 type SubTab = 'customer_wise' | 'feedback_wise'
 type PlatformFilter = 'all' | 'zomato' | 'swiggy'
 
 export default function CrmFeedbackPage() {
   const location = useLocation()
-  const [primaryTab, setPrimaryTab] = useState<PrimaryTab>('petpooja_feedback')
+  const [primaryTab, setPrimaryTab] = useState<PrimaryTab>('pos_eble_feedback')
   const [subTab, setSubTab] = useState<SubTab>('customer_wise')
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>('all')
   const [ratingsPlatform, setRatingsPlatform] = useState<'zomato' | 'swiggy'>('zomato')
@@ -39,6 +39,12 @@ export default function CrmFeedbackPage() {
 
   const [ratingsDate, setRatingsDate] = useState('')
   const [ratingsOrderNo, setRatingsOrderNo] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
+
+  function showToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(null), 2200)
+  }
 
   useEffect(() => {
     if (location.pathname.includes('/onlineorderrating')) {
@@ -46,10 +52,10 @@ export default function CrmFeedbackPage() {
     } else if (location.pathname.includes('/customercomplaints')) {
       setPrimaryTab('complaints')
     } else if (location.pathname.includes('/app_list_rating')) {
-      setPrimaryTab('petpooja_feedback')
+      setPrimaryTab('pos_eble_feedback')
       setSubTab('feedback_wise')
     } else if (location.pathname.includes('/app_list')) {
-      setPrimaryTab('petpooja_feedback')
+      setPrimaryTab('pos_eble_feedback')
       setSubTab('customer_wise')
     }
   }, [location.pathname])
@@ -66,6 +72,7 @@ export default function CrmFeedbackPage() {
     setComplaintStatus('All')
     setRatingsDate('')
     setRatingsOrderNo('')
+    showToast('Filters cleared')
   }
 
   return (
@@ -81,7 +88,7 @@ export default function CrmFeedbackPage() {
     >
       <div className="space-y-6">
         {/* Announcement Banner */}
-        {primaryTab === 'petpooja_feedback' && subTab === 'customer_wise' && (
+        {primaryTab === 'pos_eble_feedback' && subTab === 'customer_wise' && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 shadow-xs">
             <div className="flex items-start gap-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -113,8 +120,8 @@ export default function CrmFeedbackPage() {
           </div>
         )}
 
-        {/* Summary Stats — Petpooja Feedback */}
-        {primaryTab === 'petpooja_feedback' && (
+        {/* Summary Stats — POS-Eble Feedback */}
+        {primaryTab === 'pos_eble_feedback' && (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-line bg-card p-4 shadow-xs">
               <div className="flex items-center gap-3">
@@ -255,7 +262,7 @@ export default function CrmFeedbackPage() {
         )}
 
         {/* Top Actions Row */}
-        {primaryTab === 'petpooja_feedback' && (
+        {primaryTab === 'pos_eble_feedback' && (
           <div className="flex items-center justify-end gap-3">
             <OutlineButton
               variant="gray"
@@ -272,14 +279,14 @@ export default function CrmFeedbackPage() {
         <div className="flex items-center gap-8 overflow-x-auto border-b border-line">
           <button
             type="button"
-            onClick={() => setPrimaryTab('petpooja_feedback')}
+            onClick={() => setPrimaryTab('pos_eble_feedback')}
             className={`whitespace-nowrap pb-3 text-sm font-bold transition-all relative ${
-              primaryTab === 'petpooja_feedback'
+              primaryTab === 'pos_eble_feedback'
                 ? 'text-ink after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2.5px] after:rounded-t after:bg-primary'
                 : 'text-muted hover:text-ink'
             }`}
           >
-            Petpooja Feedback
+            POS-Eble Feedback
           </button>
 
           <button
@@ -308,7 +315,7 @@ export default function CrmFeedbackPage() {
         </div>
 
         {/* ─── PETPOOJA FEEDBACK CONTENT ─── */}
-        {primaryTab === 'petpooja_feedback' && (
+        {primaryTab === 'pos_eble_feedback' && (
           <>
             {/* Sub-Tab Toggle */}
             <div className="flex items-center gap-3">
@@ -409,7 +416,7 @@ export default function CrmFeedbackPage() {
                 </OutlineButton>
 
                 <OutlineButton variant="gray" onClick={handleShowAll}>
-                  Show All
+                  Clear Filter
                 </OutlineButton>
               </div>
             )}
@@ -478,7 +485,7 @@ export default function CrmFeedbackPage() {
                 </OutlineButton>
 
                 <OutlineButton variant="gray" onClick={handleShowAll}>
-                  Show All
+                  Clear Filter
                 </OutlineButton>
               </div>
             )}
@@ -500,7 +507,7 @@ export default function CrmFeedbackPage() {
                 onClick={handleShowAll}
                 className="mt-4"
               >
-                Reset Filters
+                Clear Filter
               </OutlineButton>
             </div>
           </>
@@ -655,7 +662,7 @@ export default function CrmFeedbackPage() {
                 onClick={handleShowAll}
                 className="mt-4"
               >
-                Reset Filters
+                Clear Filter
               </OutlineButton>
             </div>
           </>
@@ -802,7 +809,7 @@ export default function CrmFeedbackPage() {
                 onClick={handleShowAll}
                 className="mt-4"
               >
-                Reset Filters
+                Clear Filter
               </OutlineButton>
             </div>
 
@@ -814,6 +821,11 @@ export default function CrmFeedbackPage() {
           </div>
         )}
       </div>
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </ReportsPageShell>
   )
 }

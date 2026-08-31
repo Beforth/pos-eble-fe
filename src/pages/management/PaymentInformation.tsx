@@ -46,7 +46,7 @@ export default function PaymentInformation() {
     setStatus('All')
     setProvider('All')
     setOrderId('')
-    showToast('Showing all records')
+    showToast('Filters cleared')
   }
 
   return (
@@ -61,7 +61,7 @@ export default function PaymentInformation() {
       }
     >
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -121,7 +121,7 @@ export default function PaymentInformation() {
             </label>
             <OutlineButton onClick={handleSearch}>Search</OutlineButton>
             <OutlineButton variant="gray" onClick={handleShowAll}>
-              Show All
+              Clear Filter
             </OutlineButton>
           </div>
         </div>

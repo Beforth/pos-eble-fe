@@ -154,6 +154,12 @@ export default function VariantsManagement() {
   const [changesName, setChangesName] = useState<string | null>(null)
   const [editing, setEditing] = useState<MenuVariation | null>(null)
   const [adding, setAdding] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+function showToast(message: string) {
+  setToast(message)
+  window.setTimeout(() => setToast(null), 2200)
+}
 
   const rows = useMemo(() => {
     const q = appliedName.trim().toLowerCase()
@@ -200,6 +206,7 @@ export default function VariantsManagement() {
     setAppliedName('')
     setSearchBy('all')
     setAppliedSearchBy('all')
+    showToast('Filters cleared')
   }
 
   return (
@@ -256,7 +263,7 @@ export default function VariantsManagement() {
           <div className="flex flex-wrap items-end gap-2">
             <OutlineButton onClick={handleSearch}>Search</OutlineButton>
             <OutlineButton variant="gray" onClick={handleShowAll}>
-              Show All
+              Clear Filter
             </OutlineButton>
             <OutlineButton>Update Variation</OutlineButton>
           </div>
@@ -376,6 +383,11 @@ export default function VariantsManagement() {
         name={changesName}
         onClose={() => setChangesName(null)}
       />
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </MenuPageShell>
   )
 }

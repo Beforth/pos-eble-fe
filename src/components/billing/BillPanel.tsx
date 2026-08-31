@@ -202,9 +202,15 @@ export function BillPanel({
   useEffect(() => {
     setExpandedKotNo(null)
   }, [tableId])
-  const currentTotal = lines.reduce((sum, line) => sum + line.price * line.qty, 0)
-  const kotTotal = tableKots.reduce((sum, kot) => sum + kot.amount, 0)
-  const total = currentTotal + kotTotal
+  const currentTotal = lines.reduce(
+    (sum, line) => sum + Math.round(line.price * line.qty * 100) / 100,
+    0,
+  )
+  const kotTotal = tableKots.reduce(
+    (sum, kot) => sum + Math.round(kot.amount * 100) / 100,
+    0,
+  )
+  const total = Math.round((currentTotal + kotTotal) * 100) / 100
   const hasSentKots = tableKots.length > 0
   const hasAnyItems = lines.length > 0 || hasSentKots
   const [settlementInput, setSettlementInput] = useState('')

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  BarChart3,
   Bell,
   BookOpen,
   ChefHat,
@@ -34,11 +33,11 @@ import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
 
 const SIDEBAR_LINKS = [
   { to: '/billing', label: 'Billing', icon: UtensilsCrossed, active: true },
-  { to: '/billing/live-orders', label: 'Live Orders', icon: Monitor },
-  { to: '/billing/all-orders', label: 'All Orders', icon: BookOpen },
-  { to: '/billing/kot', label: 'KOT', icon: ChefHat },
-  { to: '/billing/day-end', label: 'Day End', icon: Sun },
-  { to: '/logs', label: 'Logs', icon: ScrollText },
+  { to: '/billing/live-orders', label: 'Live Orders', icon: Monitor, active: false },
+  { to: '/billing/all-orders', label: 'All Orders', icon: BookOpen, active: false },
+  { to: '/billing/kot', label: 'KOT', icon: ChefHat, active: false },
+  { to: '/billing/day-end', label: 'Day End', icon: Sun, active: false },
+  { to: '/logs', label: 'Logs', icon: ScrollText, active: false },
 ] as const
 
 interface BillingHeaderProps {

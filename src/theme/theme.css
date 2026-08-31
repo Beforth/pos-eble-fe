@@ -346,7 +346,6 @@ body {
 
 /* Highlighted amount column (Online Orders Total, Due Payment Total Due) */
 .col-total {
-  background-color: color-mix(in srgb, var(--color-secondary) 35%, var(--color-card));
 }
 
 

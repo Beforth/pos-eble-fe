@@ -44,11 +44,9 @@ import {
 } from '../../utils/draftBillStore'
 import {
   appendKotTicket,
-  getTableStatus,
   loadAllKotTickets,
   markTablePrinted,
   replaceKotTickets,
-  setTableStatus,
   settleTableSession,
 } from '../../utils/tableStatusStore'
 
@@ -251,16 +249,6 @@ export default function CaptainOrders() {
     window.setTimeout(() => setToast(null), 2400)
   }
 
-  /** Colour tables only from order activity — never from selection alone. */
-  function markTableFromActivity(
-    status: 'running' | 'running-kot' | 'printed' | 'paid',
-    id = tableId,
-  ) {
-    if (!id) return
-    if (status === 'running' && getTableStatus(id) !== 'blank') return
-    setTableStatus(id, status)
-  }
-
   function addItem(item: MenuItemRow) {
     if (!item.available) return
     setLines((prev) => {
@@ -281,7 +269,6 @@ export default function CaptainOrders() {
         },
       ]
     })
-    markTableFromActivity('running')
   }
 
   function addOpenItem(item: { name: string; price: number }) {
@@ -304,7 +291,6 @@ export default function CaptainOrders() {
         },
       ]
     })
-    markTableFromActivity('running')
     showToast(`Added ${item.name}`)
   }
 
@@ -942,8 +928,10 @@ export default function CaptainOrders() {
             setPayment('cash')
           }}
           onNewOrder={newOrder}
-          onPrint={() => showToast('Print — coming soon')}
-          onEBill={() => showToast('EBill — coming soon')}
+          onPrint={() => {
+            setPartPaymentOpen(false)
+            startFinalBill('Save & Print')
+          }}
         />
       ) : kotViewOpen ? (
         <KotView

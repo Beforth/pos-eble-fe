@@ -89,7 +89,7 @@ const PG_ROWS: PgTransaction[] = [
     restaurant: brand.shopName,
     gstin: '27BHFPJ0010E1Z4',
     proformaNo: 'CT580441',
-    serviceOpted: 'Bought 1 Petpooja Payroll Goods',
+    serviceOpted: 'Bought 1 POS-Eble Payroll Goods',
     orderId: 'PPORD8712 (Razorpay)',
     proformaDate: '18 Jun 2026',
     paidOn: '18 Jun 2026',
@@ -245,7 +245,7 @@ export default function ServicePaymentHistory() {
     setToDate('')
     setAppliedOrderId('')
     setAppliedProformaNo('')
-    showToast('Showing all records')
+    showToast('Filters cleared')
   }
 
   return (
@@ -260,7 +260,7 @@ export default function ServicePaymentHistory() {
       }
     >
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -378,7 +378,7 @@ export default function ServicePaymentHistory() {
             </label>
             <OutlineButton onClick={handleSearch}>Search</OutlineButton>
             <OutlineButton variant="gray" onClick={handleShowAll}>
-              Show All
+              Clear Filter
             </OutlineButton>
           </div>
 

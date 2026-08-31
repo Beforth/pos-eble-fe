@@ -41,6 +41,7 @@ const MENU_ROUTES: Record<string, string> = {
   'back-billing': '/dashboard',
   'menu-discounts': '/menu',
   'menu-images-upload': '/menu/multi-item-images',
+  'menu-on-off': '/menu/menu-on-off',
   'special-note': '/menu/special-note',
   'item-commission': '/menu/item-commission',
   'schedule-changes': '/menu/schedule-changes',

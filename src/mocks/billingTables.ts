@@ -7,7 +7,6 @@ export interface BillingTable {
 
 export type TableFloorStatus =
   | 'blank'
-  | 'running'
   | 'printed'
   | 'paid'
   | 'running-kot'
@@ -45,7 +44,6 @@ export const TABLE_STATUS_LEGEND: {
   swatch: string
 }[] = [
   { id: 'blank', label: 'Blank Table', swatch: 'bg-[#e8e8e8] border border-dashed border-[#bdbdbd]' },
-  { id: 'running', label: 'Running Table', swatch: 'bg-sky-300' },
   { id: 'printed', label: 'Printed Table', swatch: 'bg-success' },
   { id: 'paid', label: 'Paid Table', swatch: 'bg-[#e8d5b7]' },
   {
@@ -57,8 +55,6 @@ export const TABLE_STATUS_LEGEND: {
 
 export function tableCardClass(status: TableFloorStatus): string {
   switch (status) {
-    case 'running':
-      return 'border-sky-400 bg-sky-200 text-ink'
     case 'printed':
       return 'border-success bg-success text-white'
     case 'paid':

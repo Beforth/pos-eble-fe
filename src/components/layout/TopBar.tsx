@@ -73,38 +73,40 @@ export function TopBar({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-line bg-card px-4">
-      <IconButton
-        label="Open menu"
-        size="sm"
-        onClick={onMenuClick}
-        className="lg:hidden"
-      >
-        <Menu size={20} />
-      </IconButton>
+    <header className="sticky top-0 z-20 flex flex-col gap-y-2 border-b border-line bg-card px-4 py-2 lg:h-14 lg:flex-row lg:items-center lg:gap-y-0 lg:py-0">
+      <div className="flex items-center gap-2">
+        <IconButton
+          label="Open menu"
+          size="sm"
+          onClick={onMenuClick}
+          className="lg:hidden"
+        >
+          <Menu size={20} />
+        </IconButton>
 
-      {/* Outlet switcher */}
-      <button
-        type="button"
-        className="inline-flex min-w-0 items-center gap-2 rounded-lg border border-line bg-card px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-muted"
-        title={outletName}
-      >
-        <span className="max-w-40 truncate sm:max-w-56 lg:max-w-80">
-          {outletName}
-        </span>
-        <ChevronDown size={14} className="shrink-0 text-muted" />
-      </button>
+        {/* Outlet switcher */}
+        <button
+          type="button"
+          className="inline-flex min-w-0 max-lg:flex-1 items-center gap-2 rounded-lg border border-line bg-card px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-muted"
+          title={outletName}
+        >
+          <span className="max-w-40 truncate sm:max-w-56 lg:max-w-80">
+            {outletName}
+          </span>
+          <ChevronDown size={14} className="shrink-0 text-muted" />
+        </button>
 
-      <button
-        type="button"
-        onClick={() => navigate('/table-view')}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
-      >
-        <Plus size={16} strokeWidth={2.5} />
-        <span>New Order</span>
-      </button>
+        <button
+          type="button"
+          onClick={() => navigate('/table-view')}
+          className="inline-flex h-9 max-lg:shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
+        >
+          <Plus size={16} strokeWidth={2.5} />
+          <span>New Order</span>
+        </button>
+      </div>
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex items-center gap-1.5 max-lg:w-full max-lg:justify-end">
         <button
           type="button"
           onClick={onSupportClick}

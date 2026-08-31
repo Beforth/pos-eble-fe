@@ -40,7 +40,6 @@ import OnlineOrders from './pages/OnlineOrders'
 import DuePayments from './pages/due-payments/DuePayments'
 import DuePaymentClient from './pages/due-payments/DuePaymentClient'
 import ParcelMenu from './pages/ParcelMenu'
-import PlaceholderPage from './pages/PlaceholderPage'
 import Configuration from './pages/Configuration'
 import CurrentOrders from './pages/configuration/CurrentOrders'
 import Customers from './pages/customer-screen/Customers'
@@ -50,6 +49,7 @@ import TableView from './pages/TableView'
 import SwiggyMenu from './pages/SwiggyMenu'
 import SpecialNote from './pages/SpecialNote'
 import SetItemCommission from './pages/SetItemCommission'
+import MenuOnOff from './pages/MenuOnOff'
 import ScheduleChanges from './pages/ScheduleChanges'
 import ScheduleChannelMenu from './pages/ScheduleChannelMenu'
 import PhysicalMenu from './pages/PhysicalMenu'
@@ -1067,6 +1067,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <SpecialNote />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/menu/menu-on-off"
+            element={
+              <ProtectedRoute>
+                <MenuOnOff />
               </ProtectedRoute>
             }
           />

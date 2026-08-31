@@ -83,7 +83,7 @@ const GENERAL_TAGS = [
     hint: 'Used for the offline PoS billing only',
   },
   { id: 'ignore-addon', label: 'Ignore Addon', hint: 'Used only for zomato' },
-  { id: 'petpooja-recommended', label: 'Petpooja Recommended' },
+  { id: 'pos-eble-recommended', label: 'POS-Eble Recommended' },
   { id: 'set-as-combo', label: 'Set As Combo' },
   {
     id: 'mrp-item',

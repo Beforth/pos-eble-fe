@@ -266,11 +266,11 @@ const SAMPLE_MISSING_ROWS: ReconRow[] = [
 
 const TAB_INFO: Record<ReconTabId, string> = {
   missing:
-    "Displays orders that are missing by comparing Petpooja data with the third-party payout sheet. The 'Missing From' column indicates whether the order is absent in Petpooja or the payout sheet.",
+    "Displays orders that are missing by comparing POS-Eble data with the third-party payout sheet. The 'Missing From' column indicates whether the order is absent in POS-Eble or the payout sheet.",
   'status-mismatch':
-    'Identifies orders where the status differs between Petpooja and the third-party payout sheet, helping ensure accuracy in reconciliation.',
+    'Identifies orders where the status differs between POS-Eble and the third-party payout sheet, helping ensure accuracy in reconciliation.',
   variance:
-    'Highlights cells where values deviate between Petpooja and the payout sheet, ensuring discrepancies are easily spotted and corrected.',
+    'Highlights cells where values deviate between POS-Eble and the payout sheet, ensuring discrepancies are easily spotted and corrected.',
   rejected:
     'Shows reconciliation details for rejected or canceled orders in the payout sheet, including the order-level payout percentage.',
   final:
@@ -357,7 +357,7 @@ export default function OnlineOrderReconciliation() {
   }, [payoutPeriodId])
 
   const rows = useMemo(() => {
-    // Only Missing Orders has sample rows for now; other tabs match Petpooja empty states.
+    // Only Missing Orders has sample rows for now; other tabs match POS-Eble empty states.
     if (activeTab !== 'missing') return []
     if (platform === 'swiggy') {
       return SAMPLE_MISSING_ROWS.map((row) => ({

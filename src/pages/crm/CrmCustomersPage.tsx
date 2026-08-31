@@ -117,6 +117,19 @@ export default function CrmCustomersPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [fromWhereFilter, setFromWhereFilter] = useState('All')
+  const [toast, setToast] = useState<string | null>(null)
+
+  function showToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(null), 2200)
+  }
+
+  function clearFilters() {
+    setStartDate('')
+    setEndDate('')
+    setFromWhereFilter('All')
+    showToast('Filters cleared')
+  }
 
   const totalRecords = CUSTOMERS_DATA.length
 
@@ -408,13 +421,9 @@ export default function CrmCustomersPage() {
 
           <OutlineButton
             variant="gray"
-            onClick={() => {
-              setStartDate('')
-              setEndDate('')
-              setFromWhereFilter('All')
-            }}
+            onClick={clearFilters}
           >
-            Show All
+            Clear Filter
           </OutlineButton>
         </div>
 
@@ -538,6 +547,11 @@ export default function CrmCustomersPage() {
           <span>Data refreshed on page load</span>
         </div>
       </div>
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </ReportsPageShell>
   )
 }

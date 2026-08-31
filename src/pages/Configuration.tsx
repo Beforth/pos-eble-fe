@@ -214,11 +214,11 @@ export default function Configuration() {
             9099912483
           </a>
           <a
-            href="mailto:support@petpooja.com"
+            href="mailto:support@pos-eble.com"
             className="inline-flex items-center gap-1.5 hover:text-primary"
           >
             <Mail size={14} className="text-muted" />
-            support@petpooja.com
+            support@pos-eble.com
           </a>
         </div>
       </div>

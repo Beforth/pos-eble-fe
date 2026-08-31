@@ -278,7 +278,7 @@ export default function RecipeCostingReport() {
   return (
     <InventoryPageShell activeItem="other-reports">
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -328,9 +328,10 @@ export default function RecipeCostingReport() {
             setMenuName('All')
             setCalculateFrom('Latest average purchase price')
             setAppliedMenu('All')
+            showToast('Filters cleared')
           }}
         >
-          Show All
+          Clear Filter
         </OutlineButton>
       </div>
 

@@ -104,6 +104,7 @@ export default function Kot() {
   const [editKot, setEditKot] = useState<KotRow | null>(null)
   const [viewKot, setViewKot] = useState<KotRow | null>(null)
   const [detailsKot, setDetailsKot] = useState<KotRow | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   const closeOtherDrawers = () => {
     setSupportOpen(false)
@@ -160,6 +161,11 @@ export default function Kot() {
     window.setTimeout(() => setter(false), 400)
   }
 
+  function showToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(null), 2200)
+  }
+
   function handleSearch() {
     setApplied({ ...draft })
     setIgnoreDateFilter(false)
@@ -177,6 +183,7 @@ export default function Kot() {
     setPage(1)
     setMoreFilters(false)
     flash(setShowAllFlash)
+    showToast('Filters cleared')
   }
 
   return (
@@ -310,7 +317,7 @@ export default function Kot() {
                         : 'bg-white text-primary hover:bg-primary/5'
                     }`}
                   >
-                    Show All
+                    Clear Filter
                   </button>
                 </>
               )}
@@ -386,7 +393,7 @@ export default function Kot() {
                         : 'bg-white text-primary hover:bg-primary/5'
                     }`}
                   >
-                    Show All
+                    Clear Filter
                   </button>
                 </div>
               </>
@@ -458,12 +465,17 @@ export default function Kot() {
               <p className="text-base font-semibold text-ink">No Results Found</p>
               <p className="mt-1 text-sm text-muted">
                 We couldn&apos;t find a match for your search. Try adjusting
-                dates or click Show All.
+                dates or click Clear Filter.
               </p>
             </div>
           )}
         </main>
       </div>
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </div>
   )
 }

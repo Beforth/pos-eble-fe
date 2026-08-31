@@ -41,7 +41,7 @@ export function Table<T>({
               <th
                 key={column.key}
                 scope="col"
-                className={`whitespace-nowrap px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted ${alignClasses[column.align ?? 'left']}`}
+                className={`whitespace-nowrap px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted ${alignClasses[column.align ?? 'left']}`}
               >
                 {column.header}
               </th>

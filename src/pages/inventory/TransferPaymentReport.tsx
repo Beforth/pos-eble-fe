@@ -101,12 +101,13 @@ export default function TransferPaymentReport() {
     setTo('All')
     setFromDate('2026-08-04')
     setToDate('2026-08-11')
+    showToast('Filters cleared')
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -161,7 +162,7 @@ export default function TransferPaymentReport() {
         <PrimaryButton onClick={() => showToast('Search applied')}>
           Search
         </PrimaryButton>
-        <OutlineButton onClick={handleClear}>Clear</OutlineButton>
+        <OutlineButton onClick={handleClear}>Clear Filter</OutlineButton>
       </div>
 
       <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">

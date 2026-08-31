@@ -221,8 +221,12 @@ export default function AllOrders() {
     setGrandTotalOp('=')
     setGrandTotalValue('')
     setGstin('all')
+    setStartDate(atStartOfDay(new Date()))
+    setEndDate(atEndOfDay(new Date()))
+    setAdvanceDate(atStartOfDay(new Date()))
     setSearched(true)
     setPage(1)
+    showToast('Filters cleared')
   }
 
   const totalRecords = filteredOrders.length
@@ -351,7 +355,7 @@ export default function AllOrders() {
 
         <main className="px-4 py-4 sm:px-5">
           {toast ? (
-            <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
+            <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
               {toast}
             </div>
           ) : null}
@@ -598,7 +602,7 @@ export default function AllOrders() {
                         onClick={resetFilters}
                         className="h-9 rounded-lg border border-line px-4 text-sm font-medium text-ink hover:bg-page"
                       >
-                        Show All
+                        Clear Filter
                       </button>
                     </>
                   )}
@@ -693,7 +697,7 @@ export default function AllOrders() {
                         onClick={resetFilters}
                         className="h-9 rounded-lg border border-line px-4 text-sm font-medium text-ink hover:bg-page"
                       >
-                        Show All
+                        Clear Filter
                       </button>
                     </div>
                   </>

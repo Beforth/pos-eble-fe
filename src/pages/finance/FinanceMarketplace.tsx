@@ -18,7 +18,7 @@ const SERVICES: MarketplaceService[] = [
     logoLabel: 'ICICI Bank',
     logoTone: 'bg-accent/15 text-accent',
     description:
-      'ICICI Bank EDC devices come with smart Petpooja Payment and an EDC device. Collect payments directly from the billing screen with automatic order settlement.',
+      'ICICI Bank EDC devices come with smart POS-Eble Payment and an EDC device. Collect payments directly from the billing screen with automatic order settlement.',
   },
   {
     id: 'pine-labs',
@@ -26,7 +26,7 @@ const SERVICES: MarketplaceService[] = [
     logoLabel: 'Pine Labs',
     logoTone: 'bg-accent/15 text-accent',
     description:
-      'Pine Labs EDC machine integrates with Petpooja so you can collect card and UPI payments from the billing screen and settle orders automatically.',
+      'Pine Labs EDC machine integrates with POS-Eble so you can collect card and UPI payments from the billing screen and settle orders automatically.',
   },
   {
     id: 'bharatpe',
@@ -34,7 +34,7 @@ const SERVICES: MarketplaceService[] = [
     logoLabel: 'BharatPe',
     logoTone: 'bg-success/10 text-success',
     description:
-      'BharatPe EDC devices come with smart Petpooja Payment and an EDC device. This combo lets you collect payments from all modes on a single terminal.',
+      'BharatPe EDC devices come with smart POS-Eble Payment and an EDC device. This combo lets you collect payments from all modes on a single terminal.',
   },
   {
     id: 'mosambee',
@@ -42,7 +42,7 @@ const SERVICES: MarketplaceService[] = [
     logoLabel: 'Mosambee',
     logoTone: 'bg-primary/10 text-primary',
     description:
-      'Mosambee EDC devices come with smart Petpooja Payment and an EDC device. Collect payments from all modes on a single terminal with automatic settlement.',
+      'Mosambee EDC devices come with smart POS-Eble Payment and an EDC device. Collect payments from all modes on a single terminal with automatic settlement.',
   },
   {
     id: 'razorpay',
@@ -50,7 +50,7 @@ const SERVICES: MarketplaceService[] = [
     logoLabel: 'Razorpay',
     logoTone: 'bg-deep/10 text-deep',
     description:
-      'Razorpay EDC devices come with a smart Petpooja Payment and an EDC device. This smart combo allows you to collect payments from all modes on a single terminal.',
+      'Razorpay EDC devices come with a smart POS-Eble Payment and an EDC device. This smart combo allows you to collect payments from all modes on a single terminal.',
   },
   {
     id: 'paytm',
@@ -58,7 +58,7 @@ const SERVICES: MarketplaceService[] = [
     logoLabel: 'Paytm',
     logoTone: 'bg-accent/15 text-accent',
     description:
-      'Paytm EDC devices come with a smart Petpooja Payment and an EDC device. This smart combo allows you to collect payments from all modes on a single terminal.',
+      'Paytm EDC devices come with a smart POS-Eble Payment and an EDC device. This smart combo allows you to collect payments from all modes on a single terminal.',
   },
 ]
 
@@ -146,7 +146,7 @@ export default function FinanceMarketplace() {
             </p>
             <p className="mt-3 text-sm text-ink">
               Integrate this EDC with your billing screen to accept card and UPI
-              payments and settle orders automatically in Petpooja Finance.
+              payments and settle orders automatically in POS-Eble Finance.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <OutlineButton variant="gray" onClick={() => setDetailsId(null)}>
