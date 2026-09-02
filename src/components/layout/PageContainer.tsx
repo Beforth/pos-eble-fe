@@ -41,7 +41,7 @@ export function PageContainer({
 
   return (
     <main className={`px-4 py-4 sm:px-5 ${className}`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink sm:text-xl">{title}</h1>
 
         <div className="flex flex-wrap items-center gap-2">

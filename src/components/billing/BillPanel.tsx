@@ -338,7 +338,7 @@ export function BillPanel({
   }
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[380px] lg:border-l lg:border-t-0 xl:w-[420px]">
+    <aside className="flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[440px] lg:border-l lg:border-t-0 xl:w-[480px]">
       {historyNotice ? (
         <div className="fixed bottom-5 right-5 z-[80] rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {historyNotice}
@@ -1148,7 +1148,7 @@ export function BillPanel({
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
             {PAYMENTS.map((method) => (
               <label
                 key={method.id}
@@ -1190,7 +1190,7 @@ export function BillPanel({
             </p>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
               <input
                 type="checkbox"
@@ -1220,12 +1220,12 @@ export function BillPanel({
             </label>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
             {(
               [
                 { id: 'Save', label: 'Save' },
                 { id: 'Save & Print', label: 'Save & Print' },
-                { id: 'Save & eBill', label: 'Save & eBill' },
+                // { id: 'Save & eBill', label: 'Save & eBill' },
                 { id: 'KOT', label: 'KOT' },
                 { id: 'KOT & Print', label: 'KOT & Print' },
                 { id: 'Draft', label: 'Draft', icon: true },
@@ -1240,7 +1240,7 @@ export function BillPanel({
                     : action.label
                 }
                 onClick={() => onAction(action.id)}
-                className={`inline-flex h-10 items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-semibold leading-tight sm:text-xs ${
+                className={`inline-flex h-10 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[11px] font-semibold leading-tight sm:text-xs ${
                   action.id === 'Draft'
                     ? 'border border-primary bg-card text-primary hover:bg-primary/5'
                     : 'bg-primary text-white hover:bg-primary-hover'

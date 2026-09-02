@@ -26,17 +26,18 @@ export function CategoryRail({
                   type="button"
                   aria-current={active ? 'page' : undefined}
                   onClick={() => onSelect(cat.id)}
-                  className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
-                    cat.id === 'favorites'
-                      ? active
-                        ? 'bg-success/20 font-semibold text-success'
-                        : 'bg-success/10 font-medium text-success hover:bg-success/15'
-                      : active
-                        ? 'bg-primary/10 font-semibold text-primary'
-                        : 'text-ink hover:bg-page'
+                  className={`group relative w-full overflow-hidden rounded-lg px-3 py-2.5 text-left text-sm transition-all duration-300 ease-out will-change-transform focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                    active
+                      ? 'bg-primary/10 font-semibold text-primary shadow-[0_4px_14px_rgba(255,9,23,0.12)] before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-r before:bg-primary'
+                      : cat.id === 'favorites'
+                        ? 'bg-primary/5 font-medium text-primary hover:translate-x-1 hover:scale-[1.02] hover:bg-primary/10 hover:shadow-[0_4px_14px_rgba(255,9,23,0.12)]'
+                        : 'text-ink hover:translate-x-1 hover:scale-[1.02] hover:bg-page hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
                   }`}
                 >
-                  <span className="line-clamp-2 leading-snug">{cat.name}</span>
+                  <span className="category-rail-shine" aria-hidden />
+                  <span className="relative line-clamp-2 leading-snug transition-transform duration-300 group-hover:translate-x-0.5">
+                    {cat.name}
+                  </span>
                 </button>
               </li>
             )

@@ -459,7 +459,7 @@ export default function CaptainOrders() {
   }
 
   function newOrder() {
-    navigate('/table-view')
+    navigate('/table-view?from=captain')
   }
 
   const tableKotTickets = useMemo(
@@ -1067,7 +1067,7 @@ export default function CaptainOrders() {
                           active
                             ? 'bg-primary text-white'
                             : cat.id === 'favorites'
-                              ? 'bg-success/15 text-success'
+                              ? 'bg-primary/10 text-primary'
                               : 'bg-page text-ink hover:bg-page/80'
                         }`}
                       >
@@ -1131,7 +1131,7 @@ export default function CaptainOrders() {
         </div>
 
         <div
-          className={`min-h-0 w-full shrink-0 flex-col overflow-hidden lg:flex lg:w-[380px] xl:w-[420px] ${
+          className={`min-h-0 w-full shrink-0 flex-col overflow-hidden lg:flex lg:w-[440px] xl:w-[480px] ${
             mobilePane === 'bill' ? 'flex flex-1' : 'hidden'
           }`}
         >

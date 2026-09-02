@@ -27,9 +27,9 @@ export function CategoryRail({
                     onClick={() => onSelect(cat.id)}
                     className={`h-8 whitespace-nowrap rounded-full px-3 text-xs font-semibold transition-colors ${
                       active
-                        ? 'bg-ink text-white shadow-sm'
+                        ? 'bg-primary text-white shadow-sm'
                         : cat.id === 'favorites'
-                          ? 'bg-success/10 text-success hover:bg-success/20'
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
                           : 'bg-page text-ink hover:bg-line'
                     }`}
                   >
@@ -64,12 +64,12 @@ export function CategoryRail({
                     onClick={() => onSelect(cat.id)}
                     className={`group relative w-full overflow-hidden rounded-lg px-3 py-2.5 text-left text-sm transition-all duration-300 ease-out will-change-transform ${
                       active
-                        ? 'translate-x-1 scale-[1.02] bg-page font-semibold text-ink shadow-[0_4px_14px_rgba(0,0,0,0.06)] before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-r before:bg-ink before:transition-all before:duration-300'
+                        ? 'translate-x-1 scale-[1.02] bg-primary/10 font-semibold text-primary shadow-[0_4px_14px_rgba(255,9,23,0.12)] before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-r before:bg-primary before:transition-all before:duration-300'
                         : cat.id === 'favorites'
-                          ? 'bg-success/10 font-medium text-success hover:translate-x-1 hover:scale-[1.02] hover:bg-success/20 hover:shadow-[0_4px_14px_rgba(22,163,74,0.12)]'
-                          : cat.id === 'all-categories'
-                            ? 'bg-page/70 font-medium text-ink hover:translate-x-1 hover:scale-[1.02] hover:bg-page hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
-                            : 'text-ink hover:translate-x-1 hover:scale-[1.02] hover:bg-page hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
+                          ? 'bg-primary/5 font-medium text-primary hover:translate-x-1 hover:scale-[1.02] hover:bg-primary/10 hover:shadow-[0_4px_14px_rgba(255,9,23,0.12)]'
+                        : cat.id === 'all-categories'
+                          ? 'font-medium text-ink hover:translate-x-1 hover:scale-[1.02] hover:bg-page hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
+                          : 'text-ink hover:translate-x-1 hover:scale-[1.02] hover:bg-page hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)]'
                     }`}
                   >
                     <span className="category-rail-shine" aria-hidden />

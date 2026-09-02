@@ -24,6 +24,10 @@ import BackwardTaxPrintingSettings from './pages/BackwardTaxPrintingSettings'
 import BaseMenu from './pages/BaseMenu'
 import Billing from './pages/billing/Billing'
 import CaptainOrders from './pages/captainorders/CaptainOrders'
+import CaptainOrdersLiveOrders from './pages/captainorders/CaptainOrdersLiveOrders'
+import CaptainOrdersAllOrders from './pages/captainorders/CaptainOrdersAllOrders'
+import CaptainOrdersKot from './pages/captainorders/CaptainOrdersKot'
+import CaptainOrdersDayEnd from './pages/captainorders/CaptainOrdersDayEnd'
 import CategoryManagement from './pages/CategoryManagement'
 import DineInMenu from './pages/DineInMenu'
 import DiscountsManagement from './pages/DiscountsManagement'
@@ -544,6 +548,38 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <CaptainOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/captain-orders/live-orders"
+            element={
+              <ProtectedRoute>
+                <CaptainOrdersLiveOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/captain-orders/all-orders"
+            element={
+              <ProtectedRoute>
+                <CaptainOrdersAllOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/captain-orders/kot"
+            element={
+              <ProtectedRoute>
+                <CaptainOrdersKot />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/captain-orders/day-end"
+            element={
+              <ProtectedRoute>
+                <CaptainOrdersDayEnd />
               </ProtectedRoute>
             }
           />

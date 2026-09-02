@@ -84,7 +84,7 @@ function NestedNavList({
                 }
                 onClick(child.id)
               }}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${paddingLeft} ${
+              className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${paddingLeft} ${
                 childActive
                   ? 'bg-primary/10 font-semibold text-primary'
                   : 'text-ink hover:bg-page'
@@ -156,7 +156,7 @@ export function SidebarNavItem({
     onClick(item.id)
   }
 
-  const className = `group flex w-full items-center gap-2.5 rounded-lg text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+  const className = `group flex w-full cursor-pointer items-center gap-2.5 rounded-lg text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
     collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'
   } ${nested && !collapsed ? 'pl-3' : ''} ${
     active

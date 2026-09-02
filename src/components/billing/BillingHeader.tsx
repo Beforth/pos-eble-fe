@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Bell,
   BookOpen,
@@ -32,12 +32,12 @@ import {
 import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
 
 const SIDEBAR_LINKS = [
-  { to: '/billing', label: 'Billing', icon: UtensilsCrossed, active: true },
-  { to: '/billing/live-orders', label: 'Live Orders', icon: Monitor, active: false },
-  { to: '/billing/all-orders', label: 'All Orders', icon: BookOpen, active: false },
-  { to: '/billing/kot', label: 'KOT', icon: ChefHat, active: false },
-  { to: '/billing/day-end', label: 'Day End', icon: Sun, active: false },
-  { to: '/logs', label: 'Logs', icon: ScrollText, active: false },
+  { to: '/billing', label: 'Billing', icon: UtensilsCrossed },
+  { to: '/billing/live-orders', label: 'Live Orders', icon: Monitor },
+  { to: '/billing/all-orders', label: 'All Orders', icon: BookOpen },
+  { to: '/billing/kot', label: 'KOT', icon: ChefHat },
+  { to: '/billing/day-end', label: 'Day End', icon: Sun },
+  { to: '/logs', label: 'Logs', icon: ScrollText },
 ] as const
 
 interface BillingHeaderProps {
@@ -54,6 +54,7 @@ export function BillingHeader({
   onViewKot,
 }: BillingHeaderProps) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const { logout, user } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -326,22 +327,34 @@ export function BillingHeader({
             </div>
             <nav className="flex-1 overflow-y-auto p-2">
               <ul className="space-y-0.5">
-                {SIDEBAR_LINKS.map(({ to, label, icon: Icon, active }) => (
-                  <li key={to}>
-                    <Link
-                      to={to}
-                      onClick={closeDrawer}
-                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
-                        active
-                          ? 'bg-primary/10 text-primary font-semibold'
-                          : 'text-ink hover:bg-page'
-                      }`}
-                    >
-                      <Icon size={18} className={active ? 'text-primary' : 'text-muted'} />
-                      {label}
-                    </Link>
-                  </li>
-                ))}
+                {SIDEBAR_LINKS.map(({ to, label, icon: Icon }) => {
+                  const active =
+                    to === '/billing'
+                      ? pathname === '/billing'
+                      : pathname.startsWith(to)
+                  return (
+                    <li key={to}>
+                      <Link
+                        to={to}
+                        onClick={closeDrawer}
+                        aria-current={active ? 'page' : undefined}
+                        className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                          active
+                            ? 'bg-primary/10 text-primary font-semibold'
+                            : 'text-ink hover:bg-page'
+                        }`}
+                      >
+                        <Icon
+                          size={18}
+                          className={
+                            active ? 'text-primary' : 'text-muted'
+                          }
+                        />
+                        {label}
+                      </Link>
+                    </li>
+                  )
+                })}
 
                 <li className="my-2 border-t border-line" />
 

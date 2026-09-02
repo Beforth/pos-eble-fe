@@ -120,7 +120,7 @@ export function MenuSidebar({
                 type="button"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
-                className="rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
+                className="cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
               >
                 <X size={18} />
               </button>
@@ -135,7 +135,7 @@ export function MenuSidebar({
             type="button"
             onClick={onToggleCollapse}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="m-1.5 rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
+            className="m-1.5 cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             {collapsed ? (
               <ChevronsRight size={16} />
@@ -158,7 +158,7 @@ export function MenuSidebar({
                     title={collapsed ? item.label : undefined}
                     aria-current={active ? 'page' : undefined}
                     onClick={() => handleNavigate(item.id)}
-                    className={`relative flex w-full items-center gap-2.5 text-sm transition-colors ${
+                    className={`relative flex w-full cursor-pointer items-center gap-2.5 text-sm transition-colors ${
                       collapsed
                         ? 'justify-center px-0 py-2.5'
                         : 'px-4 py-2.5 text-left'

@@ -130,7 +130,7 @@ export function AllOrdersTable({
     {
       key: 'myAmount',
       header: 'My Amount (₹)',
-      align: 'right',
+      align: 'center',
       render: (row) => (
         <span className="whitespace-nowrap tabular-nums">{formatINR(row.myAmount, 2)}</span>
       ),
@@ -138,7 +138,7 @@ export function AllOrdersTable({
     {
       key: 'tax',
       header: 'Tax (₹)',
-      align: 'right',
+      align: 'center',
       render: (row) => (
         <span className="whitespace-nowrap tabular-nums">{formatINR(row.tax, 2)}</span>
       ),
@@ -146,7 +146,7 @@ export function AllOrdersTable({
     {
       key: 'discount',
       header: 'Discount (₹)',
-      align: 'right',
+      align: 'center',
       render: (row) => (
         <span className="whitespace-nowrap tabular-nums">{formatINR(row.discount, 2)}</span>
       ),
@@ -154,7 +154,7 @@ export function AllOrdersTable({
     {
       key: 'grandTotal',
       header: 'Grand Total [Round Off] (₹)',
-      align: 'right',
+      align: 'center',
       render: (row) => (
         <span className="whitespace-nowrap font-semibold tabular-nums">
           {formatINR(row.grandTotal, 2)}

@@ -361,6 +361,7 @@ const ROUTES: Record<string, string> = {
   'due-payments': '/due-payments',
   'menu-discounts': '/menu',
   'menu-images-upload': '/menu/multi-item-images',
+  'menu-on-off': '/menu/menu-on-off',
   inventory: '/inventory',
   marketing: '/marketing',
   finance: '/finance',
@@ -588,7 +589,7 @@ export function Sidebar({
             type="button"
             onClick={onToggleCollapse}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="m-2 rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
+            className="m-2 cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             {collapsed ? (
               <ChevronsRight size={16} />
@@ -678,7 +679,7 @@ export function Sidebar({
             type="button"
             onClick={() => handleNavigate('logout')}
             title={collapsed ? 'Logout' : undefined}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-muted transition-colors hover:bg-page hover:text-ink ${
+            className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-muted transition-colors hover:bg-page hover:text-ink ${
               collapsed ? 'justify-center px-0' : ''
             }`}
           >

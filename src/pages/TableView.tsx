@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, Plus, RefreshCw } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
 import {
@@ -20,6 +20,7 @@ const AREA_ORDER = ['Ground Floor', 'BASEMENT', 'Party Hall'] as const
 
 export default function TableView() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [billNo, setBillNo] = useState('')
   const [moveKot, setMoveKot] = useState(false)
   const [statuses, setStatuses] = useState<Record<string, TableFloorStatus>>(
@@ -73,9 +74,12 @@ export default function TableView() {
   }
 
   function openTable(tableId: string, tableNo: string, persons: number) {
-    navigate(
-      `/billing?tableId=${encodeURIComponent(tableId)}&tableNo=${encodeURIComponent(tableNo)}&persons=${persons}`,
-    )
+    const query = `tableId=${encodeURIComponent(tableId)}&tableNo=${encodeURIComponent(tableNo)}&persons=${persons}`
+    if (searchParams.get('from') === 'captain') {
+      navigate(`/captain-orders?${query}`)
+      return
+    }
+    navigate(`/billing?${query}`)
   }
 
   function viewTable(tableId: string, tableNo: string, persons: number) {

@@ -236,6 +236,7 @@ export default function BaseMenu({
     <MenuPageShell
       backTo={isSchedule ? '/menu/schedule-changes' : '/menu/all-in-one'}
       activeItem={isSchedule ? 'schedule-changes' : 'menu-discounts'}
+      fillViewport
       title={
         <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
           <Link to="/menu" className="text-primary hover:underline">
@@ -268,16 +269,18 @@ export default function BaseMenu({
         </span>
       }
     >
-      <MenuSectionNav activeTab="items" />
+      <div className="shrink-0 [&>div]:mb-2 [&>div]:h-11">
+        <MenuSectionNav activeTab="items" />
+      </div>
 
       {isSchedule ? (
-        <div className="mb-3 rounded-lg border border-secondary/50 bg-secondary/25 px-4 py-2.5 text-sm text-deep">
+        <div className="mb-3 shrink-0 rounded-lg border border-secondary/50 bg-secondary/25 px-4 py-2.5 text-sm text-deep">
           You can make updates to your restaurant&apos;s menu anytime and have
           them go live on the exact date and time you desire.
         </div>
       ) : null}
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
         <label className="relative min-w-[180px] flex-1">
           <Search
             size={14}
@@ -393,53 +396,70 @@ export default function BaseMenu({
         </button>
       </div>
 
-      <div className="flex overflow-hidden rounded-lg border border-line bg-card">
-        <aside className="flex h-[calc(100vh-240px)] min-h-[360px] w-56 shrink-0 flex-col border-r border-line bg-page/40">
-          <label className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2.5 text-xs text-ink">
-            Hide empty categories
-            <button
-              type="button"
-              role="switch"
-              aria-checked={hideEmpty}
-              onClick={() => setHideEmpty((prev) => !prev)}
-              className={`relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full transition-colors ${
-                hideEmpty ? 'bg-primary' : 'bg-line'
-              }`}
-            >
-              <span
-                className={`inline-block size-3.5 rounded-full bg-card transition-transform ${
-                  hideEmpty ? 'translate-x-4' : 'translate-x-1'
+      <div className="flex min-h-0 flex-1 flex-col">
+      <div
+        className={`menu-panel-viewport-fill is-channel-menu min-h-0 flex-1${isSchedule ? ' has-schedule-banner' : ''}`}
+      >
+        <div className="menu-panel-shell">
+          <aside className="menu-panel-categories hidden md:flex">
+            <label className="menu-panel-categories-header flex items-center justify-between gap-2 normal-case tracking-normal">
+              <span className="text-xs text-ink">Hide empty categories</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={hideEmpty}
+                onClick={() => setHideEmpty((prev) => !prev)}
+                className={`relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full transition-colors ${
+                  hideEmpty ? 'bg-primary' : 'bg-line'
                 }`}
-              />
-            </button>
-          </label>
-          <ul className="min-h-0 flex-1 overflow-y-auto py-2">
-            {categories.map((category) => {
-              const active = category.id === categoryId
-              return (
-                <li key={category.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCategoryId(category.id)
-                      setSelected(new Set())
-                    }}
-                    className={`flex w-full cursor-pointer px-4 py-2.5 text-left text-sm transition-colors ${
-                      active
-                        ? 'bg-primary/10 font-semibold text-primary'
-                        : 'text-ink hover:bg-page'
-                    }`}
-                  >
-                    {category.name}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </aside>
+              >
+                <span
+                  className={`inline-block size-3.5 rounded-full bg-card transition-transform ${
+                    hideEmpty ? 'translate-x-4' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </label>
+            <ul className="menu-panel-categories-list space-y-0.5">
+              {categories.map((category) => {
+                const active = category.id === categoryId
+                return (
+                  <li key={category.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategoryId(category.id)
+                        setSelected(new Set())
+                      }}
+                      className={`menu-panel-category-btn cursor-pointer ${active ? 'is-active' : ''}`}
+                    >
+                      {category.name}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="min-w-0">
+          <div className="menu-panel-main">
+            <div className="menu-panel-main-header border-b border-line bg-page/80 px-3 py-2 md:hidden">
+              <select
+                value={categoryId}
+                onChange={(event) => {
+                  setCategoryId(event.target.value)
+                  setSelected(new Set())
+                }}
+                className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+              >
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="menu-panel-items-scroll">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-line bg-page text-sm font-semibold text-ink">
                 <tr>
@@ -707,10 +727,10 @@ export default function BaseMenu({
                 )}
               </tbody>
             </table>
-          </div>
+            </div>
 
           {totalRecords > 0 ? (
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-page/80 px-3 py-2.5">
+            <div className="menu-panel-main-footer flex flex-wrap items-center justify-between gap-3 border-t border-line bg-page/80 px-3 py-2.5">
               <p className="text-sm text-muted">
                 Showing {(page - 1) * PAGE_SIZE + 1} to{' '}
                 {Math.min(page * PAGE_SIZE, totalRecords)} of {totalRecords}{' '}
@@ -758,7 +778,9 @@ export default function BaseMenu({
               </div>
             </div>
           ) : null}
+          </div>
         </div>
+      </div>
       </div>
 
       <SelectRecordAlert
