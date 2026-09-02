@@ -83,13 +83,24 @@ export default function TableView() {
   }
 
   function viewTable(tableId: string, tableNo: string, persons: number) {
-    navigate(
-      `/billing?tableId=${encodeURIComponent(tableId)}&tableNo=${encodeURIComponent(tableNo)}&persons=${persons}&view=1`,
-    )
+    const query = `tableId=${encodeURIComponent(tableId)}&tableNo=${encodeURIComponent(tableNo)}&persons=${persons}&view=1`
+    if (searchParams.get('from') === 'captain') {
+      navigate(`/captain-orders?${query}`)
+      return
+    }
+    navigate(`/billing?${query}`)
   }
 
   function openOrderType(type: 'delivery' | 'pick-up') {
     navigate(`/billing?orderType=${type}`)
+  }
+
+  function openNoTable() {
+    if (searchParams.get('from') === 'captain') {
+      navigate('/captain-orders')
+      return
+    }
+    navigate('/billing')
   }
 
   return (
@@ -183,6 +194,21 @@ export default function TableView() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="mb-6">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-primary">
+            Quick Orders
+          </h2>
+          <button
+            type="button"
+            title="Start order without a table"
+            onClick={openNoTable}
+            className="flex size-[72px] flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-[#bdbdbd] bg-[#e8e8e8] text-ink transition hover:brightness-95 sm:size-20"
+          >
+            <span className="text-xs font-bold">No Table</span>
+            <span className="text-[10px] text-muted">Walk-in</span>
+          </button>
         </div>
 
         <div className="space-y-6">
