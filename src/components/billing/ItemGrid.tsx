@@ -100,7 +100,7 @@ export function ItemGrid({
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-page">
       {/* Search / filter bar — stacks on phone, row on tablet+ */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-card px-3 py-2.5">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-card px-3 py-3 sm:py-2.5">
         {/* Category select — hidden on phone (CategoryRail strip handles it), shown md+ */}
         <select
           value={categoryFilter}
@@ -114,7 +114,7 @@ export function ItemGrid({
             </option>
           ))}
         </select>
-        <div className="flex min-w-[260px] flex-1 items-center gap-2">
+        <div className="flex w-full min-w-0 flex-1 flex-col gap-2.5 sm:min-w-[260px] sm:flex-row sm:items-center sm:gap-2">
           <input
             type="search"
             value={search}
@@ -126,7 +126,7 @@ export function ItemGrid({
               }
             }}
             placeholder="Search item (Enter to add)"
-            className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-card px-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+            className="box-border h-12 min-h-12 w-full min-w-0 appearance-none rounded-lg border border-line bg-card px-3 py-3 text-base leading-normal text-ink outline-none placeholder:text-muted focus:border-primary sm:h-9 sm:min-h-9 sm:flex-1 sm:py-0 sm:text-sm"
           />
           <input
             type="search"
@@ -139,7 +139,7 @@ export function ItemGrid({
               }
             }}
             placeholder="Short Code (Enter)"
-            className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-card px-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+            className="box-border h-12 min-h-12 w-full min-w-0 appearance-none rounded-lg border border-line bg-card px-3 py-3 text-base leading-normal text-ink outline-none placeholder:text-muted focus:border-primary sm:h-9 sm:min-h-9 sm:flex-1 sm:py-0 sm:text-sm"
           />
         </div>
       </div>

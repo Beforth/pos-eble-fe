@@ -1,3 +1,9 @@
 /* Tailwind v4 entry. All brand tokens live in theme/theme.css via @theme. */
 @import 'tailwindcss';
 @import './theme/theme.css';
+
+/* Prevent WebKit from collapsing search inputs on mobile */
+input[type='search'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
