@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react'
 import {
-  Calculator,
   ChefHat,
   Info,
   Link2,
@@ -12,7 +11,6 @@ import {
   Shield,
   ShoppingBag,
   Smartphone,
-  TableProperties,
   Trash2,
   Zap,
 } from 'lucide-react'
@@ -104,7 +102,7 @@ const TIME_TO_OPTIONS = ['24:00', '09:30', '12:00', '18:00']
 
 export default function MarketplaceSettingPage() {
   const [activeTab, setActiveTab] = useState<
-    'pos-subscription' | 'online-orders' | 'tally-integration'
+    'pos-subscription' | 'online-orders'
   >('online-orders')
 
   // Online Orders Platform Tab State
@@ -208,13 +206,12 @@ export default function MarketplaceSettingPage() {
   }> = [
     { id: 'pos-subscription', label: 'POS Subscription', icon: <Smartphone size={16} /> },
     { id: 'online-orders', label: 'Online Orders Integration', icon: <ShoppingBag size={16} /> },
-    { id: 'tally-integration', label: 'Tally Integration', icon: <Calculator size={16} /> },
   ]
 
   return (
     <ReportsPageShell
       title="Marketplace Settings"
-      activeItem="explore-products-marketplace-setting"
+      activeItem="mgmt-marketplace-setting"
     >
       {toast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
@@ -893,39 +890,6 @@ export default function MarketplaceSettingPage() {
             </>
           ) : null}
 
-          {/* TALLY INTEGRATION TAB */}
-          {activeTab === 'tally-integration' ? (
-            <ConfigSectionCard
-              icon={<TableProperties size={16} />}
-              title="Active Plan"
-              description="Your current Tally integration plan."
-            >
-              <div className="overflow-hidden rounded-xl border border-line">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-line bg-primary/5 text-xs font-semibold text-ink">
-                    <tr>
-                      <th className="w-24 px-4 py-3 font-semibold">Sr No.</th>
-                      <th className="px-4 py-3 font-semibold">Plan</th>
-                      <th className="px-4 py-3 font-semibold">Range</th>
-                      <th className="px-4 py-3 font-semibold">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line bg-card">
-                    <tr>
-                      <td className="px-4 py-3 font-semibold text-ink">1</td>
-                      <td className="px-4 py-3 font-semibold text-ink">
-                        Custom plan
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-ink">
-                        16 Mar 2024 To 4 Aug 2024
-                      </td>
-                      <td className="px-4 py-3 text-ink"></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </ConfigSectionCard>
-          ) : null}
         </div>
       </div>
     </ReportsPageShell>

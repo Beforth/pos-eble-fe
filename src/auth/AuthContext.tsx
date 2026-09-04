@@ -14,12 +14,19 @@ import {
 } from '../services/authService'
 
 const TOKEN_KEY = 'rajubhai.auth.token'
+const REFRESH_KEY = 'rajubhai.auth.refresh'
 const USER_KEY = 'rajubhai.auth.user'
+const PERMISSIONS_KEY = 'rajubhai.auth.permissions'
+const OUTLET_KEY = 'rajubhai.auth.outletId'
 
 interface AuthContextValue {
   token: string | null
+  refresh: string | null
   user: AuthUser | null
+  permissions: string[]
+  outletId: number | null
   isAuthenticated: boolean
+  hasPermission: (codename: string) => boolean
   login: (credentials: LoginCredentials) => Promise<void>
   logout: () => void
   updateProfile: (patch: Partial<AuthUser>) => void
@@ -36,25 +43,70 @@ function readStoredUser(): AuthUser | null {
   }
 }
 
+function readStoredPermissions(): string[] {
+  try {
+    const raw = localStorage.getItem(PERMISSIONS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+function readStoredOutletId(): number | null {
+  const raw = localStorage.getItem(OUTLET_KEY)
+  if (!raw) return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+function clearAuthStorage() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(REFRESH_KEY)
+  localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(PERMISSIONS_KEY)
+  localStorage.removeItem(OUTLET_KEY)
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem(TOKEN_KEY),
   )
+  const [refresh, setRefresh] = useState<string | null>(() =>
+    localStorage.getItem(REFRESH_KEY),
+  )
   const [user, setUser] = useState<AuthUser | null>(readStoredUser)
+  const [permissions, setPermissions] = useState<string[]>(readStoredPermissions)
+  const [outletId, setOutletId] = useState<number | null>(readStoredOutletId)
 
   const login = useCallback(async (credentials: LoginCredentials) => {
     const result = await loginApi(credentials)
     localStorage.setItem(TOKEN_KEY, result.token)
+    localStorage.setItem(REFRESH_KEY, result.refresh)
     localStorage.setItem(USER_KEY, JSON.stringify(result.user))
+    localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(result.permissions))
+    if (result.outletId != null) {
+      localStorage.setItem(OUTLET_KEY, String(result.outletId))
+    } else {
+      localStorage.removeItem(OUTLET_KEY)
+    }
     setToken(result.token)
+    setRefresh(result.refresh)
     setUser(result.user)
+    setPermissions(result.permissions)
+    setOutletId(result.outletId)
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
+    clearAuthStorage()
     setToken(null)
+    setRefresh(null)
     setUser(null)
+    setPermissions([])
+    setOutletId(null)
   }, [])
 
   const updateProfile = useCallback((patch: Partial<AuthUser>) => {
@@ -66,16 +118,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const hasPermission = useCallback(
+    (codename: string) => permissions.includes(codename),
+    [permissions],
+  )
+
   const value = useMemo<AuthContextValue>(
     () => ({
       token,
+      refresh,
       user,
+      permissions,
+      outletId,
       isAuthenticated: Boolean(token),
+      hasPermission,
       login,
       logout,
       updateProfile,
     }),
-    [token, user, login, logout, updateProfile],
+    [
+      token,
+      refresh,
+      user,
+      permissions,
+      outletId,
+      hasPermission,
+      login,
+      logout,
+      updateProfile,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

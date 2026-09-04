@@ -39,6 +39,7 @@ const CARD_ROUTES: Record<string, string> = {
     '/management/configuration/outlet/online-advance',
   'billing-system': '/management/configuration/outlet/billing-system',
   'sms-configuration': '/management/configuration/outlet/sms',
+  documents: '/management/configuration/outlet/documents',
 }
 
 interface ConfigCard {
@@ -101,6 +102,13 @@ const SECTIONS: ConfigSection[] = [
         description: 'Create your own floor plan using tables.',
         icon: <LayoutGrid size={18} />,
         tone: 'bg-primary/10 text-primary',
+      },
+      {
+        id: 'documents',
+        title: 'Documents',
+        description: 'Upload business & license documents for your outlet.',
+        icon: <FileText size={18} />,
+        tone: 'bg-deep/10 text-deep',
       },
     ],
   },

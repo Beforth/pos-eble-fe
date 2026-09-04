@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useSyncExternalStore, useState } from 'react'
 import { Pencil, Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/common/Badge'
@@ -8,73 +8,13 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
-
-export interface SubOrderTypeRow {
-  id: string
-  name: string
-  type: 'Default Order Type' | 'Third Party Integration' | 'Manual'
-  orderTypes: string
-  active: boolean
-  created: string
-  editable: boolean
-}
-
-const INITIAL_ROWS: SubOrderTypeRow[] = [
-  {
-    id: 'sot-1',
-    name: 'PARCEL',
-    type: 'Default Order Type',
-    orderTypes: 'PARCEL',
-    active: true,
-    created: '28 Jul 2023',
-    editable: false,
-  },
-  {
-    id: 'sot-2',
-    name: 'DINE IN',
-    type: 'Default Order Type',
-    orderTypes: 'DINE IN',
-    active: true,
-    created: '28 Jul 2023',
-    editable: false,
-  },
-  {
-    id: 'sot-3',
-    name: 'Zomato',
-    type: 'Third Party Integration',
-    orderTypes: 'PARCEL, DINE IN',
-    active: true,
-    created: '9 Oct 2023',
-    editable: false,
-  },
-  {
-    id: 'sot-4',
-    name: 'Swiggy',
-    type: 'Third Party Integration',
-    orderTypes: 'PARCEL, DINE IN',
-    active: true,
-    created: '9 Oct 2023',
-    editable: false,
-  },
-  {
-    id: 'sot-5',
-    name: 'Home Website',
-    type: 'Third Party Integration',
-    orderTypes: 'PARCEL, DINE IN',
-    active: true,
-    created: '21 Mar 2024',
-    editable: false,
-  },
-  {
-    id: 'sot-6',
-    name: 'Parcel',
-    type: 'Manual',
-    orderTypes: 'Dine In',
-    active: true,
-    created: '16 Jan 2025',
-    editable: true,
-  },
-]
+import {
+  deleteRows,
+  getRows,
+  setRowsActive,
+  subscribe,
+  type SubOrderTypeRow,
+} from './subOrderTypeStore'
 
 export default function SubOrderType() {
   const navigate = useNavigate()
@@ -84,7 +24,7 @@ export default function SubOrderType() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
     'all',
   )
-  const [rows, setRows] = useState<SubOrderTypeRow[]>(INITIAL_ROWS)
+  const rows: SubOrderTypeRow[] = useSyncExternalStore(subscribe, getRows)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const filtered = useMemo(() => {
@@ -139,11 +79,7 @@ export default function SubOrderType() {
       showToast('Please select at least one record')
       return
     }
-    setRows((prev) =>
-      prev.map((row) =>
-        selectedIds.has(row.id) ? { ...row, active } : row,
-      ),
-    )
+    setRowsActive(Array.from(selectedIds), active)
     setSelectedIds(new Set())
     showToast(active ? 'Marked as Active' : 'Marked as Inactive')
   }
@@ -163,7 +99,7 @@ export default function SubOrderType() {
     }
 
     const removableIds = new Set(removable.map((row) => row.id))
-    setRows((prev) => prev.filter((row) => !removableIds.has(row.id)))
+    deleteRows(Array.from(removableIds))
     setSelectedIds(new Set())
     showToast(
       locked > 0
@@ -173,11 +109,15 @@ export default function SubOrderType() {
   }
 
   return (
-    <ReportsPageShell
-      title="Sub Order Type"
-      activeItem="config-sub-order-type"
-      actions={
-        <div className="flex flex-wrap items-center gap-2">
+    <ReportsPageShell title="Sub Order Type" activeItem="config-sub-order-type">
+      {toast ? (
+        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
+          {toast}
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-line bg-card">
+        <div className="flex items-center justify-end gap-2 border-b border-line px-4 py-3 sm:px-5">
           <PrimaryButton
             onClick={() =>
               navigate('/management/configuration/sub-order-type/add')
@@ -194,15 +134,6 @@ export default function SubOrderType() {
             ]}
           />
         </div>
-      }
-    >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
-
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="border-b border-line p-4 sm:p-5">
           <label
             htmlFor="sub-order-type-name"
@@ -262,7 +193,7 @@ export default function SubOrderType() {
                   <th className="px-4 py-3">Order Type</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Created</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -289,7 +220,7 @@ export default function SubOrderType() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-muted">{row.created}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3">
                       {row.editable ? (
                         <button
                           type="button"

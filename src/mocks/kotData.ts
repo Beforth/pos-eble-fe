@@ -1,10 +1,12 @@
 export type KotOrderType = 'DINE IN' | 'PARCEL' | 'DELIVERY' | 'PICK UP' | 'OTHER'
 export type KotStatus = 'Used In Bill' | 'Pending' | 'Cancelled'
+export type KotRowSource = 'billing' | 'captain'
 
 export interface KotRow {
   id: string
   kotId: number
   orderType: KotOrderType
+  source?: KotRowSource
   customerName: string
   customerPhone: string
   itemCount: number

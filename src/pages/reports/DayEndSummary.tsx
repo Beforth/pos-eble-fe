@@ -2,10 +2,30 @@ import { useMemo, useState } from 'react'
 import { Download, FileText } from 'lucide-react'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
-import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
+import { DayEndSummaryModal } from '../../components/reports/DayEndSummaryModal'
+import {
+  DAY_END_SUMMARY_ROWS,
+  type DayEndSummaryRow,
+} from '../../mocks/dayEndSummaryData'
 import { formatNumber } from '../../utils/format'
 
 const PAGE_SIZE = 15
+
+function downloadCsv(rows: DayEndSummaryRow[], filename: string) {
+  const lines = [
+    'Date,Orders,Total',
+    ...rows.map((r) => `${r.createdDate},${r.orders},${r.total}`),
+  ]
+  const blob = new Blob([lines.join('\n')], {
+    type: 'text/csv;charset=utf-8;',
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export default function DayEndSummary() {
   const [startDate, setStartDate] = useState('2026-07-13')
@@ -15,6 +35,7 @@ export default function DayEndSummary() {
   const [ignoreDates, setIgnoreDates] = useState(false)
   const [page, setPage] = useState(1)
   const [toast, setToast] = useState<string | null>(null)
+  const [viewRow, setViewRow] = useState<DayEndSummaryRow | null>(null)
 
   function showToast(message: string) {
     setToast(message)
@@ -61,11 +82,16 @@ export default function DayEndSummary() {
       activeItem="day-end-summary"
       actions={
         <ExportExcelMenu
-          onExportPage={() => showToast('Exporting current page…')}
-          onExportAll={() => showToast('Exporting all records…')}
+          onExportPage={() => downloadCsv(pageRows, 'day-end-summary-page.csv')}
+          onExportAll={() => downloadCsv(filtered, 'day-end-summary-all.csv')}
         />
       }
     >
+      <DayEndSummaryModal
+        open={Boolean(viewRow)}
+        row={viewRow}
+        onClose={() => setViewRow(null)}
+      />
       {toast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
           {toast}
@@ -155,9 +181,7 @@ export default function DayEndSummary() {
                           type="button"
                           title="View summary"
                           aria-label={`View summary for ${row.createdDate}`}
-                          onClick={() =>
-                            showToast(`Opening summary for ${row.createdDate}`)
-                          }
+                          onClick={() => setViewRow(row)}
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-primary"
                         >
                           <FileText size={16} strokeWidth={1.75} />
@@ -167,7 +191,10 @@ export default function DayEndSummary() {
                           title="Download summary"
                           aria-label={`Download summary for ${row.createdDate}`}
                           onClick={() =>
-                            showToast(`Downloading ${row.createdDate}`)
+                            downloadCsv(
+                              [row],
+                              `day-end-summary-${row.dateKey}.csv`,
+                            )
                           }
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-primary"
                         >

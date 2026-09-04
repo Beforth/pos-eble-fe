@@ -265,7 +265,7 @@ export function InventorySidebar({
           title={collapsed ? item.label : undefined}
           aria-current={active ? 'page' : undefined}
           onClick={() => go(item.id)}
-          className={`relative flex w-full items-center gap-2.5 text-sm transition-colors ${
+          className={`relative flex w-full cursor-pointer items-center gap-2.5 text-sm transition-colors ${
             collapsed
               ? 'justify-center px-0 py-2.5'
               : indented
@@ -324,7 +324,7 @@ export function InventorySidebar({
             }
             go(item.id)
           }}
-          className={`relative flex w-full items-center gap-2.5 text-sm transition-colors ${
+          className={`relative flex w-full cursor-pointer items-center gap-2.5 text-sm transition-colors ${
             collapsed
               ? 'justify-center px-0 py-2.5'
               : 'px-4 py-2.5 text-left'
@@ -369,7 +369,7 @@ export function InventorySidebar({
                 <button
                   type="button"
                   onClick={() => setMastersMore((prev) => !prev)}
-                  className="w-full px-4 py-2 pl-11 text-left text-sm font-medium text-primary hover:bg-page"
+                  className="w-full cursor-pointer px-4 py-2 pl-11 text-left text-sm font-medium text-primary hover:bg-page"
                 >
                   {mastersMore ? 'View Less' : 'View More'}
                 </button>
@@ -417,7 +417,7 @@ export function InventorySidebar({
                 type="button"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
-                className="rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
+                className="cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
               >
                 <X size={18} />
               </button>
@@ -432,7 +432,7 @@ export function InventorySidebar({
             type="button"
             onClick={onToggleCollapse}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="m-1.5 rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
+            className="m-1.5 cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
           </button>
@@ -463,7 +463,7 @@ export function InventorySidebar({
                 <button
                   type="button"
                   onClick={() => setConsumptionMore((prev) => !prev)}
-                  className="w-full px-4 py-2 text-left text-sm font-medium text-primary hover:bg-page"
+                  className="w-full cursor-pointer px-4 py-2 text-left text-sm font-medium text-primary hover:bg-page"
                 >
                   {consumptionMore ? 'View Less' : 'View More'}
                 </button>
@@ -501,7 +501,7 @@ export function InventorySidebar({
             </div>
             <button
               type="button"
-              className="h-8 w-full rounded-lg border border-primary bg-card text-xs font-semibold text-primary hover:bg-primary/5"
+              className="h-8 w-full cursor-pointer rounded-lg border border-primary bg-card text-xs font-semibold text-primary hover:bg-primary/5"
             >
               Request a Callback
             </button>
@@ -511,7 +511,7 @@ export function InventorySidebar({
             <button
               type="button"
               title="Need Assistance?"
-              className="rounded-lg p-2 text-primary hover:bg-primary/10"
+              className="cursor-pointer rounded-lg p-2 text-primary hover:bg-primary/10"
             >
               <Phone size={16} />
             </button>

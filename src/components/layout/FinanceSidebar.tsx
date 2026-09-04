@@ -108,7 +108,7 @@ export function FinanceSidebar({
                 type="button"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
-                className="rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
+                className="cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
               >
                 <X size={18} />
               </button>
@@ -123,7 +123,7 @@ export function FinanceSidebar({
             type="button"
             onClick={onToggleCollapse}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="m-1.5 rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
+            className="m-1.5 cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
           </button>
@@ -133,7 +133,7 @@ export function FinanceSidebar({
           <div className="border-b border-line px-3 py-2.5">
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded-lg border border-line bg-page px-2.5 py-2 text-left text-xs font-medium text-ink"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-lg border border-line bg-page px-2.5 py-2 text-left text-xs font-medium text-ink"
             >
               <LayoutGrid size={14} className="shrink-0 text-muted" />
               <span className="min-w-0 flex-1 truncate">{brand.outletName}</span>
@@ -155,7 +155,7 @@ export function FinanceSidebar({
                       title={collapsed ? item.label : undefined}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => go(item.id)}
-                      className={`relative flex w-full items-center gap-2.5 text-sm transition-colors ${
+                      className={`relative flex w-full cursor-pointer items-center gap-2.5 text-sm transition-colors ${
                         collapsed
                           ? 'justify-center px-0 py-2.5'
                           : 'px-4 py-2.5 text-left'

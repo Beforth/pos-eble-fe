@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from 'react'
-import { Eye, EyeOff, Lock, LogIn, User } from 'lucide-react'
+import { Eye, EyeOff, Lock, LogIn, Store, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
+import {
+  OutletSelectionRequiredError,
+  type OutletMembership,
+} from '../../services/authService'
 import { Button } from '../common/Button'
 import { Input } from '../common/Input'
 
@@ -24,6 +28,10 @@ export function LoginForm() {
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [outletChoices, setOutletChoices] = useState<OutletMembership[] | null>(
+    null,
+  )
+  const [selectedOutletId, setSelectedOutletId] = useState<number | null>(null)
 
   const validate = (): boolean => {
     const next: FieldErrors = {}
@@ -49,6 +57,15 @@ export function LoginForm() {
     return Object.keys(next).length === 0
   }
 
+  const completeLogin = async (outletId?: number) => {
+    await login({
+      identifier: identifier.trim(),
+      password,
+      outletId,
+    })
+    navigate('/dashboard', { replace: true })
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setFormError('')
@@ -56,17 +73,23 @@ export function LoginForm() {
 
     setLoading(true)
     try {
-      await login({
-        identifier: identifier.trim(),
-        password,
-      })
-      navigate('/dashboard', { replace: true })
+      if (outletChoices && selectedOutletId != null) {
+        await completeLogin(selectedOutletId)
+        return
+      }
+      await completeLogin()
     } catch (err) {
-      setFormError(
-        err instanceof Error
-          ? err.message
-          : 'Login failed. Please try again.',
-      )
+      if (err instanceof OutletSelectionRequiredError) {
+        setOutletChoices(err.outlets)
+        setSelectedOutletId(err.outlets[0]?.outletId ?? null)
+        setFormError('Select an outlet to continue.')
+      } else {
+        setFormError(
+          err instanceof Error
+            ? err.message
+            : 'Login failed. Please try again.',
+        )
+      }
     } finally {
       setLoading(false)
     }
@@ -93,6 +116,7 @@ export function LoginForm() {
         autoComplete="username"
         autoFocus
         className="h-11 rounded-xl"
+        disabled={Boolean(outletChoices)}
       />
 
       <Input
@@ -105,6 +129,7 @@ export function LoginForm() {
         placeholder="Enter your password"
         autoComplete="current-password"
         className="h-11 rounded-xl"
+        disabled={Boolean(outletChoices)}
         rightSlot={
           <button
             type="button"
@@ -117,6 +142,31 @@ export function LoginForm() {
         }
       />
 
+      {outletChoices && (
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium text-ink">Outlet</span>
+          <div className="relative">
+            <Store
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+            />
+            <select
+              value={selectedOutletId ?? ''}
+              onChange={(event) =>
+                setSelectedOutletId(Number(event.target.value))
+              }
+              className="h-11 w-full rounded-xl border border-line bg-white py-2 pl-10 pr-3 text-sm text-ink outline-none focus:border-primary"
+            >
+              {outletChoices.map((outlet) => (
+                <option key={outlet.outletId} value={outlet.outletId}>
+                  {outlet.outletName}
+                </option>
+              ))}
+            </select>
+          </div>
+        </label>
+      )}
+
       <Button
         type="submit"
         fullWidth
@@ -125,7 +175,7 @@ export function LoginForm() {
         icon={!loading ? <LogIn size={16} /> : undefined}
         className="mt-1 h-12 rounded-xl text-[15px] shadow-[0_8px_20px_-8px_rgba(255,9,23,0.55)] transition-transform hover:-translate-y-0.5 active:translate-y-0"
       >
-        Sign In
+        {outletChoices ? 'Continue' : 'Sign In'}
       </Button>
     </form>
   )

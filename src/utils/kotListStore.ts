@@ -1,4 +1,10 @@
-import { kotList, parseKotDate, type KotOrderType, type KotRow } from '../mocks/kotData'
+import {
+  kotList,
+  parseKotDate,
+  type KotOrderType,
+  type KotRow,
+  type KotRowSource,
+} from '../mocks/kotData'
 import type { KotTicket } from '../mocks/kotViewData'
 import { loadAllKotTickets } from './tableStatusStore'
 
@@ -48,6 +54,7 @@ function ticketToKotRow(ticket: KotTicket): KotRow {
     id: ticket.id,
     kotId: ticket.kotNo,
     orderType: orderTypeToKot(ticket.orderType),
+    source: ticket.source ?? 'billing',
     customerName: '',
     customerPhone: '',
     itemCount: ticket.items.reduce((sum, item) => sum + item.qty, 0),
@@ -59,17 +66,26 @@ function ticketToKotRow(ticket: KotTicket): KotRow {
   }
 }
 
-/** Static KOT history merged with tickets created in Billing, newest first. */
-export function loadKotRows(): KotRow[] {
+/** Seed records: dine-in is entered via Captain Orders, everything else via Billing. */
+function kotRowSource(row: KotRow): KotRowSource {
+  return row.orderType === 'DINE IN' ? 'captain' : 'billing'
+}
+
+/** Static KOT history merged with tickets created in Billing/Captain, newest first. */
+export function loadKotRows(source?: 'billing' | 'captain'): KotRow[] {
   const ticketRows = loadAllKotTickets().map((ticket) => ({
     row: ticketToKotRow(ticket),
     ts: ticket.createdAt,
   }))
   const staticRows = kotList.map((row, index) => ({
-    row,
+    row: {
+      ...row,
+      source: kotRowSource(row),
+    },
     ts: parseKotDate(row.created)?.getTime() ?? -index,
   }))
   return [...ticketRows, ...staticRows]
+    .filter((entry) => !source || entry.row.source === source)
     .sort((a, b) => b.ts - a.ts)
     .map((entry) => entry.row)
 }

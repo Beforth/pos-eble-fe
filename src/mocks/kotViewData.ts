@@ -1,4 +1,5 @@
 export type KotViewOrderType = 'dine-in' | 'delivery' | 'pick-up' | 'other'
+export type KotSource = 'billing' | 'captain'
 
 export interface KotViewItem {
   id: string
@@ -12,6 +13,8 @@ export interface KotViewItem {
 
 export interface KotTicket {
   id: string
+  /** Where the KOT was created: billing counter or captain orders. */
+  source: KotSource
   /** Sequence for this table (1st KOT = 1, 2nd = 2, …). */
   kotNo: number
   tableId: string

@@ -30,6 +30,7 @@ import {
 import { CustomerGstModal } from './CustomerGstModal'
 import { DeleteReasonModal } from './DeleteReasonModal'
 import { OTHER_PAYMENT_TYPES } from './OtherPaymentModal'
+import { PrimaryButton } from '../menu/MenuActionButtons'
 
 const SEED_CUSTOMER_HISTORY: Record<string, CustomerHistoryOrder[]> = {
   '1234567899': [
@@ -59,6 +60,7 @@ export interface CartLine {
   name: string
   price: number
   qty: number
+  note?: string
 }
 
 export interface CustomerDetails {
@@ -100,6 +102,7 @@ interface BillPanelProps {
   onFeedbackSmsChange: (value: boolean) => void
   onQtyChange: (lineId: string, qty: number) => void
   onRemoveLine: (lineId: string) => void
+  onLineNoteChange?: (lineId: string, note: string) => void
   onRemoveKotItem?: (payload: {
     ticketId: string
     itemId: string
@@ -216,6 +219,9 @@ export function BillPanel({
   const [settlementInput, setSettlementInput] = useState('')
   const [settlementError, setSettlementError] = useState<string | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [noteLineId, setNoteLineId] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
+  const noteLine = lines.find((line) => line.id === noteLineId) ?? null
   const [discount, setDiscount] = useState(0)
   const [discountDetails, setDiscountDetails] = useState<AppliedDiscount | null>(
     null,
@@ -373,6 +379,51 @@ export function BillPanel({
           setGstOpen(false)
         }}
       />
+
+      {noteLine ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close note"
+            className="absolute inset-0 bg-ink/40"
+            onClick={() => setNoteLineId(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="line-note-title"
+            className="relative z-10 w-full max-w-lg rounded-lg border border-line bg-card p-5 shadow-xl"
+          >
+            <h3 id="line-note-title" className="sr-only">
+              Add note for {noteLine.name}
+            </h3>
+            <textarea
+              value={noteDraft}
+              onChange={(event) => setNoteDraft(event.target.value)}
+              rows={4}
+              placeholder={`Add a note for ${noteLine.name}`}
+              className="w-full resize-y rounded-md border border-line px-3 py-2.5 text-sm outline-none placeholder:text-muted focus:border-primary"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setNoteLineId(null)}
+                className="inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
+              >
+                Cancel
+              </button>
+              <PrimaryButton
+                onClick={() => {
+                  onLineNoteChange?.(noteLine.id, noteDraft)
+                  setNoteLineId(null)
+                }}
+              >
+                Done
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <DeleteReasonModal
         open={Boolean(deleteTarget)}
@@ -903,46 +954,71 @@ export function BillPanel({
                     <ul className="divide-y divide-line">
                       {lines.map((line) => (
                         <li
-                          key={line.id}
-                          className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 px-3 py-2.5"
-                        >
-                          <span className="min-w-0 truncate text-sm font-medium text-ink">
-                            {line.name}
-                          </span>
-                          <div className="flex w-16 items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              aria-label="Decrease quantity"
-                              onClick={() => onQtyChange(line.id, line.qty - 1)}
-                              className="inline-flex size-6 items-center justify-center rounded border border-line text-muted hover:bg-page"
-                            >
-                              <Minus size={12} />
-                            </button>
-                            <span className="w-5 text-center text-sm font-semibold text-ink">
-                              {line.qty}
-                            </span>
-                            <button
-                              type="button"
-                              aria-label="Increase quantity"
-                              onClick={() => onQtyChange(line.id, line.qty + 1)}
-                              className="inline-flex size-6 items-center justify-center rounded border border-line text-muted hover:bg-page"
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
-                          <span className="w-14 text-right text-sm font-semibold text-ink">
-                            ₹{line.price * line.qty}
-                          </span>
-                          <button
-                            type="button"
-                            aria-label={`Remove ${line.name}`}
-                            onClick={() => onRemoveLine(line.id)}
-                            className="inline-flex size-7 items-center justify-center rounded text-muted hover:bg-primary/10 hover:text-primary"
+                            key={line.id}
+                            className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 px-3 py-2.5"
                           >
-                            <Trash2 size={14} />
-                          </button>
-                        </li>
-                      ))}
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium text-ink">
+                                {line.name}
+                              </span>
+                              {line.note ? (
+                                <span className="mt-0.5 block text-xs italic text-muted">
+                                  [Note] {line.note}
+                                </span>
+                              ) : null}
+                            </span>
+                            <div className="flex w-16 items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                aria-label="Decrease quantity"
+                                onClick={() => onQtyChange(line.id, line.qty - 1)}
+                                className="inline-flex size-6 items-center justify-center rounded border border-line text-muted hover:bg-page"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span className="w-5 text-center text-sm font-semibold text-ink">
+                                {line.qty}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label="Increase quantity"
+                                onClick={() => onQtyChange(line.id, line.qty + 1)}
+                                className="inline-flex size-6 items-center justify-center rounded border border-line text-muted hover:bg-page"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                            <span className="w-14 text-right text-sm font-semibold text-ink">
+                              ₹{line.price * line.qty}
+                            </span>
+                            <span className="flex items-center">
+                              <button
+                                type="button"
+                                title={line.note ? 'Edit note' : 'Add note'}
+                                aria-label={`Add note to ${line.name}`}
+                                onClick={() => {
+                                  setNoteDraft(line.note ?? '')
+                                  setNoteLineId(line.id)
+                                }}
+                                className={`inline-flex size-7 items-center justify-center rounded hover:bg-primary/10 ${
+                                  line.note
+                                    ? 'text-primary'
+                                    : 'text-muted hover:text-primary'
+                                }`}
+                              >
+                                <StickyNote size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${line.name}`}
+                                onClick={() => onRemoveLine(line.id)}
+                                className="inline-flex size-7 items-center justify-center rounded text-muted hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </span>
+                          </li>
+                        ))}
                     </ul>
                   </>
                 )}
@@ -971,8 +1047,14 @@ export function BillPanel({
           </div>
         ) : null}
 
-        {hasAnyItems && detailsOpen ? (
-          <div className="max-h-[38vh] space-y-2 overflow-y-auto border-b border-line bg-white px-3 pb-2 pt-1">
+        {hasAnyItems ? (
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+              detailsOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+            }`}
+          >
+            <div className="overflow-hidden border-b border-line bg-white">
+              <div className="max-h-[38vh] space-y-2 overflow-y-auto px-3 pb-2 pt-1">
             <div className="flex items-center justify-between text-sm text-ink">
               <span>
                 Sub Total{' '}
@@ -1074,6 +1156,8 @@ export function BillPanel({
               >
                 Split
               </button>
+            </div>
+              </div>
             </div>
           </div>
         ) : null}

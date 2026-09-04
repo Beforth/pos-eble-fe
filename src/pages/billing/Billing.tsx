@@ -347,6 +347,12 @@ export default function Billing() {
     )
   }
 
+  function changeLineNote(lineId: string, note: string) {
+    setLines((prev) =>
+      prev.map((line) => (line.id === lineId ? { ...line, note } : line)),
+    )
+  }
+
   function ensureBillNo() {
     if (billNo.trim()) return billNo.trim()
     const next = String(800 + Math.floor(Math.random() * 199) + 1)
@@ -567,6 +573,7 @@ export default function Billing() {
       tableId: tableId || 'no-table',
       tableNo: displayTableNo,
       orderType,
+      source: 'billing',
       biller: 'biller (biller)',
       persons: guests > 0 ? guests : table?.persons ?? 0,
       createdAt: Date.now(),
@@ -579,6 +586,7 @@ export default function Billing() {
         name: line.name,
         qty: line.qty,
         price: line.price,
+        note: line.note,
       })),
     }
   }
@@ -1106,6 +1114,7 @@ export default function Billing() {
           onRemoveLine={(id) =>
             setLines((prev) => prev.filter((line) => line.id !== id))
           }
+          onLineNoteChange={changeLineNote}
           onRemoveKotItem={({ ticketId, itemId, reason }) => {
             setKotTickets((prev) => {
               const next = prev

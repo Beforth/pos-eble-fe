@@ -5,6 +5,7 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { addRow, findRow, updateRow } from './subOrderTypeStore'
 
 const inputClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
@@ -39,8 +40,9 @@ export default function AddSubOrderType() {
   const { id } = useParams()
   const isEdit = Boolean(id)
   const [toast, setToast] = useState<string | null>(null)
-  const [name, setName] = useState(isEdit ? 'Parcel' : '')
-  const [status, setStatus] = useState(true)
+  const existing = id ? findRow(id) : undefined
+  const [name, setName] = useState(existing?.name ?? '')
+  const [status, setStatus] = useState(existing?.active ?? true)
 
   const title = useMemo(
     () => (isEdit ? 'Edit Sub Order Type' : 'Add Sub Order Type'),
@@ -61,7 +63,25 @@ export default function AddSubOrderType() {
       showToast('Name is required')
       return
     }
-    showToast(isEdit ? 'Sub order type updated' : 'Sub order type saved')
+    if (isEdit && id) {
+      updateRow(id, { name: name.trim(), active: status })
+      showToast('Sub order type updated')
+    } else {
+      addRow({
+        id: `sot-${Date.now()}`,
+        name: name.trim(),
+        type: 'Manual',
+        orderTypes: '',
+        active: status,
+        created: new Date().toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        }),
+        editable: true,
+      })
+      showToast('Sub order type saved')
+    }
     window.setTimeout(goBack, 700)
   }
 
@@ -85,13 +105,22 @@ export default function AddSubOrderType() {
           </FormRow>
 
           <FormRow label="Status">
-            <input
-              type="checkbox"
-              checked={status}
-              onChange={(event) => setStatus(event.target.checked)}
-              className="size-4 cursor-pointer accent-primary"
-              aria-label="Status"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={status}
+                onChange={(event) => setStatus(event.target.checked)}
+                className="size-4 cursor-pointer accent-primary"
+                aria-label="Status"
+              />
+              <span
+                className={`text-sm ${
+                  status ? 'font-medium text-primary' : 'text-muted'
+                }`}
+              >
+                {status ? 'Active' : 'Inactive'}
+              </span>
+            </div>
           </FormRow>
         </div>
 

@@ -127,6 +127,7 @@ import AddReportNotification from './pages/reports/AddReportNotification'
 import DeliveryManagement from './pages/reports/DeliveryManagement'
 import ManagementPlaceholder from './pages/management/ManagementPlaceholder'
 import OutletConfiguration from './pages/management/OutletConfiguration'
+import OutletDocuments from './pages/management/OutletDocuments'
 import OutletDetails from './pages/management/OutletDetails'
 import ContactDetails from './pages/management/ContactDetails'
 import OutletTimings from './pages/management/OutletTimings'
@@ -174,21 +175,13 @@ import ClosingHourLogs from './pages/management/ClosingHourLogs'
 import ExpenseLogsPage from './pages/management/ExpenseLogsPage'
 import WithdrawalLogsPage from './pages/management/WithdrawalLogsPage'
 import CashTopUpLogsPage from './pages/management/CashTopUpLogsPage'
-import MarketplacePage from './pages/management/MarketplacePage'
 import MarketplaceSettingPage from './pages/management/MarketplaceSettingPage'
 import AuditTrailPage from './pages/management/AuditTrailPage'
 import OrderModificationAuditPage from './pages/management/OrderModificationAuditPage'
 import AfterPrintModificationPage from './pages/management/AfterPrintModificationPage'
 import PaymentChangeHistoryPage from './pages/management/PaymentChangeHistoryPage'
 import KotModificationReportPage from './pages/management/KotModificationReportPage'
-import CrmMarketingPage from './pages/crm/CrmMarketingPage'
-import CrmCampaignPage from './pages/crm/CrmCampaignPage'
-import CreateCampaignPage from './pages/crm/CreateCampaignPage'
-import CrmCustomersPage from './pages/crm/CrmCustomersPage'
-import AddCustomerPage from './pages/crm/AddCustomerPage'
-import CustomerDiscountConfigPage from './pages/crm/CustomerDiscountConfigPage'
-import EditCustomerPage from './pages/crm/EditCustomerPage'
-import CrmFeedbackPage from './pages/crm/CrmFeedbackPage'
+
 import AllRestaurantSalesReport from './pages/reports/AllRestaurantSalesReport'
 import OutletItemWiseReport from './pages/reports/OutletItemWiseReport'
 import InvoiceReport from './pages/reports/InvoiceReport'
@@ -1662,6 +1655,14 @@ export default function App() {
             }
           />
           <Route
+            path="/management/configuration/outlet/documents"
+            element={
+              <ProtectedRoute>
+                <OutletDocuments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/management/configuration/sub-order-type"
             element={
               <ProtectedRoute>
@@ -1969,22 +1970,6 @@ export default function App() {
             }
           />
           <Route
-            path="/management/explore-products"
-            element={
-              <ProtectedRoute>
-                <MarketplacePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/management/explore-products/marketplace"
-            element={
-              <ProtectedRoute>
-                <MarketplacePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/management/explore-products/marketplace-setting"
             element={
               <ProtectedRoute>
@@ -2061,150 +2046,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <KotModificationReportPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/crm_dashboard"
-            element={
-              <ProtectedRoute>
-                <CrmMarketingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/marketing"
-            element={
-              <ProtectedRoute>
-                <CrmMarketingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/campaign"
-            element={
-              <ProtectedRoute>
-                <CrmCampaignPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/users/send_sms_history"
-            element={
-              <ProtectedRoute>
-                <CrmCampaignPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/users/paid_services"
-            element={
-              <ProtectedRoute>
-                <CrmCampaignPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/users/watsup_services"
-            element={
-              <ProtectedRoute>
-                <CrmCampaignPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/campaign/create"
-            element={
-              <ProtectedRoute>
-                <CreateCampaignPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/customers"
-            element={
-              <ProtectedRoute>
-                <CrmCustomersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/users/customer_list"
-            element={
-              <ProtectedRoute>
-                <CrmCustomersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/customers/add"
-            element={
-              <ProtectedRoute>
-                <AddCustomerPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/customers/discount-config"
-            element={
-              <ProtectedRoute>
-                <CustomerDiscountConfigPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/customers/edit"
-            element={
-              <ProtectedRoute>
-                <EditCustomerPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/customers/edit/:id"
-            element={
-              <ProtectedRoute>
-                <EditCustomerPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/crm/feedback"
-            element={
-              <ProtectedRoute>
-                <CrmFeedbackPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/feedbacks/app_list"
-            element={
-              <ProtectedRoute>
-                <CrmFeedbackPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/feedbacks/app_list_rating"
-            element={
-              <ProtectedRoute>
-                <CrmFeedbackPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/feedbacks/customercomplaints"
-            element={
-              <ProtectedRoute>
-                <CrmFeedbackPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/feedbacks/onlineorderrating"
-            element={
-              <ProtectedRoute>
-                <CrmFeedbackPage />
               </ProtectedRoute>
             }
           />

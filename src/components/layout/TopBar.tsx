@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Bell,
   ChevronDown,
-  Compass,
   FileText,
   Headset,
   LogOut,
@@ -217,14 +216,6 @@ export function TopBar({
             </div>
           )}
         </div>
-
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-sm font-medium text-ink transition-colors hover:border-muted"
-        >
-          <Compass size={16} className="text-primary" />
-          <span className="hidden sm:inline">Explore Products</span>
-        </button>
       </div>
       <ChangelogModal
         open={changelogOpen}

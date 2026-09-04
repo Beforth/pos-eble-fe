@@ -31,7 +31,7 @@ const STATUS_OPTIONS = [
 export default function CaptainOrdersKot() {
   const navigate = useNavigate()
   const [billNo, setBillNo] = useState('')
-  const [rows, setRows] = useState<KotRow[]>(() => loadKotRows())
+  const [rows, setRows] = useState<KotRow[]>(() => loadKotRows('captain'))
   const [page, setPage] = useState(1)
 
   const [draftStart, setDraftStart] = useState('')
@@ -43,14 +43,12 @@ export default function CaptainOrdersKot() {
   const [appliedEnd, setAppliedEnd] = useState('')
   const [appliedType, setAppliedType] = useState('')
   const [appliedStatus, setAppliedStatus] = useState('')
-  const [searched, setSearched] = useState(false)
 
   const [viewKot, setViewKot] = useState<KotRow | null>(null)
   const [editKot, setEditKot] = useState<KotRow | null>(null)
   const [detailsKot, setDetailsKot] = useState<KotRow | null>(null)
 
   const filtered = useMemo(() => {
-    if (!searched) return []
     return rows.filter((row) => {
       if (appliedStart) {
         const rowDate = row.created.slice(0, 10)
@@ -64,7 +62,7 @@ export default function CaptainOrdersKot() {
       if (appliedStatus && row.status !== appliedStatus) return false
       return true
     })
-  }, [rows, searched, appliedStart, appliedEnd, appliedType, appliedStatus])
+  }, [rows, appliedStart, appliedEnd, appliedType, appliedStatus])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -78,7 +76,6 @@ export default function CaptainOrdersKot() {
     setAppliedEnd(draftEnd)
     setAppliedType(draftType)
     setAppliedStatus(draftStatus)
-    setSearched(true)
     setPage(1)
   }
 
@@ -91,7 +88,6 @@ export default function CaptainOrdersKot() {
     setAppliedEnd('')
     setAppliedType('')
     setAppliedStatus('')
-    setSearched(true)
     setPage(1)
   }
 
@@ -185,14 +181,7 @@ export default function CaptainOrdersKot() {
           </div>
         </div>
 
-        {!searched ? (
-          <div className="flex min-h-[300px] flex-col items-center justify-center gap-2 rounded-xl border border-line bg-card text-center">
-            <Search size={40} className="text-line" />
-            <p className="text-sm font-medium text-muted">
-              Use the filters above and click Search to view KOT records.
-            </p>
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="flex min-h-[300px] flex-col items-center justify-center gap-2 rounded-xl border border-line bg-card text-center">
             <p className="text-sm font-medium text-muted">
               No results found. Try adjusting dates or click Clear Filter.

@@ -16,14 +16,10 @@ import {
   IndianRupee,
   LayoutDashboard,
   LogOut,
-  Megaphone,
-  MessageSquare,
   Package,
   Settings,
   ShoppingBag,
   SlidersHorizontal,
-  Star,
-  Store,
   Truck,
   Upload,
   Users,
@@ -287,20 +283,8 @@ const NAV: NavEntry[] = [
           ],
         },
         {
-          id: 'mgmt-explore-products',
-          label: 'Explore Products',
-          icon: Store,
-          chevron: true,
-          children: [
-            {
-              id: 'explore-products-marketplace',
-              label: 'Marketplace',
-            },
-            {
-              id: 'explore-products-marketplace-setting',
-              label: 'Marketplace Setting',
-            },
-          ],
+          id: 'mgmt-marketplace-setting',
+          label: 'Marketplace Settings',
         },
         {
           id: 'mgmt-audit-trail',
@@ -314,42 +298,6 @@ const NAV: NavEntry[] = [
     },
   },
   { kind: 'divider' },
-  {
-    kind: 'link',
-    item: {
-      id: 'crm',
-      label: 'CRM',
-      icon: Users,
-      chevron: true,
-      children: [
-        {
-          id: 'crm-marketing',
-          label: 'Marketing',
-          icon: BarChart3,
-        },
-        {
-          id: 'crm-campaign',
-          label: 'Campaign',
-          icon: Megaphone,
-        },
-        {
-          id: 'crm-customers',
-          label: 'Customers',
-          icon: Users,
-        },
-        {
-          id: 'crm-feedback',
-          label: 'Feedback',
-          icon: MessageSquare,
-        },
-        {
-          id: 'crm-pos-eble-loyalty',
-          label: 'POS-Eble Loyalty',
-          icon: Star,
-        },
-      ],
-    },
-  },
 ]
 
 const ROUTES: Record<string, string> = {
@@ -382,9 +330,7 @@ const ROUTES: Record<string, string> = {
   'user-logs-expense': '/management/user-logs/expense',
   'user-logs-withdrawal': '/management/user-logs/withdrawal',
   'user-logs-cash-top-up': '/management/user-logs/cash-top-up',
-  'mgmt-explore-products': '/management/explore-products/marketplace',
-  'explore-products-marketplace': '/management/explore-products/marketplace',
-  'explore-products-marketplace-setting':
+  'mgmt-marketplace-setting':
     '/management/explore-products/marketplace-setting',
   'mgmt-audit-trail': '/management/audit-trail',
   'mgmt-device-mapping': '/management/device-mapping',
@@ -406,20 +352,9 @@ const ROUTES: Record<string, string> = {
     '/management/accounting/service-payment-history',
   'acct-loan-information': '/management/accounting/loan-information',
   'acct-denomination': '/management/accounting/denomination',
-  crm: '/crm/crm_dashboard',
-  'crm-marketing': '/crm/crm_dashboard',
-  'crm-campaign': '/crm/campaign',
-  'crm-customers': '/crm/customers',
-  'crm-feedback': '/crm/feedback',
-  'crm-pos-eble-loyalty': '/crm/pos-eble-loyalty',
 }
 
 const AUTO_EXPAND_PARENTS: Record<string, string[]> = {
-  'crm-marketing': ['crm'],
-  'crm-campaign': ['crm'],
-  'crm-customers': ['crm'],
-  'crm-feedback': ['crm'],
-  'crm-pos-eble-loyalty': ['crm'],
   'menu-discounts': ['menu'],
   'menu-images-upload': ['menu'],
   'menu-on-off': ['menu'],
@@ -440,12 +375,7 @@ const AUTO_EXPAND_PARENTS: Record<string, string[]> = {
   'user-logs-expense': ['management', 'mgmt-user-logs'],
   'user-logs-withdrawal': ['management', 'mgmt-user-logs'],
   'user-logs-cash-top-up': ['management', 'mgmt-user-logs'],
-  'mgmt-explore-products': ['management'],
-  'explore-products-marketplace': ['management', 'mgmt-explore-products'],
-  'explore-products-marketplace-setting': [
-    'management',
-    'mgmt-explore-products',
-  ],
+  'mgmt-marketplace-setting': ['management'],
   'mgmt-audit-trail': ['management'],
   'mgmt-device-mapping': ['management'],
   'mgmt-configuration': ['management'],
