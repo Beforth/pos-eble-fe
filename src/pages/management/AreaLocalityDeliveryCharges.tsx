@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/common/Badge'
@@ -19,7 +21,6 @@ interface AreaChargeRow {
 
 export default function AreaLocalityDeliveryCharges() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [status, setStatus] = useState('All')
   const [appliedStatus, setAppliedStatus] = useState('All')
   const [rows, setRows] = useState<AreaChargeRow[]>([])
@@ -30,10 +31,6 @@ export default function AreaLocalityDeliveryCharges() {
     return rows.filter((row) => row.active === wantActive)
   }, [rows, appliedStatus])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setAppliedStatus(status)
@@ -65,11 +62,6 @@ export default function AreaLocalityDeliveryCharges() {
         </PrimaryButton>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="border-b border-line p-4 sm:p-5">

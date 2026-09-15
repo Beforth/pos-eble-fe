@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, MonitorSmartphone, Plus } from 'lucide-react'
 import { BrandLogo } from '../../components/brand/BrandLogo'
@@ -17,7 +19,6 @@ export default function ScreenManager() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editingScreen, setEditingScreen] = useState<KotScreen | null>(null)
   const [pendingDelete, setPendingDelete] = useState<KotScreen | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   const refresh = useCallback(() => {
     fetchScreens()
@@ -30,11 +31,6 @@ export default function ScreenManager() {
     refresh()
   }, [refresh])
 
-  useEffect(() => {
-    if (!toast) return
-    const timer = window.setTimeout(() => setToast(null), 2500)
-    return () => window.clearTimeout(timer)
-  }, [toast])
 
   function handleCreated(screen: KotScreen) {
     setCreateOpen(false)
@@ -47,24 +43,19 @@ export default function ScreenManager() {
     setScreens((prev) =>
       prev.map((row) => (row.id === updated.id ? updated : row)),
     )
-    setToast(`"${updated.name}" updated`)
+    showToast(`"${updated.name}" updated`)
   }
 
   async function handleDelete() {
     if (!pendingDelete) return
     await removeScreen(pendingDelete.id)
     setScreens((prev) => prev.filter((row) => row.id !== pendingDelete.id))
-    setToast(`"${pendingDelete.name}" deleted`)
+    showToast(`"${pendingDelete.name}" deleted`)
     setPendingDelete(null)
   }
 
   return (
     <div className="min-h-screen bg-page">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <CreateScreenModal
         open={createOpen}

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import {
@@ -20,7 +22,6 @@ export default function AddUnit() {
 
   const [name, setName] = useState(existing?.name ?? '')
   const [error, setError] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
     setName(existing?.name ?? '')
@@ -34,17 +35,12 @@ export default function AddUnit() {
       return
     }
     setError(null)
-    setToast(isEdit ? 'Unit updated' : 'Unit created')
+    showToast(isEdit ? 'Unit updated' : 'Unit created')
     window.setTimeout(() => navigate('/inventory/units'), 500)
   }
 
   return (
     <InventoryPageShell activeItem="units">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="flex min-h-[calc(100vh-7.5rem)] flex-col rounded-xl border border-line bg-card">
         <div className="flex-1 p-5 sm:p-6">

@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { GripVertical, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -92,7 +94,6 @@ export default function BarcodeConfiguration() {
   const [alignment, setAlignment] = useState<'Column' | 'Row'>('Column')
   const [fields, setFields] = useState<ConfigField[]>(DEFAULT_FIELDS)
   const [draft, setDraft] = useState(emptyDraft)
-  const [toast, setToast] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
 
   const previewTop = useMemo(
@@ -104,10 +105,6 @@ export default function BarcodeConfiguration() {
     [fields],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleAdd() {
     if (!draft.label.trim()) return
@@ -208,11 +205,6 @@ export default function BarcodeConfiguration() {
 
   return (
     <InventoryPageShell activeItem="barcode-generation">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px]">
         <div className="rounded-xl border border-line bg-card p-4 sm:p-5">

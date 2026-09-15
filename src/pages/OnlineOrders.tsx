@@ -1,4 +1,6 @@
 import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
+
+import { showToast } from '../utils/toast'
 import {
   BarChart3,
   ChevronDown,
@@ -105,12 +107,7 @@ export default function OnlineOrders() {  const [collapsed, setCollapsed] = useS
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [chartOpen, setChartOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   const closeOtherDrawers = () => {
     setSupportOpen(false)
@@ -394,11 +391,6 @@ export default function OnlineOrders() {  const [collapsed, setCollapsed] = useS
           )}
         </main>
       </div>
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   )
 }

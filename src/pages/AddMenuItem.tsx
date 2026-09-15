@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+
+import { showToast } from '../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Tag } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
@@ -31,7 +33,6 @@ export default function AddMenuItem() {
   const [searchParams] = useSearchParams()
   const defaultCategoryId = searchParams.get('categoryId') || baseMenuCategories[0].id
 
-  const [toast, setToast] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const [name, setName] = useState('')
@@ -44,10 +45,6 @@ export default function AddMenuItem() {
 
   const categoryNames = baseMenuCategories.map((c) => c.name)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function toggleTag(tag: string) {
     setTags((prev) =>
@@ -108,11 +105,6 @@ export default function AddMenuItem() {
         </span>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       {/* ── Item Details ── */}
       <section className="relative z-0 mb-4 rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:z-30">

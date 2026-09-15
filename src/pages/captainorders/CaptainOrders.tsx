@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CaptainOrdersHeader } from '../../components/captainorders/CaptainOrdersHeader'
 import {
@@ -154,7 +156,6 @@ export default function CaptainOrders() {
   const [itsPaid, setItsPaid] = useState(false)
   const [loyalty, setLoyalty] = useState(false)
   const [feedbackSms, setFeedbackSms] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
   const [splitOpen, setSplitOpen] = useState(false)
   const [partPaymentOpen, setPartPaymentOpen] = useState(false)
   const [dueAlertOpen, setDueAlertOpen] = useState(false)
@@ -244,10 +245,6 @@ export default function CaptainOrders() {
     })
   }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2400)
-  }
 
   function addItem(item: MenuItemRow) {
     if (!item.available) return
@@ -814,11 +811,6 @@ export default function CaptainOrders() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <CaptainOrdersHeader
         billNo={billNo}

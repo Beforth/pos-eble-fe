@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   BadgePercent,
@@ -105,7 +107,6 @@ export default function AddSales() {
   const [updateStock, setUpdateStock] = useState(true)
   const [recipientCanEdit, setRecipientCanEdit] = useState(true)
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
   const [selectItemAlertOpen, setSelectItemAlertOpen] = useState(false)
   const [poSelectOpen, setPoSelectOpen] = useState(false)
@@ -146,10 +147,6 @@ export default function AddSales() {
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [moreActionOpen])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function clearAllLines() {
     setLines([emptyLine()])
@@ -240,9 +237,8 @@ export default function AddSales() {
       }
     }
     setError('')
-    setToast('Sale saved')
+    showToast('Sale saved')
     window.setTimeout(() => {
-      setToast(null)
       navigate('/inventory/sales')
     }, 900)
   }
@@ -253,11 +249,6 @@ export default function AddSales() {
 
   return (
     <InventoryPageShell activeItem="sales">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
@@ -877,8 +868,7 @@ export default function AddSales() {
         onSelect={(poNumber) => {
           setInvoiceNo(poNumber)
           setPoSelectOpen(false)
-          setToast(`Selected ${poNumber}`)
-          window.setTimeout(() => setToast(null), 2200)
+          showToast(`Selected ${poNumber}`)
         }}
       />
       <OtherDetailsDrawer

@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   Banknote,
   Download,
@@ -33,7 +35,6 @@ export default function FinanceExpenses() {
     maxAmount: '',
   })
   const [page, setPage] = useState(1)
-  const [toast, setToast] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     return FINANCE_EXPENSES.filter((row) => {
@@ -61,10 +62,6 @@ export default function FinanceExpenses() {
     currentPage * PAGE_SIZE,
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setApplied({
@@ -97,11 +94,6 @@ export default function FinanceExpenses() {
 
   return (
     <FinancePageShell activeItem="expenses">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-bold text-ink">Expenses</h1>

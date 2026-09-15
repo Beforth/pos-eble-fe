@@ -10,8 +10,16 @@ export interface OutletMembership {
   outletId: number
   outletName: string
   outletCode?: string | null
+  encryptedId?: string
   groups: string[]
   isDefault: boolean
+}
+
+export interface RoleSummary {
+  id: string
+  name: string
+  code: string
+  description?: string
 }
 
 export interface AuthUser {
@@ -19,8 +27,11 @@ export interface AuthUser {
   identifier: string
   outlet: string
   outletId?: number | null
+  encryptedOutletId?: string
   phone?: string
   photoUrl?: string
+  role?: RoleSummary | null
+  roleId?: string | null
   groups: string[]
   memberships: OutletMembership[]
 }
@@ -47,6 +58,7 @@ type ApiMembership = {
   outlet_id: number
   outlet_name: string
   outlet_code?: string | null
+  encrypted_id?: string
   groups: string[]
   is_default: boolean
 }
@@ -59,6 +71,8 @@ type ApiUser = {
   phone?: string | null
   photo?: string | null
   user_code?: string | null
+  role?: RoleSummary | null
+  role_id?: string | null
   groups?: string[]
   outlet?: ApiMembership | null
   memberships?: ApiMembership[]
@@ -85,6 +99,7 @@ function mapMembership(item: ApiMembership): OutletMembership {
     outletId: item.outlet_id,
     outletName: item.outlet_name,
     outletCode: item.outlet_code,
+    encryptedId: item.encrypted_id,
     groups: item.groups ?? [],
     isDefault: Boolean(item.is_default),
   }
@@ -100,6 +115,8 @@ function mapUser(apiUser: ApiUser, fallbackIdentifier: string): AuthUser {
     outletId: active?.outletId ?? null,
     phone: apiUser.phone ?? undefined,
     photoUrl: apiUser.photo ?? undefined,
+    role: apiUser.role ?? null,
+    roleId: apiUser.role_id ?? apiUser.role?.id ?? null,
     groups: apiUser.groups ?? active?.groups ?? [],
     memberships,
   }

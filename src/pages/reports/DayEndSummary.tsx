@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Download, FileText } from 'lucide-react'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -34,13 +36,8 @@ export default function DayEndSummary() {
   const [appliedEnd, setAppliedEnd] = useState('2026-08-12')
   const [ignoreDates, setIgnoreDates] = useState(false)
   const [page, setPage] = useState(1)
-  const [toast, setToast] = useState<string | null>(null)
   const [viewRow, setViewRow] = useState<DayEndSummaryRow | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   const filtered = useMemo(() => {
     if (ignoreDates) return DAY_END_SUMMARY_ROWS
@@ -92,11 +89,6 @@ export default function DayEndSummary() {
         row={viewRow}
         onClose={() => setViewRow(null)}
       />
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <label className="text-xs text-muted">

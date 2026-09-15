@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, FileCog, FileText, Plus, ScanLine, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -100,15 +102,9 @@ function PurchaseListPage({
   const [invoiceNo, setInvoiceNo] = useState('')
   const [scanOpen, setScanOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
 
   return (
     <InventoryPageShell activeItem={activeItem}>
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">{title}</h1>
@@ -125,12 +121,10 @@ function PurchaseListPage({
           ) : null}
           <ExportMenu
             onExportPage={() => {
-              setToast('Exported current page')
-              window.setTimeout(() => setToast(null), 2400)
+              showToast('Exported current page')
             }}
             onExportAll={() => {
-              setToast('Exported all')
-              window.setTimeout(() => setToast(null), 2400)
+              showToast('Exported all')
             }}
           />
           {showSettings ? (
@@ -225,8 +219,7 @@ function PurchaseListPage({
         open={scanOpen}
         onClose={() => setScanOpen(false)}
         onSave={() => {
-          setToast('Purchase added')
-          window.setTimeout(() => setToast(null), 2400)
+          showToast('Purchase added')
         }}
       />
       {showSettings ? (
@@ -236,8 +229,7 @@ function PurchaseListPage({
           title={settingsTitle}
           approvalExtra={settingsApprovalExtra}
           onSave={() => {
-            setToast('Settings saved')
-            window.setTimeout(() => setToast(null), 2400)
+            showToast('Settings saved')
           }}
         />
       ) : null}

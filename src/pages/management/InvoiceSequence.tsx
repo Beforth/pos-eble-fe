@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Search, ChevronDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -6,6 +8,11 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  listInvoiceSequencesApi,
+  type InvoiceSequenceRecord,
+} from '../../services/outletService'
 
 interface InvoiceSequenceRow {
   id: string
@@ -72,18 +79,41 @@ function ActionMenu({
 
 export default function InvoiceSequence() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [nameQuery, setNameQuery] = useState('')
   const [appliedQuery, setAppliedQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive'>(
     'active',
   )
-  const [sequences] = useState<InvoiceSequenceRow[]>([])
-  const [toast, setToast] = useState<string | null>(null)
+  const [sequences, setSequences] = useState<InvoiceSequenceRow[]>([])
 
-function showToast(message: string) {
-  setToast(message)
-  window.setTimeout(() => setToast(null), 2200)
-}
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    listInvoiceSequencesApi(encryptedOutletId)
+      .then((rows: InvoiceSequenceRecord[]) => {
+        if (cancelled) return
+        setSequences(
+          rows.map((row) => ({
+            id: row.id,
+            name: row.name,
+            prefix: row.prefix,
+            startNumber: '1'.padStart(row.number_length, '0'),
+            active: row.is_active,
+          })),
+        )
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load sequences',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   const filtered = useMemo(() => {
     const q = appliedQuery.trim().toLowerCase()
@@ -189,11 +219,6 @@ function showToast(message: string) {
           </div>
         )}
       </div>
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </ReportsPageShell>
   )
 }

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+
+import { showToast } from '../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, Plus, RefreshCw } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
@@ -30,7 +32,6 @@ export default function TableView() {
     loadTableSessions(),
   )
   const [now, setNow] = useState(() => Date.now())
-  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 30000)
@@ -58,10 +59,6 @@ export default function TableView() {
     return ordered
   }, [])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function reloadFloor() {
     setStatuses(loadTableStatuses())
@@ -105,11 +102,6 @@ export default function TableView() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <BillingHeader
         billNo={billNo}

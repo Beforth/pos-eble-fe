@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ArrowLeft, Home } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -66,7 +68,6 @@ export default function AddAreaLocalityDeliveryCharge() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEdit = Boolean(id)
-  const [toast, setToast] = useState<string | null>(null)
   const [areaLocalityName, setAreaLocalityName] = useState(
     isEdit ? 'College Road' : '',
   )
@@ -81,10 +82,6 @@ export default function AddAreaLocalityDeliveryCharge() {
     [isEdit],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function goBack() {
     navigate('/management/configuration/area-locality-delivery')
@@ -140,11 +137,6 @@ export default function AddAreaLocalityDeliveryCharge() {
         </button>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink sm:text-xl">{pageLabel}</h1>

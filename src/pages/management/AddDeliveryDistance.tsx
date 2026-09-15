@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import {
@@ -32,7 +34,6 @@ export default function AddDeliveryDistance() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEdit = Boolean(id)
-  const [toast, setToast] = useState<string | null>(null)
   const [from, setFrom] = useState(isEdit ? '0' : '')
   const [to, setTo] = useState(isEdit ? '5' : '')
   const [price, setPrice] = useState(isEdit ? '30' : '')
@@ -42,10 +43,6 @@ export default function AddDeliveryDistance() {
     [isEdit],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function goBack() {
     navigate('/management/configuration/delivery-distance')
@@ -62,11 +59,6 @@ export default function AddDeliveryDistance() {
 
   return (
     <ReportsPageShell title={title} activeItem="config-delivery-distance">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="space-y-5 p-5 sm:p-6">

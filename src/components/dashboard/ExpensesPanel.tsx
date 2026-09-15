@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Pencil } from 'lucide-react'
 import type { ExpenseType, ExpensesData } from '../../types'
 import { formatINR } from '../../utils/format'
@@ -27,7 +29,6 @@ export function ExpensesPanel({
 }: ExpensesPanelProps) {
   const [lines, setLines] = useState(data.lines)
   const [editing, setEditing] = useState<ExpenseType | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   const totalOutflow = useMemo(
     () =>
@@ -37,10 +38,6 @@ export function ExpensesPanel({
     [lines],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSave(amount: number) {
     if (!editing) return
@@ -114,11 +111,6 @@ export function ExpensesPanel({
         onSave={handleSave}
       />
 
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </>
   )
 }

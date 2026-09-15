@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { Box, FilePenLine, Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -76,7 +78,6 @@ export default function AddWastage() {
   const [lines, setLines] = useState<LineItem[]>([emptyLine()])
   const isItemMode = wastageFor === 'item'
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
@@ -99,10 +100,6 @@ export default function AddWastage() {
     [lines],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function updateLine(id: string, patch: Partial<LineItem>) {
     setLines((prev) =>
@@ -159,20 +156,14 @@ export default function AddWastage() {
       return
     }
     setError('')
-    setToast('Wastage saved')
+    showToast('Wastage saved')
     window.setTimeout(() => {
-      setToast(null)
       navigate('/inventory/wastage')
     }, 900)
   }
 
   return (
     <InventoryPageShell activeItem="wastage">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Add Wastage Details</h1>

@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { Percent, ShoppingCart } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
@@ -53,7 +55,6 @@ const inputClass =
 
 export default function AddCommission() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const [categoryIds, setCategoryIds] = useState<string[]>([])
@@ -71,10 +72,6 @@ export default function AddCommission() {
       .map((item) => item.name)
   }, [categoryIds])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSave() {
     if (!commissionValue || Number(commissionValue) <= 0) {
@@ -144,11 +141,6 @@ export default function AddCommission() {
         </span>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <SectionCard icon={<ShoppingCart size={16} />} title="Commission Scope">
         <div className="space-y-4">

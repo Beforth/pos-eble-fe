@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { Info, Trash2, Upload } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -45,16 +47,11 @@ export default function BarcodeGeneration() {
   const [barcode, setBarcode] = useState('')
   const [rows, setRows] = useState<BarcodeRow[]>([])
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [alertOpen, setAlertOpen] = useState(false)
   const [alertMessage, setAlertMessage] = useState('')
 
   const totalPrints = rows.reduce((sum, row) => sum + row.prints, 0)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function showAlert(message: string) {
     setAlertMessage(message)
@@ -125,11 +122,6 @@ export default function BarcodeGeneration() {
 
   return (
     <InventoryPageShell activeItem="barcode-generation">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Barcode Generation</h1>

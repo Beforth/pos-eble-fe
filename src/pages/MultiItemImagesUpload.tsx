@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+
+import { showToast } from '../utils/toast'
 import {
   Bike,
   Check,
@@ -114,7 +116,6 @@ export default function MultiItemImagesUpload() {
   const [platforms, setPlatforms] = useState<string[]>([])
   const [images, setImages] = useState<UploadedImage[]>([])
   const [dragOver, setDragOver] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
 
   const showPlatformSection = moduleType === 'item'
   const showUpload =
@@ -134,10 +135,6 @@ export default function MultiItemImagesUpload() {
     [images],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2800)
-  }
 
   function selectModule(id: ModuleType) {
     setModuleType(id)
@@ -270,11 +267,6 @@ export default function MultiItemImagesUpload() {
       backTo="/menu"
       activeItem="menu-images-upload"
     >
-      {toast ? (
-        <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       {/* How It Works */}
       <section className="mb-4 overflow-hidden rounded-xl border border-line bg-card">

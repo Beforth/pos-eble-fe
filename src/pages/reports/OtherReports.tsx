@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   BadgePercent,
@@ -156,16 +158,11 @@ export default function OtherReports() {
     useState<ReportCategoryId>('favourite')
   const [search, setSearch] = useState('')
   const [favourites, setFavourites] = useState<Record<string, boolean>>({})
-  const [toast, setToast] = useState<string | null>(null)
   const sectionRefs = useRef<Partial<Record<ReportCategoryId, HTMLElement | null>>>(
     {},
   )
   const listRef = useRef<HTMLDivElement>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function openReport(report: RestaurantReportItem) {
     const route = REPORT_ROUTES[report.id]
@@ -249,11 +246,6 @@ export default function OtherReports() {
 
   return (
     <ReportsPageShell title="Reports" activeItem="other-reports">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="flex min-h-[calc(100vh-9rem)] overflow-hidden rounded-xl border border-line bg-card">
         <aside className="hidden w-[240px] shrink-0 border-r border-line bg-page/30 md:block">

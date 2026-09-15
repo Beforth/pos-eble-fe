@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -6,6 +8,11 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  createInvoiceSequenceApi,
+  type InvoiceSequenceType,
+} from '../../services/outletService'
 
 const SEQUENCE_TYPES = [
   'Group Wise',
@@ -14,6 +21,12 @@ const SEQUENCE_TYPES = [
 ] as const
 
 type SequenceType = (typeof SEQUENCE_TYPES)[number]
+
+const SEQUENCE_TYPE_CODES: Record<SequenceType, InvoiceSequenceType> = {
+  'Group Wise': 'group',
+  'Order Type Wise': 'order_type',
+  'Virtual Brand Wise': 'virtual_brand',
+}
 
 const ORDER_TYPE_OPTIONS = [
   'Dine In',
@@ -79,7 +92,8 @@ function resolveTokens(value: string, year = 2018, month = 1, day = 1) {
 
 export default function AddInvoiceSequence() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
+  const { encryptedOutletId } = useAuth()
+  const [saving, setSaving] = useState(false)
 
   const [invoiceId, setInvoiceId] = useState('')
   const [name, setName] = useState('')
@@ -102,10 +116,6 @@ export default function AddInvoiceSequence() {
     return `${p}${mid}/${s}`
   }, [prefix, numberLength, suffix])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function goBack() {
     navigate('/management/configuration/outlet/invoice-sequence')
@@ -123,7 +133,7 @@ export default function AddInvoiceSequence() {
     )
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!invoiceId.trim() || !name.trim()) {
       showToast('Invoice Id and Name are required')
       return
@@ -146,8 +156,35 @@ export default function AddInvoiceSequence() {
       showToast('Please select atleast one virtual brand')
       return
     }
-    showToast('Invoice sequence saved')
-    window.setTimeout(goBack, 700)
+    if (!encryptedOutletId) {
+      showToast('No active outlet selected')
+      return
+    }
+    setSaving(true)
+    try {
+      await createInvoiceSequenceApi(encryptedOutletId, {
+        invoice_id: invoiceId.trim(),
+        name: name.trim(),
+        prefix: prefix.trim(),
+        number_length: Number(numberLength) || 2,
+        suffix: suffix.trim(),
+        sequence_type: SEQUENCE_TYPE_CODES[sequenceType],
+        groups: [],
+        order_types: selectedOrderTypes,
+        brands: selectedBrands,
+        is_active: active,
+      })
+      showToast('Invoice sequence saved')
+      window.setTimeout(goBack, 700)
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : 'Failed to save invoice sequence',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -165,11 +202,6 @@ export default function AddInvoiceSequence() {
         </button>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="space-y-6 p-5 sm:p-6">
@@ -377,7 +409,9 @@ export default function AddInvoiceSequence() {
           <OutlineButton variant="gray" onClick={goBack}>
             Cancel
           </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          <PrimaryButton onClick={handleSave} disabled={saving}>
+            Save Changes
+          </PrimaryButton>
         </div>
       </div>
     </ReportsPageShell>

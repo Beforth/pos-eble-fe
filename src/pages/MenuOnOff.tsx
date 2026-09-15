@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../utils/toast'
 import { Search } from 'lucide-react'
 import { Badge } from '../components/common/Badge'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
@@ -64,16 +66,11 @@ export default function MenuOnOff() {
     'swiggy',
     'zomato',
   ])
-  const [toast, setToast] = useState<string | null>(null)
 
   const activeCategory =
     baseMenuCategories.find((cat) => cat.id === categoryId) ??
     baseMenuCategories[0]
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   const filtered = useMemo(() => {
     let rows = items.filter((row) => row.categoryId === categoryId)
@@ -150,11 +147,6 @@ export default function MenuOnOff() {
 
   return (
     <MenuPageShell activeItem="menu-on-off" title="Menu on / off" fillViewport>
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="menu-panel-viewport-fill is-fixed-height">
         <div className="menu-on-off-shell">

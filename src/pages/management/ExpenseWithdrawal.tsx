@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ChevronDown, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
@@ -84,7 +86,6 @@ export default function ExpenseWithdrawal() {
   const [titleQuery, setTitleQuery] = useState('')
   const [appliedTitle, setAppliedTitle] = useState('')
   const [page, setPage] = useState(1)
-  const [toast, setToast] = useState<string | null>(null)
   const [top10Open, setTop10Open] = useState(false)
   const top10Ref = useRef<HTMLDivElement>(null)
 
@@ -129,10 +130,6 @@ export default function ExpenseWithdrawal() {
     filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
   const toRecord = Math.min(currentPage * PAGE_SIZE, filtered.length)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setAppliedTitle(titleQuery)
@@ -206,11 +203,6 @@ export default function ExpenseWithdrawal() {
         ) : null
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap gap-1 border-b border-line">
         {TABS.map((tab) => {

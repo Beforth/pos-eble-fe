@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   ArrowUpRight,
   Building2,
@@ -204,20 +206,10 @@ export default function FinanceDashboard() {
   const [cashDate, setCashDate] = useState('Yesterday')
   const [reconDate, setReconDate] = useState('Yesterday')
   const [activeTab, setActiveTab] = useState<FinanceTab>('card-upi')
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2000)
-  }
 
   return (
     <FinancePageShell activeItem="dashboard">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>

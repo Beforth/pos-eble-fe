@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Mail } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -89,7 +91,6 @@ export default function AddReportNotification() {
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState('Active')
   const [errors, setErrors] = useState<{ email?: string }>({})
-  const [toast, setToast] = useState<string | null>(null)
 
   const today = useMemo(() => new Date(2026, 7, 12), [])
   const tomorrow = useMemo(() => {
@@ -98,10 +99,6 @@ export default function AddReportNotification() {
     return next
   }, [today])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSave() {
     const nextErrors: { email?: string } = {}
@@ -142,11 +139,6 @@ export default function AddReportNotification() {
       }
       activeItem="report-notification"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <SectionCard icon={<Bell size={16} />} title="Notification Settings">
         <div className="space-y-4">

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../utils/toast'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
@@ -25,7 +27,6 @@ function emptyComboItem(): ComboItemDraft {
 
 export default function AddCombo() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const [name, setName] = useState('')
@@ -36,10 +37,6 @@ export default function AddCombo() {
     emptyComboItem(),
   ])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function updateItem(key: string, patch: Partial<ComboItemDraft>) {
     setComboItems((prev) =>
@@ -109,11 +106,6 @@ export default function AddCombo() {
         </span>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       {/* ── Combo Details ── */}
       <section className="relative z-0 mb-4 rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:z-30">

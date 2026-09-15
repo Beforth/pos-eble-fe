@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+
+import { showToast } from '../utils/toast'
 import { Eye, EyeOff, ImagePlus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
@@ -44,7 +46,6 @@ export default function EditProfile() {
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
-  const [toast, setToast] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const fileRef = useRef<HTMLInputElement>(null)
@@ -56,10 +57,6 @@ export default function EditProfile() {
     }
   }, [])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function closeOtherDrawers() {
     setSupportOpen(false)
@@ -186,11 +183,6 @@ export default function EditProfile() {
             </div>
           }
         >
-          {toast ? (
-            <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-              {toast}
-            </div>
-          ) : null}
 
           <form
             id="edit-profile-form"

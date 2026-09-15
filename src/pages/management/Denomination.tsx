@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { showToast } from '../../utils/toast'
 import { Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -9,12 +9,7 @@ import {
 
 export default function Denomination() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   return (
     <ReportsPageShell
@@ -44,11 +39,6 @@ export default function Denomination() {
         </div>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
         <span className="mb-4 flex size-20 items-center justify-center rounded-full bg-page text-muted">

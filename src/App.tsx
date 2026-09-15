@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Slide, ToastContainer } from 'react-toastify'
 import { AuthProvider, ProtectedRoute } from './auth/AuthContext'
+import { RoleProvider } from './state/RoleContext'
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
 import EditProfile from './pages/EditProfile'
@@ -160,11 +162,12 @@ import AddUtilityBillOperator from './pages/management/AddUtilityBillOperator'
 import ExpenseWithdrawal from './pages/management/ExpenseWithdrawal'
 import AddExpense from './pages/management/AddExpense'
 import ServicePaymentHistory from './pages/management/ServicePaymentHistory'
-import LoanInformation from './pages/management/LoanInformation'
 import Denomination from './pages/management/Denomination'
 import AddDenomination from './pages/management/AddDenomination'
 import BillerApp from './pages/management/BillerApp'
 import AddBiller from './pages/management/AddBiller'
+import RoleManagement from './pages/management/RoleManagement'
+import AddRole from './pages/management/AddRole'
 import OnlineStoreLogs from './pages/management/OnlineStoreLogs'
 import OnlineItemOnOffLogs from './pages/management/OnlineItemOnOffLogs'
 import AutoAcceptChangeLogs from './pages/management/AutoAcceptChangeLogs'
@@ -220,10 +223,12 @@ import VariantsManagement from './pages/VariantsManagement'
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+    <RoleProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <ToastContainer position="top-right" autoClose={2200} transition={Slide} />
+          <Routes>
+            <Route path="/login" element={<Login />} />
           <Route
             path="/dashboard"
             element={
@@ -1823,14 +1828,6 @@ export default function App() {
             }
           />
           <Route
-            path="/management/accounting/loan-information"
-            element={
-              <ProtectedRoute>
-                <LoanInformation />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/management/accounting/denomination"
             element={
               <ProtectedRoute>
@@ -1877,6 +1874,38 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AddBiller />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/management/user-management/biller-app/edit/:id"
+            element={
+              <ProtectedRoute>
+                <AddBiller />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/management/user-management/roles"
+            element={
+              <ProtectedRoute>
+                <RoleManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/management/user-management/roles/add"
+            element={
+              <ProtectedRoute>
+                <AddRole />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/management/user-management/roles/:id"
+            element={
+              <ProtectedRoute>
+                <AddRole />
               </ProtectedRoute>
             }
           />
@@ -2065,5 +2094,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+  </RoleProvider>
   )
 }

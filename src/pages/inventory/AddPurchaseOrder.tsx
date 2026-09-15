@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -79,7 +81,6 @@ export default function AddPurchaseOrder() {
   const [deliveryCharges, setDeliveryCharges] = useState(0)
   const [recipientCanEdit, setRecipientCanEdit] = useState(true)
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
 
   const totals = useMemo(() => {
@@ -134,9 +135,8 @@ export default function AddPurchaseOrder() {
       return
     }
     setError('')
-    setToast('Purchase order saved')
+    showToast('Purchase order saved')
     window.setTimeout(() => {
-      setToast(null)
       navigate('/inventory/purchase-order')
     }, 900)
   }
@@ -146,11 +146,6 @@ export default function AddPurchaseOrder() {
 
   return (
     <InventoryPageShell activeItem="purchase-order">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Add Purchase Order</h1>

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, Home, Printer } from 'lucide-react'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -115,7 +117,6 @@ export default function OutletItemWiseReport() {
     item: '',
     restaurant: '',
   })
-  const [toast, setToast] = useState<string | null>(null)
   const [visible, setVisible] = useState<
     Record<OutletItemWiseColumnKey, boolean>
   >(() =>
@@ -145,10 +146,6 @@ export default function OutletItemWiseReport() {
 
   const summary = useMemo(() => summarizeOutletItemWise(rows), [rows])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setApplied({ category, item, restaurant })
@@ -212,11 +209,6 @@ export default function OutletItemWiseReport() {
         </div>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-3">
         <label className="text-xs text-muted">

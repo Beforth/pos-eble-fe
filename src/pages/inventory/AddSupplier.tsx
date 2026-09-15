@@ -1,4 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -204,16 +206,11 @@ export default function AddSupplier() {
   const [paymentTerms, setPaymentTerms] = useState('')
   const [deliveryTerms, setDeliveryTerms] = useState('')
 
-  const [toast, setToast] = useState<string | null>(null)
   const [errors, setErrors] = useState<{ name?: string; company?: string }>({})
 
   const cities = CITY_OPTIONS[state] ?? ['Other']
   const shippingCities = CITY_OPTIONS[shippingState] ?? ['Other']
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2400)
-  }
 
   function handleSave() {
     const nextErrors: { name?: string; company?: string } = {}
@@ -230,11 +227,6 @@ export default function AddSupplier() {
 
   return (
     <InventoryPageShell activeItem="suppliers-third-party">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Add Supplier/Third Party</h1>

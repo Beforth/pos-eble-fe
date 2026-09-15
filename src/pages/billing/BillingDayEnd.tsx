@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { Download, FileText, Search } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
@@ -17,12 +19,7 @@ export default function BillingDayEnd() {
   const [appliedEnd, setAppliedEnd] = useState('')
   const [ignoreDates, setIgnoreDates] = useState(false)
   const [page, setPage] = useState(1)
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(msg: string) {
-    setToast(msg)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   const filtered = useMemo(() => {
     if (ignoreDates) return DAY_END_SUMMARY_ROWS
@@ -88,11 +85,6 @@ export default function BillingDayEnd() {
         onViewKot={() => navigate('/billing?kot=1')}
       />
 
-      {toast ? (
-        <div className="fixed bottom-4 right-4 z-[80] rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

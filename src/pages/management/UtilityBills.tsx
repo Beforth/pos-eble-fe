@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
@@ -18,7 +20,6 @@ interface UtilityOperatorRow {
 
 export default function UtilityBills() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [operatorQuery, setOperatorQuery] = useState('')
   const [appliedQuery, setAppliedQuery] = useState('')
   const [rows] = useState<UtilityOperatorRow[]>([])
@@ -29,10 +30,6 @@ export default function UtilityBills() {
     return rows.filter((row) => row.operator.toLowerCase().includes(q))
   }, [rows, appliedQuery])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setAppliedQuery(operatorQuery.trim())
@@ -82,11 +79,6 @@ export default function UtilityBills() {
         </div>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="border-b border-line p-4 sm:p-5">

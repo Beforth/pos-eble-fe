@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { FileText } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import {
@@ -48,7 +50,6 @@ export default function VirtualWallet() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [appliedMobile, setAppliedMobile] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
 
   const filteredRows = useMemo(() => {
     const query = appliedMobile.trim()
@@ -61,10 +62,6 @@ export default function VirtualWallet() {
     [filteredRows],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setAppliedMobile(mobileNo)
@@ -81,11 +78,6 @@ export default function VirtualWallet() {
 
   return (
     <ReportsPageShell title="Virtual Wallet" activeItem="acct-virtual-wallet">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
         <label className="min-w-[180px] flex-1 text-xs text-muted sm:max-w-[220px]">

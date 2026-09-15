@@ -1,8 +1,26 @@
-import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
+import {
+  useEffect,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from 'react'
+import { showToast } from '../../utils/toast'
 import { BarChart3, Bike, Clock, Globe, Timer, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  getOutletApi,
+  getOutletSettingsApi,
+  updateOutletApi,
+  updateOutletSettingsApi,
+  type OutletPayload,
+  type OutletSettingsRecord,
+  type OutletSummary,
+} from '../../services/outletService'
 
 interface TimeSlot {
   id: string
@@ -244,7 +262,9 @@ function newSlotId(prefix: string) {
 
 export default function OutletTimings() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
+  const { encryptedOutletId } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
   const [closingHour, setClosingHour] = useState('00')
   const [closingMinute, setClosingMinute] = useState('00')
@@ -278,10 +298,65 @@ export default function OutletTimings() {
   })
   const [dashboardSlots, setDashboardSlots] = useState<TimeSlot[]>([])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
+  function applyOutletTimings(value: OutletSummary) {
+    setClosingHour(value.closing_hour || '00')
+    setClosingMinute(value.closing_minute || '00')
+    if (value.extend_closing_notification != null)
+      setExtendClosingToast(Boolean(value.extend_closing_notification))
+    if (value.open_24x7 != null) setOpen24x7(Boolean(value.open_24x7))
+    setDeliveryFrom1(value.delivery_slot1_from || '00:00')
+    setDeliveryTo1(value.delivery_slot1_to || '00:00')
+    setDeliveryFrom2(value.delivery_slot2_from || '00:00')
+    setDeliveryTo2(value.delivery_slot2_to || '00:00')
+    if (value.online_order_all_days != null)
+      setAllDays(Boolean(value.online_order_all_days))
   }
+
+  function applyTimeSlots(value: OutletSettingsRecord) {
+    const mapRows = (rows: unknown, scope: string): TimeSlot[] =>
+      Array.isArray(rows)
+        ? (rows as Array<Record<string, unknown>>).map((row, index) => ({
+            id: `${scope}-${index}`,
+            name: String(row.name ?? ''),
+            from: String(row.from_time ?? '00:00'),
+            to: String(row.to_time ?? '00:00'),
+          }))
+        : []
+    setReportSlots(mapRows(value.report, 'report'))
+    setOnlineSlots(mapRows(value.online, 'online'))
+    setDashboardSlots(mapRows(value.dashboard, 'dashboard'))
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) {
+      setLoading(false)
+      return
+    }
+    Promise.all([
+      getOutletApi(encryptedOutletId),
+      getOutletSettingsApi(encryptedOutletId, 'time-slots'),
+    ])
+      .then(([outlet, slots]) => {
+        if (cancelled) return
+        applyOutletTimings(outlet)
+        applyTimeSlots(slots)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load timings',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -309,9 +384,62 @@ export default function OutletTimings() {
     setDraft({ name: '', from: '00:00', to: '00:00' })
   }
 
-  function handleSave() {
-    showToast('Outlet timings saved')
-    window.setTimeout(goBack, 700)
+  async function handleSave() {
+    if (!encryptedOutletId) {
+      showToast('No active outlet selected')
+      return
+    }
+    if (saving) return
+    const slotsPayload = (rows: TimeSlot[]) =>
+      rows.map((row, index) => ({
+        day: '',
+        name: row.name,
+        from_time: row.from,
+        to_time: row.to,
+        position: index,
+      }))
+    const masterPayload: OutletPayload = {
+      open_24x7: open24x7,
+      closing_hour: closingHour,
+      closing_minute: closingMinute,
+      extend_closing_notification: extendClosingToast,
+      delivery_slot1_from: deliveryFrom1,
+      delivery_slot1_to: deliveryTo1,
+      delivery_slot2_from: deliveryFrom2,
+      delivery_slot2_to: deliveryTo2,
+      online_order_all_days: allDays,
+    }
+    const slotsSettings: OutletSettingsRecord = {
+      report: slotsPayload(reportSlots),
+      online: slotsPayload(onlineSlots),
+      dashboard: slotsPayload(dashboardSlots),
+    }
+    setSaving(true)
+    try {
+      await updateOutletApi(encryptedOutletId, masterPayload)
+      await updateOutletSettingsApi(
+        encryptedOutletId,
+        'time-slots',
+        slotsSettings,
+      )
+      const [outlet, slots] = await Promise.all([
+        getOutletApi(encryptedOutletId),
+        getOutletSettingsApi(encryptedOutletId, 'time-slots'),
+      ])
+      applyOutletTimings(outlet)
+      applyTimeSlots(slots)
+      showToast('Outlet timings saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save outlet timings',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return <SettingsPageLoading />
   }
 
   return (
@@ -335,11 +463,6 @@ export default function OutletTimings() {
       }
       activeItem="config-outlet"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         Configure outlet timings. Based on the same, Sales and other day end
@@ -577,7 +700,9 @@ export default function OutletTimings() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+        <PrimaryButton onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Changes'}
+        </PrimaryButton>
       </div>
     </ReportsPageShell>
   )

@@ -1,9 +1,19 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { Headset, PhoneCall } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { brand } from '../../theme/brand'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  getOutletApi,
+  updateOutletApi,
+  type OutletPayload,
+  type OutletSummary,
+} from '../../services/outletService'
 
 const inputClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
@@ -68,31 +78,89 @@ function FormRow({
 
 export default function ContactDetails() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
+  const { encryptedOutletId } = useAuth()
+  const [loading, setLoading] = useState(true)
 
-  const [ownerMobile, setOwnerMobile] = useState('9168169991')
-  const [managerPhone, setManagerPhone] = useState('9168169991')
-  const [decisionMaker, setDecisionMaker] = useState('Devesh Jobanputra')
-  const [directNumber, setDirectNumber] = useState('9168169991')
+  const [ownerMobile, setOwnerMobile] = useState('')
+  const [managerPhone, setManagerPhone] = useState('')
+  const [decisionMaker, setDecisionMaker] = useState('')
+  const [directNumber, setDirectNumber] = useState('')
   const [billerName, setBillerName] = useState('')
   const [billerPhone, setBillerPhone] = useState('')
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
+  function applyContact(value: OutletSummary) {
+    setOwnerMobile(value.owner_mobile ?? '')
+    setManagerPhone(value.manager_phone ?? '')
+    setDecisionMaker(value.decision_maker ?? '')
+    setDirectNumber(value.direct_number ?? '')
+    setBillerName(value.biller_name ?? '')
+    setBillerPhone(value.biller_phone ?? '')
   }
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) {
+      setLoading(false)
+      return
+    }
+    getOutletApi(encryptedOutletId)
+      .then((value) => {
+        if (!cancelled) applyContact(value)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load outlet',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
   }
 
   function handleSave() {
-    if (!ownerMobile.trim() || !directNumber.trim()) {
-      showToast('Please fill required contact fields')
+    if (!ownerMobile.trim()) {
+      showToast('Owner Mobile No. is required')
       return
     }
-    showToast('Contact details saved')
-    window.setTimeout(goBack, 700)
+    if (!directNumber.trim()) {
+      showToast('Direct Number is required')
+      return
+    }
+    if (!encryptedOutletId) {
+      showToast('No active outlet selected')
+      return
+    }
+    const payload: OutletPayload = {
+      owner_mobile: ownerMobile,
+      manager_phone: managerPhone,
+      decision_maker: decisionMaker,
+      direct_number: directNumber,
+      biller_name: billerName,
+      biller_phone: billerPhone,
+    }
+    updateOutletApi(encryptedOutletId, payload)
+      .then(() => {
+        showToast('Contact details saved')
+      })
+      .catch((error: unknown) => {
+        showToast(
+          error instanceof Error ? error.message : 'Failed to save contact details',
+        )
+      })
+  }
+
+  if (loading) {
+    return <SettingsPageLoading />
   }
 
   return (
@@ -116,11 +184,6 @@ export default function ContactDetails() {
       }
       activeItem="config-outlet"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         Provide information to reach out by {brand.shortName} team in case of

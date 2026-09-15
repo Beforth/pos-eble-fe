@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   Building2,
   Calculator,
@@ -233,12 +235,7 @@ function ConfigCardItem({
 export default function OutletConfiguration() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function openCard(cardId: string, title: string) {
     const route = CARD_ROUTES[cardId]
@@ -298,11 +295,6 @@ export default function OutletConfiguration() {
         </div>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         Below are the configuration to manage your outlet information.

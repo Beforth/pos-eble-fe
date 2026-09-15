@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Home } from 'lucide-react'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -43,12 +45,7 @@ export default function AdvanceOrdersSummaryReport() {
   const [toDate, setToDate] = useState('2026-08-12')
   const [restaurant, setRestaurant] = useState('')
   const [reports, setReports] = useState<GeneratedReport[]>([])
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleExport() {
     const id = `adv-${Date.now()}`
@@ -111,11 +108,6 @@ export default function AdvanceOrdersSummaryReport() {
         </button>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <label className="text-xs text-muted">

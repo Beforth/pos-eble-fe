@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { Package, Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -36,7 +38,6 @@ export default function AddProduction() {
   const [unit, setUnit] = useState('')
   const [rows, setRows] = useState<ToMaterialRow[]>([])
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   const [moreOptions, setMoreOptions] = useState({
     defaultQuantity: '',
@@ -44,10 +45,6 @@ export default function AddProduction() {
     autoProduction: false,
   })
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleAdd() {
     if (!productionName.trim()) {
@@ -93,20 +90,14 @@ export default function AddProduction() {
       return
     }
     setError('')
-    setToast('Production process saved')
+    showToast('Production process saved')
     window.setTimeout(() => {
-      setToast(null)
       navigate('/inventory/production-master')
     }, 900)
   }
 
   return (
     <InventoryPageShell activeItem="production-master">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Add Production Process</h1>

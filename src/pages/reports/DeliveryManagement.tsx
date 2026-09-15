@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Search } from 'lucide-react'
 import {
   Cell,
@@ -62,17 +64,12 @@ export default function DeliveryManagement() {
     () => new Date(2026, 7, 12, 23, 59, 59),
   )
   const [provider, setProvider] = useState('All')
-  const [toast, setToast] = useState<string | null>(null)
 
   const totalOrders = useMemo(
     () => ORDER_DONUT.reduce((sum, slice) => sum + slice.value, 0),
     [],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     showToast('Search applied')
@@ -108,11 +105,6 @@ export default function DeliveryManagement() {
         </div>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-3">
         <DateTimeField

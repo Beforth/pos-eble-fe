@@ -22,7 +22,6 @@ import {
   SlidersHorizontal,
   Truck,
   Upload,
-  Users,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
@@ -215,10 +214,6 @@ const NAV: NavEntry[] = [
               label: 'Service Payment History',
             },
             {
-              id: 'acct-loan-information',
-              label: 'Loan Information',
-            },
-            {
               id: 'acct-denomination',
               label: 'Denomination',
             },
@@ -232,6 +227,10 @@ const NAV: NavEntry[] = [
             {
               id: 'user-mgmt-biller-app',
               label: 'Biller App',
+            },
+            {
+              id: 'user-mgmt-roles',
+              label: 'Roles',
             },
           ],
         },
@@ -319,6 +318,7 @@ const ROUTES: Record<string, string> = {
   'delivery-management': '/reports/delivery-management',
   'mgmt-user-management': '/management/user-management',
   'user-mgmt-biller-app': '/management/user-management/biller-app',
+  'user-mgmt-roles': '/management/user-management/roles',
   'mgmt-user-logs': '/management/user-logs/online-store',
   'user-logs-online-store': '/management/user-logs/online-store',
   'user-logs-online-item-on-off': '/management/user-logs/online-item-on-off',
@@ -350,7 +350,6 @@ const ROUTES: Record<string, string> = {
   'acct-expense-withdrawal': '/management/accounting/expense-withdrawal',
   'acct-service-payment-history':
     '/management/accounting/service-payment-history',
-  'acct-loan-information': '/management/accounting/loan-information',
   'acct-denomination': '/management/accounting/denomination',
 }
 
@@ -364,6 +363,7 @@ const AUTO_EXPAND_PARENTS: Record<string, string[]> = {
   'delivery-management': ['reports'],
   'mgmt-user-management': ['management'],
   'user-mgmt-biller-app': ['management', 'mgmt-user-management'],
+  'user-mgmt-roles': ['management', 'mgmt-user-management'],
   'mgmt-user-logs': ['management'],
   'user-logs-online-store': ['management', 'mgmt-user-logs'],
   'user-logs-online-item-on-off': ['management', 'mgmt-user-logs'],
@@ -398,7 +398,6 @@ const AUTO_EXPAND_PARENTS: Record<string, string[]> = {
   'acct-utility-bills': ['management', 'mgmt-accounting'],
   'acct-expense-withdrawal': ['management', 'mgmt-accounting'],
   'acct-service-payment-history': ['management', 'mgmt-accounting'],
-  'acct-loan-information': ['management', 'mgmt-accounting'],
   'acct-denomination': ['management', 'mgmt-accounting'],
 }
 

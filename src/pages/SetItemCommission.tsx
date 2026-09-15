@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { FileUp, Pencil, Plus } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
@@ -37,12 +39,7 @@ export default function SetItemCommission() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [rows, setRows] = useState<ItemCommissionRow[]>(itemCommissionRows)
   const [importOpen, setImportOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   const filtered = useMemo(() => {
     if (tab === 'addon') return []
@@ -171,11 +168,6 @@ export default function SetItemCommission() {
         </span>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
       <div className="mb-4 flex flex-wrap justify-end gap-2">
         <PrimaryButton onClick={() => navigate('/menu/add-commission')}>
           <Plus size={15} />
@@ -440,8 +432,7 @@ export default function SetItemCommission() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onUpload={(file) => {
-          setToast(`Uploaded ${file.name}`)
-          window.setTimeout(() => setToast(null), 2400)
+          showToast(`Uploaded ${file.name}`)
         }}
       />
     </MenuPageShell>

@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { MessageSquare } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -7,7 +9,9 @@ import {
   ConfigSectionCard,
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useOutletSettings } from '../../services/useOutletSettings'
 import { brand } from '../../theme/brand'
 
 function CheckRow({
@@ -44,22 +48,39 @@ function CheckRow({
 
 export default function SmsConfiguration() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [storeDailyStats, setStoreDailyStats] = useState(true)
   const [sendDailyStats, setSendDailyStats] = useState(true)
+  const { loading, data, save } = useOutletSettings('sms')
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    setStoreDailyStats(data.store_daily_stats == null ? true : Boolean(data.store_daily_stats))
+    setSendDailyStats(data.send_daily_stats == null ? true : Boolean(data.send_daily_stats))
+  }, [data])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
   }
 
-  function handleSave() {
-    showToast('SMS configuration saved')
-    window.setTimeout(goBack, 700)
+  async function handleSave() {
+    try {
+      await save({
+        store_daily_stats: storeDailyStats,
+        send_daily_stats: sendDailyStats,
+      })
+      showToast('SMS configuration saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save SMS settings',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return <SettingsPageLoading />
   }
 
   return (
@@ -69,11 +90,6 @@ export default function SmsConfiguration() {
       }
       activeItem="config-outlet"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         Configure The Option Available To Receive SMS Notifications From{' '}

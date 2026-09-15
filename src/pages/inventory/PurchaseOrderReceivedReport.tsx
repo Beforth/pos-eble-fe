@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -93,12 +95,7 @@ export default function PurchaseOrderReceivedReport() {
   const [status, setStatus] = useState('Saved & Approved')
   const [startDate, setStartDate] = useState('2026-08-11')
   const [endDate, setEndDate] = useState('2026-08-11')
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleShowAll() {
     setFrom('All')
@@ -111,11 +108,6 @@ export default function PurchaseOrderReceivedReport() {
 
   return (
     <InventoryPageShell activeItem="other-reports">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">

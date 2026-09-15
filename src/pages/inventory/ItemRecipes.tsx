@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -233,7 +235,6 @@ export default function ItemRecipes() {
   const [autoConsumption, setAutoConsumption] = useState(false)
   const [rows, setRows] = useState<RecipeRow[]>(() => [...ITEM_RECIPES])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
-  const [toast, setToast] = useState<string | null>(null)
   const [viewRecipeName, setViewRecipeName] = useState<string | null>(null)
   const [logRecipeName, setLogRecipeName] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{
@@ -269,10 +270,6 @@ export default function ItemRecipes() {
   const allSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function applySearch() {
     setAppliedItem(itemFilter)
@@ -332,11 +329,6 @@ export default function ItemRecipes() {
 
   return (
     <InventoryPageShell activeItem="item-recipes">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="relative z-40 mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Recipe Management</h1>

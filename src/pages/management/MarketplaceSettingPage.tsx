@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   ChefHat,
   Info,
@@ -158,12 +160,7 @@ export default function MarketplaceSettingPage() {
   const [expiryDays, setExpiryDays] = useState('2')
   const [senderId, setSenderId] = useState('')
 
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(msg: string) {
-    setToast(msg)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSave() {
     showToast('Marketplace settings saved successfully')
@@ -213,11 +210,6 @@ export default function MarketplaceSettingPage() {
       title="Marketplace Settings"
       activeItem="mgmt-marketplace-setting"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
         {/* Left Sub-Menu Navigation */}

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   AlertCircle,
   Building2,
@@ -64,7 +66,6 @@ const INITIAL = {
 
 export default function GstInformation() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [hasGst, setHasGst] = useState(INITIAL.hasGst)
   const [gstNo, setGstNo] = useState(INITIAL.gstNo)
   const [gstEditable, setGstEditable] = useState(false)
@@ -81,10 +82,6 @@ export default function GstInformation() {
   const [location, setLocation] = useState(INITIAL.location)
   const [zipCode, setZipCode] = useState(INITIAL.zipCode)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function goBack() {
     navigate('/management/accounting')
@@ -136,11 +133,6 @@ export default function GstInformation() {
       }
       activeItem="acct-gst-information"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 max-w-xs">
         <select

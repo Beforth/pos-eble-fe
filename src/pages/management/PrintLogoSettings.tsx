@@ -1,4 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ImagePlus, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -6,23 +8,58 @@ import {
   ConfigSaveBar,
   ConfigSectionCard,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { BrandLogo } from '../../components/brand/BrandLogo'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  getOutletSettingsApi,
+  updateOutletSettingsMultipartApi,
+} from '../../services/outletService'
 
 const MAX_BYTES = 5 * 1024 * 1024
 
 export default function PrintLogoSettings() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [fileName, setFileName] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [hasLogo, setHasLogo] = useState(true)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) {
+      setLoading(false)
+      return
+    }
+    getOutletSettingsApi(encryptedOutletId, 'print')
+      .then((value) => {
+        if (cancelled) return
+        const url = value.print_logo as string | null
+        setHasLogo(Boolean(url))
+        if (url) {
+          setPreviewUrl(url)
+          setFileName(url.split('/').pop() ?? '')
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load print logo',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -35,6 +72,7 @@ export default function PrintLogoSettings() {
   function handleFileChange(file: File | null) {
     if (!file) {
       setFileName('')
+      setLogoFile(null)
       return
     }
     if (!/\.(png|jpe?g)$/i.test(file.name) && !file.type.startsWith('image/')) {
@@ -50,6 +88,7 @@ export default function PrintLogoSettings() {
     clearPreviewObjectUrl()
     setFileName(file.name)
     setPreviewUrl(URL.createObjectURL(file))
+    setLogoFile(file)
     setHasLogo(true)
   }
 
@@ -58,6 +97,7 @@ export default function PrintLogoSettings() {
     setPreviewUrl(null)
     setFileName('')
     setHasLogo(false)
+    setLogoFile(null)
     if (fileRef.current) fileRef.current.value = ''
     showToast('Logo removed')
   }
@@ -67,17 +107,32 @@ export default function PrintLogoSettings() {
       showToast('Please upload a logo')
       return
     }
-    showToast('Print logo saved')
-    window.setTimeout(goBack, 700)
+    if (!encryptedOutletId) {
+      showToast('No active outlet selected')
+      return
+    }
+    updateOutletSettingsMultipartApi(
+      encryptedOutletId,
+      'print',
+      {},
+      { print_logo: logoFile ?? undefined },
+    )
+      .then(() => {
+        showToast('Print logo saved')
+      })
+      .catch((error: unknown) => {
+        showToast(
+          error instanceof Error ? error.message : 'Failed to save print logo',
+        )
+      })
+  }
+
+  if (loading) {
+    return <SettingsPageLoading />
   }
 
   return (
     <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Set Your Print Logo" />} activeItem="config-outlet">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <ConfigSectionCard
         icon={<ImagePlus size={16} />}

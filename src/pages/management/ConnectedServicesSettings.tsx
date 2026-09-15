@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   Archive,
   Barcode,
@@ -18,7 +20,10 @@ import {
   ConfigSectionCard,
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useOutletSettings } from '../../services/useOutletSettings'
+import type { OutletSettingsRecord } from '../../services/outletService'
 import { brand } from '../../theme/brand'
 
 const inputClass =
@@ -138,7 +143,6 @@ function CheckGroup({
 
 export default function ConnectedServicesSettings() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
 
   const [manualDayEnd, setManualDayEnd] = useState(false)
   const [blockDayEndActiveTables, setBlockDayEndActiveTables] = useState(false)
@@ -175,10 +179,53 @@ export default function ConnectedServicesSettings() {
 
   const [restrictExpenseToday, setRestrictExpenseToday] = useState(false)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  const { loading, data, save } = useOutletSettings('connected-services')
+
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    const value = data
+    if (value.manual_day_end != null) setManualDayEnd(Boolean(value.manual_day_end))
+    if (value.block_day_end_active_tables != null)
+      setBlockDayEndActiveTables(Boolean(value.block_day_end_active_tables))
+    if (value.block_day_end_unsync != null)
+      setBlockDayEndUnsync(Boolean(value.block_day_end_unsync))
+    if (value.restrict_edit_after_day_end != null)
+      setRestrictEditAfterDayEnd(Boolean(value.restrict_edit_after_day_end))
+    if (value.send_loyalty_default != null)
+      setSendLoyaltyDefault(Boolean(value.send_loyalty_default))
+    if (Array.isArray(value.apply_loyalty_types))
+      setApplyLoyaltyTypes(value.apply_loyalty_types as string[])
+    if (Array.isArray(value.send_loyalty_types))
+      setSendLoyaltyTypes(value.send_loyalty_types as string[])
+    if (value.loyalty_on_discounted != null)
+      setLoyaltyOnDiscounted(Boolean(value.loyalty_on_discounted))
+    if (value.send_loyalty_data_when) setSendLoyaltyWhen(String(value.send_loyalty_data_when))
+    if (value.cash_drawer_cash_only != null)
+      setCashDrawerCashOnly(Boolean(value.cash_drawer_cash_only))
+    if (value.kds_update_order_screen != null)
+      setKdsUpdateOrderScreen(Boolean(value.kds_update_order_screen))
+    if (value.kds_mark_kot_done != null)
+      setKdsMarkKotDone(Boolean(value.kds_mark_kot_done))
+    if (value.captain_print_kot != null)
+      setPrintKotCaptain(Boolean(value.captain_print_kot))
+    if (value.captain_allow_discount != null)
+      setDiscountCaptain(Boolean(value.captain_allow_discount))
+    if (value.notify_captain_on_ready) setNotifyCaptain(String(value.notify_captain_on_ready))
+    if (value.pin_reset_on) setPinReset(String(value.pin_reset_on))
+    if (value.enable_einvoice != null) setEnableEInvoice(Boolean(value.enable_einvoice))
+    if (value.barcode_prefix != null) setBarcodePrefix(String(value.barcode_prefix))
+    if (value.barcode_weight_chars != null)
+      setWeightChars(String(value.barcode_weight_chars))
+    if (value.barcode_weight_denominator != null)
+      setWeightDenominator(String(value.barcode_weight_denominator))
+    if (value.allow_multiple_items_barcode != null)
+      setMultiItemBarcode(Boolean(value.allow_multiple_items_barcode))
+    if (value.restrict_expense_current_date != null)
+      setRestrictExpenseToday(Boolean(value.restrict_expense_current_date))
+  }, [data])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -196,18 +243,47 @@ export default function ConnectedServicesSettings() {
     )
   }
 
-  function handleSave() {
-    showToast('Connected services settings saved')
-    window.setTimeout(goBack, 700)
+  async function handleSave() {
+    const payload: OutletSettingsRecord = {
+      manual_day_end: manualDayEnd,
+      block_day_end_active_tables: blockDayEndActiveTables,
+      block_day_end_unsync: blockDayEndUnsync,
+      restrict_edit_after_day_end: restrictEditAfterDayEnd,
+      send_loyalty_default: sendLoyaltyDefault,
+      apply_loyalty_types: applyLoyaltyTypes,
+      send_loyalty_types: sendLoyaltyTypes,
+      loyalty_on_discounted: loyaltyOnDiscounted,
+      send_loyalty_data_when: sendLoyaltyWhen,
+      cash_drawer_cash_only: cashDrawerCashOnly,
+      kds_update_order_screen: kdsUpdateOrderScreen,
+      kds_mark_kot_done: kdsMarkKotDone,
+      captain_print_kot: printKotCaptain,
+      captain_allow_discount: discountCaptain,
+      notify_captain_on_ready: notifyCaptain,
+      pin_reset_on: pinReset,
+      enable_einvoice: enableEInvoice,
+      barcode_prefix: barcodePrefix,
+      barcode_weight_chars: weightChars,
+      barcode_weight_denominator: weightDenominator,
+      allow_multiple_items_barcode: multiItemBarcode,
+      restrict_expense_current_date: restrictExpenseToday,
+    }
+    try {
+      await save(payload)
+      showToast('Connected services settings saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save connected services settings',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return <SettingsPageLoading />
   }
 
   return (
     <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Connected Services" />} activeItem="config-outlet">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         The Following Settings Can Be Used To Configure All The Connected

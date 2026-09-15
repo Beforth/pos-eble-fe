@@ -1,26 +1,26 @@
-import { useState, type ReactNode } from 'react'
-import { ArrowLeft, Plus } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
+import { ArrowLeft, Loader2, Plus } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
-import { BillerPermissionsPanel } from '../../components/management/BillerPermissionsPanel'
+import { ApiError } from '../../services/apiClient'
+import { createUserApi, getUserApi, updateUserApi } from '../../services/userService'
+import {
+  BillerPermissionsPanel,
+  type BillerPermissionsValue,
+} from '../../components/management/BillerPermissionsPanel'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useRoles } from '../../state/RoleContext'
 
 type FormTab = 'basic' | 'permissions'
 
 const inputClass =
   'h-10 w-full rounded-md border border-line bg-page px-3 text-sm text-ink outline-none transition-colors focus:border-primary focus:bg-card'
-
-const USER_TYPES = [
-  'Billing User',
-  'Delivery Boy',
-  'Waiter',
-  'Captain',
-  'Online Acceptance App',
-] as const
 
 const DISCOUNT_CAPPING = ['Percentage', 'Fixed', 'No Capping'] as const
 
@@ -47,11 +47,54 @@ function Field({
   )
 }
 
+function serverFieldKey(key: string): string {
+  switch (key) {
+    case 'username':
+      return 'userName'
+    case 'first_name':
+      return 'name'
+    case 'user_code':
+      return 'userCode'
+    case 'role_id':
+      return 'userType'
+    case 'passcode':
+      return 'userPasscode'
+    case 'swipe_code':
+      return 'swipeCode'
+    case 'discount_capping':
+      return 'discountCapping'
+    case 'discount_value':
+      return 'discountValue'
+    default:
+      return key
+  }
+}
+
+function mapServerErrors(errors: unknown): Record<string, string> {
+  if (typeof errors !== 'object' || errors === null) return {}
+  const next: Record<string, string> = {}
+  for (const [key, value] of Object.entries(errors)) {
+    const message = Array.isArray(value) ? value[0] : String(value)
+    if (message) next[serverFieldKey(key)] = message
+  }
+  return next
+}
+
 export default function AddBiller() {
   const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const isEdit = Boolean(id)
+  const { roles, loadRoles } = useRoles()
   const [activeTab, setActiveTab] = useState<FormTab>('basic')
-  const [toast, setToast] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [serverError, setServerError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [editInitial, setEditInitial] = useState<BillerPermissionsValue | null>(
+    null,
+  )
+  const [panelValue, setPanelValue] = useState<BillerPermissionsValue | null>(
+    null,
+  )
 
   const [name, setName] = useState('')
   const [userName, setUserName] = useState('')
@@ -59,41 +102,128 @@ export default function AddBiller() {
   const [userPasscode, setUserPasscode] = useState('')
   const [discountCapping, setDiscountCapping] =
     useState<(typeof DISCOUNT_CAPPING)[number]>('No Capping')
-  const [userType, setUserType] =
-    useState<(typeof USER_TYPES)[number]>('Billing User')
+  const [userType, setUserType] = useState('Billing User')
   const [userCode, setUserCode] = useState('')
   const [phone, setPhone] = useState('')
   const [swipeCode, setSwipeCode] = useState('')
   const [discountValue, setDiscountValue] = useState('')
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function goBack() {
     navigate('/management/user-management/biller-app')
   }
 
+  useEffect(() => {
+    void loadRoles()
+  }, [loadRoles])
+
+  useEffect(() => {
+    if (roles.length > 0 && !roles.some((role) => role.name === userType)) {
+      setUserType(roles[0].name)
+    }
+  }, [roles, userType])
+
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    getUserApi(id)
+      .then((user) => {
+        if (cancelled) return
+        setName(user.name)
+        setUserName(user.username)
+        setUserPasscode(user.passcode || '')
+        setDiscountCapping(
+          (user.discount_capping as (typeof DISCOUNT_CAPPING)[number]) ||
+            'No Capping',
+        )
+        if (user.role) setUserType(user.role.name)
+        setUserCode(user.user_code || '')
+        setPhone(user.phone || '')
+        setSwipeCode(user.swipe_code || '')
+        setDiscountValue(
+          user.discount_value != null ? String(user.discount_value) : '',
+        )
+        setEditInitial({
+          group: user.memberships?.[0]?.groups?.[0] ?? '',
+          selectedGroup: user.memberships?.[0]?.groups?.[0] ?? '',
+          selectedCodenames: user.permissions ?? [],
+          tables: [],
+        })
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setServerError(
+            err instanceof ApiError
+              ? err.message
+              : 'Failed to load billing user',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
   function validate(): boolean {
     const next: Record<string, string> = {}
     if (!name.trim()) next.name = 'Name is required'
     if (!userName.trim()) next.userName = 'User Name is required'
-    if (!password.trim()) next.password = 'Password is required'
+    if (!isEdit && !password.trim()) next.password = 'Password is required'
     if (!userPasscode.trim()) next.userPasscode = 'User Passcode is required'
     if (!userCode.trim()) next.userCode = 'User Code is required'
     setErrors(next)
     return Object.keys(next).length === 0
   }
 
-  function handleCreate() {
+  async function handleSave() {
     setActiveTab('basic')
     if (!validate()) {
       showToast('Please fill all required fields')
       return
     }
-    showToast('Billing user created')
-    window.setTimeout(goBack, 700)
+    setSaving(true)
+    setServerError(null)
+    const role = roles.find((item) => item.name === userType)
+    const payload = {
+      username: userName.trim(),
+      first_name: name.trim(),
+      password: password.trim(),
+      passcode: userPasscode.trim(),
+      discount_capping: discountCapping,
+      role_id: role?.id ?? null,
+      user_code: userCode.trim(),
+      phone: phone.trim(),
+      swipe_code: swipeCode.trim(),
+      discount_value: discountValue.trim() !== '' ? discountValue.trim() : null,
+      ...(panelValue
+        ? {
+            group:
+              panelValue.group === 'No Group Selected' ? '' : panelValue.group,
+            permissions: panelValue.selectedCodenames,
+          }
+        : {}),
+    }
+    try {
+      if (isEdit && id) {
+        await updateUserApi(id, {
+          ...payload,
+          password: password.trim() ? password.trim() : undefined,
+        })
+      } else {
+        await createUserApi(payload)
+      }
+      showToast(isEdit ? 'Billing user updated' : 'Billing user created')
+      window.setTimeout(goBack, 700)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setErrors(mapServerErrors(err.errors))
+      }
+      setServerError(
+        err instanceof ApiError ? err.message : 'Failed to save billing user',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -108,7 +238,7 @@ export default function AddBiller() {
           >
             <ArrowLeft size={18} />
           </button>
-          Add Billing User
+          {isEdit ? 'Edit Billing User' : 'Add Billing User'}
         </span>
       }
       activeItem="user-mgmt-biller-app"
@@ -117,16 +247,21 @@ export default function AddBiller() {
           <OutlineButton variant="gray" onClick={goBack}>
             Discard
           </OutlineButton>
-          <PrimaryButton onClick={handleCreate}>
-            <Plus size={15} />
-            Create
+          <PrimaryButton onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Plus size={15} />
+            )}
+            {isEdit ? 'Save' : 'Create'}
           </PrimaryButton>
         </div>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
+
+      {serverError ? (
+        <div className="mb-4 rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          {serverError}
         </div>
       ) : null}
 
@@ -263,10 +398,8 @@ export default function AddBiller() {
                   </>
                 }
                 value={userType}
-                options={[...USER_TYPES]}
-                onChange={(value) =>
-                  setUserType(value as (typeof USER_TYPES)[number])
-                }
+                options={roles.map((role) => role.name)}
+                onChange={(value) => setUserType(value)}
               />
 
               <Field label="User Code" required>
@@ -294,18 +427,44 @@ export default function AddBiller() {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  className={inputClass}
+                  onChange={(event) => {
+                    setPhone(event.target.value)
+                    if (errors.phone) {
+                      setErrors((prev) => {
+                        const next = { ...prev }
+                        delete next.phone
+                        return next
+                      })
+                    }
+                  }}
+                  className={`${inputClass} ${errors.phone ? 'border-danger' : ''}`}
                 />
+                {errors.phone ? (
+                  <span className="text-xs text-danger">{errors.phone}</span>
+                ) : null}
               </Field>
 
               <Field label="Swipe Code">
                 <input
                   type="text"
                   value={swipeCode}
-                  onChange={(event) => setSwipeCode(event.target.value)}
-                  className={inputClass}
+                  onChange={(event) => {
+                    setSwipeCode(event.target.value)
+                    if (errors.swipeCode) {
+                      setErrors((prev) => {
+                        const next = { ...prev }
+                        delete next.swipeCode
+                        return next
+                      })
+                    }
+                  }}
+                  className={`${inputClass} ${errors.swipeCode ? 'border-danger' : ''}`}
                 />
+                {errors.swipeCode ? (
+                  <span className="text-xs text-danger">
+                    {errors.swipeCode}
+                  </span>
+                ) : null}
               </Field>
 
               <Field label="Discount Value">
@@ -313,15 +472,32 @@ export default function AddBiller() {
                   type="text"
                   inputMode="decimal"
                   value={discountValue}
-                  onChange={(event) => setDiscountValue(event.target.value)}
-                  className={inputClass}
+                  onChange={(event) => {
+                    setDiscountValue(event.target.value)
+                    if (errors.discountValue) {
+                      setErrors((prev) => {
+                        const next = { ...prev }
+                        delete next.discountValue
+                        return next
+                      })
+                    }
+                  }}
+                  className={`${inputClass} ${errors.discountValue ? 'border-danger' : ''}`}
                 />
+                {errors.discountValue ? (
+                  <span className="text-xs text-danger">
+                    {errors.discountValue}
+                  </span>
+                ) : null}
               </Field>
             </div>
           </div>
         </div>
       ) : (
-        <BillerPermissionsPanel />
+        <BillerPermissionsPanel
+          initial={editInitial}
+          onChange={setPanelValue}
+        />
       )}
     </ReportsPageShell>
   )

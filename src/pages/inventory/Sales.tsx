@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, FileCog, FileText, Plus, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -79,15 +81,9 @@ export default function Sales() {
   const [to, setTo] = useState('all')
   const [invoiceNo, setInvoiceNo] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
 
   return (
     <InventoryPageShell activeItem="sales">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Sales List</h1>
@@ -98,12 +94,10 @@ export default function Sales() {
           </PrimaryButton>
           <ExportMenu
             onExportPage={() => {
-              setToast('Exported current page')
-              window.setTimeout(() => setToast(null), 2400)
+              showToast('Exported current page')
             }}
             onExportAll={() => {
-              setToast('Exported all')
-              window.setTimeout(() => setToast(null), 2400)
+              showToast('Exported all')
             }}
           />
           <button
@@ -194,8 +188,7 @@ export default function Sales() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onSave={() => {
-          setToast('Settings saved')
-          window.setTimeout(() => setToast(null), 2400)
+          showToast('Settings saved')
         }}
       />
     </InventoryPageShell>

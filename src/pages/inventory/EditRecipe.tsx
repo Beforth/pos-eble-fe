@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -49,7 +51,6 @@ export default function EditRecipe() {
     toEditable(buildRecipeIngredients(existing?.name ?? '')),
   )
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
     if (!existing) return
@@ -62,10 +63,6 @@ export default function EditRecipe() {
     return Array.from(new Set([...RAW_MATERIAL_OPTIONS, ...current]))
   }, [rows])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function updateRow(id: string, patch: Partial<EditableIngredient>) {
     setRows((prev) =>
@@ -110,11 +107,6 @@ export default function EditRecipe() {
 
   return (
     <InventoryPageShell activeItem="item-recipes">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>

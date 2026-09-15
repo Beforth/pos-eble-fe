@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { CalendarDays, ChevronLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -39,7 +41,6 @@ function formatDisplayDate(value: string): string {
 
 export default function AddExpense() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [date, setDate] = useState('')
   const [loadedDate, setLoadedDate] = useState<string | null>(null)
   const [amounts, setAmounts] = useState<Record<string, string>>({})
@@ -51,10 +52,6 @@ export default function AddExpense() {
     }, 0)
   }, [amounts])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function goBack() {
     navigate('/management/accounting/expense-withdrawal')
@@ -94,11 +91,6 @@ export default function AddExpense() {
         </button>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="space-y-5 p-5 sm:p-6">

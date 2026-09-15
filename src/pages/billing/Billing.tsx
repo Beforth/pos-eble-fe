@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import {
@@ -163,7 +165,6 @@ export default function Billing() {
   const [itsPaid, setItsPaid] = useState(false)
   const [loyalty, setLoyalty] = useState(false)
   const [feedbackSms, setFeedbackSms] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
   const [splitOpen, setSplitOpen] = useState(false)
   const [partPaymentOpen, setPartPaymentOpen] = useState(false)
   const [dueAlertOpen, setDueAlertOpen] = useState(false)
@@ -253,10 +254,6 @@ export default function Billing() {
     })
   }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2400)
-  }
 
   function addItem(item: MenuItemRow) {
     if (!item.available) return
@@ -865,11 +862,6 @@ export default function Billing() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <BillingHeader
         billNo={billNo}

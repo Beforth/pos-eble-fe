@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Calendar, RotateCcw, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -50,12 +52,7 @@ export default function AutoAcceptChangeLogs() {
   )
   const [isSearched, setIsSearched] = useState(true)
   const [logs, setLogs] = useState<AutoAcceptLogEntry[]>([])
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setIsSearched(true)
@@ -81,11 +78,6 @@ export default function AutoAcceptChangeLogs() {
       title="Auto Accept Change Logs"
       activeItem="user-logs-auto-accept-change"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="space-y-4">
         {/* Filter Controls */}

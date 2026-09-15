@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -11,7 +13,6 @@ export default function AddRecipe() {
   const navigate = useNavigate()
   const [menuItem, setMenuItem] = useState('')
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
 
   function handleSave() {
     if (!menuItem) {
@@ -19,20 +20,14 @@ export default function AddRecipe() {
       return
     }
     setError('')
-    setToast('Recipe saved')
+    showToast('Recipe saved')
     window.setTimeout(() => {
-      setToast(null)
       navigate('/inventory/item-recipes')
     }, 900)
   }
 
   return (
     <InventoryPageShell activeItem="item-recipes">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Add Recipe</h1>

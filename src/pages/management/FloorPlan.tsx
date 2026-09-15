@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   Circle,
   Diamond,
@@ -15,6 +17,13 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  createFloorPlanApi,
+  listFloorPlansApi,
+  updateFloorPlanApi,
+  type FloorPlanRecord,
+} from '../../services/outletService'
 
 type ShapeKind =
   | 'circle'
@@ -213,9 +222,11 @@ function NumberStepper({
 }
 
 export default function FloorPlan() {
-  const [toast, setToast] = useState<string | null>(null)
+  const { encryptedOutletId } = useAuth()
   const [editing, setEditing] = useState(false)
   const [planName, setPlanName] = useState('Floor Plan')
+  const [planId, setPlanId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [items, setItems] = useState<FloorItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -229,10 +240,35 @@ export default function FloorPlan() {
 
   const selected = items.find((item) => item.id === selectedId) ?? null
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
+
+  function applyPlan(plan: FloorPlanRecord) {
+    setPlanId(plan.id)
+    setPlanName(plan.name)
+    setItems(
+      plan.items.map((item) => ({
+        id: newId(),
+        kind: item.kind as ShapeKind,
+        label: item.label,
+        x: item.x,
+        y: item.y,
+        width: item.width,
+        height: item.height,
+        rotation: item.rotation,
+        fontSize: item.font_size,
+      })),
+    )
   }
+
+  function reloadPlan() {
+    if (!planId || !encryptedOutletId) return
+    listFloorPlansApi(encryptedOutletId)
+      .then((plans) => {
+        const plan = plans.find((item) => item.id === planId) ?? null
+        if (plan) applyPlan(plan)
+      })
+      .catch(() => {})
+  }
+
 
   const addItem = useCallback(
     (kind: ShapeKind, label?: string, at?: { x: number; y: number }) => {
@@ -277,11 +313,50 @@ export default function FloorPlan() {
     setItems([])
     setSelectedId(null)
     setPreview(false)
+    reloadPlan()
     showToast('Changes discarded')
   }
 
-  function handleSave() {
-    showToast('Floor plan saved')
+  async function handleSave() {
+    if (!encryptedOutletId) {
+      showToast('No active outlet selected')
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = {
+        name: planName.trim() || 'Floor Plan',
+        is_active: true,
+        items: items.map((item) => ({
+          kind: item.kind,
+          label: item.label,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          rotation: item.rotation,
+          font_size: item.fontSize,
+        })),
+      }
+      if (planId) {
+        await updateFloorPlanApi(encryptedOutletId, planId, payload)
+      } else {
+        const created = await createFloorPlanApi(encryptedOutletId, payload)
+        setPlanId(created.id)
+      }
+      showToast('Floor plan saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save floor plan',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function openEditor() {
+    setEditing(true)
+    reloadPlan()
   }
 
   function handleBack() {
@@ -329,29 +404,25 @@ export default function FloorPlan() {
         title="Floor Plan"
         activeItem="config-floor-plan"
         actions={
-          <PrimaryButton
-            onClick={() => {
-              setEditing(true)
-              showToast('Floor plan editor opened')
-            }}
-          >
+          <PrimaryButton onClick={openEditor}>
             <Plus size={15} />
-            Create Floor Plan
+            {planId ? 'Edit Floor Plan' : 'Create Floor Plan'}
           </PrimaryButton>
         }
       >
-        {toast ? (
-          <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-            {toast}
-          </div>
-        ) : null}
         <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
           <span className="mb-5 flex size-28 items-center justify-center rounded-full bg-page">
             <FloorPlanEmptyIcon />
           </span>
           <p className="text-base font-semibold text-ink">
-            No Floor Plan Available
+            {planId ? planName : 'No Floor Plan Available'}
           </p>
+          {planId ? (
+            <p className="mt-1 text-sm text-muted">
+              {items.length} item{items.length === 1 ? '' : 's'} placed. Click
+              Edit Floor Plan to modify.
+            </p>
+          ) : null}
         </div>
       </ReportsPageShell>
     )
@@ -375,18 +446,15 @@ export default function FloorPlan() {
           <OutlineButton variant="gray" onClick={handleDiscard}>
             Discard
           </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Floor Plan</PrimaryButton>
+          <PrimaryButton onClick={handleSave} disabled={saving}>
+            Save Floor Plan
+          </PrimaryButton>
           <OutlineButton variant="gray" onClick={handleBack}>
             &lt; Back
           </OutlineButton>
         </div>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="flex min-h-[580px] flex-col lg:flex-row">

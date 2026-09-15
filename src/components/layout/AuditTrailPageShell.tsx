@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { AuditTrailSidebar } from './AuditTrailSidebar'
+import { UniversalSearchBar } from './UniversalSearchBar'
 import { brand } from '../../theme/brand'
 
 interface AuditTrailPageShellProps {
@@ -27,7 +28,7 @@ export function AuditTrailPageShell({
       <div
         className={`min-w-0 overflow-x-hidden transition-all duration-300 ${collapsed ? 'lg:pl-[76px]' : 'lg:pl-[240px]'}`}
       >
-        <div className="flex h-14 items-center justify-between gap-3 border-b border-line bg-card px-4">
+        <div className="flex h-14 items-center gap-3 border-b border-line bg-card px-4">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -38,7 +39,8 @@ export function AuditTrailPageShell({
           <p className="truncate text-sm font-semibold text-ink">
             {brand.outletName}
           </p>
-          <span className="hidden text-xs text-muted sm:inline">
+          <UniversalSearchBar compact className="ml-auto w-52 sm:w-64 lg:w-80" />
+          <span className="hidden text-xs text-muted lg:inline">
             Audit Trail
           </span>
         </div>

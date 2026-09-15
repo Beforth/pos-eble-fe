@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Download, FileText, Search } from 'lucide-react'
 import { FinancePageShell } from '../../components/layout/FinancePageShell'
 import {
@@ -65,7 +67,6 @@ export default function FinanceTransactions() {
   const [appliedSubOrderType, setAppliedSubOrderType] = useState('All')
   const [appliedPaymentType, setAppliedPaymentType] = useState('All')
   const [page, setPage] = useState(1)
-  const [toast, setToast] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   const showClassicFilters = tab === 'all' || tab === 'cash'
@@ -128,10 +129,6 @@ export default function FinanceTransactions() {
     currentPage * PAGE_SIZE,
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setAppliedBillNo(billNo.trim())
@@ -169,11 +166,6 @@ export default function FinanceTransactions() {
 
   return (
     <FinancePageShell activeItem="transactions">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-line">
         <div className="flex flex-wrap gap-1">

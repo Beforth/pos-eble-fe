@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -108,15 +110,9 @@ export default function Wastage() {
   const [category, setCategory] = useState<string>('All')
   const [view, setView] = useState<string>('Date wise')
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
 
   return (
     <InventoryPageShell activeItem="wastage">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Wastage List</h1>
@@ -127,12 +123,10 @@ export default function Wastage() {
           </PrimaryButton>
           <ExportMenu
             onExportPage={() => {
-              setToast('Exported current page')
-              window.setTimeout(() => setToast(null), 2400)
+              showToast('Exported current page')
             }}
             onExportAll={() => {
-              setToast('Exported all')
-              window.setTimeout(() => setToast(null), 2400)
+              showToast('Exported all')
             }}
           />
           <button

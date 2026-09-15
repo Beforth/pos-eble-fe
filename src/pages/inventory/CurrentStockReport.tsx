@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -210,20 +212,10 @@ export default function CurrentStockReport() {
   const [categories, setCategories] = useState<string[]>([])
   const [stockLevel, setStockLevel] = useState('All')
   const [status, setStatus] = useState('Up to date')
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   return (
     <InventoryPageShell activeItem="current-stock">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Current Stock Report</h1>

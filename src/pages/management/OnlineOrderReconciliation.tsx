@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   ArrowDownUp,
   Check,
@@ -342,7 +344,6 @@ export default function OnlineOrderReconciliation() {
   const [customLabel, setCustomLabel] = useState('6th Aug to 11th Aug')
   const [payoutPeriodId, setPayoutPeriodId] = useState('2026-07-20')
   const [uploadName, setUploadName] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [finalSearch, setFinalSearch] = useState('')
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
     () => new Set(ALL_COLUMNS.map((col) => col.key)),
@@ -373,10 +374,6 @@ export default function OnlineOrderReconciliation() {
   const showEmptyState = rows.length === 0
   const showFinalSearch = activeTab === 'final'
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleCustomRange(from: string, to: string) {
     const fromLabel = formatDayMonth(parseInputDate(from))
@@ -424,11 +421,6 @@ export default function OnlineOrderReconciliation() {
       title="Manage Your All Third Party Online Orders Reconciliation"
       activeItem="acct-online-order-reconciliation"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-2 mb-4 text-xs text-muted">
         Note: You would be able to view and reconcile the data till the previous

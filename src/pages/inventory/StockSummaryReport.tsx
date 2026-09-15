@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -199,7 +201,6 @@ export default function StockSummaryReport() {
   const [fromDate, setFromDate] = useState('2026-08-11')
   const [toDate, setToDate] = useState('2026-08-11')
   const [page, setPage] = useState(1)
-  const [toast, setToast] = useState<string | null>(null)
   const [appliedQuery, setAppliedQuery] = useState('')
 
   const filteredRows = useMemo(() => {
@@ -244,10 +245,6 @@ export default function StockSummaryReport() {
     )
   }, [currentPage, totalPages])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setAppliedQuery(rawMaterial)
@@ -267,11 +264,6 @@ export default function StockSummaryReport() {
 
   return (
     <InventoryPageShell activeItem="stock-summary">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <h1 className="mb-5 text-lg font-bold text-ink">Stock Summary Report</h1>
 

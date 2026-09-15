@@ -1,16 +1,13 @@
-import { useMemo, useState } from 'react'
-import { Info, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Info, Loader2, Search } from 'lucide-react'
 import { SearchableSelect } from '../inventory/SearchableSelect'
+import {
+  getPermissionCatalogApi,
+  type CatalogFeature,
+  type PermissionCatalog,
+} from '../../services/permissionService'
 
-export type PermissionCategoryId =
-  | 'all'
-  | 'pos'
-  | 'order-kot'
-  | 'bill-mods'
-  | 'inventory'
-  | 'config'
-  | 'reports'
-  | 'tables'
+export type PermissionCategoryId = string
 
 export interface PermissionCategory {
   id: PermissionCategoryId
@@ -21,8 +18,8 @@ export interface PermissionCategory {
 type YesPermission = {
   id: string
   label: string
-  category: Exclude<PermissionCategoryId, 'all'>
-  type: 'yes'
+  category: string
+  kind: 'yes'
   defaultChecked: boolean
   info?: string
 }
@@ -30,28 +27,18 @@ type YesPermission = {
 type MultiPermission = {
   id: string
   label: string
-  category: Exclude<PermissionCategoryId, 'all'>
-  type: 'multi'
+  category: string
+  kind: 'multi'
   options: string[]
   defaultSelected: string[]
-  info?: string
-}
-
-type RadioPermission = {
-  id: string
-  label: string
-  category: Exclude<PermissionCategoryId, 'all'>
-  type: 'radio'
-  options: string[]
-  defaultValue: string
   info?: string
 }
 
 type ReportPermission = {
   id: string
   label: string
-  category: 'reports'
-  type: 'report'
+  category: string
+  kind: 'report'
   hasDisplayValues: boolean
   defaultShow: boolean
   defaultDisplayValues: boolean
@@ -59,22 +46,19 @@ type ReportPermission = {
   info?: string
 }
 
-export type PermissionDef =
-  | YesPermission
-  | MultiPermission
-  | RadioPermission
-  | ReportPermission
+export type PermissionDef = YesPermission | MultiPermission | ReportPermission
 
-export const PERMISSION_CATEGORIES: PermissionCategory[] = [
-  { id: 'all', label: 'All Permissions' },
-  { id: 'pos', label: 'POS & Billing Operations' },
-  { id: 'order-kot', label: 'Order & KOT Management' },
-  { id: 'bill-mods', label: 'Bill Modifications, Discounts & Security' },
-  { id: 'inventory', label: 'Inventory & Stock Management' },
-  { id: 'config', label: 'Configuration, Reports & System' },
-  { id: 'reports', label: 'Reports' },
-  { id: 'tables', label: 'Tables', required: true },
-]
+export interface BillerPermissionsValue {
+  group: string
+  selectedGroup: string
+  selectedCodenames: string[]
+  tables: string[]
+}
+
+export interface BillerPermissionsPanelProps {
+  initial?: BillerPermissionsValue | null
+  onChange?: (value: BillerPermissionsValue) => void
+}
 
 const GROUP_OPTIONS = [
   'No Group Selected',
@@ -84,27 +68,6 @@ const GROUP_OPTIONS = [
   'Delivery',
 ]
 
-function yes(
-  id: string,
-  label: string,
-  category: YesPermission['category'],
-  defaultChecked = true,
-  info?: string,
-): YesPermission {
-  return { id, label, category, type: 'yes', defaultChecked, info }
-}
-
-function multi(
-  id: string,
-  label: string,
-  category: MultiPermission['category'],
-  options: string[],
-  defaultSelected = options,
-  info?: string,
-): MultiPermission {
-  return { id, label, category, type: 'multi', options, defaultSelected, info }
-}
-
 const REPORT_DAYS_OPTIONS = [
   'No Restriction',
   'Today',
@@ -113,440 +76,83 @@ const REPORT_DAYS_OPTIONS = [
   '30 Days',
 ]
 
-function report(
-  id: string,
-  label: string,
-  options?: {
-    hasDisplayValues?: boolean
-    defaultShow?: boolean
-    defaultDisplayValues?: boolean
-    defaultDays?: string
-  },
-): ReportPermission {
-  return {
-    id,
-    label,
-    category: 'reports',
-    type: 'report',
-    hasDisplayValues: options?.hasDisplayValues ?? true,
-    defaultShow: options?.defaultShow ?? true,
-    defaultDisplayValues: options?.defaultDisplayValues ?? false,
-    defaultDays: options?.defaultDays ?? 'No Restriction',
-  }
+function buildCategories(catalog: PermissionCatalog): PermissionCategory[] {
+  return [
+    { id: 'all', label: 'All Permissions' },
+    ...catalog.categories.map((category) => ({
+      id: category.code,
+      label: category.label,
+    })),
+    { id: 'tables', label: 'Tables', required: true },
+  ]
 }
 
-export const BILLER_PERMISSIONS: PermissionDef[] = [
-  // POS & Billing Operations
-  yes('allow-billing-rights', 'Allow Billing Rights', 'pos'),
-  yes('settle-save', 'Settle & Save', 'pos'),
-  yes('print-bill-settle-save', 'Print bill on Settle & Save', 'pos', false),
-  yes('btn-save', 'Show Button : Save', 'pos'),
-  yes('btn-save-print', 'Show Button : Save & Print', 'pos'),
-  yes('btn-print-ebill', 'Show Button : Print & eBill', 'pos'),
-  yes('btn-save-ebill', 'Show Button : Save & eBill', 'pos'),
-  yes('btn-split', 'Show Button : Split', 'pos'),
-  yes('btn-hold', 'Show Button : Hold', 'pos'),
-  yes('btn-kot', 'Show Button : KOT', 'pos'),
-  yes('btn-kot-print', 'Show Button : KOT & Print', 'pos'),
-  yes('btn-save-kot-print', 'Show Button : Save & KOT Print', 'pos', false),
-  yes('show-due-payment-box', 'Show Due payment box', 'pos'),
-  yes('manual-finalize-order', 'Manual Finalize Order', 'pos', false),
-  yes('remove-tax-from-bill', 'Remove Tax From Bill', 'pos', false),
-  yes('special-note', 'Special Note', 'pos'),
-  yes('show-sap-box', 'Show Sap Box', 'pos', false),
-  yes('language-profile', 'Language Profile', 'pos'),
-  yes('cash-drawer', 'Cash Drawer', 'pos', false),
-  yes('manual-open-cash-drawer', 'Manual Open Cash Drawer', 'pos'),
-  yes('day-end', 'Day End', 'pos'),
-  yes('blind-day-end', 'Blind Day End', 'pos', false),
-  multi(
-    'allow-payment-type',
-    'Allow payment type',
-    'pos',
-    ['Cash', 'Card', 'Due', 'Other', 'Part', 'Not Paid', 'UPI'],
-  ),
-  multi(
-    'update-payment-type',
-    'Update Payment Type',
-    'pos',
-    ['After Save', 'After Print', 'After Settle & Save'],
-  ),
-  yes('show-current-order-details', 'Show Current Order Details', 'pos'),
-  yes('order-live-view', 'Order Live View', 'pos'),
-  yes('kot-live-view', 'KOT Live View', 'pos'),
-  yes(
-    'show-close-live-view',
-    'Show Close button on live view card',
-    'pos',
-  ),
-  multi('item-master', 'Item Master', 'pos', ['Read', 'Write']),
-  multi(
-    'item-variation-management',
-    'Item Variation Management',
-    'pos',
-    ['Read', 'Write'],
-  ),
-  yes('store-on-off', 'Store On Off', 'pos'),
-  yes('item-on-off', 'Item On Off', 'pos'),
-  multi(
-    'expense-withdrawal-mgmt',
-    'Expense & Withdrawal Management',
-    'pos',
-    ['Read', 'Write'],
-  ),
-  yes('manual-sync', 'Manual Sync', 'pos'),
-  yes(
-    'multi-billing-screen-config',
-    'Show multiple billing screen configuration settings (Only for multiple screens)',
-    'pos',
-    false,
-  ),
-  yes('show-virtual-wallet-config', 'Show Virtual Wallet Configuration', 'pos'),
-
-  // Order & KOT Management
-  multi('kot-management', 'KOT Management', 'order-kot', ['Read', 'Write']),
-  yes('move-kot-items', 'Move KOT/Items', 'order-kot'),
-  multi('allow-kot-to-cancel', 'Allow KOT To Cancel', 'order-kot', [
-    'Reason',
-    'Reason With Password',
-  ]),
-  multi('allow-kot-reprint', 'Allow KOT Reprint', 'order-kot', [
-    'Yes',
-    'With Password',
-  ]),
-  yes('logout-after-kot-print', 'Logout after KOT print', 'order-kot', false),
-  multi('after-print-modification', 'After Print Modification', 'order-kot', [
-    'Add item',
-    'Modify quantity & delete item',
-  ]),
-  multi(
-    'after-save-kot-modification',
-    'After Save Kot Modification',
-    'order-kot',
-    ['Add item', 'Modify quantity & delete item'],
-  ),
-  multi('check-items', 'Check Items', 'order-kot', ['Yes', 'Modify', 'Print']),
-  yes('allow-item-delete-first-time', 'Allow item delete first time', 'order-kot'),
-  yes('advanced-order-management', 'Advanced Order Management', 'order-kot'),
-  yes('pending-order-management', 'Pending Order Management', 'order-kot'),
-  yes('edit-advanced-order', 'Edit Advanced Order', 'order-kot'),
-  yes(
-    'allow-edit-fully-settled-advance',
-    'Allow edit fully settled advance order',
-    'order-kot',
-    true,
-    'Allow editing of advance orders that are already fully settled.',
-  ),
-  yes(
-    'allow-auto-acceptance-config',
-    'Allow Auto acceptance configuration change',
-    'order-kot',
-  ),
-  yes('do-not-show-autoaccept', 'Do not show autoaccept order', 'order-kot', false),
-  yes(
-    'show-custom-order-status-config',
-    'Show Custom Order Status Configuration',
-    'order-kot',
-  ),
-  yes('allow-pending-order-edit', 'Allow Pending Order Edit Rights', 'order-kot'),
-  yes(
-    'hide-print-live-view-auto',
-    'Hide print button on live view card (Applicable to auto-accepted online orders only)',
-    'order-kot',
-    false,
-  ),
-
-  // Bill Modifications, Discounts & Security
-  multi('allow-bill-to-cancel', 'Allow Bill To Cancel', 'bill-mods', [
-    'Reason',
-    'Reason With Password',
-  ]),
-  multi('allow-bill-reprint', 'Allow Bill Reprint', 'bill-mods', [
-    'Yes',
-    'With Password',
-  ]),
-  multi(
-    'after-save-bill-modification',
-    'After Save Bill Modification',
-    'bill-mods',
-    ['Add item', 'Modify quantity & delete item'],
-  ),
-  multi(
-    'after-settle-save-modification',
-    'After Settle & Save Modification',
-    'bill-mods',
-    ['Add item', 'Modify quantity & delete item'],
-  ),
-  yes(
-    'require-bill-modification-reason',
-    'Require Bill Modification Reason',
-    'bill-mods',
-    false,
-  ),
-  multi(
-    'ask-reason-edit-delete-items',
-    'Ask Reason when edit/delete items from edit bill/kot',
-    'bill-mods',
-    ['Yes', 'With Password'],
-    [],
-  ),
-  yes('logout-after-bill-print', 'Logout after Bill print', 'bill-mods', false),
-  yes(
-    'allow-edit-auto-charges',
-    'Allow editing of charges that are set to be calculated automatically',
-    'bill-mods',
-    false,
-  ),
-  multi('discount-configuration', 'Discount Configuration', 'bill-mods', [
-    'Read',
-    'Write',
-  ]),
-  yes('allow-special-discount', 'Allow Special Discount', 'bill-mods'),
-  multi(
-    'allow-discount',
-    'Allow Discount',
-    'bill-mods',
-    ['Yes', 'After Print', 'After Settle & Save'],
-  ),
-  multi(
-    'complimentary-bill',
-    'Complimentary Bill',
-    'bill-mods',
-    ['Yes', 'With Password'],
-    [],
-  ),
-  multi(
-    'nc-items',
-    'NC Items (No Charge Items)',
-    'bill-mods',
-    ['Yes', 'With Password'],
-    [],
-  ),
-  multi(
-    'sales-return-bill',
-    'Sales Return Bill',
-    'bill-mods',
-    ['Yes', 'With Password'],
-    [],
-  ),
-  yes(
-    'show-only-my-created-bill-kot',
-    'Show only my created Bill/KOT',
-    'bill-mods',
-    false,
-  ),
-  yes(
-    'restrict-customer-payment-due',
-    'Restrict changes to customer details/payment type for orders with due payment',
-    'bill-mods',
-    false,
-  ),
-  yes(
-    'allow-return-cash-advance',
-    'Allow return cash option in advance orders (offline billing)',
-    'bill-mods',
-    false,
-  ),
-
-  // Inventory & Stock Management
-  multi(
-    'menu-item-stock-mgmt',
-    'Menu Item Stock Management [Inventory]',
-    'inventory',
-    ['Read', 'Write'],
-    [],
-  ),
-  multi('purchase-inventory', 'Purchase [Inventory]', 'inventory', [
-    'Read',
-    'Write',
-  ]),
-  yes('indent-management', 'Indent Management', 'inventory'),
-  multi('stock-management-inventory', 'Stock Management [Inventory]', 'inventory', [
-    'Read',
-    'Write',
-  ]),
-  multi(
-    'internal-transfer-sales',
-    'Internal Transfer/Sales [Inventory]',
-    'inventory',
-    ['Read', 'Write'],
-  ),
-  multi(
-    'request-for-purchase',
-    'Request For Purchase [Inventory]',
-    'inventory',
-    ['Read', 'Write'],
-  ),
-  multi(
-    'realtime-stock-management',
-    'Real-Time stock management [Inventory]',
-    'inventory',
-    ['Read', 'Write'],
-  ),
-  multi(
-    'raw-material-master',
-    'Raw Material Master [Inventory]',
-    'inventory',
-    ['Read', 'Write'],
-  ),
-  multi('wastage-inventory', 'Wastage [Inventory]', 'inventory', [
-    'Read',
-    'Write',
-  ]),
-  multi('rate-card-inventory', 'Rate Card [Inventory]', 'inventory', [
-    'Read',
-    'Write',
-  ], []),
-  yes('grocery-inventory', 'Grocery Inventory', 'inventory', false),
-  multi(
-    'manual-stock-available',
-    'Manual stock (available stock) [inventory]',
-    'inventory',
-    ['Read', 'Write'],
-    [],
-  ),
-  yes(
-    'paid-unpaid-inventory',
-    'Is this user allowed to use paid/unpaid functionality in inventory?',
-    'inventory',
-  ),
-  yes('inventory-report', 'Inventory Report', 'inventory'),
-  multi('supplier-inventory', 'Supplier [Inventory]', 'inventory', [
-    'Read',
-    'Write',
-  ]),
-  multi(
-    'production-master-module',
-    'Production Master Module [Inventory]',
-    'inventory',
-    ['Read', 'Write'],
-  ),
-
-  // Configuration, Reports & System
-  yes('reports-access', 'Reports', 'config'),
-  yes(
-    'allow-graphical-analytics',
-    'Allow Graphical Analytics in Reports',
-    'config',
-    false,
-  ),
-  yes('finance-dashboard', 'Finance Dashboard', 'config', false),
-  yes('configure-profit-loss', 'Configure profit and loss', 'config', false),
-  multi('tax-configuration', 'Tax Configuration', 'config', ['Read', 'Write']),
-  multi('category-wise-taxes', 'Category wise taxes', 'config', [
-    'Read',
-    'Write',
-  ]),
-  multi(
-    'pos-configuration-details',
-    'Point of Sale Configuration Details',
-    'config',
-    ['Read', 'Write'],
-  ),
-  multi('area-table-management', 'Area, Table Management', 'config', [
-    'Read',
-    'Write',
-  ]),
-  multi('customer-management', 'Customer Management', 'config', [
-    'Read',
-    'Write',
-  ]),
-  multi('delivery-boy-management', 'Delivery Boy Management', 'config', [
-    'Read',
-    'Write',
-  ]),
-  yes('show-customer-complaints-pos', 'Show customer complaint(s) POS', 'config'),
-  multi('allow-complaint-actions', 'Allow Complaint Actions', 'config', [
-    'Read',
-    'Write',
-  ]),
-  yes('hsn-mandatory-item-level', 'Hsn Mandatory Item level', 'config', false),
-  multi(
-    'allow-biller-create-order-for',
-    'Allow biller to create order for',
-    'config',
-    ['Delivery', 'Pick Up', 'Dine In'],
-  ),
-
-  // Reports — Desktop Report Rights
-  report('rpt-category-summary', 'Category Summary', {
-    defaultDisplayValues: true,
-  }),
-  report('rpt-item-summary', 'Item Summary', {
-    defaultDisplayValues: true,
-  }),
-  report('rpt-sales-summary', 'Sales Summary', {
-    defaultDisplayValues: true,
-  }),
-  report('rpt-order-summary', 'Order Summary'),
-  report('rpt-executive-sales-summary', 'Executive Sales Summary'),
-  report('rpt-employee-summary', 'Employee Summary', {
-    hasDisplayValues: false,
-  }),
-  report('rpt-group-summary', 'Group Summary', { hasDisplayValues: false }),
-  report('rpt-variation-summary', 'Variation Summary', {
-    hasDisplayValues: false,
-  }),
-  report('rpt-coversize-summary', 'Coversize Summary', {
-    hasDisplayValues: false,
-  }),
-  report('rpt-tip-summary', 'Tip Summary', { hasDisplayValues: false }),
-  report('rpt-counter-summary', 'Counter Summary', { hasDisplayValues: false }),
-  report('rpt-locality-wise-summary', 'Locality Wise Summary', {
-    hasDisplayValues: false,
-  }),
-  report('rpt-captain-wise-summary', 'Captain Wise Summary', {
-    hasDisplayValues: false,
-  }),
-  report('rpt-settlement-summary', 'Settlement Summary', {
-    hasDisplayValues: false,
-  }),
-  report(
-    'rpt-nc-item-summary',
-    'NC Item Summary (Non-Chargeable Item Summary)',
-    { hasDisplayValues: false },
-  ),
-  report('rpt-assignee-wise-summary', 'Assignee Wise Summary', {
-    hasDisplayValues: false,
-  }),
-]
+function catalogToDefs(catalog: PermissionCatalog): PermissionDef[] {
+  return catalog.features.map((feature) => {
+    const category = feature.category
+    const info = feature.info ?? undefined
+    if (feature.mode === 'yes') {
+      return {
+        id: feature.key,
+        label: feature.label,
+        category,
+        kind: 'yes',
+        defaultChecked: feature.defaults.checked ?? true,
+        info,
+      }
+    }
+    if (feature.mode === 'multi') {
+      return {
+        id: feature.key,
+        label: feature.label,
+        category,
+        kind: 'multi',
+        options: feature.options,
+        defaultSelected: [...(feature.defaults.selected ?? feature.options)],
+        info,
+      }
+    }
+    return {
+      id: feature.key,
+      label: feature.label,
+      category,
+      kind: 'report',
+      hasDisplayValues: feature.defaults.has_display_values ?? false,
+      defaultShow: feature.defaults.show ?? true,
+      defaultDisplayValues: feature.defaults.display_values ?? false,
+      defaultDays: feature.defaults.days ?? 'No Restriction',
+      info,
+    }
+  })
+}
 
 type YesState = Record<string, boolean>
 type MultiState = Record<string, string[]>
-type RadioState = Record<string, string>
 type ReportState = Record<
   string,
   { show: boolean; displayValues: boolean; days: string }
 >
 
-function buildDefaultYes(): YesState {
+function buildDefaultYes(defs: PermissionDef[]): YesState {
   const state: YesState = {}
-  for (const item of BILLER_PERMISSIONS) {
-    if (item.type === 'yes') state[item.id] = item.defaultChecked
+  for (const item of defs) {
+    if (item.kind === 'yes') state[item.id] = item.defaultChecked
   }
   return state
 }
 
-function buildDefaultMulti(): MultiState {
+function buildDefaultMulti(defs: PermissionDef[]): MultiState {
   const state: MultiState = {}
-  for (const item of BILLER_PERMISSIONS) {
-    if (item.type === 'multi') state[item.id] = [...item.defaultSelected]
+  for (const item of defs) {
+    if (item.kind === 'multi') state[item.id] = [...item.defaultSelected]
   }
   return state
 }
 
-function buildDefaultRadio(): RadioState {
-  const state: RadioState = {}
-  for (const item of BILLER_PERMISSIONS) {
-    if (item.type === 'radio') state[item.id] = item.defaultValue
-  }
-  return state
-}
-
-function buildDefaultReport(): ReportState {
+function buildDefaultReport(defs: PermissionDef[]): ReportState {
   const state: ReportState = {}
-  for (const item of BILLER_PERMISSIONS) {
-    if (item.type === 'report') {
+  for (const item of defs) {
+    if (item.kind === 'report') {
       state[item.id] = {
         show: item.defaultShow,
         displayValues: item.defaultDisplayValues,
@@ -563,20 +169,134 @@ function isPermissionEnabled(
   multiState: MultiState,
   reportState: ReportState,
 ): boolean {
-  if (item.type === 'yes') return Boolean(yesState[item.id])
-  if (item.type === 'multi') return (multiState[item.id] ?? []).length > 0
-  if (item.type === 'report') return Boolean(reportState[item.id]?.show)
+  if (item.kind === 'yes') return Boolean(yesState[item.id])
+  if (item.kind === 'multi') return (multiState[item.id] ?? []).length > 0
+  if (item.kind === 'report') return Boolean(reportState[item.id]?.show)
   return true
 }
 
-export function BillerPermissionsPanel() {
+function bareCodename(codename: string): string {
+  return codename.split('.').pop() ?? codename
+}
+
+function computeSelectedCodenames(
+  features: CatalogFeature[],
+  yesState: YesState,
+  multiState: MultiState,
+  reportState: ReportState,
+): string[] {
+  const selected: string[] = []
+  for (const feature of features) {
+    const codenameFor = (label: string): string | undefined =>
+      feature.permissions
+        .find((permission) => permission.label === label)
+        ?.codename.split('.')
+        .pop()
+    if (feature.mode === 'yes') {
+      if (yesState[feature.key]) {
+        const codename = feature.permissions[0]?.codename.split('.').pop()
+        if (codename) selected.push(codename)
+      }
+    } else if (feature.mode === 'multi') {
+      for (const option of multiState[feature.key] ?? []) {
+        const codename = codenameFor(option)
+        if (codename) selected.push(codename)
+      }
+    } else {
+      const report = reportState[feature.key]
+      if (report?.show) {
+        const codename = codenameFor('View')
+        if (codename) selected.push(codename)
+      }
+      if (report?.displayValues) {
+        const codename = codenameFor('Display Values')
+        if (codename) selected.push(codename)
+      }
+    }
+  }
+  return selected
+}
+
+export function BillerPermissionsPanel({
+  initial,
+  onChange,
+}: BillerPermissionsPanelProps = {}) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [defs, setDefs] = useState<PermissionDef[]>([])
+  const [features, setFeatures] = useState<CatalogFeature[]>([])
+  const [categories, setCategories] = useState<PermissionCategory[]>([])
   const [group, setGroup] = useState(GROUP_OPTIONS[0])
   const [category, setCategory] = useState<PermissionCategoryId>('pos')
   const [search, setSearch] = useState('')
-  const [yesState, setYesState] = useState<YesState>(buildDefaultYes)
-  const [multiState, setMultiState] = useState<MultiState>(buildDefaultMulti)
-  const [radioState, setRadioState] = useState<RadioState>(buildDefaultRadio)
-  const [reportState, setReportState] = useState<ReportState>(buildDefaultReport)
+  const [yesState, setYesState] = useState<YesState>({})
+  const [multiState, setMultiState] = useState<MultiState>({})
+  const [reportState, setReportState] = useState<ReportState>({})
+
+  useEffect(() => {
+    let cancelled = false
+    getPermissionCatalogApi()
+      .then((catalog) => {
+        if (cancelled) return
+        const next = catalogToDefs(catalog)
+        setDefs(next)
+        setFeatures(catalog.features)
+        setCategories(buildCategories(catalog))
+        setYesState(buildDefaultYes(next))
+        setMultiState(buildDefaultMulti(next))
+        setReportState(buildDefaultReport(next))
+      })
+      .catch(() => {
+        if (!cancelled) setError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!initial || features.length === 0) return
+    const codes = new Set(
+      (initial.selectedCodenames ?? []).map((codename) =>
+        bareCodename(codename),
+      ),
+    )
+    const yes: YesState = {}
+    const multi: MultiState = {}
+    const report: ReportState = {}
+    for (const feature of features) {
+      const codenameFor = (label: string): string => {
+        const codename = feature.permissions.find(
+          (permission) => permission.label === label,
+        )?.codename
+        return codename ? bareCodename(codename) : ''
+      }
+      if (feature.mode === 'yes') {
+        yes[feature.key] = codes.has(codenameFor(feature.permissions[0]?.label ?? ''))
+      } else if (feature.mode === 'multi') {
+        multi[feature.key] = feature.options.filter((option) => {
+          const codename = feature.permissions.find(
+            (permission) => permission.label === option,
+          )?.codename
+          return codename ? codes.has(bareCodename(codename)) : false
+        })
+      } else {
+        report[feature.key] = {
+          show: codes.has(codenameFor('View')),
+          displayValues: codes.has(codenameFor('Display Values')),
+          days: 'No Restriction',
+        }
+      }
+    }
+    setYesState(yes)
+    setMultiState(multi)
+    setReportState(report)
+    setGroup(initial.selectedGroup ?? initial.group ?? GROUP_OPTIONS[0])
+    if (initial.tables) setSelectedTables(initial.tables)
+  }, [initial, features])
 
   const TABLE_NUMBERS = ['1', '2']
 
@@ -601,34 +321,42 @@ export function BillerPermissionsPanel() {
     )
   }
 
-  const enabledCount = useMemo(
-    () =>
-      BILLER_PERMISSIONS.filter((item) =>
-        isPermissionEnabled(item, yesState, multiState, reportState),
-      ).length + (selectedTables.length > 0 ? 1 : 0),
-    [yesState, multiState, reportState, selectedTables],
+  const selectedCodenames = useMemo(
+    () => computeSelectedCodenames(features, yesState, multiState, reportState),
+    [features, yesState, multiState, reportState],
   )
 
-  const totalCount = BILLER_PERMISSIONS.length + 1
+  useEffect(() => {
+    onChange?.({ group, selectedGroup: group, selectedCodenames, tables: selectedTables })
+  }, [onChange, group, selectedCodenames, selectedTables])
+
+  const enabledCount = useMemo(
+    () =>
+      defs.filter((item) =>
+        isPermissionEnabled(item, yesState, multiState, reportState),
+      ).length + (selectedTables.length > 0 ? 1 : 0),
+    [defs, yesState, multiState, reportState, selectedTables],
+  )
+
+  const totalCount = defs.length + 1
 
   const visiblePermissions = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return BILLER_PERMISSIONS.filter((item) => {
+    return defs.filter((item) => {
       const categoryOk = category === 'all' || item.category === category
       const searchOk = !q || item.label.toLowerCase().includes(q)
       return categoryOk && searchOk
     })
-  }, [category, search])
+  }, [defs, category, search])
 
   const showingReportsOnly =
-    category === 'reports' ||
+    category === 'rpt' ||
     (visiblePermissions.length > 0 &&
-      visiblePermissions.every((item) => item.type === 'report'))
+      visiblePermissions.every((item) => item.kind === 'report'))
 
   const listTitle = showingReportsOnly
     ? 'Desktop Report Rights'
-    : (PERMISSION_CATEGORIES.find((item) => item.id === category)?.label ??
-      'Permissions')
+    : (categories.find((item) => item.id === category)?.label ?? 'Permissions')
 
   function toggleYes(id: string) {
     setYesState((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -644,10 +372,6 @@ export function BillerPermissionsPanel() {
     })
   }
 
-  function setRadio(id: string, value: string) {
-    setRadioState((prev) => ({ ...prev, [id]: value }))
-  }
-
   function patchReport(
     id: string,
     patch: Partial<{ show: boolean; displayValues: boolean; days: string }>,
@@ -661,6 +385,28 @@ export function BillerPermissionsPanel() {
         ...patch,
       },
     }))
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-[620px] flex-col items-center justify-center gap-3 rounded-xl border border-line bg-card">
+        <Loader2 size={22} className="animate-spin text-primary" />
+        <p className="text-sm text-muted">Loading permissions…</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[620px] flex-col items-center justify-center gap-3 rounded-xl border border-line bg-card px-6 text-center">
+        <p className="text-sm font-semibold text-ink">
+          Could not load the permission catalog.
+        </p>
+        <p className="text-xs text-muted">
+          Sign in again or contact support if this keeps happening.
+        </p>
+      </div>
+    )
   }
 
   return (
@@ -694,17 +440,17 @@ export function BillerPermissionsPanel() {
       </p>
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="flex min-h-[480px] flex-col lg:flex-row">
-          <aside className="w-full shrink-0 border-b border-line bg-page/40 lg:w-64 lg:border-b-0 lg:border-r">
-            <nav className="flex gap-1 overflow-x-auto p-2 lg:flex-col lg:overflow-visible">
-              {PERMISSION_CATEGORIES.map((item) => {
+        <div className="flex h-[620px] flex-col lg:flex-row">
+          <aside className="w-full shrink-0 overflow-y-auto border-b border-line bg-page/40 lg:w-64 lg:border-b-0 lg:border-r">
+            <nav className="flex gap-1 overflow-x-auto p-2 lg:flex-col">
+              {categories.map((item) => {
                 const active = category === item.id
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setCategory(item.id)}
-                    className={`relative whitespace-nowrap rounded-md px-3 py-2.5 text-left text-sm transition-colors ${
+                    className={`relative whitespace-nowrap rounded-md px-3 py-2.5 text-left text-sm transition-colors lg:whitespace-normal ${
                       active
                         ? 'border-l-4 border-primary bg-primary/10 font-semibold text-primary pl-3'
                         : 'text-ink hover:bg-page'
@@ -720,7 +466,7 @@ export function BillerPermissionsPanel() {
             </nav>
           </aside>
 
-          <div className="min-w-0 flex-1 overflow-x-auto">
+          <div className="min-w-0 flex-1 overflow-auto">
             {category === 'tables' ? (
               <div className="p-6 md:p-8 space-y-6">
                 <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-ink select-none">
@@ -778,7 +524,7 @@ export function BillerPermissionsPanel() {
             ) : (
               <ul className="divide-y divide-line">
                 {visiblePermissions.map((item) =>
-                  item.type === 'report' ? (
+                  item.kind === 'report' ? (
                     <li
                       key={item.id}
                       className="grid min-w-[640px] grid-cols-[minmax(0,1.4fr)_120px_130px_160px] items-center gap-3 px-4 py-3"
@@ -858,7 +604,7 @@ export function BillerPermissionsPanel() {
                         ) : null}
                       </span>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
-                        {item.type === 'yes' ? (
+                        {item.kind === 'yes' ? (
                           <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
                             <input
                               type="checkbox"
@@ -870,7 +616,7 @@ export function BillerPermissionsPanel() {
                           </label>
                         ) : null}
 
-                        {item.type === 'multi'
+                        {item.kind === 'multi'
                           ? item.options.map((option) => {
                               const selected = (
                                 multiState[item.id] ?? []
@@ -892,24 +638,6 @@ export function BillerPermissionsPanel() {
                                 </label>
                               )
                             })
-                          : null}
-
-                        {item.type === 'radio'
-                          ? item.options.map((option) => (
-                              <label
-                                key={option}
-                                className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                              >
-                                <input
-                                  type="radio"
-                                  name={item.id}
-                                  checked={radioState[item.id] === option}
-                                  onChange={() => setRadio(item.id, option)}
-                                  className="size-4 cursor-pointer accent-primary"
-                                />
-                                {option}
-                              </label>
-                            ))
                           : null}
                       </div>
                     </li>

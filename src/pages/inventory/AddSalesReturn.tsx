@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   BadgePercent,
@@ -100,7 +102,6 @@ export default function AddSalesReturn() {
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [updateStock, setUpdateStock] = useState(true)
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
   const [selectItemAlertOpen, setSelectItemAlertOpen] = useState(false)
   const [purchaseReturnOpen, setPurchaseReturnOpen] = useState(false)
@@ -141,10 +142,6 @@ export default function AddSalesReturn() {
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [moreActionOpen])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function clearAllLines() {
     setLines([emptyLine()])
@@ -239,9 +236,8 @@ export default function AddSalesReturn() {
       }
     }
     setError('')
-    setToast('Sales return saved')
+    showToast('Sales return saved')
     window.setTimeout(() => {
-      setToast(null)
       navigate('/inventory/sales-return')
     }, 900)
   }
@@ -252,11 +248,6 @@ export default function AddSalesReturn() {
 
   return (
     <InventoryPageShell activeItem="sales-return">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">

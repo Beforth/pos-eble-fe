@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   BadgePercent,
   Bike,
@@ -18,11 +20,18 @@ import {
   ConfigSectionCard,
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useOutletSettings } from '../../services/useOutletSettings'
+import type { OutletSettingsRecord } from '../../services/outletService'
 
 const inputClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
 const selectClass = inputClass
+
+const ROUND_INCREMENT_OPTIONS: Record<string, string> = {
+  '1 (Default)': '1',
+}
 
 function RadioGroup({
   name,
@@ -85,7 +94,6 @@ function CheckRow({
 
 export default function CalculationSettings() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
 
   const [roundOff, setRoundOff] = useState('Normal')
   const [roundIncrement, setRoundIncrement] = useState('1 (Default)')
@@ -136,10 +144,85 @@ export default function CalculationSettings() {
   const [saveSpecialNoteMaster, setSaveSpecialNoteMaster] = useState(false)
   const [displaySurcharge, setDisplaySurcharge] = useState(false)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  const { loading, data, save } = useOutletSettings('calculations')
+
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    const value = data
+    if (value.round_off_mode) setRoundOff(String(value.round_off_mode))
+    if (value.round_off_increment != null) {
+      const stored = String(value.round_off_increment)
+      setRoundIncrement(
+        Object.entries(ROUND_INCREMENT_OPTIONS).find(
+          ([, code]) => code === stored,
+        )?.[0] ?? stored,
+      )
+    }
+    if (value.invoice_decimal_points != null)
+      setDecimalPoints(String(value.invoice_decimal_points))
+    if (value.display_calc_service_charge != null)
+      setDisplayServiceCharge(Boolean(value.display_calc_service_charge))
+    if (value.display_calc_surcharge != null)
+      setDisplaySurcharge(Boolean(value.display_calc_surcharge))
+    if (value.show_container_charge != null)
+      setShowContainerCharge(Boolean(value.show_container_charge))
+    if (value.container_charge_label) setContainerLabel(String(value.container_charge_label))
+    if (value.container_charge_mode) setContainerMode(String(value.container_charge_mode))
+    if (Array.isArray(value.container_charge_auto_types))
+      setAutoContainer(value.container_charge_auto_types as string[])
+    if (value.tax_on_container_charge != null)
+      setTaxOnContainer(Boolean(value.tax_on_container_charge))
+    if (value.container_charge_threshold)
+      setContainerAmountRule(String(value.container_charge_threshold))
+    if (value.container_charge_amount != null)
+      setContainerAmount(String(value.container_charge_amount))
+    if (value.show_delivery_charge != null)
+      setShowDeliveryCharge(Boolean(value.show_delivery_charge))
+    if (value.default_delivery_charge != null)
+      setDefaultDeliveryCharge(String(value.default_delivery_charge))
+    if (value.tax_on_delivery_charge != null)
+      setTaxOnDelivery(Boolean(value.tax_on_delivery_charge))
+    if (value.delivery_charge_threshold)
+      setDeliveryAmountRule(String(value.delivery_charge_threshold))
+    if (value.delivery_charge_amount != null)
+      setDeliveryAmount(String(value.delivery_charge_amount))
+    if (value.tax_before_discount != null)
+      setTaxBeforeDiscount(Boolean(value.tax_before_discount))
+    if (value.backward_tax_after_discount != null)
+      setBackwardTaxAfterDiscount(Boolean(value.backward_tax_after_discount))
+    if (value.special_discount_on) setSpecialDiscountOn(String(value.special_discount_on))
+    if (value.item_category_discount_autoapply != null)
+      setAutoItemCategoryDiscount(Boolean(value.item_category_discount_autoapply))
+    if (value.show_item_category_discount_box != null)
+      setShowItemCategoryDiscountBox(Boolean(value.show_item_category_discount_box))
+    if (value.bogo_autoapply != null) setApplyBogoAuto(Boolean(value.bogo_autoapply))
+    if (value.common_coupon_discount != null)
+      setCommonCoupon(Boolean(value.common_coupon_discount))
+    if (value.ignore_addon_price_for_discount != null)
+      setIgnoreAddonInDiscount(Boolean(value.ignore_addon_price_for_discount))
+    if (value.special_discount_reason_mandatory != null)
+      setSpecialDiscountReasonMandatory(Boolean(value.special_discount_reason_mandatory))
+    if (value.assign_bill_sales_to_kot_user != null)
+      setAssignBillToKotUser(Boolean(value.assign_bill_sales_to_kot_user))
+    if (value.save_kot_on_save_bill != null)
+      setSaveKotOnSaveBill(Boolean(value.save_kot_on_save_bill))
+    if (value.consider_non_prepared_kot != null)
+      setConsiderNonPreparedKot(Boolean(value.consider_non_prepared_kot))
+    if (value.merge_duplicate_items_kot != null)
+      setMergeDuplicateItems(Boolean(value.merge_duplicate_items_kot))
+    if (value.split_bill_multiple_groups != null)
+      setSplitBillMultiGroups(Boolean(value.split_bill_multiple_groups))
+    if (value.auto_finalize_order != null)
+      setAutoFinalizeOrder(Boolean(value.auto_finalize_order))
+    if (value.kot_reset_from != null) setKotResetFrom(String(value.kot_reset_from))
+    if (value.complimentary_disable_taxes_charges != null)
+      setDisableChargesOnComp(Boolean(value.complimentary_disable_taxes_charges))
+    if (value.save_special_note_master != null)
+      setSaveSpecialNoteMaster(Boolean(value.save_special_note_master))
+  }, [data])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -157,7 +240,7 @@ export default function CalculationSettings() {
     )
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!containerLabel.trim()) {
       showToast('Container Charge Label is required')
       return
@@ -170,17 +253,59 @@ export default function CalculationSettings() {
       showToast('Everyday reset KOT number is required')
       return
     }
-    showToast('Calculation settings saved')
-    window.setTimeout(goBack, 700)
+    const payload: OutletSettingsRecord = {
+      round_off_mode: roundOff,
+      round_off_increment: ROUND_INCREMENT_OPTIONS[roundIncrement] ?? roundIncrement,
+      invoice_decimal_points: decimalPoints,
+      display_calc_service_charge: displayServiceCharge,
+      display_calc_surcharge: displaySurcharge,
+      show_container_charge: showContainerCharge,
+      container_charge_label: containerLabel,
+      container_charge_mode: containerMode,
+      container_charge_auto_types: autoContainer,
+      tax_on_container_charge: taxOnContainer,
+      container_charge_threshold: containerAmountRule,
+      container_charge_amount: containerAmount,
+      show_delivery_charge: showDeliveryCharge,
+      default_delivery_charge: defaultDeliveryCharge,
+      tax_on_delivery_charge: taxOnDelivery,
+      delivery_charge_threshold: deliveryAmountRule,
+      delivery_charge_amount: deliveryAmount,
+      tax_before_discount: taxBeforeDiscount,
+      backward_tax_after_discount: backwardTaxAfterDiscount,
+      special_discount_on: specialDiscountOn,
+      item_category_discount_autoapply: autoItemCategoryDiscount,
+      show_item_category_discount_box: showItemCategoryDiscountBox,
+      bogo_autoapply: applyBogoAuto,
+      common_coupon_discount: commonCoupon,
+      ignore_addon_price_for_discount: ignoreAddonInDiscount,
+      special_discount_reason_mandatory: specialDiscountReasonMandatory,
+      assign_bill_sales_to_kot_user: assignBillToKotUser,
+      save_kot_on_save_bill: saveKotOnSaveBill,
+      consider_non_prepared_kot: considerNonPreparedKot,
+      merge_duplicate_items_kot: mergeDuplicateItems,
+      split_bill_multiple_groups: splitBillMultiGroups,
+      auto_finalize_order: autoFinalizeOrder,
+      kot_reset_from: kotResetFrom,
+      complimentary_disable_taxes_charges: disableChargesOnComp,
+      save_special_note_master: saveSpecialNoteMaster,
+    }
+    try {
+      await save(payload)
+      showToast('Calculation settings saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save calculation settings',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return <SettingsPageLoading />
   }
 
   return (
     <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Calculations" />} activeItem="config-outlet">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         The Following Settings Are Used To Configure Calculation Of Certain

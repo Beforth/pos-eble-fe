@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   CreditCard,
   History,
@@ -14,7 +16,10 @@ import {
   ConfigSectionCard,
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useOutletSettings } from '../../services/useOutletSettings'
+import type { OutletSettingsRecord } from '../../services/outletService'
 
 const inputClass =
   'h-10 w-full max-w-xs rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
@@ -85,7 +90,6 @@ function RadioGroup({
 
 export default function BillingSystemSettings() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
 
   const [batchSize, setBatchSize] = useState('20')
   const [orderLimit, setOrderLimit] = useState('500')
@@ -107,26 +111,67 @@ export default function BillingSystemSettings() {
   const [logsModifiedAfterPrint, setLogsModifiedAfterPrint] = useState(true)
   const [logsOrdersUpdated, setLogsOrdersUpdated] = useState(false)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  const { loading, data, save } = useOutletSettings('billing-system')
+
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    const value = data
+    if (value.sync_batch_size != null) setBatchSize(String(value.sync_batch_size))
+    if (value.default_order_limit != null) setOrderLimit(String(value.default_order_limit))
+    if (value.auto_sync_time_mins != null) setAutoSyncTime(String(value.auto_sync_time_mins))
+    if (value.pending_order_sync_time_secs != null)
+      setPendingSyncTime(String(value.pending_order_sync_time_secs))
+    if (value.captain_order_intranet_sync_secs != null)
+      setCaptainIntranetSync(String(value.captain_order_intranet_sync_secs))
+    if (value.edit_orders_minutes != null)
+      setEditOrdersMinutes(String(value.edit_orders_minutes))
+    if (value.auto_settle_after_print_minutes != null)
+      setAutoSettleAfterPrint(String(value.auto_settle_after_print_minutes))
+    if (value.sync_use) setSyncUse(String(value.sync_use))
+    if (value.order_cancel_hours != null)
+      setCancelHours(String(value.order_cancel_hours))
+    if (value.payment_request_sync_secs != null)
+      setPaymentRequestSync(String(value.payment_request_sync_secs))
+    if (value.check_payment_request_sync_secs != null)
+      setCheckPaymentRequestSync(String(value.check_payment_request_sync_secs))
+    if (value.voice_notification_qr_payments != null)
+      setVoiceQrPayments(Boolean(value.voice_notification_qr_payments))
+    if (value.billing_screen_refresh_after_print != null)
+      setRefreshAfterBillPrint(String(value.billing_screen_refresh_after_print))
+    if (value.user_idle_logout_mins != null)
+      setIdleLogoutMins(String(value.user_idle_logout_mins))
+    if (value.logs_modified_after_print != null)
+      setLogsModifiedAfterPrint(Boolean(value.logs_modified_after_print))
+    if (value.logs_orders_updated != null)
+      setLogsOrdersUpdated(Boolean(value.logs_orders_updated))
+  }, [data])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
   }
 
-  function handleSave() {
-    if (!orderLimit.trim() || !editOrdersMinutes.trim()) {
-      showToast('Please fill required fields')
-      return
-    }
-    if (!paymentRequestSync.trim() || !checkPaymentRequestSync.trim()) {
-      showToast('Payment sync times are required')
-      return
-    }
-    if (!refreshAfterBillPrint.trim() || !idleLogoutMins.trim()) {
-      showToast('Please fill required display and security fields')
+  async function handleSave() {
+    const requiredFields: Array<[string, string]> = [
+      [batchSize, 'Sync Batch Packet Size'],
+      [orderLimit, 'Default Order Limit'],
+      [autoSyncTime, 'Default Auto Sync Time'],
+      [pendingSyncTime, 'Default Pending Order Sync Time'],
+      [captainIntranetSync, 'Default Captain Order Intranet Sync Time'],
+      [editOrdersMinutes, 'No. of Minutes to Edit Orders'],
+      [cancelHours, 'Cancellation Window Hours'],
+      [paymentRequestSync, 'Payment Request Sync Time'],
+      [checkPaymentRequestSync, 'Check Payment Request Sync Time'],
+      [refreshAfterBillPrint, 'Billing Screen Refresh After Print'],
+      [idleLogoutMins, 'User Idle Time for Logout'],
+    ]
+    const missing = requiredFields
+      .filter(([value]) => !value.trim())
+      .map(([, label]) => label)
+    if (missing.length > 0) {
+      showToast(`Required field${missing.length > 1 ? 's' : ''} missing: ${missing.join(', ')}`)
       return
     }
     const hours = Number(cancelHours)
@@ -134,17 +179,43 @@ export default function BillingSystemSettings() {
       showToast('Maximum cancellation window is 744 hours (31 days)')
       return
     }
-    showToast('Billing system settings saved')
-    window.setTimeout(goBack, 700)
+    const payload: OutletSettingsRecord = {
+      sync_batch_size: batchSize,
+      default_order_limit: orderLimit,
+      auto_sync_time_mins: autoSyncTime,
+      pending_order_sync_time_secs: pendingSyncTime,
+      captain_order_intranet_sync_secs: captainIntranetSync,
+      edit_orders_minutes: editOrdersMinutes,
+      auto_settle_after_print_minutes: autoSettleAfterPrint,
+      sync_use: syncUse,
+      order_cancel_hours: cancelHours,
+      payment_request_sync_secs: paymentRequestSync,
+      check_payment_request_sync_secs: checkPaymentRequestSync,
+      voice_notification_qr_payments: voiceQrPayments,
+      billing_screen_refresh_after_print: refreshAfterBillPrint,
+      user_idle_logout_mins: idleLogoutMins,
+      logs_modified_after_print: logsModifiedAfterPrint,
+      logs_orders_updated: logsOrdersUpdated,
+    }
+    if (managerPassword.trim()) {
+      payload.manager_password = managerPassword.trim()
+    }
+    try {
+      await save(payload)
+      showToast('Billing system settings saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save billing system settings',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return <SettingsPageLoading />
   }
 
   return (
     <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Billing System" />} activeItem="config-outlet">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         These Settings Configure The Display Type, Order And Payment

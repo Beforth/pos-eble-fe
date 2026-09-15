@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   Plus,
   RotateCcw,
@@ -78,7 +80,6 @@ export default function AvailableStock() {
   const [favouritesOnly, setFavouritesOnly] = useState(false)
   const [enteredTodayOnly, setEnteredTodayOnly] = useState(false)
   const [stockValues, setStockValues] = useState<Record<string, string>>({})
-  const [toast, setToast] = useState<string | null>(null)
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -116,18 +117,9 @@ export default function AvailableStock() {
     setValue(id, String(Number.isFinite(current) ? current + 1 : 1))
   }
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   return (
     <InventoryPageShell activeItem="available-stock">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Available Stock</h1>

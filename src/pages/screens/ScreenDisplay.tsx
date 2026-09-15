@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -61,12 +63,7 @@ export default function ScreenDisplay() {
   const [readyByTicket, setReadyByTicket] = useState<Record<string, string[]>>({})
   const [now, setNow] = useState(Date.now())
   const [editOpen, setEditOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(msg: string) {
-    setToast(msg)
-    window.setTimeout(() => setToast(null), 2500)
-  }
 
   const loadScreenData = useCallback(() => {
     if (!id) return
@@ -246,11 +243,6 @@ export default function ScreenDisplay() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <EditScreenModal
         open={editOpen}

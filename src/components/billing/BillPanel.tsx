@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   ChevronDown,
   ChevronUp,
@@ -181,6 +183,7 @@ export function BillPanel({
   onFeedbackSmsChange,
   onQtyChange,
   onRemoveLine,
+  onLineNoteChange,
   onRemoveKotItem,
   onClearItems,
   onAction,
@@ -232,7 +235,6 @@ export function BillPanel({
   const [customerHistory, setCustomerHistory] = useState<
     Record<string, CustomerHistoryOrder[]>
   >(() => ({ ...SEED_CUSTOMER_HISTORY }))
-  const [historyNotice, setHistoryNotice] = useState<string | null>(null)
   const [deliveryCharge, setDeliveryCharge] = useState('0')
   const [containerCharge, setContainerCharge] = useState('0')
   const [customerPaid, setCustomerPaid] = useState('0')
@@ -339,17 +341,11 @@ export function BillPanel({
       gstNo: '',
     })
     setHistoryOpen(false)
-    setHistoryNotice('Customer history deleted')
-    window.setTimeout(() => setHistoryNotice(null), 2200)
+    showToast('Customer history deleted')
   }
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[440px] lg:border-l lg:border-t-0 xl:w-[480px]">
-      {historyNotice ? (
-        <div className="fixed bottom-5 right-5 z-[80] rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {historyNotice}
-        </div>
-      ) : null}
       <AppliedDiscountModal
         open={discountOpen}
         billTotal={total}
@@ -682,12 +678,10 @@ export function BillPanel({
                   title="Wallet balance"
                   onClick={() => {
                     if (!customer.mobile.trim()) {
-                      setHistoryNotice('Enter a mobile number first')
-                      window.setTimeout(() => setHistoryNotice(null), 2200)
+                      showToast('Enter a mobile number first')
                       return
                     }
-                    setHistoryNotice('Wallet — coming soon')
-                    window.setTimeout(() => setHistoryNotice(null), 2200)
+                    showToast('Wallet — coming soon')
                   }}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >

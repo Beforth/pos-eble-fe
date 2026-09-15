@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, FileText, Plus, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -99,14 +101,9 @@ export default function SuppliersThirdParty() {
   const [companyInput, setCompanyInput] = useState('')
   const [appliedName, setAppliedName] = useState('')
   const [appliedCompany, setAppliedCompany] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState(false)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2400)
-  }
 
   function handleSearch() {
     setAppliedName(nameInput.trim())
@@ -161,11 +158,6 @@ export default function SuppliersThirdParty() {
 
   return (
     <InventoryPageShell activeItem="suppliers-third-party">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">

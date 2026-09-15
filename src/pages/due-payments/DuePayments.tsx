@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   Download,
@@ -64,15 +66,10 @@ export default function DuePayments() {
   const [month, setMonth] = useState(String(now.getMonth()))
   const [year, setYear] = useState(String(now.getFullYear()))
   const [removeId, setRemoveId] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   const monthIndex = Number(month)
   const yearNumber = Number(year)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function persist(next: DueClient[]) {
     setDueClients(next)
@@ -199,11 +196,6 @@ export default function DuePayments() {
 
   return (
     <DuePaymentsShell>
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <AlertDialog
         open={Boolean(removeTarget)}

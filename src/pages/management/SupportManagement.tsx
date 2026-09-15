@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Calendar, RotateCcw, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -51,12 +53,7 @@ export default function SupportManagement() {
   const [endDate, setEndDate] = useState('')
   const [isSearched, setIsSearched] = useState(true)
   const [tickets, setTickets] = useState<SupportTicketEntry[]>([])
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setIsSearched(true)
@@ -91,11 +88,6 @@ export default function SupportManagement() {
       title="Support Management"
       activeItem="user-logs-support-mgmt"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="space-y-4">
         {/* Filter Controls */}

@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   CalendarClock,
   Clock,
@@ -14,7 +16,10 @@ import {
   ConfigSectionCard,
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useOutletSettings } from '../../services/useOutletSettings'
+import type { OutletSettingsRecord } from '../../services/outletService'
 import { brand } from '../../theme/brand'
 
 const inputClass =
@@ -85,7 +90,6 @@ function RadioGroup({
 
 export default function OnlineOrderConfiguration() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
 
   const [kotAfterAutoAccept, setKotAfterAutoAccept] = useState(true)
   const [kotInAdvanceOrder, setKotInAdvanceOrder] = useState(false)
@@ -112,18 +116,94 @@ export default function OnlineOrderConfiguration() {
 
   const [turnOffDuration, setTurnOffDuration] = useState('None')
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  const { loading, data, save } = useOutletSettings('online-advance')
+
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    const value = data
+    if (value.kot_print_after_autoaccept != null)
+      setKotAfterAutoAccept(Boolean(value.kot_print_after_autoaccept))
+    if (value.kot_in_advance_order != null)
+      setKotInAdvanceOrder(Boolean(value.kot_in_advance_order))
+    if (value.bill_print_after_autoaccept != null)
+      setBillAfterAutoAccept(Boolean(value.bill_print_after_autoaccept))
+    if (value.ignore_online_delivery_charge != null)
+      setIgnoreDeliveryCharge(Boolean(value.ignore_online_delivery_charge))
+    if (value.default_delivery_charge != null)
+      setDeliveryCharges(String(value.default_delivery_charge))
+    if (value.minimum_order_amount != null)
+      setMinOrderAmount(String(value.minimum_order_amount))
+    if (value.auto_cancel_duration_mins != null)
+      setAutoCancelDuration(String(value.auto_cancel_duration_mins))
+    if (value.accept_online_payment != null)
+      setAcceptOnlinePayment(Boolean(value.accept_online_payment))
+    if (value.generate_invoices_on_accept != null)
+      setGenerateInvoicesOnAccept(Boolean(value.generate_invoices_on_accept))
+    if (value.minimum_preparation_time_mins != null)
+      setMinPrepTime(String(value.minimum_preparation_time_mins))
+    if (value.minimum_delivery_time_mins != null)
+      setMinDeliveryTime(String(value.minimum_delivery_time_mins))
+    if (value.prior_reminder_advance_mins != null)
+      setPriorReminder(String(value.prior_reminder_advance_mins))
+    if (value.no_memo_for_advance != null)
+      setNoMemoAdvance(Boolean(value.no_memo_for_advance))
+    if (value.kot_on_advance_memo != null)
+      setKotOnMemoAdvance(Boolean(value.kot_on_advance_memo))
+    if (value.manual_invoice_from_memo != null)
+      setManualInvoiceFromMemo(Boolean(value.manual_invoice_from_memo))
+    if (value.print_kot_online_advance != null)
+      setPrintKotOnlineAdvance(Boolean(value.print_kot_online_advance))
+    if (value.skip_offline_stock_check_advance != null)
+      setSkipOfflineStockCheck(Boolean(value.skip_offline_stock_check_advance))
+    if (value.enable_minimum_advance_amount_validation != null)
+      setMinAdvanceAmountValidation(
+        Boolean(value.enable_minimum_advance_amount_validation),
+      )
+    if (value.custom_turn_off_duration != null)
+      setTurnOffDuration(String(value.custom_turn_off_duration))
+  }, [data])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
   }
 
-  function handleSave() {
-    showToast('Online order configuration saved')
-    window.setTimeout(goBack, 700)
+  async function handleSave() {
+    const payload: OutletSettingsRecord = {
+      kot_print_after_autoaccept: kotAfterAutoAccept,
+      kot_in_advance_order: kotInAdvanceOrder,
+      bill_print_after_autoaccept: billAfterAutoAccept,
+      ignore_online_delivery_charge: ignoreDeliveryCharge,
+      default_delivery_charge: deliveryCharges,
+      minimum_order_amount: minOrderAmount,
+      auto_cancel_duration_mins: autoCancelDuration,
+      accept_online_payment: acceptOnlinePayment,
+      generate_invoices_on_accept: generateInvoicesOnAccept,
+      minimum_preparation_time_mins: minPrepTime,
+      minimum_delivery_time_mins: minDeliveryTime,
+      prior_reminder_advance_mins: priorReminder,
+      no_memo_for_advance: noMemoAdvance,
+      kot_on_advance_memo: kotOnMemoAdvance,
+      manual_invoice_from_memo: manualInvoiceFromMemo,
+      print_kot_online_advance: printKotOnlineAdvance,
+      skip_offline_stock_check_advance: skipOfflineStockCheck,
+      enable_minimum_advance_amount_validation: minAdvanceAmountValidation,
+      custom_turn_off_duration: turnOffDuration,
+    }
+    try {
+      await save(payload)
+      showToast('Online order configuration saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save online order configuration',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return <SettingsPageLoading />
   }
 
   return (
@@ -136,11 +216,6 @@ export default function OnlineOrderConfiguration() {
       }
       activeItem="config-outlet"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         Configuration System Level Parameters Such As Auto Accept, Cancellation

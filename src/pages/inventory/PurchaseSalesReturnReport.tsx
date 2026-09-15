@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -96,12 +98,7 @@ export default function PurchaseSalesReturnReport() {
   const [category, setCategory] = useState('All')
   const [fromDate, setFromDate] = useState('2026-08-04')
   const [toDate, setToDate] = useState('2026-08-11')
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleClear() {
     setReturnType('Purchase Return')
@@ -113,11 +110,6 @@ export default function PurchaseSalesReturnReport() {
 
   return (
     <InventoryPageShell activeItem="other-reports">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">

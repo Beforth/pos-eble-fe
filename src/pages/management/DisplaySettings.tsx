@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   Armchair,
   BadgePercent,
@@ -29,6 +31,9 @@ import {
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
+import { useOutletSettings } from '../../services/useOutletSettings'
+import type { OutletSettingsRecord } from '../../services/outletService'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
 import { brand } from '../../theme/brand'
 
@@ -47,6 +52,11 @@ const PAYMENT_OPTIONS = [
 ]
 
 const ORDER_TYPES = ['Delivery', 'Pick Up', 'Dine In'] as const
+
+const TIP_CALC_CODES: Record<string, string> = {
+  'Core (Sub Total)': 'Core',
+  'Total (Total Bill Value)': 'Total',
+}
 
 function RadioGroup({
   name,
@@ -167,7 +177,6 @@ function ReasonFields({
 
 export default function DisplaySettings() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
 
   const [layout, setLayout] = useState('Touch Screen')
   const [menuSide, setMenuSide] = useState('On the Left')
@@ -272,10 +281,181 @@ export default function DisplaySettings() {
   const [ncReasons, setNcReasons] = useState(['', '', '', ''])
   const [kotCancelReasons, setKotCancelReasons] = useState(['', '', '', ''])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  const { loading, data, save } = useOutletSettings('display')
+  const reasonsOtp = useOutletSettings('reasons-otp')
+
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    const value = data
+    if (value.layout_type) setLayout(String(value.layout_type))
+    if (value.menu_position) setMenuSide(String(value.menu_position))
+    if (value.default_screen) setDefaultScreen(String(value.default_screen))
+    if (value.order_live_view) setOrderLiveView(String(value.order_live_view))
+    if (value.kot_live_view) setKotLiveView(String(value.kot_live_view))
+    if (value.new_item_cart_position)
+      setAddItemPosition(String(value.new_item_cart_position))
+    if (value.enable_virtual_keyboard_touch != null)
+      setVirtualKeyboard(Boolean(value.enable_virtual_keyboard_touch))
+    if (value.open_vk_on_order_number != null)
+      setVkOrderNumber(Boolean(value.open_vk_on_order_number))
+    if (value.display_item_images != null)
+      setItemImages(Boolean(value.display_item_images))
+    if (value.auto_add_items_on_select != null)
+      setAutoAddItems(Boolean(value.auto_add_items_on_select))
+    if (value.open_vk_shortcode_search != null)
+      setVkShortCode(Boolean(value.open_vk_shortcode_search))
+    if (value.auto_add_from_variation_popup != null)
+      setAutoAddVariation(Boolean(value.auto_add_from_variation_popup))
+    if (value.display_search_item != null)
+      setDisplaySearch(Boolean(value.display_search_item))
+    if (value.addon_min_max_validation != null)
+      setAddonMinMax(Boolean(value.addon_min_max_validation))
+    if (value.display_item_price != null)
+      setDisplayItemPrice(Boolean(value.display_item_price))
+    if (value.display_settle_amount_box != null)
+      setDisplaySettleAmount(Boolean(value.display_settle_amount_box))
+    if (value.settle_amount_mandatory != null)
+      setSettleMandatory(Boolean(value.settle_amount_mandatory))
+    if (value.allow_lower_settlement != null)
+      setAllowLowerSettle(Boolean(value.allow_lower_settlement))
+    if (value.show_tip != null) setShowTip(Boolean(value.show_tip))
+    if (value.tip_selection) setTipSelection(String(value.tip_selection))
+    if (value.tip_value != null) setTipValue(String(value.tip_value))
+    if (value.tip_calculation_on) {
+      const stored = String(value.tip_calculation_on)
+      setTipCalcOn(
+        Object.entries(TIP_CALC_CODES).find(([, code]) => code === stored)?.[0] ??
+          stored,
+      )
+    }
+    if (value.show_cwt_bifurcation != null)
+      setShowCwt(Boolean(value.show_cwt_bifurcation))
+    if (value.tax_area_open_by_default != null)
+      setTaxAreaOpen(Boolean(value.tax_area_open_by_default))
+    if (value.show_kot_details_on_view_merge != null)
+      setShowKotDetails(Boolean(value.show_kot_details_on_view_merge))
+    if (value.merge_ebill_print_bill != null)
+      setMergeEbill(Boolean(value.merge_ebill_print_bill))
+    if (value.no_of_persons_mandatory != null)
+      setPersonsMandatory(Boolean(value.no_of_persons_mandatory))
+    if (value.show_addon_qty_multiplication != null)
+      setShowAddonQty(Boolean(value.show_addon_qty_multiplication))
+    if (value.display_printer_status_errors != null)
+      setPrinterErrors(Boolean(value.display_printer_status_errors))
+    if (value.custom_payment_info_mandatory != null)
+      setCustomPaymentMandatory(Boolean(value.custom_payment_info_mandatory))
+    if (value.disable_decimal_item_qty != null)
+      setNoDecimalQty(Boolean(value.disable_decimal_item_qty))
+    if (value.consider_category_scheduling_offline != null)
+      setCategoryScheduling(Boolean(value.consider_category_scheduling_offline))
+    if (value.show_suggested_items != null)
+      setSuggestedItems(Boolean(value.show_suggested_items))
+    if (Array.isArray(value.assign_to_validation_types))
+      setAssignValidation(value.assign_to_validation_types as string[])
+    if (Array.isArray(value.order_kot_completed_types))
+      setMarkCompleted(value.order_kot_completed_types as string[])
+    if (value.item_sorting) setItemSorting(String(value.item_sorting))
+    if (value.show_table_started_by_info != null)
+      setShowTableStartBy(Boolean(value.show_table_started_by_info))
+    if (value.display_menu) setDisplayMenu(String(value.display_menu))
+    if (value.open_edit_mode_after_save_print != null)
+      setOpenEditAfterPrint(Boolean(value.open_edit_mode_after_save_print))
+    if (Array.isArray(value.order_type_selection_types))
+      setOrderTypeSelection(value.order_type_selection_types as string[])
+    if (value.auto_open_settlement_popup != null)
+      setAutoOpenSettlement(Boolean(value.auto_open_settlement_popup))
+    if (value.default_order_type) setDefaultOrderType(String(value.default_order_type))
+    if (value.default_payment_type)
+      setDefaultPaymentType(String(value.default_payment_type))
+    if (value.default_custom_payment_type)
+      setDefaultCustomPayment(String(value.default_custom_payment_type))
+    if (value.default_table_no != null)
+      setDefaultTableNo(String(value.default_table_no))
+    if (value.default_petty_cash_amount != null)
+      setPettyCash(String(value.default_petty_cash_amount))
+    if (value.item_quantities != null)
+      setItemQuantityPresets(String(value.item_quantities))
+    if (value.item_prices != null) setItemPricePresets(String(value.item_prices))
+    if (value.default_quantity != null)
+      setDefaultQuantity(String(value.default_quantity))
+    if (value.finalize_order != null)
+      setFinalizeOrder(Boolean(value.finalize_order))
+    if (value.payment_option_1 != null) setPayOpt1(String(value.payment_option_1))
+    if (value.payment_option_2 != null) setPayOpt2(String(value.payment_option_2))
+    if (value.payment_option_3 != null) setPayOpt3(String(value.payment_option_3))
+    if (value.payment_option_4 != null) setPayOpt4(String(value.payment_option_4))
+    if (value.section_delivery_name != null)
+      setDeliveryName(String(value.section_delivery_name))
+    if (value.section_delivery_enabled != null)
+      setDeliveryEnabled(Boolean(value.section_delivery_enabled))
+    if (value.section_pickup_name != null)
+      setPickupName(String(value.section_pickup_name))
+    if (value.section_pickup_enabled != null)
+      setPickupEnabled(Boolean(value.section_pickup_enabled))
+    if (value.section_dinein_name != null)
+      setDineInName(String(value.section_dinein_name))
+    if (value.section_dinein_enabled != null)
+      setDineInEnabled(Boolean(value.section_dinein_enabled))
+    if (value.section_extra_enabled != null)
+      setExtraSectionEnabled(Boolean(value.section_extra_enabled))
+    if (value.lock_active_table) setLockActiveTable(String(value.lock_active_table))
+    if (value.release_table_on) setReleaseTableOn(String(value.release_table_on))
+    if (value.release_recent_section_on)
+      setReleaseSectionOn(String(value.release_recent_section_on))
+    if (value.discount_label != null) setDiscountLabel(String(value.discount_label))
+    if (value.discount_calculate_button_text != null)
+      setDiscountButtonText(String(value.discount_calculate_button_text))
+    if (value.display_no_discount_option != null)
+      setShowLeaveNoDiscount(Boolean(value.display_no_discount_option))
+    if (value.discount_area_open_by_default != null)
+      setDiscountAreaOpen(Boolean(value.discount_area_open_by_default))
+    if (value.enable_order_wise_info != null)
+      setOrderWiseInfo(Boolean(value.enable_order_wise_info))
+    if (Array.isArray(value.negative_quantity_reasons) && value.negative_quantity_reasons.length > 0)
+      setNegativeQtyReason(String(value.negative_quantity_reasons[0]))
+    if (value.allow_negative_quantity != null)
+      setAllowNegativeQty(Boolean(value.allow_negative_quantity))
+    if (value.release_kots_on_cancel != null)
+      setReleaseKotsOnCancel(Boolean(value.release_kots_on_cancel))
+    if (value.settle_amount_reason_required != null)
+      setSettlementReasonRequired(Boolean(value.settle_amount_reason_required))
+  }, [data])
+
+  const reasonsLoadedRef = { current: false }
+  useEffect(() => {
+    if (!reasonsOtp.data || reasonsLoadedRef.current) return
+    reasonsLoadedRef.current = true
+    const reasons = (reasonsOtp.data.reasons ?? {}) as Record<string, unknown>
+    const otpEmails = (reasonsOtp.data.otp_emails ??
+      {}) as Record<string, unknown>
+
+    function pad(list: unknown, size: number): string[] {
+      const arr = Array.isArray(list)
+        ? list.map((item) => String(item ?? ''))
+        : []
+      return Array.from({ length: size }, (_, index) => arr[index] ?? '')
+    }
+    function emails(list: unknown): string {
+      if (!Array.isArray(list)) return ''
+      return list.map((item) => String(item ?? '')).join(', ')
+    }
+
+    setCancelReasons(pad(reasons['order_cancel'], 4))
+    setEditReasons(pad(reasons['order_edit'], 4))
+    setCompReasons(pad(reasons['complimentary'], 4))
+    setReturnReasons(pad(reasons['sales_return'], 4))
+    setNcReasons(pad(reasons['item_price_change'], 4))
+    setKotCancelReasons(pad(reasons['kot_cancel'], 4))
+
+    setCancelOtpEmails(emails(otpEmails['order_cancel']))
+    setEditOtpEmails(emails(otpEmails['order_edit']))
+    setCompOtpEmails(emails(otpEmails['complimentary']))
+    setReturnOtpEmails(emails(otpEmails['sales_return']))
+    setSpecialDiscountOtp(emails(otpEmails['special_discount']))
+  }, [reasonsOtp.data])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -304,7 +484,7 @@ export default function DisplaySettings() {
     setter(next)
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!discountButtonText.trim()) {
       showToast('Discount Calculate Button Text is required')
       return
@@ -313,17 +493,126 @@ export default function DisplaySettings() {
       showToast('Delivery name is required')
       return
     }
-    showToast('Display settings saved')
-    window.setTimeout(goBack, 700)
+
+    function splitEmails(value: string): string[] {
+      return value
+        .split(',')
+        .map((email) => email.trim())
+        .filter((email) => email.length > 0)
+    }
+
+    const reasonsPayload: OutletSettingsRecord = {
+      reasons: {
+        order_cancel: cancelReasons,
+        order_edit: editReasons,
+        complimentary: compReasons,
+        sales_return: returnReasons,
+        item_price_change: ncReasons,
+        kot_cancel: kotCancelReasons,
+      },
+      otp_emails: {
+        order_cancel: splitEmails(cancelOtpEmails),
+        order_edit: splitEmails(editOtpEmails),
+        complimentary: splitEmails(compOtpEmails),
+        sales_return: splitEmails(returnOtpEmails),
+        special_discount: splitEmails(specialDiscountOtp),
+      },
+    }
+
+    const payload: OutletSettingsRecord = {
+      layout_type: layout,
+      menu_position: menuSide,
+      default_screen: defaultScreen,
+      order_live_view: orderLiveView,
+      kot_live_view: kotLiveView,
+      new_item_cart_position: addItemPosition,
+      enable_virtual_keyboard_touch: virtualKeyboard,
+      open_vk_on_order_number: vkOrderNumber,
+      display_item_images: itemImages,
+      auto_add_items_on_select: autoAddItems,
+      open_vk_shortcode_search: vkShortCode,
+      auto_add_from_variation_popup: autoAddVariation,
+      display_search_item: displaySearch,
+      addon_min_max_validation: addonMinMax,
+      display_item_price: displayItemPrice,
+      display_settle_amount_box: displaySettleAmount,
+      settle_amount_mandatory: settleMandatory,
+      allow_lower_settlement: allowLowerSettle,
+      show_tip: showTip,
+      tip_selection: tipSelection,
+      tip_value: tipValue,
+      tip_calculation_on: TIP_CALC_CODES[tipCalcOn] ?? tipCalcOn,
+      show_cwt_bifurcation: showCwt,
+      tax_area_open_by_default: taxAreaOpen,
+      show_kot_details_on_view_merge: showKotDetails,
+      merge_ebill_print_bill: mergeEbill,
+      no_of_persons_mandatory: personsMandatory,
+      show_addon_qty_multiplication: showAddonQty,
+      display_printer_status_errors: printerErrors,
+      custom_payment_info_mandatory: customPaymentMandatory,
+      disable_decimal_item_qty: noDecimalQty,
+      consider_category_scheduling_offline: categoryScheduling,
+      show_suggested_items: suggestedItems,
+      assign_to_validation_types: assignValidation,
+      order_kot_completed_types: markCompleted,
+      item_sorting: itemSorting,
+      show_table_started_by_info: showTableStartBy,
+      display_menu: displayMenu,
+      open_edit_mode_after_save_print: openEditAfterPrint,
+      order_type_selection_types: orderTypeSelection,
+      auto_open_settlement_popup: autoOpenSettlement,
+      default_order_type: defaultOrderType,
+      default_payment_type: defaultPaymentType,
+      default_custom_payment_type: defaultCustomPayment,
+      default_table_no: defaultTableNo,
+      default_petty_cash_amount: pettyCash,
+      item_quantities: itemQuantityPresets,
+      item_prices: itemPricePresets,
+      default_quantity: defaultQuantity,
+      finalize_order: finalizeOrder,
+      payment_option_1: payOpt1,
+      payment_option_2: payOpt2,
+      payment_option_3: payOpt3,
+      payment_option_4: payOpt4,
+      section_delivery_name: deliveryName,
+      section_delivery_enabled: deliveryEnabled,
+      section_pickup_name: pickupName,
+      section_pickup_enabled: pickupEnabled,
+      section_dinein_name: dineInName,
+      section_dinein_enabled: dineInEnabled,
+      section_extra_enabled: extraSectionEnabled,
+      lock_active_table: lockActiveTable,
+      release_table_on: releaseTableOn,
+      release_recent_section_on: releaseSectionOn,
+      discount_label: discountLabel,
+      discount_calculate_button_text: discountButtonText,
+      display_no_discount_option: showLeaveNoDiscount,
+      discount_area_open_by_default: discountAreaOpen,
+      enable_order_wise_info: orderWiseInfo,
+      negative_quantity_reasons: negativeQtyReason.trim()
+        ? [negativeQtyReason.trim()]
+        : [],
+      allow_negative_quantity: allowNegativeQty,
+      release_kots_on_cancel: releaseKotsOnCancel,
+      settle_amount_reason_required: settlementReasonRequired,
+    }
+    try {
+      await save(payload)
+      await reasonsOtp.save(reasonsPayload)
+      showToast('Display settings saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save display settings',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return <SettingsPageLoading />
   }
 
   return (
     <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Display" />} activeItem="config-outlet">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         The following settings can be used to configure the billing screen and

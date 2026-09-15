@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Calculator, ChevronDown, FileText } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -262,7 +264,6 @@ export default function RecipeCostingReport() {
     'Latest average purchase price',
   )
   const [appliedMenu, setAppliedMenu] = useState('All')
-  const [toast, setToast] = useState<string | null>(null)
   const [selectedRow, setSelectedRow] = useState<RecipeRow | null>(null)
 
   const rows = useMemo(() => {
@@ -270,18 +271,9 @@ export default function RecipeCostingReport() {
     return ALL_ROWS.filter((row) => row.menuName === appliedMenu)
   }, [appliedMenu])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Recipe Costing Report</h1>

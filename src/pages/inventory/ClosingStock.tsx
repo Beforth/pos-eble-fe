@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   Check,
   MessageCirclePlus,
@@ -70,7 +72,6 @@ export default function ClosingStock() {
   const [stockValues, setStockValues] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [noteRowId, setNoteRowId] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -109,20 +110,11 @@ export default function ClosingStock() {
     })
   }
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   const noteRow = RAW_MATERIALS.find((row) => row.id === noteRowId)
 
   return (
     <InventoryPageShell activeItem="closing-stock">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Closing Stock</h1>

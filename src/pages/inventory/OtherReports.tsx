@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownToLine,
@@ -310,7 +312,6 @@ export default function OtherReports() {
   const [bookmarks, setBookmarks] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(REPORTS.map((report) => [report.id, Boolean(report.bookmarked)])),
   )
-  const [toast, setToast] = useState<string | null>(null)
 
   const copy = TAB_COPY[activeTab]
 
@@ -321,10 +322,6 @@ export default function OtherReports() {
     return REPORTS.filter((report) => report.tabIds.includes(activeTab))
   }, [activeTab, bookmarks])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function openReport(report: ReportItem) {
     const route =
@@ -343,11 +340,6 @@ export default function OtherReports() {
 
   return (
     <InventoryPageShell activeItem="other-reports">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 overflow-x-auto border-b border-line">
         <div className="flex min-w-max gap-1">

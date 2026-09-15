@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -13,15 +15,10 @@ interface DeliveryDistanceRow {
 
 export default function DeliveryDistance() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [rows, setRows] = useState<DeliveryDistanceRow[]>([])
 
   const hasRows = useMemo(() => rows.length > 0, [rows])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleDelete(id: string) {
     setRows((prev) => prev.filter((row) => row.id !== id))
@@ -43,11 +40,6 @@ export default function DeliveryDistance() {
         </PrimaryButton>
       }
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       {!hasRows ? (
         <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">

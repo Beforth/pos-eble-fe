@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -60,12 +62,7 @@ export default function OrderwiseConsumptionReport() {
   const [fromDate, setFromDate] = useState('2026-08-11')
   const [toDate, setToDate] = useState('2026-08-11')
   const [orderType, setOrderType] = useState('Orders')
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleClear() {
     setOrderNumber('')
@@ -76,11 +73,6 @@ export default function OrderwiseConsumptionReport() {
 
   return (
     <InventoryPageShell activeItem="orderwise-consumption">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">

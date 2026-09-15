@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -76,7 +78,6 @@ export default function AddPurchaseReturn() {
   const [deliveryCharges, setDeliveryCharges] = useState(0)
   const [recipientCanEdit, setRecipientCanEdit] = useState(true)
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
 
   const totals = useMemo(() => {
     let subTotal = 0
@@ -146,9 +147,8 @@ export default function AddPurchaseReturn() {
       return
     }
     setError('')
-    setToast('Purchase return saved')
+    showToast('Purchase return saved')
     window.setTimeout(() => {
-      setToast(null)
       navigate('/inventory/purchase-return')
     }, 900)
   }
@@ -157,11 +157,6 @@ export default function AddPurchaseReturn() {
 
   return (
     <InventoryPageShell activeItem="purchase-return">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Add Purchase Return</h1>

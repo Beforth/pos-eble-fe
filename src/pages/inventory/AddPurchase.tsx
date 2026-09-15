@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -85,7 +87,6 @@ export default function AddPurchase() {
   const [paymentType, setPaymentType] = useState<'unpaid' | 'paid'>('unpaid')
   const [updateStock, setUpdateStock] = useState(true)
   const [error, setError] = useState('')
-  const [toast, setToast] = useState<string | null>(null)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
 
   const totals = useMemo(() => {
@@ -144,9 +145,8 @@ export default function AddPurchase() {
       return
     }
     setError('')
-    setToast('Purchase saved')
+    showToast('Purchase saved')
     window.setTimeout(() => {
-      setToast(null)
       navigate('/inventory/purchase')
     }, 900)
   }
@@ -156,11 +156,6 @@ export default function AddPurchase() {
 
   return (
     <InventoryPageShell activeItem="stock-purchase">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">

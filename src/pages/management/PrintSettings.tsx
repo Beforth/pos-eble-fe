@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Layers, Printer, ReceiptText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -7,7 +9,10 @@ import {
   ConfigSectionCard,
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useOutletSettings } from '../../services/useOutletSettings'
+import type { OutletSettingsRecord } from '../../services/outletService'
 import { brand } from '../../theme/brand'
 
 function RadioGroup({
@@ -71,7 +76,6 @@ function CheckRow({
 
 export default function PrintSettings() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
 
   const [barcodeBoth, setBarcodeBoth] = useState(false)
 
@@ -98,27 +102,103 @@ export default function PrintSettings() {
   const [mergeEbill, setMergeEbill] = useState(false)
   const [saveInvoiceHistory, setSaveInvoiceHistory] = useState(false)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  const { loading, data, save } = useOutletSettings('print')
+
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    const value = data
+    if (value.show_order_barcode_bill_kot != null)
+      setBarcodeBoth(Boolean(value.show_order_barcode_bill_kot))
+    if (value.print_kot_on_print_bill != null)
+      setPrintKotOnBill(Boolean(value.print_kot_on_print_bill))
+    if (value.print_only_modified_kot != null)
+      setPrintOnlyModifiedKot(Boolean(value.print_only_modified_kot))
+    if (value.print_only_modified_items_kot != null)
+      setPrintOnlyModifiedItems(Boolean(value.print_only_modified_items_kot))
+    if (value.print_cancelled_kot != null)
+      setPrintCancelledKot(Boolean(value.print_cancelled_kot))
+    if (value.print_addons_notes_below_item != null)
+      setAddonsBelowItem(Boolean(value.print_addons_notes_below_item))
+    if (value.show_duplicate_kot != null)
+      setShowDuplicateKot(Boolean(value.show_duplicate_kot))
+    if (value.print_deleted_items_kot != null)
+      setPrintDeletedItemsKot(Boolean(value.print_deleted_items_kot))
+    if (value.print_deleted_items_separate_kot != null)
+      setPrintDeletedSeparateKot(Boolean(value.print_deleted_items_separate_kot))
+    if (value.show_order_barcode_kot != null)
+      setBarcodeOnKot(Boolean(value.show_order_barcode_kot))
+    if (value.print_kot_on_table_move != null)
+      setPrintKotOnMove(Boolean(value.print_kot_on_table_move))
+    if (value.kot_status_print) setPrintKotOnStatus(String(value.kot_status_print))
+    if (value.bill_bifurcation) setBillBifurcation(String(value.bill_bifurcation))
+    if (value.show_duplicate_bill != null)
+      setShowDuplicateBill(Boolean(value.show_duplicate_bill))
+    if (value.show_paid_return_bill != null)
+      setShowCustomerPaid(Boolean(value.show_paid_return_bill))
+    if (value.print_kotno_as_token != null)
+      setKotAsToken(Boolean(value.print_kotno_as_token))
+    if (value.show_addons_bill != null)
+      setShowAddonsBill(Boolean(value.show_addons_bill))
+    if (value.show_order_barcode_bill != null)
+      setBarcodeOnBill(Boolean(value.show_order_barcode_bill))
+    if (value.merge_duplicate_items_bill != null)
+      setMergeDuplicateItem(Boolean(value.merge_duplicate_items_bill))
+    if (value.display_qty_ordered_items != null)
+      setDisplayQtyBreakdown(Boolean(value.display_qty_ordered_items))
+    if (value.merge_ebill_print_bill != null)
+      setMergeEbill(Boolean(value.merge_ebill_print_bill))
+    if (value.save_invoice_print_history != null)
+      setSaveInvoiceHistory(Boolean(value.save_invoice_print_history))
+  }, [data])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
   }
 
-  function handleSave() {
-    showToast('Print settings saved')
-    window.setTimeout(goBack, 700)
+  async function handleSave() {
+    const payload: OutletSettingsRecord = {
+      show_order_barcode_bill_kot: barcodeBoth,
+      print_kot_on_print_bill: printKotOnBill,
+      print_only_modified_kot: printOnlyModifiedKot,
+      print_only_modified_items_kot: printOnlyModifiedItems,
+      print_cancelled_kot: printCancelledKot,
+      print_addons_notes_below_item: addonsBelowItem,
+      show_duplicate_kot: showDuplicateKot,
+      print_deleted_items_kot: printDeletedItemsKot,
+      print_deleted_items_separate_kot: printDeletedSeparateKot,
+      show_order_barcode_kot: barcodeOnKot,
+      print_kot_on_table_move: printKotOnMove,
+      kot_status_print: printKotOnStatus,
+      bill_bifurcation: billBifurcation,
+      show_duplicate_bill: showDuplicateBill,
+      show_paid_return_bill: showCustomerPaid,
+      print_kotno_as_token: kotAsToken,
+      show_addons_bill: showAddonsBill,
+      show_order_barcode_bill: barcodeOnBill,
+      merge_duplicate_items_bill: mergeDuplicateItem,
+      display_qty_ordered_items: displayQtyBreakdown,
+      merge_ebill_print_bill: mergeEbill,
+      save_invoice_print_history: saveInvoiceHistory,
+    }
+    try {
+      await save(payload)
+      showToast('Print settings saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save print settings',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return <SettingsPageLoading />
   }
 
   return (
     <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Print" />} activeItem="config-outlet">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         These Settings Configure The Print Settings Of The Bill And KOT Of

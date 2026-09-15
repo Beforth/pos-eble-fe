@@ -1,4 +1,6 @@
 import { useMemo, useSyncExternalStore, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Pencil, Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/common/Badge'
@@ -18,7 +20,6 @@ import {
 
 export default function SubOrderType() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
   const [nameQuery, setNameQuery] = useState('')
   const [appliedQuery, setAppliedQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
@@ -41,10 +42,6 @@ export default function SubOrderType() {
     })
   }, [rows, appliedQuery, statusFilter])
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function handleSearch() {
     setAppliedQuery(nameQuery.trim())
@@ -110,11 +107,6 @@ export default function SubOrderType() {
 
   return (
     <ReportsPageShell title="Sub Order Type" activeItem="config-sub-order-type">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="flex items-center justify-end gap-2 border-b border-line px-4 py-3 sm:px-5">

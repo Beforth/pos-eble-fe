@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import {
@@ -10,13 +12,8 @@ export default function AddDenomination() {
   const navigate = useNavigate()
   const [value, setValue] = useState('')
   const [available, setAvailable] = useState(true)
-  const [toast, setToast] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function goBack() {
     navigate('/management/accounting/denomination')
@@ -37,11 +34,6 @@ export default function AddDenomination() {
       title="Add Denomination"
       activeItem="acct-denomination"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="rounded-xl border border-line bg-card p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">

@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Users, Wallet } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -8,7 +10,10 @@ import {
   ConfigSectionCard,
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useOutletSettings } from '../../services/useOutletSettings'
+import type { OutletSettingsRecord } from '../../services/outletService'
 
 const inputClass =
   'h-10 w-full max-w-xs rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
@@ -44,7 +49,6 @@ function CheckRow({
 
 export default function CustomerSettings() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
 
   const [phoneValidationTypes, setPhoneValidationTypes] = useState<string[]>(
     [],
@@ -54,11 +58,22 @@ export default function CustomerSettings() {
   const [showCustomerEmail, setShowCustomerEmail] = useState(false)
   const [createBillsWithTaxId, setCreateBillsWithTaxId] = useState(true)
   const [phoneMandatoryOnDue, setPhoneMandatoryOnDue] = useState(true)
+  const { loading, data, save } = useOutletSettings('customer')
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    setPhoneValidationTypes(
+      Array.isArray(data.phone_validation_types) ? data.phone_validation_types : [],
+    )
+    if (data.min_phone_length != null) setMinPhoneLength(String(data.min_phone_length))
+    if (data.max_phone_length != null) setMaxPhoneLength(String(data.max_phone_length))
+    if (data.show_customer_email != null) setShowCustomerEmail(Boolean(data.show_customer_email))
+    if (data.create_bills_with_tax_id != null) setCreateBillsWithTaxId(Boolean(data.create_bills_with_tax_id))
+    if (data.due_payment_phone_mandatory != null) setPhoneMandatoryOnDue(Boolean(data.due_payment_phone_mandatory))
+  }, [data])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -72,7 +87,7 @@ export default function CustomerSettings() {
     )
   }
 
-  function handleSave() {
+  async function handleSave() {
     const min = Number(minPhoneLength)
     const max = Number(maxPhoneLength)
     if (!Number.isFinite(min) || !Number.isFinite(max) || min < 1 || max < 1) {
@@ -83,17 +98,30 @@ export default function CustomerSettings() {
       showToast('Minimum length cannot exceed maximum length')
       return
     }
-    showToast('Customer settings saved')
-    window.setTimeout(goBack, 700)
+    const payload: OutletSettingsRecord = {
+      phone_validation_types: phoneValidationTypes,
+      min_phone_length: min,
+      max_phone_length: max,
+      show_customer_email: showCustomerEmail,
+      create_bills_with_tax_id: createBillsWithTaxId,
+      due_payment_phone_mandatory: phoneMandatoryOnDue,
+    }
+    try {
+      await save(payload)
+      showToast('Customer settings saved')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save customer settings',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return <SettingsPageLoading />
   }
 
   return (
     <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Customer" />} activeItem="config-outlet">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         The Following Settings Can Be Used To Configure Customer Settings.

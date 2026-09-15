@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Check, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
@@ -188,7 +190,6 @@ function TemplatePreviewModal({
 
 export default function InvoiceTemplates() {
   const navigate = useNavigate()
-  const location = useLocation()
 
   const [activeTab, setActiveTab] = useState<InvoiceTabId>('purchase')
   const [selectedByTab, setSelectedByTab] = useState<
@@ -200,24 +201,7 @@ export default function InvoiceTemplates() {
     transfer: 'transfer-standard',
   })
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
-  useEffect(() => {
-    const state = location.state as
-      | { tab?: InvoiceTabId; selectedId?: string }
-      | null
-    if (!state?.tab && !state?.selectedId) return
-    if (state.tab) setActiveTab(state.tab)
-    if (state.selectedId && state.tab) {
-      setSelectedByTab((prev) => ({
-        ...prev,
-        [state.tab!]: state.selectedId!,
-      }))
-      setToast('Template selected')
-      window.setTimeout(() => setToast(null), 2000)
-    }
-    navigate('.', { replace: true, state: null })
-  }, [location.state, navigate])
 
   const templates = TEMPLATES_BY_TAB[activeTab]
   const selectedId = selectedByTab[activeTab]
@@ -227,10 +211,6 @@ export default function InvoiceTemplates() {
     [templates, selectedId],
   )
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2000)
-  }
 
   function confirmSelect() {
     if (previewIndex == null) return
@@ -253,11 +233,6 @@ export default function InvoiceTemplates() {
 
   return (
     <InventoryPageShell activeItem="invoice-templates">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Invoice Management</h1>

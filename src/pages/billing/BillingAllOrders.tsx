@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { BarChart3, Download, Search } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
@@ -35,12 +37,7 @@ export default function BillingAllOrders() {
   const [viewKotOrder, setViewKotOrder] = useState<AllOrderRow | null>(null)
   const [editOrder, setEditOrder] = useState<AllOrderRow | null>(null)
   const [changePaymentOrder, setChangePaymentOrder] = useState<AllOrderRow | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
-  function showToast(msg: string) {
-    setToast(msg)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   const filtered = useMemo(() => {
     let result = orders
@@ -124,11 +121,6 @@ export default function BillingAllOrders() {
         onViewKot={() => navigate('/billing?kot=1')}
       />
 
-      {toast ? (
-        <div className="fixed bottom-4 right-4 z-[80] rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <OrderDetailsDrawer
         open={Boolean(viewOrder)}

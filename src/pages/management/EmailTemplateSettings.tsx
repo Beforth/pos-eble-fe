@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   Globe,
   ImagePlus,
@@ -31,7 +33,6 @@ const textareaClass =
 export default function EmailTemplateSettings() {
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [toast, setToast] = useState<string | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [logoName, setLogoName] = useState('')
   const [headerColor, setHeaderColor] = useState('#ff0917')
@@ -42,10 +43,6 @@ export default function EmailTemplateSettings() {
   const [emailId, setEmailId] = useState('deveshjobanputra143@gmail.com')
   const [website, setWebsite] = useState('https://www.rajubhaidabeliwale.com/')
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -95,11 +92,6 @@ export default function EmailTemplateSettings() {
       title={<ConfigBreadcrumb onNavigate={goBack} current="Email Template" />}
       activeItem="config-email-template"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         This email template configured would be utilised in emails sent for

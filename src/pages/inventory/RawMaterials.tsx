@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -229,7 +231,6 @@ export default function RawMaterials() {
   const [rows, setRows] = useState<RawMaterialRow[]>(() => [...RAW_MATERIALS])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [page, setPage] = useState(1)
-  const [toast, setToast] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [details, setDetails] = useState<RawMaterialDetails | null>(null)
@@ -270,10 +271,6 @@ export default function RawMaterials() {
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function applySearch() {
     setAppliedName(nameInput)
@@ -356,11 +353,6 @@ export default function RawMaterials() {
 
   return (
     <InventoryPageShell activeItem="raw-materials">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Raw Materials Management</h1>

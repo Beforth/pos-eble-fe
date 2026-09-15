@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../utils/toast'
 import {
   BarChart3,
   ChevronDown,
@@ -150,7 +152,6 @@ export default function AllOrders() {
   const [editOrder, setEditOrder] = useState<AllOrderRow | null>(null)
   const [paymentOrder, setPaymentOrder] = useState<AllOrderRow | null>(null)
   const [orders, setOrders] = useState(allOrdersList)
-  const [toast, setToast] = useState<string | null>(null)
 
   const [startDate, setStartDate] = useState(() => atStartOfDay(new Date()))
   const [endDate, setEndDate] = useState(() => atEndOfDay(new Date()))
@@ -258,10 +259,6 @@ export default function AllOrders() {
     })
   }
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function selectedRows(): AllOrderRow[] {
     return orders.filter((row) => selected.has(row.id))
@@ -354,11 +351,6 @@ export default function AllOrders() {
         />
 
         <main className="px-4 py-4 sm:px-5">
-          {toast ? (
-            <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-              {toast}
-            </div>
-          ) : null}
           {/* Header */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3 sm:gap-4">

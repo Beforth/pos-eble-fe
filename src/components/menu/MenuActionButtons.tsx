@@ -31,15 +31,18 @@ export function OutlineButton({
 export function PrimaryButton({
   children,
   onClick,
+  disabled,
 }: {
   children: ReactNode
   onClick?: () => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
+      disabled={disabled}
+      className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </button>

@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { ChevronRight } from 'lucide-react'
 import { FinancePageShell } from '../../components/layout/FinancePageShell'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
@@ -63,23 +65,13 @@ const SERVICES: MarketplaceService[] = [
 ]
 
 export default function FinanceMarketplace() {
-  const [toast, setToast] = useState<string | null>(null)
   const [detailsId, setDetailsId] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   const details = SERVICES.find((item) => item.id === detailsId) ?? null
 
   return (
     <FinancePageShell activeItem="marketplace">
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="mb-4">
         <button

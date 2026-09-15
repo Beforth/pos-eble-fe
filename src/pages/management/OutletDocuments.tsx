@@ -1,4 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Eye, FileUp, FolderOpen, Plus, Trash2, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -6,8 +8,14 @@ import {
   ConfigSaveBar,
   ConfigSectionCard,
 } from '../../components/management/ConfigSectionCard'
+import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { brand } from '../../theme/brand'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  getOutletDocumentsApi,
+  updateOutletDocumentsApi,
+} from '../../services/outletService'
 
 const MAX_BYTES = 5 * 1024 * 1024
 const ACCEPTED_TYPES = /\.(pdf|png|jpe?g|docx?|xlsx?)$/i
@@ -24,22 +32,62 @@ interface DocumentFile {
   name: string
   fileName: string
   previewUrl?: string
+  file?: File
 }
 
 export default function OutletDocuments() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [loading, setLoading] = useState(true)
   const [pendingDoc, setPendingDoc] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
   const [files, setFiles] = useState<Record<string, DocumentFile>>({})
   const [customDocs, setCustomDocs] = useState<string[]>([])
   const [customFileName, setCustomFileName] = useState('')
   const [previewDoc, setPreviewDoc] = useState<string | null>(null)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) {
+      setLoading(false)
+      return
+    }
+    getOutletDocumentsApi(encryptedOutletId)
+      .then((value) => {
+        if (cancelled) return
+        const nextFiles: Record<string, DocumentFile> = {}
+        const customs: string[] = []
+        for (const doc of value.documents) {
+          if (doc.is_custom) customs.push(doc.name)
+          if (doc.file) {
+            nextFiles[doc.name] = {
+              name: doc.name,
+              fileName: doc.file.split('/').pop() || doc.name,
+              previewUrl: doc.file,
+            }
+          }
+        }
+        setCustomDocs((prev) => {
+          const merged = [...new Set([...prev, ...customs])]
+          return merged
+        })
+        setFiles((prev) => ({ ...prev, ...nextFiles }))
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load documents',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -71,6 +119,7 @@ export default function OutletDocuments() {
         name: doc,
         fileName: file.name,
         previewUrl: URL.createObjectURL(file),
+        file,
       },
     }))
     showToast(`${doc} uploaded`)
@@ -120,12 +169,32 @@ export default function OutletDocuments() {
     showToast('Custom document added')
   }
 
+  const renderedDocs = [...DEFAULT_DOCUMENTS, ...customDocs]
+
   function handleSave() {
-    showToast('Documents saved')
-    window.setTimeout(goBack, 700)
+    if (!encryptedOutletId) {
+      showToast('No active outlet selected')
+      return
+    }
+    const documents = renderedDocs.map((name) => ({
+      name,
+      is_custom: customDocs.includes(name),
+    }))
+    const fileList = renderedDocs.map((name) => files[name]?.file ?? null)
+    updateOutletDocumentsApi(encryptedOutletId, { documents, files: fileList })
+      .then(() => {
+        showToast('Documents saved')
+      })
+      .catch((error: unknown) => {
+        showToast(
+          error instanceof Error ? error.message : 'Failed to save documents',
+        )
+      })
   }
 
-  const renderedDocs = [...DEFAULT_DOCUMENTS, ...customDocs]
+  if (loading) {
+    return <SettingsPageLoading />
+  }
 
   return (
     <ReportsPageShell
@@ -142,11 +211,6 @@ export default function OutletDocuments() {
         onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
       />
 
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         Upload the business and license documents of your outlet. These are used

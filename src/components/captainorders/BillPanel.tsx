@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import {
   ChevronDown,
   ChevronUp,
@@ -169,6 +171,7 @@ export function BillPanel({
   onFeedbackSmsChange,
   onQtyChange,
   onRemoveLine,
+  onLineNoteChange,
   onRemoveKotItem,
   onClearItems,
   onAction,
@@ -214,7 +217,6 @@ export function BillPanel({
   const [customerHistory, setCustomerHistory] = useState<
     Record<string, CustomerHistoryOrder[]>
   >(() => ({ ...SEED_CUSTOMER_HISTORY }))
-  const [historyNotice, setHistoryNotice] = useState<string | null>(null)
   const [deliveryCharge, setDeliveryCharge] = useState('0')
   const [containerCharge, setContainerCharge] = useState('0')
   const [customerPaid, setCustomerPaid] = useState('0')
@@ -321,17 +323,11 @@ export function BillPanel({
       gstNo: '',
     })
     setHistoryOpen(false)
-    setHistoryNotice('Customer history deleted')
-    window.setTimeout(() => setHistoryNotice(null), 2200)
+    showToast('Customer history deleted')
   }
 
   return (
     <aside className="flex h-full w-full min-h-0 shrink-0 flex-col border-line bg-card lg:border-l">
-      {historyNotice ? (
-        <div className="fixed bottom-5 right-5 z-[80] rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-medium text-ink shadow-lg">
-          {historyNotice}
-        </div>
-      ) : null}
       <AppliedDiscountModal
         open={discountOpen}
         billTotal={total}

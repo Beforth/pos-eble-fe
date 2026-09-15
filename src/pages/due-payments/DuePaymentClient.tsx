@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { ArrowLeft, HandCoins } from 'lucide-react'
 import { FilterSelect } from '../../components/all-orders/FilterSelect'
@@ -39,7 +41,6 @@ export default function DuePaymentClient() {
   const [amount, setAmount] = useState('0.00')
   const [mode, setMode] = useState<DuePaymentMode>('Cash')
   const [tab, setTab] = useState<DetailTab>('outstanding')
-  const [toast, setToast] = useState<string | null>(null)
   const [settleOpen, setSettleOpen] = useState(false)
 
   const due = client ? clientDue(client) : 0
@@ -53,10 +54,6 @@ export default function DuePaymentClient() {
     return <Navigate to="/due-payments" replace />
   }
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
-  }
 
   function receive(value: number) {
     if (!client) return
@@ -213,11 +210,6 @@ export default function DuePaymentClient() {
 
   return (
     <DuePaymentsShell>
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <ConfirmDeleteModal
         open={settleOpen}

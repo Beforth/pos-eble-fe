@@ -1,4 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+
+import { showToast } from '../../utils/toast'
 import { Building2, MapPin, Settings2, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -7,6 +9,12 @@ import {
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
 import { brand } from '../../theme/brand'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  getOutletApi,
+  updateOutletApi,
+  type OutletSummary,
+} from '../../services/outletService'
 
 const CUISINE_OPTIONS = [
   'Indian',
@@ -119,49 +127,40 @@ function FormRow({
 
 export default function OutletDetails() {
   const navigate = useNavigate()
-  const [toast, setToast] = useState<string | null>(null)
+  const { encryptedOutletId } = useAuth()
+  const [loading, setLoading] = useState(true)
 
-  const [outletName] = useState(brand.shopName)
+  const [outletName, setOutletName] = useState<string>(brand.shopName)
   const [outletAlias, setOutletAlias] = useState<string>(brand.shopName)
-  const [email, setEmail] = useState('deveshjobanputra143@gmail.com')
+  const [email, setEmail] = useState('')
 
-  const [landmark, setLandmark] = useState('Near Parijat Nagar Signal')
-  const [zipCode, setZipCode] = useState('422005')
+  const [landmark, setLandmark] = useState('')
+  const [zipCode, setZipCode] = useState('')
   const [fax, setFax] = useState('')
   const [tinNo, setTinNo] = useState('')
   const [country] = useState('India')
   const [state] = useState('Maharashtra')
   const [city] = useState('Nashik')
   const [timezone, setTimezone] = useState('Asia/Calcutta')
-  const [address, setAddress] = useState(
-    'Shop 01, Sunrich Apartment, Satpur, College Road, Nashik',
-  )
-  const [area, setArea] = useState('College Road')
-  const [latitude, setLatitude] = useState('20.00326624')
-  const [longitude, setLongitude] = useState('73.75414916')
+  const [address, setAddress] = useState('')
+  const [area, setArea] = useState('')
+  const [latitude, setLatitude] = useState('')
+  const [longitude, setLongitude] = useState('')
 
   const [additionalInfo, setAdditionalInfo] = useState('')
-  const [cuisines, setCuisines] = useState<string[]>([
-    'Indian',
-    'Fast Food',
-    'PIZZA HOUSE',
-    'Maharashtrian',
-    'Street Food',
-    'Burger',
-  ])
+  const [cuisines, setCuisines] = useState<string[]>([])
   const [cuisineDraft, setCuisineDraft] = useState('')
-  const [seatingCapacity, setSeatingCapacity] = useState('10-50')
+  const [seatingCapacity, setSeatingCapacity] = useState('')
   const [logoName, setLogoName] = useState('')
   const [imagesName, setImagesName] = useState('')
-  const [restaurantTypes, setRestaurantTypes] = useState<string[]>(['QSR'])
-  const [onlineChannels, setOnlineChannels] = useState<string[]>([
-    'Zomato',
-    'Swiggy',
-  ])
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [restaurantTypes, setRestaurantTypes] = useState<string[]>([])
+  const [onlineChannels, setOnlineChannels] = useState<string[]>([])
 
   const [code, setCode] = useState('')
-  const [fssai, setFssai] = useState('11523027000309')
-  const [taxAuthority, setTaxAuthority] = useState('GST')
+  const [fssai, setFssai] = useState('')
+  const [taxAuthority, setTaxAuthority] = useState('')
   const [hsnMandatory, setHsnMandatory] = useState(false)
   const [servingType, setServingType] =
     useState<(typeof SERVING_TYPES)[number]>('Service')
@@ -170,10 +169,64 @@ export default function OutletDetails() {
   const [kotForOnline, setKotForOnline] = useState(true)
   const [showSubpayment, setShowSubpayment] = useState(false)
 
-  function showToast(message: string) {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 2200)
+
+  function applyOutlet(value: OutletSummary) {
+    setOutletName(value.name)
+    setOutletAlias(value.alias ?? '')
+    setEmail(value.email ?? '')
+    setLandmark(value.landmark ?? '')
+    setZipCode(value.zip_code ?? '')
+    setFax(value.fax ?? '')
+    setTinNo(value.tin_no ?? '')
+    setTimezone(value.timezone || 'Asia/Calcutta')
+    setAddress(value.address_line1 ?? '')
+    setArea(value.area ?? '')
+    setLatitude(value.latitude ?? '')
+    setLongitude(value.longitude ?? '')
+    setAdditionalInfo(value.additional_info ?? '')
+    setCuisines(value.cuisines ?? [])
+    setSeatingCapacity(value.seating_capacity ?? '')
+    setRestaurantTypes(value.restaurant_types ?? [])
+    setOnlineChannels(value.online_channels ?? [])
+    setCode(value.code ?? '')
+    setFssai(value.fssai_no ?? '')
+    setTaxAuthority(value.tax_authority ?? '')
+    setHsnMandatory(Boolean(value.hsn_mandatory_item_level))
+    setServingType(
+      (SERVING_TYPES as readonly string[]).includes(value.serving_type)
+        ? (value.serving_type as (typeof SERVING_TYPES)[number])
+        : 'Service',
+    )
+    setValidateSapcode(Boolean(value.validate_unique_sapcode))
+    setVariationWiseOnline(Boolean(value.variation_wise_online_menu))
+    setKotForOnline(Boolean(value.enable_kot_for_online_order))
+    setShowSubpayment(Boolean(value.show_subpayment_details))
   }
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) {
+      setLoading(false)
+      return
+    }
+    getOutletApi(encryptedOutletId)
+      .then((value) => {
+        if (!cancelled) applyOutlet(value)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load outlet',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   function goBack() {
     navigate('/management/configuration/outlet')
@@ -203,16 +256,97 @@ export default function OutletDetails() {
   }
 
   function handleSave() {
-    if (!zipCode.trim() || !address.trim() || !area.trim()) {
-      showToast('Please fill required address fields')
+    if (!zipCode.trim()) {
+      showToast('Zip Code is required')
+      return
+    }
+    if (!address.trim()) {
+      showToast('Address is required')
+      return
+    }
+    if (!area.trim()) {
+      showToast('Area is required')
       return
     }
     if (!taxAuthority.trim()) {
       showToast('Tax Authority Name is required')
       return
     }
-    showToast('Outlet details saved')
-    window.setTimeout(goBack, 700)
+    if (!encryptedOutletId) {
+      showToast('No active outlet selected')
+      return
+    }
+    const payload = {
+      alias: outletAlias,
+      email,
+      landmark,
+      zip_code: zipCode,
+      fax,
+      tin_no: tinNo,
+      timezone,
+      address_line1: address,
+      area,
+      latitude,
+      longitude,
+      additional_info: additionalInfo,
+      cuisines,
+      seating_capacity: seatingCapacity,
+      restaurant_types: restaurantTypes,
+      online_channels: onlineChannels,
+      code,
+      fssai_no: fssai,
+      tax_authority: taxAuthority,
+      hsn_mandatory_item_level: hsnMandatory,
+      serving_type: servingType,
+      validate_unique_sapcode: validateSapcode,
+      variation_wise_online_menu: variationWiseOnline,
+      enable_kot_for_online_order: kotForOnline,
+      show_subpayment_details: showSubpayment,
+    }
+    const files = {
+      logo: logoFile ?? undefined,
+      images: imageFiles.length ? imageFiles : undefined,
+    }
+    updateOutletApi(encryptedOutletId, payload, files)
+      .then(() => {
+        showToast('Outlet details saved')
+      })
+      .catch((error: unknown) => {
+        showToast(
+          error instanceof Error ? error.message : 'Failed to save outlet',
+        )
+      })
+  }
+
+  if (loading) {
+    return (
+      <ReportsPageShell
+        title={
+          <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate('/management/configuration/outlet')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  navigate('/management/configuration/outlet')
+                }
+              }}
+              className="cursor-pointer text-primary hover:underline"
+            >
+              Outlet Configuration
+            </span>
+            <span className="font-normal text-muted">&gt;</span>
+            <span className="font-semibold text-ink">Outlet Information</span>
+          </span>
+        }
+        activeItem="config-outlet"
+      >
+        <div className="py-16 text-center text-sm text-muted">
+          Loading outlet details…
+        </div>
+      </ReportsPageShell>
+    )
   }
 
   return (
@@ -236,11 +370,6 @@ export default function OutletDetails() {
       }
       activeItem="config-outlet"
     >
-      {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-ink px-4 py-2.5 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <SectionCard
         icon={<Building2 size={16} />}
@@ -478,9 +607,11 @@ export default function OutletDetails() {
               <input
                 type="file"
                 accept=".png,.jpeg,.jpg,image/png,image/jpeg"
-                onChange={(event) =>
-                  setLogoName(event.target.files?.[0]?.name ?? '')
-                }
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null
+                  setLogoFile(file)
+                  setLogoName(file?.name ?? '')
+                }}
                 className="block w-full text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-page file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-line/60"
               />
               {logoName ? (
@@ -499,13 +630,12 @@ export default function OutletDetails() {
                   const files = event.target.files
                   if (!files?.length) {
                     setImagesName('')
+                    setImageFiles([])
                     return
                   }
-                  setImagesName(
-                    Array.from(files)
-                      .map((file) => file.name)
-                      .join(', '),
-                  )
+                  const next = Array.from(files)
+                  setImageFiles(next)
+                  setImagesName(next.map((file) => file.name).join(', '))
                 }}
                 className="block w-full text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-page file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-line/60"
               />
