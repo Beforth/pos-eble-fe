@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
 
 const PAGE_SIZE = 10
@@ -12,11 +15,21 @@ export default function OrderSummaryReport() {
   const [page, setPage] = useState(1)
 
   const rows = DAY_END_SUMMARY_ROWS
-  const totalOrders = rows.reduce((s, r) => s + r.orders, 0)
-  const totalRevenue = rows.reduce((s, r) => s + r.total, 0)
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      rows,
+      (row) => [row.createdDate, row.orders, row.total],
+      (row, key) => {
+        if (key === 'orders') return row.orders
+        if (key === 'revenue') return row.total
+        return row.createdDate
+      },
+    )
+  const totalOrders = visible.reduce((s, r) => s + r.orders, 0)
+  const totalRevenue = visible.reduce((s, r) => s + r.total, 0)
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pageRows = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   function handleExport() {
     const header = 'Date,Orders,Revenue'
@@ -47,7 +60,7 @@ export default function OrderSummaryReport() {
         <div className="mb-4 grid grid-cols-3 gap-3">
           <div className="rounded-lg border border-line bg-card p-3 text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Days</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{rows.length}</p>
+            <p className="mt-1 text-xl font-extrabold text-ink">{visible.length}</p>
           </div>
           <div className="rounded-lg border border-line bg-card p-3 text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Orders</p>
@@ -60,13 +73,23 @@ export default function OrderSummaryReport() {
         </div>
 
         <div className="rounded-xl border border-line bg-card">
+          <div className="border-b border-line p-3">
+            <ListSearch
+              value={search}
+              onChange={(value) => {
+                setSearch(value)
+                setPage(1)
+              }}
+              placeholder="Search summary"
+            />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[400px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Date</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Orders</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</th>
+                  <SortableTh columnKey="date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Date</SortableTh>
+                  <SortableTh columnKey="orders" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Orders</SortableTh>
+                  <SortableTh columnKey="revenue" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

@@ -1,34 +1,64 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
-import { RECIPE_ITEM_OPTIONS } from '../../mocks/itemRecipesData'
-
-const MENU_OPTIONS = RECIPE_ITEM_OPTIONS.filter((item) => item !== 'All')
+import { useAuth } from '../../auth/AuthContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_WRITE_PERMISSION,
+  createRecipeApi,
+  listRecipeMenuItemsApi,
+  type MenuItemRef,
+} from '../../services/inventoryService'
 
 export default function AddRecipe() {
   const navigate = useNavigate()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WRITE_PERMISSION)
   const [menuItem, setMenuItem] = useState('')
+  const [items, setItems] = useState<MenuItemRef[]>([])
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  function handleSave() {
-    if (!menuItem) {
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    listRecipeMenuItemsApi(encryptedOutletId)
+      .then(setItems)
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load menu items',
+        )
+      })
+  }, [encryptedOutletId])
+
+  async function handleSave() {
+    if (!canWrite || !encryptedOutletId) return
+    const selected = items.find((item) => item.name === menuItem)
+    if (!selected) {
       setError('Please select a menu item')
       return
     }
     setError('')
-    showToast('Recipe saved')
-    window.setTimeout(() => {
+    setSaving(true)
+    try {
+      await createRecipeApi(encryptedOutletId, {
+        item_id: selected.id,
+        lines: [],
+      })
+      showToast('Recipe saved')
       navigate('/inventory/item-recipes')
-    }, 900)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to save recipe')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <InventoryPageShell activeItem="item-recipes">
-
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Add Recipe</h1>
       </div>
@@ -38,7 +68,7 @@ export default function AddRecipe() {
           <SearchableSelect
             label="Select Menu"
             value={menuItem}
-            options={MENU_OPTIONS}
+            options={items.map((item) => item.name)}
             placeholder="Select Item"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -59,7 +89,11 @@ export default function AddRecipe() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+        {canWrite ? (
+          <PrimaryButton onClick={() => void handleSave()}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
+        ) : null}
       </div>
     </InventoryPageShell>
   )

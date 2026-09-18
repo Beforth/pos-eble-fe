@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { SortableTh } from './SortableTh'
+import type { SortDirection, SortValue } from '../../utils/listQuery'
 
 export interface Column<T> {
   key: string
@@ -6,6 +8,8 @@ export interface Column<T> {
   align?: 'left' | 'right' | 'center'
   render?: (row: T) => ReactNode
   className?: string
+  sortable?: boolean
+  sortValue?: (row: T) => SortValue
 }
 
 interface TableProps<T> {
@@ -16,6 +20,9 @@ interface TableProps<T> {
   footer?: ReactNode
   emptyMessage?: string
   dense?: boolean
+  sortKey?: string | null
+  sortDir?: SortDirection
+  onSort?: (key: string) => void
 }
 
 const alignClasses = {
@@ -31,21 +38,38 @@ export function Table<T>({
   footer,
   emptyMessage = 'No records to show',
   dense = false,
+  sortKey = null,
+  sortDir = 'asc',
+  onSort,
 }: TableProps<T>) {
   return (
     <div className="w-full overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-line">
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                scope="col"
-                className={`whitespace-nowrap px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted ${alignClasses[column.align ?? 'left']}`}
-              >
-                {column.header}
-              </th>
-            ))}
+            {columns.map((column) =>
+              column.sortable && onSort ? (
+                <SortableTh
+                  key={column.key}
+                  columnKey={column.key}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  align={column.align ?? 'left'}
+                  className="whitespace-nowrap px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
+                >
+                  {column.header}
+                </SortableTh>
+              ) : (
+                <th
+                  key={column.key}
+                  scope="col"
+                  className={`whitespace-nowrap px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted ${alignClasses[column.align ?? 'left']}`}
+                >
+                  {column.header}
+                </th>
+              ),
+            )}
           </tr>
         </thead>
         <tbody>

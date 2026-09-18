@@ -4,7 +4,9 @@ import { showToast } from '../../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, Home, Printer } from 'lucide-react'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useListQuery } from '../../hooks/useListQuery'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
 import {
   ORDER_SUB_ORDER_COLUMNS,
@@ -139,6 +141,27 @@ export default function OrderSubOrderWiseReport() {
 
   const totals = useMemo(() => summarizeOrderSubOrder(rows), [rows])
 
+  const { sortKey, sortDir, toggleSort, visible: listedRows } = useListQuery(
+    rows,
+    (row) => [
+      row.restaurant,
+      row.orderType,
+      row.subOrderType,
+      row.totalBills,
+      row.myAmount,
+      row.totalDiscount,
+      row.netSales,
+      row.deliveryCharge,
+      row.containerCharge,
+      row.serviceCharge,
+      row.totalTax,
+      row.roundOff,
+      row.tip,
+      row.totalSales,
+    ],
+    (row, key) => row[key as OrderSubOrderColumnKey],
+  )
+
 
   function handleSearch() {
     setAppliedRestaurant(restaurant)
@@ -266,14 +289,17 @@ export default function OrderSubOrderWiseReport() {
             <thead>
               <tr className="border-b border-line bg-page">
                 {columns.map((column) => (
-                  <th
+                  <SortableTh
                     key={column.key}
-                    className={`whitespace-nowrap px-3 py-2.5 text-xs font-semibold text-ink ${
-                      column.align === 'right' ? 'text-right' : 'text-left'
-                    }`}
+                    columnKey={column.key}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    align={column.align ?? 'left'}
+                    className="whitespace-nowrap px-3 py-2.5 text-xs font-semibold text-ink"
                   >
                     {column.label}
-                  </th>
+                  </SortableTh>
                 ))}
               </tr>
             </thead>
@@ -291,7 +317,7 @@ export default function OrderSubOrderWiseReport() {
                 ))}
               </tr>
 
-              {rows.length === 0 ? (
+              {listedRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={columns.length}
@@ -301,7 +327,7 @@ export default function OrderSubOrderWiseReport() {
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                listedRows.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line hover:bg-page/50"
@@ -320,7 +346,7 @@ export default function OrderSubOrderWiseReport() {
                 ))
               )}
 
-              {rows.length > 0 ? (
+              {listedRows.length > 0 ? (
                 <tr className="border-t border-line bg-page font-semibold text-ink">
                   {columns.map((column, index) => (
                     <td
@@ -338,7 +364,7 @@ export default function OrderSubOrderWiseReport() {
           </table>
         </div>
         <div className="border-t border-line px-4 py-2.5 text-xs text-muted">
-          Showing {rows.length === 0 ? 0 : 1} to {rows.length} of {rows.length}{' '}
+          Showing {listedRows.length === 0 ? 0 : 1} to {listedRows.length} of {listedRows.length}{' '}
           entries
         </div>
       </div>

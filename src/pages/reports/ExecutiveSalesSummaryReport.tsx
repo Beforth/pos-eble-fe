@@ -2,17 +2,32 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { PAX_SALES_ROWS, summarizePaxSales } from '../../mocks/paxSalesReportData'
 
 export default function ExecutiveSalesSummaryReport() {
   const navigate = useNavigate()
   const [billNo, setBillNo] = useState('')
 
-  const stats = useMemo(() => summarizePaxSales(PAX_SALES_ROWS), [])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      PAX_SALES_ROWS,
+      (row) => [row.name, row.totalPax, row.totalSales, row.apc],
+      (row, key) => {
+        if (key === 'totalPax') return row.totalPax
+        if (key === 'totalSales') return row.totalSales
+        if (key === 'apc') return row.apc
+        return row.name
+      },
+    )
+
+  const stats = useMemo(() => summarizePaxSales(visible), [visible])
 
   function handleExport() {
     const header = 'Executive,Pax,Sales,APC'
-    const lines = [header, ...PAX_SALES_ROWS.map((r) => `${r.name},${r.totalPax},${r.totalSales},${r.apc}`)]
+    const lines = [header, ...visible.map((r) => `${r.name},${r.totalPax},${r.totalSales},${r.apc}`)]
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -52,18 +67,25 @@ export default function ExecutiveSalesSummaryReport() {
         </div>
 
         <div className="rounded-xl border border-line bg-card">
+          <div className="border-b border-line p-3">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search executives"
+            />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[500px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Executive</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Total Pax</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Total Sales</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">APC</th>
+                  <SortableTh columnKey="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Executive</SortableTh>
+                  <SortableTh columnKey="totalPax" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Total Pax</SortableTh>
+                  <SortableTh columnKey="totalSales" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Total Sales</SortableTh>
+                  <SortableTh columnKey="apc" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">APC</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {PAX_SALES_ROWS.map((r) => (
+                {visible.map((r) => (
                   <tr key={r.id} className="hover:bg-page/40">
                     <td className="px-4 py-2.5 font-medium text-ink">{r.name}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-ink">{r.totalPax}</td>

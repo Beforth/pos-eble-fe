@@ -2,9 +2,12 @@ import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Search, Tv, Users } from 'lucide-react'
+import { ArrowLeft, Plus, Tv, Users } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { CustomerHistoryModal } from '../../components/billing/CustomerHistoryModal'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { AddCustomerModal } from './AddCustomerModal'
 import {
   customersList,
@@ -23,7 +26,6 @@ const FILTERS: { id: CustomerFilter; label: string }[] = [
 export default function Customers() {
   const navigate = useNavigate()
   const [billNo, setBillNo] = useState('')
-  const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<CustomerFilter>('all')
   const [customers, setCustomers] = useState<CustomerRow[]>(() => [
     ...customersList,
@@ -36,20 +38,37 @@ export default function Customers() {
 
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
     return customers.filter((customer) => {
       if (filter === 'due' && customer.dueAmount <= 0) return false
       if (filter === 'loyalty' && customer.loyaltyPoints <= 0) return false
-      if (!q) return true
-      return (
-        customer.name.toLowerCase().includes(q) ||
-        customer.phone.includes(q) ||
-        customer.email.toLowerCase().includes(q) ||
-        customer.locality.toLowerCase().includes(q) ||
-        customer.address.toLowerCase().includes(q)
-      )
+      return true
     })
-  }, [customers, filter, search])
+  }, [customers, filter])
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      filtered,
+      (customer) => [
+        customer.name,
+        customer.phone,
+        customer.email,
+        customer.locality,
+        customer.address,
+        customer.dueAmount,
+        customer.loyaltyPoints,
+        customer.lastVisit,
+      ],
+      (customer, key) => {
+        if (key === 'phone') return customer.phone
+        if (key === 'email') return customer.email
+        if (key === 'address') return customer.address
+        if (key === 'locality') return customer.locality
+        if (key === 'due') return customer.dueAmount
+        if (key === 'loyalty') return customer.loyaltyPoints
+        if (key === 'lastVisit') return customer.lastVisit
+        return customer.name
+      },
+    )
 
   const dueTotal = customers.reduce((sum, row) => sum + row.dueAmount, 0)
 
@@ -144,19 +163,12 @@ export default function Customers() {
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-card px-4 py-3 sm:px-5">
         <div className="mb-3 flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[200px] max-w-sm flex-1">
-            <Search
-              size={14}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
-            />
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name, phone, locality"
-              className="h-9 w-full rounded-lg border border-line bg-card pl-8 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
-            />
-          </div>
+          <ListSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search name, phone, locality"
+            className="max-w-sm"
+          />
           <div className="flex items-center gap-1">
             {FILTERS.map((tab) => (
               <button
@@ -183,23 +195,85 @@ export default function Customers() {
           <table className="w-full min-w-[980px] border-collapse text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-page text-left text-xs font-semibold text-ink">
-                <th className="border-b border-line px-3 py-2.5">Name</th>
-                <th className="border-b border-line px-3 py-2.5">Phone</th>
-                <th className="border-b border-line px-3 py-2.5">Email</th>
-                <th className="border-b border-line px-3 py-2.5">Address</th>
-                <th className="border-b border-line px-3 py-2.5">Locality</th>
-                <th className="border-b border-line px-3 py-2.5 text-right">
+                <SortableTh
+                  columnKey="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="border-b border-line px-3 py-2.5"
+                >
+                  Name
+                </SortableTh>
+                <SortableTh
+                  columnKey="phone"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="border-b border-line px-3 py-2.5"
+                >
+                  Phone
+                </SortableTh>
+                <SortableTh
+                  columnKey="email"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="border-b border-line px-3 py-2.5"
+                >
+                  Email
+                </SortableTh>
+                <SortableTh
+                  columnKey="address"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="border-b border-line px-3 py-2.5"
+                >
+                  Address
+                </SortableTh>
+                <SortableTh
+                  columnKey="locality"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="border-b border-line px-3 py-2.5"
+                >
+                  Locality
+                </SortableTh>
+                <SortableTh
+                  columnKey="due"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="right"
+                  className="border-b border-line px-3 py-2.5"
+                >
                   Due (₹)
-                </th>
-                <th className="border-b border-line px-3 py-2.5 text-right">
+                </SortableTh>
+                <SortableTh
+                  columnKey="loyalty"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="right"
+                  className="border-b border-line px-3 py-2.5"
+                >
                   Loyalty
-                </th>
-                <th className="border-b border-line px-3 py-2.5">Last Visit</th>
+                </SortableTh>
+                <SortableTh
+                  columnKey="lastVisit"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="border-b border-line px-3 py-2.5"
+                >
+                  Last Visit
+                </SortableTh>
                 <th className="border-b border-line px-3 py-2.5">Action</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {visible.length === 0 ? (
                 <tr>
                   <td
                     colSpan={9}
@@ -209,7 +283,7 @@ export default function Customers() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((customer) => (
+                visible.map((customer) => (
                   <tr key={customer.id} className="hover:bg-page/70">
                     <td className="border-b border-line px-3 py-2 font-semibold text-ink">
                       {customer.name}

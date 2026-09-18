@@ -2,17 +2,50 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { ALL_RESTAURANT_SALES_ROWS, summarizeAllRestaurantSales } from '../../mocks/allRestaurantSalesData'
 
 export default function SalesSummaryReport() {
   const navigate = useNavigate()
   const [billNo, setBillNo] = useState('')
 
-  const stats = useMemo(() => summarizeAllRestaurantSales(ALL_RESTAURANT_SALES_ROWS), [])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      ALL_RESTAURANT_SALES_ROWS,
+      (row) => [
+        row.restaurant,
+        row.invoiceFrom,
+        row.invoiceTo,
+        row.totalBills,
+        row.myAmount,
+        row.totalDiscount,
+        row.netSales,
+        row.totalTax,
+        row.roundOff,
+        row.tip,
+        row.totalSales,
+      ],
+      (row, key) => {
+        if (key === 'invoiceNos') return `${row.invoiceFrom}-${row.invoiceTo}`
+        if (key === 'totalBills') return row.totalBills
+        if (key === 'myAmount') return row.myAmount
+        if (key === 'totalDiscount') return row.totalDiscount
+        if (key === 'netSales') return row.netSales
+        if (key === 'totalTax') return row.totalTax
+        if (key === 'roundOff') return row.roundOff
+        if (key === 'tip') return row.tip
+        if (key === 'totalSales') return row.totalSales
+        return row.restaurant
+      },
+    )
+
+  const stats = useMemo(() => summarizeAllRestaurantSales(visible), [visible])
 
   function handleExport() {
     const header = 'Restaurant,Invoice From,Invoice To,Bills,My Amount,Discount,Net Sales,Tax,Round Off,Tip,Total Sales'
-    const lines = [header, ...ALL_RESTAURANT_SALES_ROWS.map((r) => `${r.restaurant},${r.invoiceFrom},${r.invoiceTo},${r.totalBills},${r.myAmount},${r.totalDiscount},${r.netSales},${r.totalTax},${r.roundOff},${r.tip},${r.totalSales}`)]
+    const lines = [header, ...visible.map((r) => `${r.restaurant},${r.invoiceFrom},${r.invoiceTo},${r.totalBills},${r.myAmount},${r.totalDiscount},${r.netSales},${r.totalTax},${r.roundOff},${r.tip},${r.totalSales}`)]
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -56,24 +89,31 @@ export default function SalesSummaryReport() {
         </div>
 
         <div className="rounded-xl border border-line bg-card">
+          <div className="border-b border-line p-3">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search restaurants"
+            />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Restaurant</th>
-                  <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-muted">Invoice Nos.</th>
-                  <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-muted">Bills</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">My Amount</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Discount</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Net Sales</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Tax</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Round Off</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Tip</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Total Sales</th>
+                  <SortableTh columnKey="restaurant" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Restaurant</SortableTh>
+                  <SortableTh columnKey="invoiceNos" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="center" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Invoice Nos.</SortableTh>
+                  <SortableTh columnKey="totalBills" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="center" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Bills</SortableTh>
+                  <SortableTh columnKey="myAmount" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">My Amount</SortableTh>
+                  <SortableTh columnKey="totalDiscount" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Discount</SortableTh>
+                  <SortableTh columnKey="netSales" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Net Sales</SortableTh>
+                  <SortableTh columnKey="totalTax" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Tax</SortableTh>
+                  <SortableTh columnKey="roundOff" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Round Off</SortableTh>
+                  <SortableTh columnKey="tip" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Tip</SortableTh>
+                  <SortableTh columnKey="totalSales" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Total Sales</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {ALL_RESTAURANT_SALES_ROWS.map((r) => (
+                {visible.map((r) => (
                   <tr key={r.id} className="hover:bg-page/40">
                     <td className="px-4 py-2.5 font-medium text-ink">{r.restaurant}</td>
                     <td className="px-4 py-2.5 text-center tabular-nums text-muted">{r.invoiceFrom}–{r.invoiceTo}</td>

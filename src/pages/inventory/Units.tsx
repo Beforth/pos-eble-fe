@@ -6,12 +6,22 @@ import { useNavigate } from 'react-router-dom'
 import { FileText, Pencil, Plus, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
   RowActionButton,
 } from '../../components/menu/MenuActionButtons'
-import { UNITS, type UnitRow } from '../../mocks/unitsData'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_WRITE_PERMISSION,
+  deleteUnitApi,
+  formatInventoryStamp,
+  type InventoryUnit,
+} from '../../services/inventoryService'
 
 const PAGE_SIZE = 10
 
@@ -21,7 +31,7 @@ function UnitNameModal({
   onClose,
 }: {
   open: boolean
-  unit: UnitRow | null
+  unit: InventoryUnit | null
   onClose: () => void
 }) {
   const titleId = useId()
@@ -82,24 +92,39 @@ function UnitNameModal({
 
 export default function Units() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<UnitRow[]>(() => [...UNITS])
+  const { hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WRITE_PERMISSION)
+  const { units, status, error, loadMasters, removeUnit } = useInventoryMasters()
   const [nameInput, setNameInput] = useState('')
   const [appliedName, setAppliedName] = useState('')
   const [page, setPage] = useState(1)
-  const [viewUnit, setViewUnit] = useState<UnitRow | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<UnitRow | null>(null)
+  const [viewUnit, setViewUnit] = useState<InventoryUnit | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<InventoryUnit | null>(null)
 
+  useEffect(() => {
+    void loadMasters({ force: true })
+  }, [loadMasters])
 
   const filteredRows = useMemo(() => {
     const q = appliedName.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter((row) => row.name.toLowerCase().includes(q))
-  }, [rows, appliedName])
+    if (!q) return units
+    return units.filter((row) => row.name.toLowerCase().includes(q))
+  }, [units, appliedName])
 
-  const totalRecords = filteredRows.length
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filteredRows,
+    (row) => [row.name, row.created_at, row.updated_at],
+    (row, key) => {
+      if (key === 'created') return row.created_at
+      if (key === 'modified') return row.updated_at
+      return row.name
+    },
+  )
+
+  const totalRecords = visible.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
-  const pageRows = filteredRows.slice(
+  const pageRows = visible.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   )
@@ -115,22 +140,32 @@ export default function Units() {
     setPage(1)
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!pendingDelete) return
-    setRows((prev) => prev.filter((row) => row.id !== pendingDelete.id))
-    showToast('Unit deleted')
+    try {
+      await deleteUnitApi(pendingDelete.id)
+      removeUnit(pendingDelete.id)
+      showToast('Unit deleted')
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Unable to delete unit')
+    }
   }
 
   return (
     <InventoryPageShell activeItem="units">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Unit Management</h1>
-        <PrimaryButton onClick={() => navigate('/inventory/units/new')}>
-          <Plus size={15} />
-          Create New
-        </PrimaryButton>
+        {canWrite ? (
+          <PrimaryButton onClick={() => navigate('/inventory/units/new')}>
+            <Plus size={15} />
+            Create New
+          </PrimaryButton>
+        ) : null}
       </div>
+
+      {status === 'error' && error ? (
+        <p className="mb-3 text-sm text-primary">{error}</p>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
         <div className="min-w-[220px] flex-1">
@@ -158,9 +193,33 @@ export default function Units() {
           <table className="min-w-[720px] w-full text-left text-sm">
             <thead className="border-b border-line bg-page text-xs font-semibold text-ink">
               <tr>
-                <th className="px-3 py-2.5">Name</th>
-                <th className="px-3 py-2.5">Created</th>
-                <th className="px-3 py-2.5">Modified</th>
+                <SortableTh
+                  columnKey="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Name
+                </SortableTh>
+                <SortableTh
+                  columnKey="created"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Created
+                </SortableTh>
+                <SortableTh
+                  columnKey="modified"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Modified
+                </SortableTh>
                 <th className="px-3 py-2.5 text-center">Actions</th>
               </tr>
             </thead>
@@ -171,7 +230,9 @@ export default function Units() {
                     colSpan={4}
                     className="px-3 py-16 text-center text-sm font-semibold text-ink"
                   >
-                    Unit Management Record Not Found
+                    {status === 'loading'
+                      ? 'Loading units…'
+                      : 'Unit Management Record Not Found'}
                   </td>
                 </tr>
               ) : (
@@ -183,8 +244,12 @@ export default function Units() {
                     }`}
                   >
                     <td className="px-3 py-2.5 text-ink">{row.name}</td>
-                    <td className="px-3 py-2.5 text-ink">{row.created}</td>
-                    <td className="px-3 py-2.5 text-ink">{row.modified}</td>
+                    <td className="px-3 py-2.5 text-ink">
+                      {formatInventoryStamp(row.created_at)}
+                    </td>
+                    <td className="px-3 py-2.5 text-ink">
+                      {formatInventoryStamp(row.updated_at)}
+                    </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-center gap-1.5">
                         <RowActionButton
@@ -194,18 +259,18 @@ export default function Units() {
                         >
                           <FileText size={15} strokeWidth={1.75} />
                         </RowActionButton>
-                        <RowActionButton
-                          boxed
-                          label="Edit"
-                          onClick={() =>
-                            navigate(`/inventory/units/${row.id}/edit`, {
-                              state: { row },
-                            })
-                          }
-                        >
-                          <Pencil size={15} strokeWidth={1.75} />
-                        </RowActionButton>
-                        {row.canDelete ? (
+                        {canWrite ? (
+                          <RowActionButton
+                            boxed
+                            label="Edit"
+                            onClick={() =>
+                              navigate(`/inventory/units/${row.id}/edit`)
+                            }
+                          >
+                            <Pencil size={15} strokeWidth={1.75} />
+                          </RowActionButton>
+                        ) : null}
+                        {canWrite ? (
                           <RowActionButton
                             boxed
                             label="Delete"
@@ -281,7 +346,7 @@ export default function Units() {
         title="Confirm Delete"
         message={`Are you sure you want to delete "${pendingDelete?.name ?? 'this unit'}"? This action cannot be undone.`}
         confirmLabel="Delete"
-        onConfirm={confirmDelete}
+        onConfirm={() => void confirmDelete()}
         onClose={() => setPendingDelete(null)}
       />
     </InventoryPageShell>

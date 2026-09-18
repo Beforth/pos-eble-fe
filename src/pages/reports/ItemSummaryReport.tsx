@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Printer, Search } from 'lucide-react'
+import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { OUTLET_ITEM_WISE_ROWS, summarizeOutletItemWise } from '../../mocks/outletItemWiseData'
 
 const PAGE_SIZE = 10
@@ -9,25 +12,30 @@ const PAGE_SIZE = 10
 export default function ItemSummaryReport() {
   const navigate = useNavigate()
   const [billNo, setBillNo] = useState('')
-  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return OUTLET_ITEM_WISE_ROWS
-    return OUTLET_ITEM_WISE_ROWS.filter(
-      (r) => r.item.toLowerCase().includes(q) || r.category.toLowerCase().includes(q),
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      OUTLET_ITEM_WISE_ROWS,
+      (row) => [row.item, row.category, row.qty, row.myAmount, row.tax, row.grossSales],
+      (row, key) => {
+        if (key === 'item') return row.item
+        if (key === 'qty') return row.qty
+        if (key === 'amount') return row.myAmount
+        if (key === 'tax') return row.tax
+        if (key === 'grossSales') return row.grossSales
+        return row.category
+      },
     )
-  }, [search])
 
-  const stats = useMemo(() => summarizeOutletItemWise(filtered), [filtered])
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const stats = useMemo(() => summarizeOutletItemWise(visible), [visible])
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pageRows = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   function handleExport() {
     const header = 'Category,Item,Qty,Amount,Discount,Tax,Gross Sales'
-    const lines = [header, ...filtered.map((r) => `${r.category},${r.item},${r.qty},${r.myAmount},${r.discount},${r.tax},${r.grossSales}`)]
+    const lines = [header, ...visible.map((r) => `${r.category},${r.item},${r.qty},${r.myAmount},${r.discount},${r.tax},${r.grossSales}`)]
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -54,7 +62,7 @@ export default function ItemSummaryReport() {
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg border border-line bg-card p-3 text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Items</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{filtered.length}</p>
+            <p className="mt-1 text-xl font-extrabold text-ink">{visible.length}</p>
           </div>
           <div className="rounded-lg border border-line bg-card p-3 text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Qty</p>
@@ -72,22 +80,26 @@ export default function ItemSummaryReport() {
 
         <div className="rounded-xl border border-line bg-card">
           <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search items..." className="h-9 w-full rounded-lg border border-line bg-page pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary" />
-            </div>
-            <span className="text-xs text-muted">{filtered.length} items</span>
+            <ListSearch
+              value={search}
+              onChange={(value) => {
+                setSearch(value)
+                setPage(1)
+              }}
+              placeholder="Search items"
+            />
+            <span className="text-xs text-muted">{visible.length} items</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Category</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Item</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Qty</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Amount</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Tax</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Gross Sales</th>
+                  <SortableTh columnKey="category" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Category</SortableTh>
+                  <SortableTh columnKey="item" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Item</SortableTh>
+                  <SortableTh columnKey="qty" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Qty</SortableTh>
+                  <SortableTh columnKey="amount" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Amount</SortableTh>
+                  <SortableTh columnKey="tax" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Tax</SortableTh>
+                  <SortableTh columnKey="grossSales" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Gross Sales</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

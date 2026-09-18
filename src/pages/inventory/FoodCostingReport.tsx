@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Lightbulb, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -22,6 +23,9 @@ const CATEGORY_OPTIONS = [
 ]
 
 const ORDER_TYPE_OPTIONS = ['All', 'Dine In', 'Delivery', 'Pick Up']
+
+const DEFAULT_FROM = '2026-08-10'
+const DEFAULT_TO = '2026-08-11'
 
 function ExportMenu({
   onExportPage,
@@ -91,21 +95,52 @@ export default function FoodCostingReport() {
   const [menuItem, setMenuItem] = useState('')
   const [category, setCategory] = useState('All')
   const [orderType, setOrderType] = useState('All')
-  const [fromDate, setFromDate] = useState('2026-08-10')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState(DEFAULT_FROM)
+  const [toDate, setToDate] = useState(DEFAULT_TO)
+  const [applied, setApplied] = useState({
+    menuItem: '',
+    category: 'All',
+    orderType: 'All',
+    fromDate: DEFAULT_FROM,
+    toDate: DEFAULT_TO,
+  })
 
+  function handleSearch() {
+    setApplied({
+      menuItem: menuItem.trim(),
+      category,
+      orderType,
+      fromDate,
+      toDate,
+    })
+    showToast('Search applied')
+  }
 
   function handleClear() {
     setMenuItem('')
     setCategory('All')
     setOrderType('All')
-    setFromDate('2026-08-10')
-    setToDate('2026-08-11')
+    setFromDate(DEFAULT_FROM)
+    setToDate(DEFAULT_TO)
+    setApplied({
+      menuItem: '',
+      category: 'All',
+      orderType: 'All',
+      fromDate: DEFAULT_FROM,
+      toDate: DEFAULT_TO,
+    })
   }
+
+  const exportRow = [
+    applied.menuItem,
+    applied.category,
+    applied.orderType,
+    applied.fromDate,
+    applied.toDate,
+  ]
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Food Costing Report</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -114,8 +149,34 @@ export default function FoodCostingReport() {
             Help Center
           </OutlineButton>
           <ExportMenu
-            onExportPage={() => showToast('Exported current page')}
-            onExportAll={() => showToast('Exported all')}
+            onExportPage={() => {
+              downloadCsv(
+                [
+                  'menu_item',
+                  'category',
+                  'order_type',
+                  'from_date',
+                  'to_date',
+                ],
+                [exportRow],
+                'food-costing-page.csv',
+              )
+              showToast('Exported current page')
+            }}
+            onExportAll={() => {
+              downloadCsv(
+                [
+                  'menu_item',
+                  'category',
+                  'order_type',
+                  'from_date',
+                  'to_date',
+                ],
+                [exportRow],
+                'food-costing-all.csv',
+              )
+              showToast('Exported all')
+            }}
           />
         </div>
       </div>
@@ -176,9 +237,7 @@ export default function FoodCostingReport() {
             className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -194,6 +253,11 @@ export default function FoodCostingReport() {
         </span>
         <p className="text-base font-semibold text-ink">
           No Food Costing Report Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: menu={applied.menuItem || '—'} · category={applied.category}{' '}
+          · orderType={applied.orderType} · from={applied.fromDate} · to=
+          {applied.toDate}
         </p>
       </div>
     </InventoryPageShell>

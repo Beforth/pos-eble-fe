@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -103,6 +104,44 @@ function buildRows(): StockSummaryRow[] {
 }
 
 const ALL_ROWS = buildRows()
+
+const STOCK_SUMMARY_HEADERS = [
+  'raw_material',
+  'opening',
+  'purchase',
+  'excess',
+  'total_in',
+  'consumed',
+  'wastage',
+  'normal_loss',
+  'transfer',
+  'shortage',
+  'production',
+  'total_out',
+  'closing_stock',
+  'closing_summary',
+  'difference',
+]
+
+function toStockSummaryCsv(list: StockSummaryRow[]) {
+  return list.map((row) => [
+    row.rawMaterial,
+    row.opening,
+    row.purchase,
+    row.excess,
+    row.totalIn,
+    row.consumed,
+    row.wastage,
+    row.normalLoss,
+    row.transfer,
+    row.shortage,
+    row.production,
+    row.totalOut,
+    row.closingStock,
+    row.closingSummary,
+    row.difference,
+  ])
+}
 
 function ExportMenu({
   onExportPage,
@@ -386,10 +425,38 @@ export default function StockSummaryReport() {
             </p>
           </div>
           <ExportMenu
-            onExportPage={() => showToast('Exported current page')}
-            onExportAll={() => showToast('Exported all')}
-            onExportPagePdf={() => showToast('Exported current page to PDF')}
-            onExportAllPdf={() => showToast('Exported all to PDF')}
+            onExportPage={() => {
+              downloadCsv(
+                STOCK_SUMMARY_HEADERS,
+                toStockSummaryCsv(pageRows),
+                'stock-summary-page.csv',
+              )
+              showToast('Exported current page')
+            }}
+            onExportAll={() => {
+              downloadCsv(
+                STOCK_SUMMARY_HEADERS,
+                toStockSummaryCsv(filteredRows),
+                'stock-summary-all.csv',
+              )
+              showToast('Exported all')
+            }}
+            onExportPagePdf={() => {
+              downloadCsv(
+                STOCK_SUMMARY_HEADERS,
+                toStockSummaryCsv(pageRows),
+                'stock-summary-page.csv',
+              )
+              showToast('Exported current page to PDF')
+            }}
+            onExportAllPdf={() => {
+              downloadCsv(
+                STOCK_SUMMARY_HEADERS,
+                toStockSummaryCsv(filteredRows),
+                'stock-summary-all.csv',
+              )
+              showToast('Exported all to PDF')
+            }}
           />
         </div>
 

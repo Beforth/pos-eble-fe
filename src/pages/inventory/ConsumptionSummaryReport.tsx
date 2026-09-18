@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
@@ -333,8 +334,54 @@ export default function ConsumptionSummaryReport() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Consumption Summary</h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => {
+            downloadCsv(
+              [
+                'raw_material',
+                'unit',
+                'consumption',
+                'avg_purchase_price',
+                'consumption_cost',
+                'total_qty',
+                'total_cost',
+              ],
+              pageRows.map((row) => [
+                row.rawMaterial,
+                row.unit,
+                row.consumption,
+                row.avgPurchasePrice,
+                row.consumptionCost,
+                row.totalQty,
+                row.totalCost,
+              ]),
+              'consumption-summary-page.csv',
+            )
+            showToast('Exported current page')
+          }}
+          onExportAll={() => {
+            downloadCsv(
+              [
+                'raw_material',
+                'unit',
+                'consumption',
+                'avg_purchase_price',
+                'consumption_cost',
+                'total_qty',
+                'total_cost',
+              ],
+              filteredRows.map((row) => [
+                row.rawMaterial,
+                row.unit,
+                row.consumption,
+                row.avgPurchasePrice,
+                row.consumptionCost,
+                row.totalQty,
+                row.totalCost,
+              ]),
+              'consumption-summary-all.csv',
+            )
+            showToast('Exported all')
+          }}
         />
       </div>
 

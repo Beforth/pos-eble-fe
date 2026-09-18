@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -24,6 +25,8 @@ const STATUS_OPTIONS = [
   'Pending for Approval',
   'Payment Pending',
 ]
+
+const DEFAULT_DATE = '2026-08-11'
 
 function ExportMenu({
   onExportList,
@@ -93,29 +96,73 @@ export default function PurchaseOrderReceivedReport() {
   const [from, setFrom] = useState('All')
   const [poNumber, setPoNumber] = useState('')
   const [status, setStatus] = useState('Saved & Approved')
-  const [startDate, setStartDate] = useState('2026-08-11')
-  const [endDate, setEndDate] = useState('2026-08-11')
+  const [startDate, setStartDate] = useState(DEFAULT_DATE)
+  const [endDate, setEndDate] = useState(DEFAULT_DATE)
+  const [applied, setApplied] = useState({
+    from: 'All',
+    poNumber: '',
+    status: 'Saved & Approved',
+    startDate: DEFAULT_DATE,
+    endDate: DEFAULT_DATE,
+  })
 
+  function handleSearch() {
+    setApplied({
+      from,
+      poNumber: poNumber.trim(),
+      status,
+      startDate,
+      endDate,
+    })
+    showToast('Search applied')
+  }
 
-  function handleShowAll() {
+  function handleClear() {
     setFrom('All')
     setPoNumber('')
     setStatus('Saved & Approved')
-    setStartDate('2026-08-11')
-    setEndDate('2026-08-11')
-    showToast('Filters cleared')
+    setStartDate(DEFAULT_DATE)
+    setEndDate(DEFAULT_DATE)
+    setApplied({
+      from: 'All',
+      poNumber: '',
+      status: 'Saved & Approved',
+      startDate: DEFAULT_DATE,
+      endDate: DEFAULT_DATE,
+    })
   }
+
+  const exportRow = [
+    applied.from,
+    applied.poNumber,
+    applied.status,
+    applied.startDate,
+    applied.endDate,
+  ]
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Purchase Order Received Report
         </h1>
         <ExportMenu
-          onExportList={() => showToast('Exported report list')}
-          onExportDetail={() => showToast('Exported detail report')}
+          onExportList={() => {
+            downloadCsv(
+              ['from', 'po_number', 'status', 'start_date', 'end_date'],
+              [exportRow],
+              'po-received-list.csv',
+            )
+            showToast('Exported report list')
+          }}
+          onExportDetail={() => {
+            downloadCsv(
+              ['from', 'po_number', 'status', 'start_date', 'end_date'],
+              [exportRow],
+              'po-received-detail.csv',
+            )
+            showToast('Exported detail report')
+          }}
         />
       </div>
 
@@ -175,10 +222,8 @@ export default function PurchaseOrderReceivedReport() {
             className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
-        <OutlineButton variant="gray" onClick={handleShowAll}>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
+        <OutlineButton variant="gray" onClick={handleClear}>
           Clear Filter
         </OutlineButton>
       </div>
@@ -194,6 +239,10 @@ export default function PurchaseOrderReceivedReport() {
         <p className="text-base font-semibold text-ink">No Record Found</p>
         <p className="mt-1 max-w-sm text-sm text-muted">
           We could not find what you searched for Try searching again
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: from={applied.from} · po={applied.poNumber || '—'} · status=
+          {applied.status} · start={applied.startDate} · end={applied.endDate}
         </p>
       </div>
     </InventoryPageShell>

@@ -3,6 +3,7 @@ import { Eye, Pencil, ReceiptText, Search } from 'lucide-react'
 import type { AllOrderRow } from '../../mocks/allOrdersData'
 import { formatINR } from '../../utils/format'
 import { Badge } from '../common/Badge'
+import { useListQuery } from '../../hooks/useListQuery'
 import { Table, type Column } from '../common/Table'
 
 /** Credit card + edit mark — matches POS-Eble “Change Payment Type” action. */
@@ -69,7 +70,40 @@ export function AllOrdersTable({
   onEdit,
   onChangePayment,
 }: AllOrdersTableProps) {
-  const allSelected = rows.length > 0 && rows.every((row) => selected.has(row.id))
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    rows,
+    (row) => [
+      row.orderNo,
+      row.orderType,
+      row.customerName,
+      row.assignTo,
+      row.items,
+      row.myAmount,
+      row.tax,
+      row.discount,
+      row.grandTotal,
+      row.payment,
+      row.status,
+      row.created,
+    ],
+    (row, key) => {
+      if (key === 'orderType') return row.orderType
+      if (key === 'customerName') return row.customerName
+      if (key === 'assignTo') return row.assignTo
+      if (key === 'items') return row.items
+      if (key === 'myAmount') return row.myAmount
+      if (key === 'tax') return row.tax
+      if (key === 'discount') return row.discount
+      if (key === 'grandTotal') return row.grandTotal
+      if (key === 'payment') return row.payment
+      if (key === 'status') return row.status
+      if (key === 'created') return row.created
+      return row.orderNo
+    },
+  )
+
+  const allSelected =
+    visible.length > 0 && visible.every((row) => selected.has(row.id))
 
   const columns: Column<AllOrderRow>[] = [
     {
@@ -96,6 +130,7 @@ export function AllOrdersTable({
     {
       key: 'orderNo',
       header: 'Order No.',
+      sortable: true,
       render: (row) => (
         <span className="font-semibold text-primary">{row.orderNo}</span>
       ),
@@ -103,6 +138,7 @@ export function AllOrdersTable({
     {
       key: 'orderType',
       header: 'Order Type',
+      sortable: true,
       render: (row) => (
         <span className="text-xs font-semibold uppercase tracking-wide text-ink">
           {row.orderType}
@@ -112,17 +148,20 @@ export function AllOrdersTable({
     {
       key: 'customerName',
       header: 'Customer Name',
+      sortable: true,
       render: (row) => row.customerName || '—',
     },
     {
       key: 'assignTo',
       header: 'Assign To',
+      sortable: true,
       render: (row) => row.assignTo || '—',
     },
     {
       key: 'items',
       header: 'Items',
       className: 'min-w-[180px]',
+      sortable: true,
       render: (row) => (
         <span className="line-clamp-2 max-w-[220px] text-xs">{row.items}</span>
       ),
@@ -131,6 +170,7 @@ export function AllOrdersTable({
       key: 'myAmount',
       header: 'My Amount (₹)',
       align: 'center',
+      sortable: true,
       render: (row) => (
         <span className="whitespace-nowrap tabular-nums">{formatINR(row.myAmount, 2)}</span>
       ),
@@ -139,6 +179,7 @@ export function AllOrdersTable({
       key: 'tax',
       header: 'Tax (₹)',
       align: 'center',
+      sortable: true,
       render: (row) => (
         <span className="whitespace-nowrap tabular-nums">{formatINR(row.tax, 2)}</span>
       ),
@@ -147,6 +188,7 @@ export function AllOrdersTable({
       key: 'discount',
       header: 'Discount (₹)',
       align: 'center',
+      sortable: true,
       render: (row) => (
         <span className="whitespace-nowrap tabular-nums">{formatINR(row.discount, 2)}</span>
       ),
@@ -155,6 +197,7 @@ export function AllOrdersTable({
       key: 'grandTotal',
       header: 'Grand Total [Round Off] (₹)',
       align: 'center',
+      sortable: true,
       render: (row) => (
         <span className="whitespace-nowrap font-semibold tabular-nums">
           {formatINR(row.grandTotal, 2)}
@@ -164,11 +207,13 @@ export function AllOrdersTable({
     {
       key: 'payment',
       header: 'Payment',
+      sortable: true,
       render: (row) => <span className="text-xs">{row.payment}</span>,
     },
     {
       key: 'status',
       header: 'Status',
+      sortable: true,
       render: (row) => (
         <Badge
           variant={row.status === 'Cancelled' ? 'primary' : 'success'}
@@ -181,6 +226,7 @@ export function AllOrdersTable({
     {
       key: 'created',
       header: 'Created',
+      sortable: true,
       render: (row) => (
         <span className="whitespace-nowrap text-xs text-muted">
           {row.created}
@@ -226,5 +272,15 @@ export function AllOrdersTable({
     )
   }
 
-  return <Table columns={columns} rows={rows} rowKey={(row) => row.id} dense />
+  return (
+    <Table
+      columns={columns}
+      rows={visible}
+      rowKey={(row) => row.id}
+      dense
+      sortKey={sortKey}
+      sortDir={sortDir}
+      onSort={toggleSort}
+    />
+  )
 }

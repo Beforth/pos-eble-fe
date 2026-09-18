@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import {
-  ArrowDownUp,
   Check,
   ChevronDown,
   CloudUpload,
@@ -10,9 +9,12 @@ import {
   Search,
 } from 'lucide-react'
 import { DatePickerPill, type DateRangeOption } from '../../components/common/DatePickerPill'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
 import { AggregatorLogo } from '../../components/common/AggregatorLogo'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { ActionDropdown } from '../../components/menu/MenuActionButtons'
+import { useListQuery } from '../../hooks/useListQuery'
 import { formatDayMonth, parseInputDate } from '../../utils/format'
 
 type PlatformId = 'zomato' | 'swiggy'
@@ -317,14 +319,14 @@ function RecordsNotFound() {
 }
 
 const ALL_COLUMNS = [
-  { key: 'orderId', label: 'Order ID', sortable: true },
-  { key: 'orderDateTime', label: 'Order (D/T)', sortable: true },
-  { key: 'missingFrom', label: 'Missing From', sortable: false },
-  { key: 'orderStatus', label: 'Order Status', sortable: false },
-  { key: 'subTotal', label: 'Sub Total', sortable: false },
-  { key: 'packingCharge', label: 'Packing Charge', sortable: false },
-  { key: 'gstTotal', label: 'GST Total', sortable: false },
-  { key: 'totalDiscount', label: 'Total Discount', sortable: false },
+  { key: 'orderId', label: 'Order ID' },
+  { key: 'orderDateTime', label: 'Order (D/T)' },
+  { key: 'missingFrom', label: 'Missing From' },
+  { key: 'orderStatus', label: 'Order Status' },
+  { key: 'subTotal', label: 'Sub Total' },
+  { key: 'packingCharge', label: 'Packing Charge' },
+  { key: 'gstTotal', label: 'GST Total' },
+  { key: 'totalDiscount', label: 'Total Discount' },
 ] as const
 
 type ColumnKey = (typeof ALL_COLUMNS)[number]['key']
@@ -344,7 +346,6 @@ export default function OnlineOrderReconciliation() {
   const [customLabel, setCustomLabel] = useState('6th Aug to 11th Aug')
   const [payoutPeriodId, setPayoutPeriodId] = useState('2026-07-20')
   const [uploadName, setUploadName] = useState('')
-  const [finalSearch, setFinalSearch] = useState('')
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
     () => new Set(ALL_COLUMNS.map((col) => col.key)),
   )
@@ -369,6 +370,31 @@ export default function OnlineOrderReconciliation() {
     }
     return SAMPLE_MISSING_ROWS
   }, [activeTab, platform])
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      rows,
+      (row) => [
+        row.orderId,
+        row.orderDateTime,
+        row.missingFrom,
+        row.orderStatus,
+        row.subTotal,
+        row.packingCharge,
+        row.gstTotal,
+        row.totalDiscount,
+      ],
+      (row, key) => {
+        if (key === 'orderDateTime') return row.orderDateTime
+        if (key === 'missingFrom') return row.missingFrom
+        if (key === 'orderStatus') return row.orderStatus
+        if (key === 'subTotal') return row.subTotal
+        if (key === 'packingCharge') return row.packingCharge
+        if (key === 'gstTotal') return row.gstTotal
+        if (key === 'totalDiscount') return row.totalDiscount
+        return row.orderId
+      },
+    )
 
   const shownColumns = ALL_COLUMNS.filter((col) => visibleColumns.has(col.key))
   const showEmptyState = rows.length === 0
@@ -560,8 +586,8 @@ export default function OnlineOrderReconciliation() {
             <Search size={14} className="shrink-0 text-muted" />
             <input
               type="search"
-              value={finalSearch}
-              onChange={(event) => setFinalSearch(event.target.value)}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Search"
               className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
             />
@@ -579,6 +605,12 @@ export default function OnlineOrderReconciliation() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
             <h2 className="text-sm font-bold text-ink">Order Mismatch List</h2>
             <div className="flex flex-wrap items-center gap-2">
+              <ListSearch
+                value={search}
+                onChange={setSearch}
+                placeholder="Search orders"
+                className="sm:max-w-[220px]"
+              />
               <ActionDropdown
                 label="Columns"
                 options={ALL_COLUMNS.map((col) => ({
@@ -611,19 +643,21 @@ export default function OnlineOrderReconciliation() {
               <thead className="border-b border-line bg-primary/5 text-xs font-semibold text-ink">
                 <tr>
                   {shownColumns.map((col) => (
-                    <th key={col.key} className="px-3 py-3 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1">
-                        {col.label}
-                        {col.sortable ? (
-                          <ArrowDownUp size={12} className="text-muted" />
-                        ) : null}
-                      </span>
-                    </th>
+                    <SortableTh
+                      key={col.key}
+                      columnKey={col.key}
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3 whitespace-nowrap"
+                    >
+                      {col.label}
+                    </SortableTh>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {visible.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-0 hover:bg-page/40"

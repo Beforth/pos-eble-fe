@@ -1,36 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
-
-const CATEGORY_OPTIONS = [
-  { id: 'all', name: 'All' },
-  { id: 'no-category', name: 'No Category' },
-  { id: 'rice-pulses-flours', name: 'Rice/pulses/flours' },
-  { id: 'bread-dairy', name: 'Bread/dairy' },
-  { id: 'oils-masala', name: 'Oils/masala/salt/sugar' },
-  { id: 'ready-to-cook', name: 'Ready To Cook/ready To Eat' },
-  { id: 'sauces', name: 'Sauces/dressings/marinades' },
-  { id: 'snacks', name: 'Snacks' },
-  { id: 'packaging', name: 'Packaging/storage' },
-  { id: 'fruits-vegetables', name: 'Fruits/vegetables' },
-]
-
-const CATEGORY_IDS = CATEGORY_OPTIONS.map((option) => option.id)
-const CATEGORY_IDS_WITHOUT_ALL = CATEGORY_IDS.filter((id) => id !== 'all')
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  categoryIdByName,
+  listCurrentStockReportApi,
+  type CurrentStockRow,
+} from '../../services/inventoryService'
 
 const STOCK_LEVEL_OPTIONS = [
   'All',
   'At-par stock',
   'Minimum stock',
   'Negative stock',
-  'Maximum stock',
 ]
-
-const STATUS_OPTIONS = ['Up to date', 'Lack of action']
 
 function ExportMenu({
   onExportPage,
@@ -96,132 +87,126 @@ function ExportMenu({
   )
 }
 
-function CategoryMultiSelect({
-  selectedIds,
-  onChange,
-}: {
-  selectedIds: string[]
-  onChange: (ids: string[]) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
+export default function CurrentStockReport() {
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
+  const { categories, loadMasters } = useInventoryMasters()
+  const [rawMaterial, setRawMaterial] = useState('')
+  const [category, setCategory] = useState('All')
+  const [stockLevel, setStockLevel] = useState('All')
+  const [appliedSearch, setAppliedSearch] = useState('')
+  const [appliedCategory, setAppliedCategory] = useState('All')
+  const [rows, setRows] = useState<CurrentStockRow[]>([])
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
+    void loadMasters()
+  }, [loadMasters])
 
-  const display =
-    selectedIds.length === 0
-      ? 'Select Category'
-      : selectedIds.includes('all') ||
-          selectedIds.length === CATEGORY_IDS_WITHOUT_ALL.length
-        ? 'All'
-        : selectedIds.length === 1
-          ? (CATEGORY_OPTIONS.find((o) => o.id === selectedIds[0])?.name ??
-            '1 selected')
-          : `${selectedIds.length} selected`
-
-  function toggle(id: string) {
-    if (id === 'all') {
-      const selectingAll =
-        !selectedIds.includes('all') &&
-        selectedIds.length !== CATEGORY_IDS_WITHOUT_ALL.length
-      onChange(selectingAll ? [...CATEGORY_IDS] : [])
-      return
-    }
-
-    const withoutAll = selectedIds.filter((value) => value !== 'all')
-    const next = withoutAll.includes(id)
-      ? withoutAll.filter((value) => value !== id)
-      : [...withoutAll, id]
-
-    if (next.length === CATEGORY_IDS_WITHOUT_ALL.length) {
-      onChange([...CATEGORY_IDS])
-      return
-    }
-    onChange(next)
-  }
-
-  return (
-    <div ref={rootRef} className="relative">
-      <label className="mb-1.5 block text-sm font-medium text-ink">
-        Category
-      </label>
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-line bg-card px-3 text-left text-sm outline-none hover:bg-page focus:border-primary"
-      >
-        <span
-          className={`min-w-0 flex-1 truncate ${
-            selectedIds.length ? 'text-ink' : 'text-muted'
-          }`}
-        >
-          {display}
-        </span>
-        <ChevronDown
-          size={14}
-          className={`shrink-0 text-muted transition-transform ${
-            open ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
-      {open ? (
-        <ul
-          role="listbox"
-          aria-multiselectable="true"
-          className="absolute left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto rounded-md border border-line bg-card py-1 shadow-lg"
-        >
-          {CATEGORY_OPTIONS.map((option) => {
-            const checked =
-              option.id === 'all'
-                ? selectedIds.includes('all') ||
-                  selectedIds.length === CATEGORY_IDS_WITHOUT_ALL.length
-                : selectedIds.includes(option.id) || selectedIds.includes('all')
-            return (
-              <li key={option.id} role="option" aria-selected={checked}>
-                <label className="flex cursor-pointer items-start gap-2.5 px-3 py-2 text-sm text-ink hover:bg-page">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(option.id)}
-                    className="mt-0.5 size-4 shrink-0 accent-primary"
-                  />
-                  <span className="leading-snug">{option.name}</span>
-                </label>
-              </li>
-            )
-          })}
-        </ul>
-      ) : null}
-    </div>
+  const categoryOptions = useMemo(
+    () => ['All', ...categories.map((row) => row.name), 'No Category'],
+    [categories],
   )
-}
 
-export default function CurrentStockReport() {
-  const [rawMaterial, setRawMaterial] = useState('')
-  const [categories, setCategories] = useState<string[]>([])
-  const [stockLevel, setStockLevel] = useState('All')
-  const [status, setStatus] = useState('Up to date')
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    setLoading(true)
+    try {
+      const categoryId =
+        appliedCategory === 'All'
+          ? undefined
+          : appliedCategory === 'No Category'
+            ? 'no-category'
+            : categoryIdByName(categories, appliedCategory)
+      const data = await listCurrentStockReportApi(encryptedOutletId, {
+        search: appliedSearch || undefined,
+        categoryId,
+      })
+      setRows(data)
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : 'Unable to load current stock',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [
+    encryptedOutletId,
+    canRead,
+    appliedSearch,
+    appliedCategory,
+    categories,
+  ])
 
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const filtered = useMemo(() => {
+    return rows.filter((row) => {
+      const qty = Number(row.stock_qty)
+      const min = Number(row.min_stock ?? NaN)
+      const atPar = Number(row.at_par_stock ?? NaN)
+      if (stockLevel === 'Negative stock') return qty < 0
+      if (stockLevel === 'Minimum stock') {
+        return Number.isFinite(min) && qty <= min
+      }
+      if (stockLevel === 'At-par stock') {
+        return Number.isFinite(atPar) && qty <= atPar
+      }
+      return true
+    })
+  }, [rows, stockLevel])
 
   return (
     <InventoryPageShell activeItem="current-stock">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Current Stock Report</h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => {
+            downloadCsv(
+              [
+                'raw_material',
+                'category',
+                'stock_qty',
+                'unit',
+                'min_stock',
+                'at_par_stock',
+              ],
+              filtered.map((row) => [
+                row.raw_material_name,
+                row.category_name || '',
+                row.stock_qty,
+                row.consumption_unit_name,
+                row.min_stock,
+                row.at_par_stock,
+              ]),
+              'current-stock-page.csv',
+            )
+            showToast('Exported current page')
+          }}
+          onExportAll={() => {
+            downloadCsv(
+              [
+                'raw_material',
+                'category',
+                'stock_qty',
+                'unit',
+                'min_stock',
+                'at_par_stock',
+              ],
+              filtered.map((row) => [
+                row.raw_material_name,
+                row.category_name || '',
+                row.stock_qty,
+                row.consumption_unit_name,
+                row.min_stock,
+                row.at_par_stock,
+              ]),
+              'current-stock-all.csv',
+            )
+            showToast('Exported all')
+          }}
         />
       </div>
 
@@ -237,10 +222,15 @@ export default function CurrentStockReport() {
             className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <div className="min-w-[180px] flex-1">
-          <CategoryMultiSelect
-            selectedIds={categories}
-            onChange={setCategories}
+        <div className="min-w-[180px]">
+          <SearchableSelect
+            label="Category"
+            value={category}
+            options={categoryOptions}
+            placeholder="All"
+            searchPlaceholder="Search"
+            includePlaceholderOption={false}
+            onChange={setCategory}
           />
         </div>
         <div className="min-w-[150px]">
@@ -254,34 +244,78 @@ export default function CurrentStockReport() {
             onChange={setStockLevel}
           />
         </div>
-        <div className="min-w-[150px]">
-          <SearchableSelect
-            label="Status"
-            value={status}
-            options={STATUS_OPTIONS}
-            placeholder="Up to date"
-            searchPlaceholder="Search"
-            includePlaceholderOption={false}
-            onChange={setStatus}
-          />
-        </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
+        <OutlineButton
+          onClick={() => {
+            setAppliedSearch(rawMaterial.trim())
+            setAppliedCategory(category)
+          }}
+        >
           Search
         </OutlineButton>
       </div>
 
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-        <span className="relative mb-4 text-muted">
-          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
-          <Search
-            size={24}
-            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-          />
-        </span>
-        <p className="text-base font-semibold text-ink">
-          No Current Stock Report Found
-        </p>
-      </div>
+      {!canRead ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          You do not have permission to view inventory reports.
+        </div>
+      ) : loading ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          Loading…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+          <span className="relative mb-4 text-muted">
+            <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
+            <Search
+              size={24}
+              className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+            />
+          </span>
+          <p className="text-base font-semibold text-ink">
+            No Current Stock Report Found
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-line bg-card">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
+              <tr>
+                <th className="px-3 py-2.5">Raw Material</th>
+                <th className="px-3 py-2.5">Category</th>
+                <th className="px-3 py-2.5">Stock Qty</th>
+                <th className="px-3 py-2.5">Unit</th>
+                <th className="px-3 py-2.5">Min</th>
+                <th className="px-3 py-2.5">At Par</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row) => (
+                <tr
+                  key={row.raw_material_id}
+                  className="border-b border-line last:border-b-0"
+                >
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.raw_material_name}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.category_name || '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">{row.stock_qty}</td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.consumption_unit_name}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.min_stock ?? '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.at_par_stock ?? '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </InventoryPageShell>
   )
 }

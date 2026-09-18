@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { FileText, Mail, Search } from 'lucide-react'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
+import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   RowActionButton,
@@ -225,6 +227,41 @@ export default function ServicePaymentHistory() {
     )
   }, [filtered])
 
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filtered,
+    (row) => [
+      row.restaurant,
+      row.gstin,
+      row.proformaNo,
+      row.serviceOpted,
+      row.orderId,
+      row.proformaDate,
+      row.paidOn,
+      row.basicAmount,
+      row.cgst,
+      row.sgst,
+      row.igst,
+      row.grossAmount,
+      row.status,
+      row.invoiceGenerated ? 'Yes' : 'No',
+    ],
+    (row, key) => {
+      if (key === 'proformaNo') return row.proformaNo
+      if (key === 'serviceOpted') return row.serviceOpted
+      if (key === 'orderId') return row.orderId
+      if (key === 'proformaDate') return row.proformaDate
+      if (key === 'paidOn') return row.paidOn
+      if (key === 'basicAmount') return row.basicAmount
+      if (key === 'cgst') return row.cgst
+      if (key === 'sgst') return row.sgst
+      if (key === 'igst') return row.igst
+      if (key === 'grossAmount') return row.grossAmount
+      if (key === 'status') return row.status
+      if (key === 'invoiceGenerated') return row.invoiceGenerated ? 'Yes' : 'No'
+      return row.restaurant
+    },
+  )
+
 
   function handleSearch() {
     setAppliedOrderId(orderId)
@@ -379,39 +416,142 @@ export default function ServicePaymentHistory() {
               <table className="w-full min-w-[1200px] text-left text-sm">
                 <thead className="border-b border-line bg-primary/5 text-xs font-semibold text-ink">
                   <tr>
-                    <th className="px-3 py-3">Restaurant [GSTIN]</th>
-                    <th className="px-3 py-3">Proforma No.</th>
-                    <th className="px-3 py-3">Service Opted</th>
-                    <th className="px-3 py-3">Order ID</th>
-                    <th className="px-3 py-3">Proforma Date</th>
-                    <th className="px-3 py-3">Paid On</th>
-                    <th className="px-3 py-3 text-right">
+                    <SortableTh
+                      columnKey="restaurant"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3"
+                    >
+                      Restaurant [GSTIN]
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="proformaNo"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3"
+                    >
+                      Proforma No.
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="serviceOpted"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3"
+                    >
+                      Service Opted
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="orderId"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3"
+                    >
+                      Order ID
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="proformaDate"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3"
+                    >
+                      Proforma Date
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="paidOn"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3"
+                    >
+                      Paid On
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="basicAmount"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-3 py-3"
+                    >
                       Basic Amount
                       <span className="mt-0.5 block font-normal text-muted">
                         ({formatAmount(totals.basic)})
                       </span>
-                    </th>
-                    <th className="px-3 py-3 text-right">CGST Tax</th>
-                    <th className="px-3 py-3 text-right">SGST Tax</th>
-                    <th className="px-3 py-3 text-right">
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="cgst"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-3 py-3"
+                    >
+                      CGST Tax
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="sgst"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-3 py-3"
+                    >
+                      SGST Tax
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="igst"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-3 py-3"
+                    >
                       IGST Tax
                       <span className="mt-0.5 block font-normal text-muted">
                         ({formatAmount(totals.igst)})
                       </span>
-                    </th>
-                    <th className="px-3 py-3 text-right">
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="grossAmount"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-3 py-3"
+                    >
                       Gross Amount
                       <span className="mt-0.5 block font-normal text-muted">
                         ({formatAmount(totals.gross)})
                       </span>
-                    </th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3">Invoice Generated (Yes/No)</th>
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="status"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3"
+                    >
+                      Status
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="invoiceGenerated"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-3 py-3"
+                    >
+                      Invoice Generated (Yes/No)
+                    </SortableTh>
                     <th className="px-3 py-3 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.length === 0 ? (
+                  {visible.length === 0 ? (
                     <tr>
                       <td
                         colSpan={14}
@@ -421,7 +561,7 @@ export default function ServicePaymentHistory() {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((row) => (
+                    visible.map((row) => (
                       <tr
                         key={row.id}
                         className="border-b border-line last:border-0 hover:bg-page/40"
@@ -494,9 +634,9 @@ export default function ServicePaymentHistory() {
             </div>
             <div className="border-t border-line bg-page/50 px-4 py-3">
               <p className="text-sm text-muted">
-                {filtered.length === 0
+                {visible.length === 0
                   ? 'Showing 0 records'
-                  : `Showing 1 to ${filtered.length} of ${filtered.length} records`}
+                  : `Showing 1 to ${visible.length} of ${visible.length} records`}
               </p>
             </div>
           </div>

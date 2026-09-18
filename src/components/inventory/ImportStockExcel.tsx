@@ -8,6 +8,8 @@ import {
   StockUpdateCycleSelect,
   type StockUpdateCycle,
 } from './StockUpdateCycleSelect'
+import { StockStepGuideModal } from './StockStepGuideModal'
+import { downloadCsv } from '../../utils/downloadFile'
 
 const STEPS = [
   { id: 1, label: 'Upload' },
@@ -28,10 +30,11 @@ export function ImportStockExcel({
   onToast,
 }: ImportStockExcelProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [step] = useState(1)
+  const [step, setStep] = useState(1)
   const [cycle, setCycle] = useState<StockUpdateCycle>('daily')
   const [dragging, setDragging] = useState(false)
   const [fileName, setFileName] = useState<string | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
 
   function acceptFile(file: File | undefined) {
     if (!file) return
@@ -49,6 +52,7 @@ export function ImportStockExcel({
       return
     }
     setFileName(file.name)
+    setStep(2)
     onToast?.(`Uploaded ${file.name}`)
   }
 
@@ -61,6 +65,18 @@ export function ImportStockExcel({
     event.preventDefault()
     setDragging(false)
     acceptFile(event.dataTransfer.files?.[0])
+  }
+
+  function downloadSample() {
+    downloadCsv(
+      ['raw_material_name', 'unit', 'qty', 'stock_date', 'notes'],
+      [
+        ['Milk', 'Ltr', '10', new Date().toISOString().slice(0, 10), ''],
+        ['Flour', 'Kg', '5', new Date().toISOString().slice(0, 10), ''],
+      ],
+      `${entityLabel.replace(/\s+/g, '-').toLowerCase()}-sample.csv`,
+    )
+    onToast?.('Sample Excel downloaded')
   }
 
   return (
@@ -79,20 +95,15 @@ export function ImportStockExcel({
                   active
                     ? 'bg-primary text-white'
                     : done
-                      ? 'bg-primary/15 text-primary'
+                      ? 'bg-success/15 text-success'
                       : 'bg-page text-muted'
                 }`}
               >
                 {item.id}
               </span>
               <span
-                className={`text-sm ${
-                  active ? 'font-semibold text-ink' : 'text-muted'
-                }`}
+                className={`text-sm ${active ? 'font-semibold text-ink' : 'text-muted'}`}
               >
-                <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide">
-                  Step {item.id}:
-                </span>
                 {item.label}
               </span>
             </li>
@@ -113,16 +124,11 @@ export function ImportStockExcel({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StockUpdateCycleSelect value={cycle} onChange={setCycle} />
-            <PrimaryButton
-              onClick={() => onToast?.('Sample Excel downloaded')}
-            >
+            <PrimaryButton onClick={downloadSample}>
               <Download size={15} />
               Download Excel File
             </PrimaryButton>
-            <OutlineButton
-              variant="gray"
-              onClick={() => onToast?.('Step-by-step guide opened')}
-            >
+            <OutlineButton variant="gray" onClick={() => setGuideOpen(true)}>
               <BookOpen size={15} />
               Step-By-Step Guide
             </OutlineButton>
@@ -147,38 +153,51 @@ export function ImportStockExcel({
               inputRef.current?.click()
             }
           }}
-          onDragEnter={(event) => {
-            event.preventDefault()
-            setDragging(true)
-          }}
           onDragOver={(event) => {
             event.preventDefault()
             setDragging(true)
           }}
-          onDragLeave={(event) => {
-            event.preventDefault()
-            setDragging(false)
-          }}
+          onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
-          className={`flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center transition-colors ${
+          className={`flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
             dragging
-              ? 'border-primary bg-primary/10'
-              : 'border-primary/40 bg-primary/[0.04] hover:bg-primary/[0.07]'
+              ? 'border-primary bg-primary/5'
+              : 'border-line bg-page/40 hover:border-primary/40'
           }`}
         >
-          <span className="mb-3 inline-flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <CloudUpload size={24} />
-          </span>
+          <CloudUpload size={36} className="mb-3 text-muted" />
           <p className="text-sm font-semibold text-ink">
-            {fileName ? fileName : 'Drag & drop your file here'}
+            {fileName ? fileName : 'Drag & drop or click to upload'}
           </p>
-          <p className="mt-1 text-sm text-muted">
-            {fileName
-              ? 'Click to choose a different file'
-              : 'or click to browse .xlsx, .xls, .csv - max 10MB'}
+          <p className="mt-1 text-xs text-muted">
+            .xlsx, .xls, or .csv · max 10MB · cycle: {cycle}
           </p>
+          {fileName ? (
+            <div
+              className="mt-4"
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              <OutlineButton
+                onClick={() => {
+                  setStep(3)
+                  onToast?.(
+                    `Ready to import ${fileName}. Stock import API will apply rows when connected.`,
+                  )
+                }}
+              >
+                Continue to summary
+              </OutlineButton>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      <StockStepGuideModal
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        title={`${entityLabel} import guide`}
+      />
     </div>
   )
 }

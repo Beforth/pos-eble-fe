@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ChevronDown,
   FilePenLine,
   Plus,
   StickyNote,
@@ -13,9 +12,25 @@ import {
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
+  ActionDropdown,
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import { listOutletsApi } from '../../services/outletService'
+import {
+  INV_PURCHASE_WRITE_PERMISSION,
+  createPurchaseApi,
+  getPurchaseApi,
+  listAllRawMaterialsApi,
+  listSuppliersApi,
+  updatePurchaseApi,
+  type RawMaterial,
+  type Supplier,
+} from '../../services/inventoryService'
+import { downloadCsv } from '../../utils/downloadFile'
 
 interface LineItem {
   id: string
@@ -30,21 +45,6 @@ interface LineItem {
   igst: string
   note: string
 }
-
-const SUPPLIERS = ['The Bandhan', 'Fresh Mart', 'Daily Dairy', 'Veggie Hub']
-const RESTAURANTS = [
-  "Annapurna's Rajubhai Dabeliwale — Dadar",
-  "Annapurna's Rajubhai Dabeliwale — Andheri",
-]
-const RAW_MATERIALS = [
-  { name: 'Tomatoes', unit: 'Kg' },
-  { name: 'Onion', unit: 'Kg' },
-  { name: 'Paneer', unit: 'Kg' },
-  { name: 'Milk', unit: 'Ltr' },
-  { name: 'Butter', unit: 'Kg' },
-  { name: 'Flour', unit: 'Kg' },
-]
-const UNITS = ['Kg', 'Ltr', 'Pcs', 'Box', 'Packet']
 
 function emptyLine(): LineItem {
   return {
@@ -73,12 +73,19 @@ function formatAmount(value: number) {
 
 export default function AddPurchase() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_PURCHASE_WRITE_PERMISSION)
+  const isEdit = Boolean(id)
+  const { units, loadMasters } = useInventoryMasters()
   const [purchaseFrom, setPurchaseFrom] = useState<'supplier' | 'restaurant'>(
     'supplier',
   )
   const [supplier, setSupplier] = useState('')
   const [restaurant, setRestaurant] = useState('')
-  const [invoiceDate, setInvoiceDate] = useState('2026-08-10')
+  const [invoiceDate, setInvoiceDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [invoiceNo, setInvoiceNo] = useState('')
   const [lines, setLines] = useState<LineItem[]>([emptyLine()])
   const [discount, setDiscount] = useState(0)
@@ -88,6 +95,14 @@ export default function AddPurchase() {
   const [updateStock, setUpdateStock] = useState(true)
   const [error, setError] = useState('')
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
+  const [restaurants, setRestaurants] = useState<
+    { id: string; name: string }[]
+  >([])
+  const [invoiceFileName, setInvoiceFileName] = useState<string | null>(null)
+  const invoiceInputRef = useRef<HTMLInputElement>(null)
 
   const totals = useMemo(() => {
     let subTotal = 0
@@ -110,6 +125,74 @@ export default function AddPurchase() {
     }
   }, [lines, discount, otherCharges, otherTaxes])
 
+  const supplierNames = suppliers.filter((row) => row.is_active).map((row) => row.name)
+  const restaurantNames = restaurants.map((row) => row.name)
+  const rawNames = rawMaterials.map((row) => row.name)
+  const unitNames = units.filter((row) => row.is_active).map((row) => row.name)
+
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    void listSuppliersApi().then(setSuppliers).catch(() => setSuppliers([]))
+    void listAllRawMaterialsApi(encryptedOutletId)
+      .then(setRawMaterials)
+      .catch(() => setRawMaterials([]))
+    void listOutletsApi()
+      .then((rows) =>
+        setRestaurants(
+          rows
+            .filter((row) => row.encrypted_id !== encryptedOutletId)
+            .map((row) => ({
+              id: row.encrypted_id,
+              name: row.outlet_name,
+            })),
+        ),
+      )
+      .catch(() => setRestaurants([]))
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!id || !encryptedOutletId) return
+    getPurchaseApi(encryptedOutletId, id)
+      .then((row) => {
+        setPurchaseFrom(row.source_type === 'restaurant' ? 'restaurant' : 'supplier')
+        setSupplier(row.supplier_name ?? '')
+        setRestaurant(row.restaurant_name ?? '')
+        setInvoiceDate(row.invoice_date)
+        setInvoiceNo(row.invoice_number)
+        setDiscount(Number(row.discount) || 0)
+        setOtherCharges(Number(row.other_charges) || 0)
+        setOtherTaxes(Number(row.other_taxes) || 0)
+        setPaymentType(row.payment_status === 'paid' ? 'paid' : 'unpaid')
+        setUpdateStock(row.update_inventory_stock)
+        setLines(
+          row.lines.length
+            ? row.lines.map((line) => ({
+                id: `line-${line.raw_material_id}-${Math.random()}`,
+                selected: false,
+                rawMaterial: line.raw_material_name,
+                qty: line.qty,
+                unit: line.unit_name,
+                price: line.price,
+                amount: line.amount,
+                cgst: line.cgst,
+                sgst: line.sgst,
+                igst: line.igst,
+                note: line.note,
+              }))
+            : [emptyLine()],
+        )
+      })
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load purchase',
+        )
+      })
+  }, [id, encryptedOutletId])
+
   function updateLine(id: string, patch: Partial<LineItem>) {
     setLines((prev) =>
       prev.map((line) => {
@@ -128,27 +211,125 @@ export default function AddPurchase() {
     setLines((prev) => prev.map((line) => ({ ...line, selected: checked })))
   }
 
-  function handleSave() {
+  function applyInvoiceTax(cgst: string, sgst: string, igst: string) {
+    setLines((prev) =>
+      prev.map((line) => ({ ...line, cgst, sgst, igst })),
+    )
+    showToast('Tax applied at invoice level')
+  }
+
+  function deleteSelectedLines() {
+    setLines((prev) => {
+      const next = prev.filter((line) => !line.selected)
+      return next.length ? next : [emptyLine()]
+    })
+    showToast('Selected rows removed')
+  }
+
+  function clearEmptyLines() {
+    setLines((prev) => {
+      const next = prev.filter(
+        (line) =>
+          line.rawMaterial.trim() ||
+          line.qty.trim() ||
+          toNumber(line.price) > 0,
+      )
+      return next.length ? next : [emptyLine()]
+    })
+    showToast('Empty rows cleared')
+  }
+
+  function exportLinesCsv() {
+    downloadCsv(
+      ['raw_material', 'qty', 'unit', 'price', 'amount', 'cgst', 'sgst', 'igst', 'note'],
+      lines.map((line) => [
+        line.rawMaterial,
+        line.qty,
+        line.unit,
+        line.price,
+        line.amount,
+        line.cgst,
+        line.sgst,
+        line.igst,
+        line.note,
+      ]),
+      `purchase-lines-${invoiceNo || 'draft'}.csv`,
+    )
+    showToast('Lines exported')
+  }
+
+  async function handleSave() {
+    if (!canWrite || !encryptedOutletId) return
     if (purchaseFrom === 'supplier' && !supplier) {
       setError('Please select a supplier')
+      return
+    }
+    if (purchaseFrom === 'restaurant' && !restaurant) {
+      setError('Please select a restaurant')
       return
     }
     if (!invoiceDate) {
       setError('Invoice date is required')
       return
     }
-    const validLine = lines.some(
+    const validLines = lines.filter(
       (line) => line.rawMaterial && toNumber(line.qty) > 0 && line.unit,
     )
-    if (!validLine) {
+    if (validLines.length === 0) {
       setError('Add at least one raw material with qty and unit')
       return
     }
+    const payloadLines = validLines.map((line) => {
+      const raw = rawMaterials.find((row) => row.name === line.rawMaterial)
+      const unit = units.find((row) => row.name === line.unit)
+      if (!raw || !unit) {
+        throw new Error('Select a saved raw material and unit')
+      }
+      return {
+        raw_material_id: raw.id,
+        qty: line.qty,
+        unit_id: unit.id,
+        price: line.price || '0',
+        amount: line.amount || String(toNumber(line.qty) * toNumber(line.price)),
+        cgst: line.cgst || '0',
+        sgst: line.sgst || '0',
+        igst: line.igst || '0',
+        note: line.note,
+      }
+    })
     setError('')
-    showToast('Purchase saved')
-    window.setTimeout(() => {
+    setSaving(true)
+    try {
+      const payload = {
+        source_type: purchaseFrom,
+        supplier_id:
+          purchaseFrom === 'supplier'
+            ? suppliers.find((row) => row.name === supplier)?.id ?? null
+            : null,
+        restaurant_id:
+          purchaseFrom === 'restaurant'
+            ? restaurants.find((row) => row.name === restaurant)?.id ?? null
+            : null,
+        invoice_date: invoiceDate,
+        invoice_number: invoiceNo,
+        subtotal: String(totals.subTotal),
+        discount: String(discount),
+        other_charges: String(otherCharges),
+        other_taxes: String(otherTaxes),
+        grand_total: String(totals.grand),
+        payment_status: paymentType,
+        update_inventory_stock: updateStock,
+        lines: payloadLines,
+      }
+      if (isEdit && id) await updatePurchaseApi(encryptedOutletId, id, payload)
+      else await createPurchaseApi(encryptedOutletId, payload)
+      showToast(isEdit ? 'Purchase updated' : 'Purchase saved')
       navigate('/inventory/purchase')
-    }, 900)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to save purchase')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const allSelected = lines.length > 0 && lines.every((line) => line.selected)
@@ -159,7 +340,9 @@ export default function AddPurchase() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
-          <h1 className="text-lg font-bold text-ink">Add Purchase</h1>
+          <h1 className="text-lg font-bold text-ink">
+            {isEdit ? 'Edit Purchase' : 'Add Purchase'}
+          </h1>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-semibold text-ink">Purchase From</span>
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -201,7 +384,7 @@ export default function AddPurchase() {
               }
               required
               value={supplier}
-              options={SUPPLIERS}
+              options={supplierNames}
               placeholder="Select Supplier"
               searchPlaceholder="Search suppliers..."
               onChange={setSupplier}
@@ -215,7 +398,7 @@ export default function AddPurchase() {
               }
               required
               value={restaurant}
-              options={RESTAURANTS}
+              options={restaurantNames}
               placeholder="Select Restaurant"
               searchPlaceholder="Search restaurants..."
               onChange={setRestaurant}
@@ -251,24 +434,61 @@ export default function AddPurchase() {
           <Plus size={15} />
           Add New
         </OutlineButton>
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
-        >
-          At Invoice Level
-          <ChevronDown size={14} className="text-muted" />
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
-        >
-          More Action
-          <ChevronDown size={14} className="text-muted" />
-        </button>
-        <OutlineButton>
+        <ActionDropdown
+          label="At Invoice Level"
+          options={[
+            {
+              label: 'Apply GST 2.5% + 2.5%',
+              onClick: () => applyInvoiceTax('2.5', '2.5', '0'),
+            },
+            {
+              label: 'Apply IGST 5%',
+              onClick: () => applyInvoiceTax('0', '0', '5'),
+            },
+            {
+              label: 'Clear line taxes',
+              onClick: () => applyInvoiceTax('0', '0', '0'),
+            },
+          ]}
+        />
+        <ActionDropdown
+          label="More Action"
+          options={[
+            {
+              label: 'Delete selected',
+              onClick: deleteSelectedLines,
+              danger: true,
+            },
+            { label: 'Clear empty rows', onClick: clearEmptyLines },
+            { label: 'Export lines (CSV)', onClick: exportLinesCsv },
+            {
+              label: 'Add blank row',
+              onClick: () => setLines((prev) => [...prev, emptyLine()]),
+            },
+          ]}
+        />
+        <input
+          ref={invoiceInputRef}
+          type="file"
+          accept="image/*,.pdf"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (!file) return
+            setInvoiceFileName(file.name)
+            showToast(`Invoice uploaded: ${file.name}`)
+            event.target.value = ''
+          }}
+        />
+        <OutlineButton onClick={() => invoiceInputRef.current?.click()}>
           <Upload size={15} />
-          Upload Invoice
+          {invoiceFileName ? 'Replace Invoice' : 'Upload Invoice'}
         </OutlineButton>
+        {invoiceFileName ? (
+          <span className="max-w-[160px] truncate text-xs text-muted">
+            {invoiceFileName}
+          </span>
+        ) : null}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:overflow-visible">
@@ -316,16 +536,16 @@ export default function AddPurchase() {
                 <td className="px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
                   <SearchableSelect
                     value={line.rawMaterial}
-                    options={RAW_MATERIALS.map((m) => m.name)}
+                    options={rawNames}
                     placeholder="Select/Add Raw Material"
                     searchPlaceholder="Search materials..."
                     compact
                     dropdownPlacement="auto"
                     onChange={(value) => {
-                      const material = RAW_MATERIALS.find((m) => m.name === value)
+                      const material = rawMaterials.find((m) => m.name === value)
                       updateLine(line.id, {
                         rawMaterial: value,
-                        unit: material?.unit ?? line.unit,
+                        unit: material?.consumption_unit.name ?? line.unit,
                       })
                     }}
                   />
@@ -350,7 +570,7 @@ export default function AddPurchase() {
                     className="h-9 w-24 rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
                   >
                     <option value="">Unit</option>
-                    {UNITS.map((unit) => (
+                    {unitNames.map((unit) => (
                       <option key={unit} value={unit}>
                         {unit}
                       </option>
@@ -544,7 +764,11 @@ export default function AddPurchase() {
           >
             Cancel
           </button>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          {canWrite ? (
+            <PrimaryButton onClick={() => void handleSave()}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </PrimaryButton>
+          ) : null}
         </div>
       </div>
 

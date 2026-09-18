@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
@@ -10,34 +10,40 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_PRODUCTION_WRITE_PERMISSION,
+  createProductionProcessApi,
+  listAllRawMaterialsApi,
+  unitIdByName,
+  type RawMaterial,
+} from '../../services/inventoryService'
 
-interface ToMaterialRow {
+interface FromRow {
   id: string
-  productionName: string
   rawMaterial: string
   qty: string
   unit: string
 }
 
-const RAW_MATERIALS = [
-  { name: 'Tomatoes', unit: 'Kg' },
-  { name: 'Onion', unit: 'Kg' },
-  { name: 'Paneer', unit: 'Kg' },
-  { name: 'Milk', unit: 'Ltr' },
-  { name: 'Butter', unit: 'Kg' },
-  { name: 'Flour', unit: 'Kg' },
-  { name: 'Dabeli Masala Mix', unit: 'Kg' },
-]
-const UNITS = ['Kg', 'Ltr', 'Pcs', 'Box', 'Packet', 'Cup']
-
 export default function AddProduction() {
   const navigate = useNavigate()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_PRODUCTION_WRITE_PERMISSION)
+  const { units, loadMasters } = useInventoryMasters()
+  const [materials, setMaterials] = useState<RawMaterial[]>([])
   const [productionName, setProductionName] = useState('')
-  const [rawMaterial, setRawMaterial] = useState('')
-  const [qty, setQty] = useState('')
-  const [unit, setUnit] = useState('')
-  const [rows, setRows] = useState<ToMaterialRow[]>([])
+  const [toMaterial, setToMaterial] = useState('')
+  const [toQty, setToQty] = useState('1')
+  const [toUnit, setToUnit] = useState('')
+  const [fromMaterial, setFromMaterial] = useState('')
+  const [fromQty, setFromQty] = useState('')
+  const [fromUnit, setFromUnit] = useState('')
+  const [fromRows, setFromRows] = useState<FromRow[]>([])
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [moreOptions, setMoreOptions] = useState({
     defaultQuantity: '',
@@ -45,69 +51,135 @@ export default function AddProduction() {
     autoProduction: false,
   })
 
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
 
-  function handleAdd() {
-    if (!productionName.trim()) {
-      setError('Production name is required')
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    listAllRawMaterialsApi(encryptedOutletId)
+      .then(setMaterials)
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load raw materials',
+        )
+      })
+  }, [encryptedOutletId])
+
+  const materialNames = materials.map((row) => row.name)
+  const unitNames = units.map((row) => row.name)
+
+  function materialByName(name: string) {
+    return materials.find((row) => row.name === name)
+  }
+
+  function handleAddFrom() {
+    if (!fromMaterial) {
+      setError('Please select a from raw material')
       return
     }
-    if (!rawMaterial) {
-      setError('Please select a raw material')
+    if (!fromQty.trim() || Number(fromQty) <= 0) {
+      setError('From quantity is required')
       return
     }
-    if (!qty.trim() || Number(qty) <= 0) {
-      setError('Quantity is required')
+    if (!fromUnit) {
+      setError('Please select a from unit')
       return
     }
-    if (!unit) {
-      setError('Please select a unit')
+    if (toMaterial && fromMaterial === toMaterial) {
+      setError('From raw material cannot match the To output')
       return
     }
     setError('')
-    setRows((prev) => [
+    setFromRows((prev) => [
       ...prev,
       {
         id: `row-${Date.now()}-${Math.random()}`,
-        productionName: productionName.trim(),
-        rawMaterial,
-        qty,
-        unit,
+        rawMaterial: fromMaterial,
+        qty: fromQty,
+        unit: fromUnit,
       },
     ])
-    setRawMaterial('')
-    setQty('')
-    setUnit('')
-    showToast('Raw material added')
+    setFromMaterial('')
+    setFromQty('')
+    setFromUnit('')
+    showToast('From raw material added')
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (!canWrite || !encryptedOutletId) return
     if (!productionName.trim()) {
       setError('Production name is required')
       return
     }
-    if (rows.length === 0) {
-      setError('Add at least one to raw material')
+    const output = materialByName(toMaterial)
+    if (!output) {
+      setError('Please select a To raw material')
       return
     }
+    if (!toQty.trim() || Number(toQty) <= 0) {
+      setError('To quantity is required')
+      return
+    }
+    const outputUnitId = unitIdByName(units, toUnit)
+    if (!outputUnitId) {
+      setError('Please select a To unit')
+      return
+    }
+    if (fromRows.length === 0) {
+      setError('Add at least one From raw material')
+      return
+    }
+    const lines: { raw_material_id: string; qty: string; unit_id: string }[] =
+      []
+    for (const row of fromRows) {
+      const raw = materialByName(row.rawMaterial)
+      const unitId = unitIdByName(units, row.unit)
+      if (!raw || !unitId) {
+        setError('From lines must use valid raw materials and units')
+        return
+      }
+      lines.push({
+        raw_material_id: raw.id,
+        qty: row.qty,
+        unit_id: unitId,
+      })
+    }
     setError('')
-    showToast('Production process saved')
-    window.setTimeout(() => {
+    setSaving(true)
+    try {
+      await createProductionProcessApi(encryptedOutletId, {
+        name: productionName.trim(),
+        output_raw_material_id: output.id,
+        output_qty: toQty,
+        output_unit_id: outputUnitId,
+        default_quantity: moreOptions.defaultQuantity || null,
+        description: moreOptions.description,
+        auto_production: moreOptions.autoProduction,
+        lines,
+      })
+      showToast('Production process saved')
       navigate('/inventory/production-master')
-    }, 900)
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Unable to save production',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <InventoryPageShell activeItem="production-master">
-
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Add Production Process</h1>
         <p className="mt-1 text-sm text-muted">
-          Create or modify production process you just need to add from and to
-          raw material here.
+          Create a process with From (input) lines and one To (output) raw
+          material.
         </p>
       </div>
 
-      <div className="rounded-xl border border-line bg-card p-4 sm:p-5">
+      <div className="mb-4 rounded-xl border border-line bg-card p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -118,8 +190,7 @@ export default function AddProduction() {
                 To Raw Material
               </h2>
               <p className="mt-1 max-w-2xl text-sm text-muted">
-                This refers to the process where the raw material is the final
-                output of a production or conversion activity.
+                Final output of this production or conversion activity.
               </p>
             </div>
           </div>
@@ -128,7 +199,7 @@ export default function AddProduction() {
           </OutlineButton>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[1.2fr_1.2fr_0.7fr_0.8fr_auto] lg:items-end">
+        <div className="grid gap-3 lg:grid-cols-[1.2fr_1.2fr_0.7fr_0.8fr] lg:items-end">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">
               Production Name <span className="text-primary">*</span>
@@ -144,15 +215,17 @@ export default function AddProduction() {
           <SearchableSelect
             label="Raw Material"
             required
-            value={rawMaterial}
-            options={RAW_MATERIALS.map((m) => m.name)}
+            value={toMaterial}
+            options={materialNames}
             placeholder="Select Raw Material"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={(value) => {
-              setRawMaterial(value)
-              const material = RAW_MATERIALS.find((m) => m.name === value)
-              if (material && !unit) setUnit(material.unit)
+              setToMaterial(value)
+              const material = materialByName(value)
+              if (material?.consumption_unit?.name && !toUnit) {
+                setToUnit(material.consumption_unit.name)
+              }
             }}
           />
           <div>
@@ -162,8 +235,8 @@ export default function AddProduction() {
             <input
               type="text"
               inputMode="decimal"
-              value={qty}
-              onChange={(event) => setQty(event.target.value)}
+              value={toQty}
+              onChange={(event) => setToQty(event.target.value)}
               placeholder="Quantity"
               className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
             />
@@ -171,27 +244,84 @@ export default function AddProduction() {
           <SearchableSelect
             label="Unit"
             required
-            value={unit}
-            options={UNITS}
+            value={toUnit}
+            options={unitNames}
             placeholder="Select Unit"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
-            onChange={setUnit}
+            onChange={setToUnit}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-line bg-card p-4 sm:p-5">
+        <div className="mb-4 flex items-start gap-3">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Package size={20} />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-ink">
+              From Raw Material
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted">
+              Inputs consumed when this process runs.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-[1.4fr_0.7fr_0.8fr_auto] lg:items-end">
+          <SearchableSelect
+            label="Raw Material"
+            required
+            value={fromMaterial}
+            options={materialNames}
+            placeholder="Select Raw Material"
+            searchPlaceholder="Search"
+            includePlaceholderOption={false}
+            onChange={(value) => {
+              setFromMaterial(value)
+              const material = materialByName(value)
+              if (material?.consumption_unit?.name && !fromUnit) {
+                setFromUnit(material.consumption_unit.name)
+              }
+            }}
+          />
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              Quantity <span className="text-primary">*</span>
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={fromQty}
+              onChange={(event) => setFromQty(event.target.value)}
+              placeholder="Quantity"
+              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
+          <SearchableSelect
+            label="Unit"
+            required
+            value={fromUnit}
+            options={unitNames}
+            placeholder="Select Unit"
+            searchPlaceholder="Search"
+            includePlaceholderOption={false}
+            onChange={setFromUnit}
           />
           <div className="flex items-end">
-            <OutlineButton onClick={handleAdd}>
+            <OutlineButton onClick={handleAddFrom}>
               <Plus size={15} />
               Add
             </OutlineButton>
           </div>
         </div>
 
-        {rows.length > 0 ? (
+        {fromRows.length > 0 ? (
           <div className="mt-5 overflow-x-auto rounded-lg border border-line">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
                 <tr>
-                  <th className="px-3 py-2.5">Production Name</th>
                   <th className="px-3 py-2.5">Raw Material</th>
                   <th className="px-3 py-2.5">Quantity</th>
                   <th className="px-3 py-2.5">Unit</th>
@@ -199,12 +329,11 @@ export default function AddProduction() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {fromRows.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-b-0"
                   >
-                    <td className="px-3 py-2.5 text-ink">{row.productionName}</td>
                     <td className="px-3 py-2.5 text-ink">{row.rawMaterial}</td>
                     <td className="px-3 py-2.5 text-ink">{row.qty}</td>
                     <td className="px-3 py-2.5 text-ink">{row.unit}</td>
@@ -213,7 +342,7 @@ export default function AddProduction() {
                         type="button"
                         aria-label="Remove row"
                         onClick={() =>
-                          setRows((prev) =>
+                          setFromRows((prev) =>
                             prev.filter((item) => item.id !== row.id),
                           )
                         }
@@ -239,7 +368,14 @@ export default function AddProduction() {
           >
             Cancel
           </button>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          {canWrite ? (
+            <PrimaryButton
+              onClick={() => void handleSave()}
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </PrimaryButton>
+          ) : null}
         </div>
       </div>
 
@@ -249,10 +385,7 @@ export default function AddProduction() {
         initialValues={moreOptions}
         onSave={(values) => {
           setMoreOptions(values)
-          if (values.defaultQuantity && !qty) {
-            setQty(values.defaultQuantity)
-          }
-          showToast('More options saved')
+          setMoreOpen(false)
         }}
       />
     </InventoryPageShell>

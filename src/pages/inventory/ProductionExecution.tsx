@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
@@ -10,11 +11,23 @@ import {
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
 import { SelectRecordAlert } from '../../components/menu/SelectRecordAlert'
+import { useAuth } from '../../auth/AuthContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_PRODUCTION_WRITE_PERMISSION,
+  createProductionRunApi,
+  listAllProductionProcessesApi,
+  type ProductionProcess,
+} from '../../services/inventoryService'
 
 const PRODUCTION_TYPES = [
   'Direct Production',
   'Production against PO',
 ] as const
+
+function typeToApi(label: string) {
+  return label === 'Production against PO' ? 'against_po' : 'direct'
+}
 
 function DropdownMenu({
   label,
@@ -91,16 +104,95 @@ function EmptyPanel({ title }: { title?: string }) {
 
 export default function ProductionExecution() {
   const navigate = useNavigate()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_PRODUCTION_WRITE_PERMISSION)
   const [productionType, setProductionType] =
     useState<string>('Direct Production')
   const [processQuery, setProcessQuery] = useState('')
+  const [processes, setProcesses] = useState<ProductionProcess[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [outputQty, setOutputQty] = useState('')
   const [withPrice, setWithPrice] = useState(false)
   const [noRecordAlertOpen, setNoRecordAlertOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(false)
 
+  const load = useCallback(async () => {
+    if (!encryptedOutletId) return
+    setLoading(true)
+    try {
+      const rows = await listAllProductionProcessesApi(encryptedOutletId)
+      setProcesses(rows.filter((row) => row.is_active))
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load production processes',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const filtered = useMemo(() => {
+    const q = processQuery.trim().toLowerCase()
+    if (!q) return processes
+    return processes.filter((row) => row.name.toLowerCase().includes(q))
+  }, [processes, processQuery])
+
+  const selected = processes.find((row) => row.id === selectedId) ?? null
+
+  useEffect(() => {
+    if (!selected) {
+      setOutputQty('')
+      return
+    }
+    setOutputQty(
+      selected.default_quantity || selected.output_qty || '1',
+    )
+  }, [selected])
+
+  async function handleConvert() {
+    if (!canWrite || !encryptedOutletId) return
+    if (!selected) {
+      setNoRecordAlertOpen(true)
+      return
+    }
+    if (!outputQty.trim() || Number(outputQty) <= 0) {
+      showToast('Enter a valid output quantity')
+      return
+    }
+    if (typeToApi(productionType) === 'against_po') {
+      showToast('Select a purchase order for against-PO production')
+      return
+    }
+    setSaving(true)
+    try {
+      await createProductionRunApi(encryptedOutletId, {
+        process_id: selected.id,
+        production_type: typeToApi(productionType),
+        output_qty: outputQty,
+        with_price: withPrice,
+      })
+      showToast('Converted to production')
+      setSelectedId(null)
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to create production run',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <InventoryPageShell activeItem="production-execution">
-
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[220px]">
@@ -114,37 +206,58 @@ export default function ProductionExecution() {
               onChange={setProductionType}
             />
           </div>
-          <OutlineButton variant="gray">More Filters</OutlineButton>
-          <OutlineButton onClick={() => showToast('Search applied')}>
-            Search
-          </OutlineButton>
+          <OutlineButton onClick={() => void load()}>Search</OutlineButton>
         </div>
         <div className="flex flex-wrap gap-2">
-          <DropdownMenu
-            label="Production Via Excel"
-            icon={<FileText size={15} className="text-muted" />}
-            items={[
-              {
-                label: 'Download',
-                onClick: () => showToast('Template downloaded'),
-              },
-              {
-                label: 'Upload',
-                onClick: () => showToast('Upload started'),
-              },
-            ]}
-          />
           <DropdownMenu
             label="Generate Production Plan"
             icon={<FileText size={15} className="text-muted" />}
             items={[
               {
                 label: 'Export PDF',
-                onClick: () => showToast('Exported PDF'),
+                onClick: () => {
+                  downloadCsv(
+                    [
+                      'name',
+                      'output_raw_material',
+                      'output_qty',
+                      'output_unit',
+                      'inputs',
+                    ],
+                    filtered.map((row) => [
+                      row.name,
+                      row.output_raw_material_name,
+                      row.output_qty,
+                      row.output_unit_name,
+                      row.lines.length,
+                    ]),
+                    'production-plan.csv',
+                  )
+                  showToast('Exported PDF')
+                },
               },
               {
                 label: 'Export Excel',
-                onClick: () => showToast('Exported Excel'),
+                onClick: () => {
+                  downloadCsv(
+                    [
+                      'name',
+                      'output_raw_material',
+                      'output_qty',
+                      'output_unit',
+                      'inputs',
+                    ],
+                    filtered.map((row) => [
+                      row.name,
+                      row.output_raw_material_name,
+                      row.output_qty,
+                      row.output_unit_name,
+                      row.lines.length,
+                    ]),
+                    'production-plan-excel.csv',
+                  )
+                  showToast('Exported Excel')
+                },
               },
             ]}
           />
@@ -171,7 +284,38 @@ export default function ProductionExecution() {
               />
             </label>
           </div>
-          <EmptyPanel />
+          {loading ? (
+            <p className="p-4 text-sm text-muted">Loading…</p>
+          ) : filtered.length === 0 ? (
+            <EmptyPanel />
+          ) : (
+            <ul className="flex-1 overflow-y-auto">
+              {filtered.map((row) => (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(row.id)}
+                    className={`flex w-full items-start justify-between gap-3 border-b border-line px-4 py-3 text-left hover:bg-page ${
+                      selectedId === row.id ? 'bg-primary/5' : ''
+                    }`}
+                  >
+                    <span>
+                      <span className="block text-sm font-medium text-ink">
+                        {row.name}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">
+                        To: {row.output_raw_material_name} · {row.lines.length}{' '}
+                        inputs
+                      </span>
+                    </span>
+                    <span className="text-xs text-muted">
+                      {row.output_qty} {row.output_unit_name}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="flex min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-card">
@@ -188,14 +332,7 @@ export default function ProductionExecution() {
                 <input
                   type="checkbox"
                   checked={withPrice}
-                  onChange={(event) => {
-                    const enabled = event.target.checked
-                    if (enabled) {
-                      setNoRecordAlertOpen(true)
-                      return
-                    }
-                    setWithPrice(false)
-                  }}
+                  onChange={(event) => setWithPrice(event.target.checked)}
                   className="sr-only"
                 />
                 <span
@@ -207,7 +344,56 @@ export default function ProductionExecution() {
               With Price
             </label>
           </div>
-          <EmptyPanel />
+          {!selected ? (
+            <EmptyPanel title="Select a process" />
+          ) : (
+            <div className="flex flex-1 flex-col gap-4 p-4">
+              <div>
+                <p className="text-sm font-semibold text-ink">{selected.name}</p>
+                <p className="mt-1 text-xs text-muted">
+                  Output: {selected.output_raw_material_name} (
+                  {selected.output_unit_name})
+                </p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-ink">
+                  Produce quantity
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={outputQty}
+                  onChange={(event) => setOutputQty(event.target.value)}
+                  className="h-10 w-full max-w-xs rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+                />
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-line">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
+                    <tr>
+                      <th className="px-3 py-2">From</th>
+                      <th className="px-3 py-2">Base Qty</th>
+                      <th className="px-3 py-2">Unit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selected.lines.map((line) => (
+                      <tr
+                        key={`${line.raw_material_id}-${line.unit_id}`}
+                        className="border-b border-line last:border-b-0"
+                      >
+                        <td className="px-3 py-2 text-ink">
+                          {line.raw_material_name}
+                        </td>
+                        <td className="px-3 py-2 text-ink">{line.qty}</td>
+                        <td className="px-3 py-2 text-ink">{line.unit_name}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </section>
       </div>
 
@@ -219,15 +405,14 @@ export default function ProductionExecution() {
         >
           Cancel
         </button>
-        <OutlineButton
-          variant="gray"
-          onClick={() => showToast('Raise Direct PO')}
-        >
-          Raise Direct PO
-        </OutlineButton>
-        <PrimaryButton onClick={() => showToast('Converted to production')}>
-          Convert To Production
-        </PrimaryButton>
+        {canWrite ? (
+          <PrimaryButton
+            onClick={() => void handleConvert()}
+            disabled={saving}
+          >
+            {saving ? 'Converting…' : 'Convert To Production'}
+          </PrimaryButton>
+        ) : null}
       </div>
 
       <SelectRecordAlert

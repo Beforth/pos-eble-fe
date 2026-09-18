@@ -1,47 +1,71 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
-import { getUnitById, type UnitRow } from '../../mocks/unitsData'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_WRITE_PERMISSION,
+  createUnitApi,
+  updateUnitApi,
+} from '../../services/inventoryService'
 
 export default function AddUnit() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const location = useLocation()
-  const stateRow = (location.state as { row?: UnitRow } | null)?.row
+  const { hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WRITE_PERMISSION)
+  const { units, loadMasters, upsertUnit } = useInventoryMasters()
   const existing = useMemo(
-    () => stateRow ?? (id ? getUnitById(id) : undefined),
-    [stateRow, id],
+    () => (id ? units.find((row) => row.id === id) : undefined),
+    [id, units],
   )
-  const isEdit = Boolean(id) || Boolean(existing)
+  const isEdit = Boolean(id)
 
   const [name, setName] = useState(existing?.name ?? '')
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
 
   useEffect(() => {
     setName(existing?.name ?? '')
     setError(null)
   }, [existing?.id, existing?.name])
 
-  function handleSave() {
+  async function handleSave() {
+    if (!canWrite) return
     const trimmed = name.trim()
     if (!trimmed) {
       setError('Name is required')
       return
     }
     setError(null)
-    showToast(isEdit ? 'Unit updated' : 'Unit created')
-    window.setTimeout(() => navigate('/inventory/units'), 500)
+    setSaving(true)
+    try {
+      const row = isEdit && id
+        ? await updateUnitApi(id, { name: trimmed })
+        : await createUnitApi(trimmed)
+      upsertUnit(row)
+      showToast(isEdit ? 'Unit updated' : 'Unit created')
+      navigate('/inventory/units')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to save unit')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <InventoryPageShell activeItem="units">
-
       <div className="flex min-h-[calc(100vh-7.5rem)] flex-col rounded-xl border border-line bg-card">
         <div className="flex-1 p-5 sm:p-6">
           <h1 className="mb-5 text-lg font-bold text-ink">
@@ -60,7 +84,8 @@ export default function AddUnit() {
                 if (error) setError(null)
               }}
               autoFocus
-              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+              disabled={!canWrite}
+              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary disabled:opacity-60"
             />
             {error ? (
               <p className="mt-1.5 text-xs text-primary">{error}</p>
@@ -72,7 +97,11 @@ export default function AddUnit() {
           <OutlineButton onClick={() => navigate('/inventory/units')}>
             Cancel
           </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          {canWrite ? (
+            <PrimaryButton onClick={() => void handleSave()} disabled={saving}>
+              Save Changes
+            </PrimaryButton>
+          ) : null}
         </div>
       </div>
     </InventoryPageShell>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -16,6 +17,9 @@ const TO_OPTIONS = [
   'Dadar Outlet',
   'Other Restaurant',
 ]
+
+const DEFAULT_FROM = '2026-08-04'
+const DEFAULT_TO = '2026-08-11'
 
 function ExportMenu({
   onExportReport,
@@ -90,30 +94,59 @@ function ExportMenu({
 
 export default function TransferPaymentReport() {
   const [to, setTo] = useState('All')
-  const [fromDate, setFromDate] = useState('2026-08-04')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState(DEFAULT_FROM)
+  const [toDate, setToDate] = useState(DEFAULT_TO)
+  const [applied, setApplied] = useState({
+    to: 'All',
+    fromDate: DEFAULT_FROM,
+    toDate: DEFAULT_TO,
+  })
 
+  function handleSearch() {
+    setApplied({ to, fromDate, toDate })
+    showToast('Search applied')
+  }
 
   function handleClear() {
     setTo('All')
-    setFromDate('2026-08-04')
-    setToDate('2026-08-11')
-    showToast('Filters cleared')
+    setFromDate(DEFAULT_FROM)
+    setToDate(DEFAULT_TO)
+    setApplied({
+      to: 'All',
+      fromDate: DEFAULT_FROM,
+      toDate: DEFAULT_TO,
+    })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Transfer Payment Report</h1>
         <ExportMenu
-          onExportReport={() => showToast('Exported Transfer Payment Report')}
-          onExportSummary={() =>
+          onExportReport={() => {
+            downloadCsv(
+              ['to', 'from_date', 'to_date'],
+              [[applied.to, applied.fromDate, applied.toDate]],
+              'transfer-payment-report.csv',
+            )
+            showToast('Exported Transfer Payment Report')
+          }}
+          onExportSummary={() => {
+            downloadCsv(
+              ['to', 'from_date', 'to_date', 'report'],
+              [[applied.to, applied.fromDate, applied.toDate, 'summary']],
+              'transfer-payment-summary.csv',
+            )
             showToast('Exported Transfer Payment Summary Report')
-          }
-          onExportOld={() =>
+          }}
+          onExportOld={() => {
+            downloadCsv(
+              ['to', 'from_date', 'to_date', 'report'],
+              [[applied.to, applied.fromDate, applied.toDate, 'old']],
+              'transfer-payment-old.csv',
+            )
             showToast('Exported Transfer Payment Report (Old)')
-          }
+          }}
         />
       </div>
 
@@ -151,9 +184,7 @@ export default function TransferPaymentReport() {
             className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
           />
         </div>
-        <PrimaryButton onClick={() => showToast('Search applied')}>
-          Search
-        </PrimaryButton>
+        <PrimaryButton onClick={handleSearch}>Search</PrimaryButton>
         <OutlineButton onClick={handleClear}>Clear Filter</OutlineButton>
       </div>
 
@@ -167,6 +198,10 @@ export default function TransferPaymentReport() {
         </span>
         <p className="text-base font-semibold text-ink">
           Transfer Payment Report Record Not Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: to={applied.to} · start={applied.fromDate} · end=
+          {applied.toDate}
         </p>
       </div>
     </InventoryPageShell>

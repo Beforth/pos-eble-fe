@@ -6,25 +6,6 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../menu/MenuActionButtons'
-import {
-  RAW_MATERIAL_CATEGORIES,
-  type RawMaterialCategory,
-} from '../../mocks/rawMaterialsData'
-
-const UNITS = [
-  'Kg',
-  'Gm',
-  'Ltr',
-  'Ml',
-  'Pcs',
-  'Box',
-  'Packet',
-  'Bottle',
-  'Dozen',
-  'Carton',
-]
-
-const CATEGORY_OPTIONS = [...RAW_MATERIAL_CATEGORIES, 'No Category']
 
 export interface QuickAddRawMaterialValues {
   name: string
@@ -36,7 +17,10 @@ export interface QuickAddRawMaterialValues {
 interface QuickAddRawMaterialModalProps {
   open: boolean
   onClose: () => void
-  onSave: (values: QuickAddRawMaterialValues) => void
+  onSave: (values: QuickAddRawMaterialValues) => Promise<boolean>
+  unitOptions: string[]
+  categoryOptions: string[]
+  saving?: boolean
 }
 
 function MultiUnitSelect({
@@ -203,6 +187,9 @@ export function QuickAddRawMaterialModal({
   open,
   onClose,
   onSave,
+  unitOptions,
+  categoryOptions,
+  saving = false,
 }: QuickAddRawMaterialModalProps) {
   const titleId = useId()
   const nameId = useId()
@@ -228,7 +215,8 @@ export function QuickAddRawMaterialModal({
 
   if (!open) return null
 
-  function handleSave() {
+  async function handleSave() {
+    if (saving) return
     const trimmed = name.trim()
     if (!trimmed) {
       setError('Raw material name is required')
@@ -242,13 +230,14 @@ export function QuickAddRawMaterialModal({
       setError('Consumption unit is required')
       return
     }
-    onSave({
+    setError('')
+    const ok = await onSave({
       name: trimmed,
       category,
       purchaseUnits,
       consumptionUnit,
     })
-    onClose()
+    if (ok) onClose()
   }
 
   return createPortal(
@@ -308,7 +297,7 @@ export function QuickAddRawMaterialModal({
           <SearchableSelect
             label="Category"
             value={category}
-            options={CATEGORY_OPTIONS}
+            options={categoryOptions}
             placeholder="Select/Add Category"
             searchPlaceholder="Search"
             includePlaceholderOption
@@ -321,7 +310,7 @@ export function QuickAddRawMaterialModal({
                 label="Purchase Units"
                 required
                 values={purchaseUnits}
-                options={UNITS}
+                options={unitOptions}
                 placeholder="Select multiple unit"
                 onChange={setPurchaseUnits}
               />
@@ -335,7 +324,7 @@ export function QuickAddRawMaterialModal({
                 label="Consumption Units"
                 required
                 value={consumptionUnit}
-                options={UNITS}
+                options={unitOptions}
                 placeholder="Select Unit"
                 searchPlaceholder="Search"
                 includePlaceholderOption={false}
@@ -355,21 +344,12 @@ export function QuickAddRawMaterialModal({
           <OutlineButton variant="gray" onClick={onClose}>
             Cancel
           </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save</PrimaryButton>
+          <PrimaryButton onClick={() => void handleSave()} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </PrimaryButton>
         </div>
       </div>
     </div>,
     document.body,
   )
-}
-
-export function resolveQuickAddCategory(
-  category: string,
-): RawMaterialCategory {
-  if (
-    (RAW_MATERIAL_CATEGORIES as readonly string[]).includes(category)
-  ) {
-    return category as RawMaterialCategory
-  }
-  return 'Oils/masala/salt/sugar'
 }

@@ -5,6 +5,8 @@ import { Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   ActionDropdown,
   OutlineButton,
@@ -29,6 +31,16 @@ export default function UtilityBills() {
     if (!q) return rows
     return rows.filter((row) => row.operator.toLowerCase().includes(q))
   }, [rows, appliedQuery])
+
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filtered,
+    (row) => [row.operator, row.type, row.status],
+    (row, key) => {
+      if (key === 'type') return row.type
+      if (key === 'status') return row.status
+      return row.operator
+    },
+  )
 
 
   function handleSearch() {
@@ -106,7 +118,7 @@ export default function UtilityBills() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center">
             <span className="mb-4 flex size-20 items-center justify-center rounded-full bg-page">
               <Search
@@ -125,13 +137,37 @@ export default function UtilityBills() {
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
                 <tr>
-                  <th className="px-4 py-3">Operator</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Status</th>
+                  <SortableTh
+                    columnKey="operator"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Operator
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="type"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Type
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="status"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Status
+                  </SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
+                {visible.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-0 hover:bg-page/50"

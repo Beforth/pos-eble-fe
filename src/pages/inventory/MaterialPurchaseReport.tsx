@@ -1,33 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  categoryIdByName,
+  listAllMaterialPurchaseReportApi,
+  type MaterialPurchaseReportRow,
+} from '../../services/inventoryService'
 
-const CATEGORY_OPTIONS = [
-  'All',
-  'Rice/pulses/flours',
-  'Bread/dairy',
-  'Oils/masala/salt/sugar',
-  'Ready To Cook/ready To Eat',
-  'Sauces/dressings/marinades',
-  'Snacks',
-  'Packaging/storage',
-  'Fruits/vegetables',
-  'No Category',
-]
-
-function ExportMenu({
-  onExportReport,
-  onExportSummary,
-  onExportOld,
-}: {
-  onExportReport?: () => void
-  onExportSummary?: () => void
-  onExportOld?: () => void
-}) {
+function ExportMenu({ onExportReport }: { onExportReport?: () => void }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -42,21 +31,6 @@ function ExportMenu({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
 
-  const items = [
-    {
-      label: 'Export Material Purchase Report',
-      onClick: onExportReport,
-    },
-    {
-      label: 'Export Material Purchase Summary Report',
-      onClick: onExportSummary,
-    },
-    {
-      label: 'Export Material Purchase Report (Old)',
-      onClick: onExportOld,
-    },
-  ]
-
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -70,20 +44,18 @@ function ExportMenu({
       </button>
       {open ? (
         <ul className="absolute right-0 z-40 mt-1.5 min-w-[280px] overflow-hidden rounded-md border border-line bg-card py-1 shadow-lg">
-          {items.map((item) => (
-            <li key={item.label}>
-              <button
-                type="button"
-                onClick={() => {
-                  item.onClick?.()
-                  setOpen(false)
-                }}
-                className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
-              >
-                {item.label}
-              </button>
-            </li>
-          ))}
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                onExportReport?.()
+                setOpen(false)
+              }}
+              className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
+            >
+              Export Material Purchase Report
+            </button>
+          </li>
         </ul>
       ) : null}
     </div>
@@ -91,32 +63,92 @@ function ExportMenu({
 }
 
 export default function MaterialPurchaseReport() {
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
+  const { categories, loadMasters } = useInventoryMasters()
   const [rawMaterial, setRawMaterial] = useState('')
   const [category, setCategory] = useState('All')
-  const [fromDate, setFromDate] = useState('2026-08-04')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [applied, setApplied] = useState({
+    search: '',
+    category: 'All',
+    fromDate: '',
+    toDate: '',
+  })
+  const [rows, setRows] = useState<MaterialPurchaseReportRow[]>([])
+  const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
 
-  function handleClear() {
-    setRawMaterial('')
-    setCategory('All')
-    setFromDate('2026-08-04')
-    setToDate('2026-08-11')
-  }
+  const categoryOptions = useMemo(
+    () => ['All', ...categories.map((row) => row.name), 'No Category'],
+    [categories],
+  )
+
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    setLoading(true)
+    try {
+      const categoryId =
+        applied.category === 'All'
+          ? undefined
+          : applied.category === 'No Category'
+            ? 'no-category'
+            : categoryIdByName(categories, applied.category)
+      const data = await listAllMaterialPurchaseReportApi(encryptedOutletId, {
+        search: applied.search || undefined,
+        categoryId,
+        dateFrom: applied.fromDate || undefined,
+        dateTo: applied.toDate || undefined,
+      })
+      setRows(data)
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load material purchase report',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, canRead, applied, categories])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Material Purchase Report</h1>
         <ExportMenu
-          onExportReport={() => showToast('Exported Material Purchase Report')}
-          onExportSummary={() =>
-            showToast('Exported Material Purchase Summary Report')
-          }
-          onExportOld={() =>
-            showToast('Exported Material Purchase Report (Old)')
-          }
+          onExportReport={() => {
+            downloadCsv(
+              [
+                'date',
+                'invoice',
+                'supplier',
+                'raw_material',
+                'qty',
+                'unit',
+                'amount',
+              ],
+              rows.map((row) => [
+                row.invoice_date,
+                row.invoice_number,
+                row.supplier_name || '',
+                row.raw_material_name,
+                row.qty,
+                row.unit_name,
+                row.amount,
+              ]),
+              'material-purchase-report.csv',
+            )
+            showToast('Exported report')
+          }}
         />
       </div>
 
@@ -132,11 +164,11 @@ export default function MaterialPurchaseReport() {
             className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <div className="min-w-[160px] flex-1">
+        <div className="min-w-[160px]">
           <SearchableSelect
             label="Category"
             value={category}
-            options={CATEGORY_OPTIONS}
+            options={categoryOptions}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -145,46 +177,111 @@ export default function MaterialPurchaseReport() {
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">
-            From Date
+            From
           </label>
           <input
             type="date"
             value={fromDate}
             onChange={(event) => setFromDate(event.target.value)}
-            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            className="h-10 rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink">
-            To Date
-          </label>
+          <label className="mb-1.5 block text-sm font-medium text-ink">To</label>
           <input
             type="date"
             value={toDate}
             onChange={(event) => setToDate(event.target.value)}
-            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            className="h-10 rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
+        <OutlineButton
+          onClick={() =>
+            setApplied({
+              search: rawMaterial.trim(),
+              category,
+              fromDate,
+              toDate,
+            })
+          }
+        >
           Search
         </OutlineButton>
-        <OutlineButton variant="gray" onClick={handleClear}>
+        <OutlineButton
+          variant="gray"
+          onClick={() => {
+            setRawMaterial('')
+            setCategory('All')
+            setFromDate('')
+            setToDate('')
+            setApplied({
+              search: '',
+              category: 'All',
+              fromDate: '',
+              toDate: '',
+            })
+          }}
+        >
           Clear
         </OutlineButton>
       </div>
 
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-        <span className="relative mb-4 text-muted">
-          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
-          <Search
-            size={24}
-            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-          />
-        </span>
-        <p className="text-base font-semibold text-ink">
-          Material Purchase Report Record Not Found
-        </p>
-      </div>
+      {!canRead ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          You do not have permission to view inventory reports.
+        </div>
+      ) : loading ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          Loading…
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+          <span className="relative mb-4 text-muted">
+            <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
+            <Search
+              size={24}
+              className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+            />
+          </span>
+          <p className="text-base font-semibold text-ink">No records found</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-line bg-card">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
+              <tr>
+                <th className="px-3 py-2.5">Date</th>
+                <th className="px-3 py-2.5">Invoice</th>
+                <th className="px-3 py-2.5">Supplier</th>
+                <th className="px-3 py-2.5">Raw Material</th>
+                <th className="px-3 py-2.5">Qty</th>
+                <th className="px-3 py-2.5">Unit</th>
+                <th className="px-3 py-2.5">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr
+                  key={`${row.raw_material_id}-${row.invoice_number}-${index}`}
+                  className="border-b border-line last:border-b-0"
+                >
+                  <td className="px-3 py-2.5 text-ink">{row.invoice_date}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.invoice_number}</td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.supplier_name || '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.raw_material_name}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">{row.qty}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.unit_name}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.amount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </InventoryPageShell>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   Boxes,
   Check,
@@ -21,38 +21,25 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
 import {
-  defaultPurchaseUnitsForCategory,
-  getRawMaterialById,
-  RAW_MATERIAL_CATEGORIES,
-  type RawMaterialRow,
-} from '../../mocks/rawMaterialsData'
-
-const UNITS = [
-  'Kg',
-  'GM',
-  'Gm',
-  'Ltr',
-  'Ml',
-  'Pcs',
-  'BOX',
-  'Box',
-  'pkt',
-  'Packet',
-  'TIN',
-  'jar',
-  'bottle',
-  'Bottle',
-  'Dozen',
-  'Carton',
-]
+  INV_WRITE_PERMISSION,
+  categoryIdByName,
+  createRawMaterialApi,
+  getRawMaterialApi,
+  unitIdByName,
+  updateRawMaterialApi,
+  type RawMaterialPayload,
+} from '../../services/inventoryService'
 
 const CLOSING_CYCLES = ['Daily', 'Weekly', 'Bi-Weekly', 'Monthly', 'Yearly']
 
-const CATEGORY_OPTIONS = [
-  ...RAW_MATERIAL_CATEGORIES,
-  'No Category',
-]
+function noneLabel(value: string): boolean {
+  const needle = value.trim().toLowerCase()
+  return !needle || needle === 'no category' || needle === 'no sub category'
+}
 
 function SectionCard({
   icon,
@@ -318,12 +305,11 @@ function RadioYesNo({
 
 export default function AddRawMaterial() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const isEdit = Boolean(id)
-  const stateRow = (location.state as { row?: RawMaterialRow } | null)?.row
-  const existing =
-    stateRow ?? (id ? getRawMaterialById(id) : undefined)
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WRITE_PERMISSION)
+  const { units, categories, loadMasters } = useInventoryMasters()
 
   const [name, setName] = useState('')
   const [purchaseUnits, setPurchaseUnits] = useState<string[]>([])
@@ -360,36 +346,127 @@ export default function AddRawMaterial() {
   const [gtin, setGtin] = useState('')
   const [brand, setBrand] = useState('')
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [loadingExisting, setLoadingExisting] = useState(isEdit)
+
+  const unitNames = useMemo(() => {
+    const names = units.filter((row) => row.is_active).map((row) => row.name)
+    const extras = [
+      consumptionUnit,
+      conversionPurchaseUnit,
+      minStockUnit,
+      atParUnit,
+      maxStockUnit,
+      ...purchaseUnits,
+      ...maxStockRows.map((row) => row.unit),
+    ]
+    for (const name of extras) {
+      if (name && !names.includes(name)) names.push(name)
+    }
+    return names
+  }, [
+    units,
+    consumptionUnit,
+    conversionPurchaseUnit,
+    minStockUnit,
+    atParUnit,
+    maxStockUnit,
+    purchaseUnits,
+    maxStockRows,
+  ])
+
+  const categoryOptions = useMemo(
+    () => [...categories.map((row) => row.name), 'No Category'],
+    [categories],
+  )
+
+  const selectedCategoryId = categoryIdByName(categories, category) ?? null
+  const subCategoryOptions = useMemo(() => {
+    const children = categories
+      .filter((row) => row.parent_id && row.parent_id === selectedCategoryId)
+      .map((row) => row.name)
+    return [...children, 'No Sub Category']
+  }, [categories, selectedCategoryId])
 
   useEffect(() => {
-    if (!isEdit) return
-    if (!existing) {
-      setError('Raw material not found')
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!isEdit || !id) {
+      setLoadingExisting(false)
       return
     }
-    const units = defaultPurchaseUnitsForCategory(existing.category)
-    setName(existing.name)
-    setPurchaseUnits(units)
-    setConsumptionUnit('GM')
-    setConversionPurchaseUnit(units[0] ?? 'Kg')
-    setConversionQty('1000')
-    setCategory(existing.category)
-    setSubCategory('')
-    setPurchasePrice('0')
-    setTransferPrice('0')
-    setReconciliationPrice('0')
-    setTaxType('gst')
-    setTaxPercent('0')
-    setMinStockLevel('0')
-    setAtParLevel('0')
-    setClosingCycles(['Daily'])
-    setAddOpeningStock(true)
-    setAllowDecimal('yes')
-    setNormalLoss('0')
-    setExciseQty('0')
-    setExclusive('No')
-    setIsExpiry('No')
-  }, [isEdit, existing])
+    if (!encryptedOutletId) {
+      setError('Select an outlet before editing a raw material')
+      setLoadingExisting(false)
+      return
+    }
+    let cancelled = false
+    setLoadingExisting(true)
+    getRawMaterialApi(encryptedOutletId, id)
+      .then((existing) => {
+        if (cancelled) return
+        setName(existing.name)
+        setPurchaseUnits(existing.purchase_units.map((unit) => unit.name))
+        setConsumptionUnit(existing.consumption_unit.name)
+        setConversionPurchaseUnit(
+          existing.conversion_purchase_unit?.name ??
+            existing.purchase_units[0]?.name ??
+            '',
+        )
+        setConversionQty(existing.conversion_qty)
+        setCategory(existing.category?.name ?? '')
+        setSubCategory(existing.sub_category?.name ?? '')
+        setPurchasePrice(existing.purchase_price)
+        setTransferPrice(existing.transfer_price)
+        setReconciliationPrice(existing.reconciliation_price)
+        setTaxType(existing.tax_type === 'vat' ? 'vat' : 'gst')
+        setTaxPercent(existing.tax_percent)
+        setMinStockUnit(existing.min_stock_unit?.name ?? '')
+        setMinStockLevel(existing.min_stock_level)
+        setAtParUnit(existing.at_par_unit?.name ?? '')
+        setAtParLevel(existing.at_par_level)
+        setClosingCycles(
+          existing.closing_cycles.length > 0
+            ? existing.closing_cycles
+            : ['Daily'],
+        )
+        setAllowRestock(existing.allow_restock)
+        setMaxStockRows(
+          existing.max_stock_rows.map((row, index) => ({
+            id: `max-${index}-${row.unit_id}`,
+            qty: row.qty,
+            unit: row.unit_name,
+          })),
+        )
+        setBarcode(existing.barcode)
+        setHsnCode(existing.hsn_code)
+        setExclusive(existing.exclusive_to_outlet ? 'Yes' : 'No')
+        setIsExpiry(existing.is_expiry ? 'Yes' : 'No')
+        setAllowDecimal(existing.allow_decimal ? 'yes' : 'no')
+        setDescription(existing.description)
+        setNormalLoss(existing.normal_loss_percent)
+        setExciseQty(existing.excise_qty)
+        setGtin(existing.gtin)
+        setBrand(existing.brand)
+        setError('')
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : 'Raw material not found',
+        )
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingExisting(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, id, isEdit])
 
   const displayName = name.trim() || 'Raw Material'
   const pricesTitle = isEdit ? `${displayName} Prices` : 'Prices'
@@ -416,7 +493,12 @@ export default function AddRawMaterial() {
     setMaxStockUnit('')
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (!canWrite) return
+    if (!encryptedOutletId) {
+      setError('Select an outlet before saving a raw material')
+      return
+    }
     if (!name.trim()) {
       setError('Name is required')
       return
@@ -429,9 +511,74 @@ export default function AddRawMaterial() {
       setError('Consumption unit is required')
       return
     }
+    const purchaseIds = purchaseUnits
+      .map((unitName) => unitIdByName(units, unitName))
+      .filter((unitId): unitId is string => Boolean(unitId))
+    const consumptionId = unitIdByName(units, consumptionUnit)
+    if (purchaseIds.length === 0 || !consumptionId) {
+      setError('Create a unit before saving a raw material')
+      return
+    }
+    const conversionId =
+      unitIdByName(units, conversionPurchaseUnit) ?? purchaseIds[0]
+    const minId = minStockUnit ? unitIdByName(units, minStockUnit) : undefined
+    const atParId = atParUnit ? unitIdByName(units, atParUnit) : undefined
+    const payload: RawMaterialPayload = {
+      name: name.trim(),
+      purchase_unit_ids: purchaseIds,
+      consumption_unit_id: consumptionId,
+      conversion_purchase_unit_id: conversionId,
+      conversion_qty: conversionQty || '1',
+      category_id: noneLabel(category)
+        ? null
+        : (categoryIdByName(categories, category) ?? null),
+      sub_category_id: noneLabel(subCategory)
+        ? null
+        : (categoryIdByName(categories, subCategory) ?? null),
+      purchase_price: purchasePrice || '0',
+      transfer_price: transferPrice || '0',
+      reconciliation_price: reconciliationPrice || '0',
+      tax_type: taxType,
+      tax_percent: taxPercent || '0',
+      min_stock_unit_id: minId ?? null,
+      min_stock_level: minStockLevel || '0',
+      at_par_unit_id: atParId ?? null,
+      at_par_level: atParLevel || '0',
+      closing_cycles: closingCycles,
+      allow_restock: allowRestock,
+      barcode,
+      hsn_code: hsnCode,
+      exclusive_to_outlet: exclusive === 'Yes',
+      is_expiry: isExpiry === 'Yes',
+      allow_decimal: allowDecimal === 'yes',
+      description,
+      normal_loss_percent: normalLoss || '0',
+      excise_qty: exciseQty || '0',
+      gtin,
+      brand,
+      max_stock_rows: maxStockRows.map((row) => {
+        const unitId = unitIdByName(units, row.unit)
+        return { qty: row.qty, unit_id: unitId ?? '' }
+      }).filter((row) => row.unit_id),
+    }
     setError('')
-    showToast(isEdit ? 'Raw material updated' : 'Raw material saved')
-    window.setTimeout(() => navigate('/inventory/raw-materials'), 900)
+    setSaving(true)
+    try {
+      if (isEdit && id) {
+        await updateRawMaterialApi(encryptedOutletId, id, payload)
+        showToast('Raw material updated')
+      } else {
+        await createRawMaterialApi(encryptedOutletId, payload)
+        showToast('Raw material saved')
+      }
+      navigate('/inventory/raw-materials')
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Unable to save raw material',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -453,7 +600,7 @@ export default function AddRawMaterial() {
             label="Purchase Unit"
             required
             values={purchaseUnits}
-            options={UNITS}
+            options={unitNames}
             placeholder="Select multiple unit"
             onChange={(values) => {
               setPurchaseUnits(values)
@@ -469,7 +616,7 @@ export default function AddRawMaterial() {
             label="Consumption Unit"
             required
             value={consumptionUnit}
-            options={UNITS}
+            options={unitNames}
             placeholder="Select Unit"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -513,16 +660,19 @@ export default function AddRawMaterial() {
           <SearchableSelect
             label="Category"
             value={category}
-            options={CATEGORY_OPTIONS}
+            options={categoryOptions}
             placeholder="Select/Add Category"
             searchPlaceholder="Search"
             includePlaceholderOption
-            onChange={setCategory}
+            onChange={(value) => {
+              setCategory(value)
+              setSubCategory('')
+            }}
           />
           <SearchableSelect
             label="Sub Category"
             value={subCategory}
-            options={['No Sub Category']}
+            options={subCategoryOptions}
             placeholder="Select/Add Sub Category"
             searchPlaceholder="Search"
             includePlaceholderOption
@@ -603,7 +753,7 @@ export default function AddRawMaterial() {
           <SearchableSelect
             label="Minimum Stock Level Unit"
             value={minStockUnit}
-            options={UNITS}
+            options={unitNames}
             placeholder="Select Unit"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -616,7 +766,7 @@ export default function AddRawMaterial() {
           <SearchableSelect
             label="At Par Stock Level Unit"
             value={atParUnit}
-            options={UNITS}
+            options={unitNames}
             placeholder="Select Unit"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -689,7 +839,7 @@ export default function AddRawMaterial() {
             <SearchableSelect
               label="Maximum Stock Unit"
               value={maxStockUnit}
-              options={UNITS}
+              options={unitNames}
               placeholder="Select Unit"
               searchPlaceholder="Search"
               includePlaceholderOption={false}
@@ -822,7 +972,14 @@ export default function AddRawMaterial() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+        {canWrite ? (
+          <PrimaryButton
+            disabled={saving || loadingExisting}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
+        ) : null}
       </div>
     </InventoryPageShell>
   )

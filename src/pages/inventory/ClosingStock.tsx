@@ -1,17 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import {
-  Check,
-  MessageCirclePlus,
-  RotateCcw,
-  Search,
-  Star,
-  X,
-} from 'lucide-react'
+import { Plus, RotateCcw, Search, Star, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { HistoryMenu } from '../../components/inventory/HistoryMenu'
 import { ImportStockExcel } from '../../components/inventory/ImportStockExcel'
+import { StockStepGuideModal } from '../../components/inventory/StockStepGuideModal'
 import {
   StockUpdateCycleSelect,
   type StockUpdateCycle,
@@ -20,6 +14,16 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  getInventorySettingsApi,
+  listAllRawMaterialsApi,
+  updateInventorySettingsApi,
+  type RawMaterial,
+} from '../../services/inventoryService'
+import { downloadCsv } from '../../utils/downloadFile'
 
 interface StockRow {
   id: string
@@ -29,64 +33,125 @@ interface StockRow {
   favourite?: boolean
 }
 
-const CATEGORIES = [
-  'All categories',
-  'No category',
-  'Bread/dairy',
-  'Fruits/vegetables',
-  'Oils/masala/salt/sugar',
-  'Grocery',
-  'Packaging',
-  'Snacks',
-]
-
-const RAW_MATERIALS: StockRow[] = [
-  { id: '1', name: 'Ajwain Sticks', unit: 'Kg', category: 'Snacks', favourite: true },
-  { id: '2', name: 'Ajwain Sticks', unit: 'GM', category: 'Snacks' },
-  { id: '3', name: 'Ajwain Sticks', unit: 'BOX', category: 'Snacks' },
-  { id: '4', name: 'Ajwain Sticks', unit: 'pkt', category: 'Snacks' },
-  { id: '5', name: 'Ajwain Sticks', unit: 'carton', category: 'Snacks' },
-  { id: '6', name: 'Ajwain Sticks', unit: 'Bag', category: 'Snacks' },
-  { id: '7', name: 'Aloo Bhujia Sev', unit: 'Kg', category: 'Snacks' },
-  { id: '8', name: 'Aloo Bhujia Sev', unit: 'GM', category: 'Snacks' },
-  { id: '9', name: 'Aloo Bhujia Sev', unit: 'BOX', category: 'Snacks' },
-  { id: '10', name: 'Aloo Bhujia Sev', unit: 'pkt', category: 'Snacks' },
-  { id: '11', name: 'Aloo Bhujia Sev', unit: 'carton', category: 'Snacks' },
-  { id: '12', name: 'Aloo Bhujia Sev', unit: 'Bag', category: 'Snacks', favourite: true },
-  { id: '13', name: 'Milk', unit: 'Ltr', category: 'Bread/dairy' },
-  { id: '14', name: 'Butter', unit: 'Kg', category: 'Bread/dairy' },
-  { id: '15', name: 'Salt', unit: 'Kg', category: 'Oils/masala/salt/sugar' },
-  { id: '16', name: 'Sugar', unit: 'Kg', category: 'Oils/masala/salt/sugar' },
-]
-
 type TabId = 'add' | 'import'
 
+function draftKey(outletId: string, kind: string) {
+  return `rajubhai.inv.${kind}.${outletId}`
+}
+
 export default function ClosingStock() {
+  const { encryptedOutletId } = useAuth()
+  const { categories, loadMasters } = useInventoryMasters()
   const [tab, setTab] = useState<TabId>('add')
-  const [stockDate, setStockDate] = useState('2026-08-10')
+  const [stockDate, setStockDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [query, setQuery] = useState('')
   const [cycle, setCycle] = useState<StockUpdateCycle>('daily')
   const [category, setCategory] = useState('All categories')
   const [favouritesOnly, setFavouritesOnly] = useState(false)
   const [enteredTodayOnly, setEnteredTodayOnly] = useState(false)
   const [stockValues, setStockValues] = useState<Record<string, string>>({})
-  const [notes, setNotes] = useState<Record<string, string>>({})
-  const [noteRowId, setNoteRowId] = useState<string | null>(null)
+  const [materials, setMaterials] = useState<RawMaterial[]>([])
+  const [loading, setLoading] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
+
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    getInventorySettingsApi(encryptedOutletId)
+      .then((settings) => {
+        const value = settings.stock_update_cycle
+        if (
+          value === 'all' ||
+          value === 'daily' ||
+          value === 'weekly' ||
+          value === 'bi-weekly' ||
+          value === 'monthly' ||
+          value === 'yearly'
+        ) {
+          setCycle(value)
+        }
+      })
+      .catch(() => undefined)
+  }, [encryptedOutletId])
+
+  const loadMaterials = useCallback(async () => {
+    if (!encryptedOutletId) return
+    setLoading(true)
+    try {
+      const rows = await listAllRawMaterialsApi(encryptedOutletId)
+      setMaterials(rows)
+      const raw = localStorage.getItem(
+        draftKey(encryptedOutletId, 'closingStock'),
+      )
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          date?: string
+          values?: Record<string, string>
+        }
+        if (parsed.date) setStockDate(parsed.date)
+        if (parsed.values) setStockValues(parsed.values)
+      }
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load raw materials',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    void loadMaterials()
+  }, [loadMaterials])
+
+  const categoryOptions = useMemo(
+    () => [
+      'All categories',
+      'No category',
+      ...categories.map((row) => row.name),
+    ],
+    [categories],
+  )
+
+  const rows: StockRow[] = useMemo(
+    () =>
+      materials.map((row) => ({
+        id: row.id,
+        name: row.name,
+        unit: row.consumption_unit?.name ?? '',
+        category: row.category?.name || 'No category',
+        favourite: row.is_favourite,
+      })),
+    [materials],
+  )
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return RAW_MATERIALS.filter((row) => {
+    return rows.filter((row) => {
       if (category !== 'All categories' && row.category !== category) return false
       if (favouritesOnly && !row.favourite) return false
       if (enteredTodayOnly && !stockValues[row.id]?.trim()) return false
       if (!q) return true
       return (
         row.name.toLowerCase().includes(q) ||
-        row.unit.toLowerCase().includes(q) ||
-        row.id.includes(q)
+        row.unit.toLowerCase().includes(q)
       )
     })
-  }, [query, category, favouritesOnly, enteredTodayOnly, stockValues])
+  }, [rows, query, category, favouritesOnly, enteredTodayOnly, stockValues])
+
+  const enteredRows = useMemo(
+    () =>
+      rows.filter((row) => (stockValues[row.id] || '').trim().length > 0),
+    [rows, stockValues],
+  )
 
   function setValue(id: string, value: string) {
     setStockValues((prev) => ({ ...prev, [id]: value }))
@@ -94,7 +159,6 @@ export default function ClosingStock() {
 
   function clearAll() {
     setStockValues({})
-    setNotes({})
   }
 
   function resetRow(id: string) {
@@ -103,19 +167,56 @@ export default function ClosingStock() {
       delete next[id]
       return next
     })
-    setNotes((prev) => {
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
   }
 
+  function bumpRow(id: string) {
+    const current = Number(stockValues[id] || 0)
+    setValue(id, String(Number.isFinite(current) ? current + 1 : 1))
+  }
 
-  const noteRow = RAW_MATERIALS.find((row) => row.id === noteRowId)
+  function exportDraft() {
+    downloadCsv(
+      ['raw_material', 'unit', 'category', 'qty', 'stock_date', 'cycle'],
+      enteredRows.map((row) => [
+        row.name,
+        row.unit,
+        row.category,
+        stockValues[row.id] ?? '',
+        stockDate,
+        cycle,
+      ]),
+      `closing-stock-${stockDate}.csv`,
+    )
+    showToast('Closing Stock PDF exported')
+  }
+
+  async function persistCycle(next: StockUpdateCycle) {
+    setCycle(next)
+    if (!encryptedOutletId) return
+    try {
+      await updateInventorySettingsApi(encryptedOutletId, {
+        stock_update_cycle: next,
+      })
+    } catch {
+      /* keep local cycle even if settings PATCH fails */
+    }
+  }
+
+  function quickSave() {
+    if (!encryptedOutletId) return
+    localStorage.setItem(
+      draftKey(encryptedOutletId, 'closingStock'),
+      JSON.stringify({ date: stockDate, values: stockValues, cycle }),
+    )
+    showToast(
+      enteredRows.length
+        ? `Quick save completed (${enteredRows.length} entries)`
+        : 'Quick save completed (empty draft)',
+    )
+  }
 
   return (
     <InventoryPageShell activeItem="closing-stock">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Closing Stock</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -126,8 +227,8 @@ export default function ClosingStock() {
             className="h-9 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
           />
           <HistoryMenu
-            exportLabel="Closing stock PDF"
-            onExport={() => showToast('Closing stock PDF exported')}
+            exportLabel="Closing Stock CSV"
+            onExport={exportDraft}
           />
           <OutlineButton
             variant="gray"
@@ -138,6 +239,9 @@ export default function ClosingStock() {
           >
             <X size={15} />
             Reset
+          </OutlineButton>
+          <OutlineButton variant="gray" onClick={() => setGuideOpen(true)}>
+            Step-By-Step Guide
           </OutlineButton>
         </div>
       </div>
@@ -166,7 +270,7 @@ export default function ClosingStock() {
 
       {tab === 'import' ? (
         <ImportStockExcel
-          entityLabel="closing stock"
+          entityLabel="Closing Stock"
           onToast={showToast}
         />
       ) : (
@@ -181,11 +285,11 @@ export default function ClosingStock() {
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search raw material or barcode"
+                placeholder="Search raw material"
                 className="h-9 w-full rounded-md border border-line bg-card pl-9 pr-3 text-sm outline-none focus:border-primary"
               />
             </label>
-            <StockUpdateCycleSelect value={cycle} onChange={setCycle} />
+            <StockUpdateCycleSelect value={cycle} onChange={persistCycle} />
             <button
               type="button"
               onClick={() => setFavouritesOnly((prev) => !prev)}
@@ -207,7 +311,6 @@ export default function ClosingStock() {
                   : 'border-line bg-card text-ink hover:bg-page'
               }`}
             >
-              <Check size={14} />
               Entered Today
             </button>
           </div>
@@ -218,7 +321,7 @@ export default function ClosingStock() {
                 Categories
               </p>
               <ul className="max-h-[520px] overflow-y-auto py-1">
-                {CATEGORIES.map((item) => {
+                {categoryOptions.map((item) => {
                   const active = category === item
                   return (
                     <li key={item}>
@@ -246,7 +349,11 @@ export default function ClosingStock() {
                 <span className="text-right">Action</span>
               </div>
               <ul className="max-h-[520px] divide-y divide-line overflow-y-auto">
-                {filteredRows.length === 0 ? (
+                {loading ? (
+                  <li className="px-4 py-12 text-center text-sm text-muted">
+                    Loading…
+                  </li>
+                ) : filteredRows.length === 0 ? (
                   <li className="px-4 py-12 text-center text-sm text-muted">
                     No raw materials found
                   </li>
@@ -275,15 +382,11 @@ export default function ClosingStock() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
-                          aria-label={`Add note for ${row.name}`}
-                          onClick={() => setNoteRowId(row.id)}
-                          className={`inline-flex size-8 items-center justify-center rounded-full border border-line hover:bg-page ${
-                            notes[row.id]
-                              ? 'text-primary'
-                              : 'text-muted hover:text-ink'
-                          }`}
+                          aria-label={`Increase ${row.name}`}
+                          onClick={() => bumpRow(row.id)}
+                          className="inline-flex size-8 items-center justify-center rounded-full border border-line text-muted hover:bg-page hover:text-ink"
                         >
-                          <MessageCirclePlus size={14} />
+                          <Plus size={14} />
                         </button>
                         <button
                           type="button"
@@ -312,49 +415,46 @@ export default function ClosingStock() {
             >
               Clear All Entries
             </button>
-            <OutlineButton onClick={() => showToast('Quick save completed')}>
-              Quick Save
-            </OutlineButton>
-            <PrimaryButton onClick={() => showToast('Review closing stock')}>
+            <OutlineButton onClick={quickSave}>Quick Save</OutlineButton>
+            <PrimaryButton onClick={() => setReviewOpen(true)}>
               Review →
             </PrimaryButton>
           </div>
         </>
       )}
 
-      {noteRow ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close note"
-            className="absolute inset-0 bg-ink/40"
-            onClick={() => setNoteRowId(null)}
-          />
-          <div className="relative z-10 w-full max-w-md rounded-lg border border-line bg-card p-4 shadow-xl">
-            <h3 className="mb-1 text-sm font-semibold text-ink">
-              Note — {noteRow.name}
-            </h3>
-            <p className="mb-3 text-xs text-muted">/ {noteRow.unit}</p>
-            <textarea
-              value={notes[noteRow.id] ?? ''}
-              onChange={(event) =>
-                setNotes((prev) => ({
-                  ...prev,
-                  [noteRow.id]: event.target.value,
-                }))
-              }
-              rows={4}
-              placeholder="Add a note for this closing stock entry"
-              className="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-            <div className="mt-3 flex justify-end">
-              <PrimaryButton onClick={() => setNoteRowId(null)}>
-                Done
-              </PrimaryButton>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <StockStepGuideModal
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        title="Closing Stock guide"
+      />
+
+      <StockStepGuideModal
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        title="Review stock entries"
+        steps={[
+          {
+            title: `${enteredRows.length} entries ready`,
+            body: enteredRows.length
+              ? enteredRows
+                  .slice(0, 8)
+                  .map(
+                    (row) =>
+                      `${row.name}: ${stockValues[row.id]} ${row.unit}`,
+                  )
+                  .join(' · ') +
+                (enteredRows.length > 8
+                  ? ` · +${enteredRows.length - 8} more`
+                  : '')
+              : 'No quantities entered yet. Fill New Stock values, then Review again.',
+          },
+          {
+            title: 'Date & cycle',
+            body: `Stock date ${stockDate}, update cycle “${cycle}”. Use Quick Save to keep a local draft until the stock-entry API is connected.`,
+          },
+        ]}
+      />
     </InventoryPageShell>
   )
 }

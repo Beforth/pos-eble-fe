@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -13,6 +14,8 @@ const TO_OPTIONS = [
   'Dairy Vendors',
   'Other Restaurant',
 ]
+
+const DEFAULT_DATE = '2026-08-11'
 
 function ExportMenu({ onExportAll }: { onExportAll?: () => void }) {
   const [open, setOpen] = useState(false)
@@ -61,25 +64,47 @@ function ExportMenu({ onExportAll }: { onExportAll?: () => void }) {
 }
 
 export default function RaisedPoVarianceReport() {
-  const [fromDate, setFromDate] = useState('2026-08-11')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState(DEFAULT_DATE)
+  const [toDate, setToDate] = useState(DEFAULT_DATE)
   const [to, setTo] = useState('All')
+  const [applied, setApplied] = useState({
+    fromDate: DEFAULT_DATE,
+    toDate: DEFAULT_DATE,
+    to: 'All',
+  })
 
+  function handleSearch() {
+    setApplied({ fromDate, toDate, to })
+    showToast('Search applied')
+  }
 
   function handleClear() {
-    setFromDate('2026-08-11')
-    setToDate('2026-08-11')
+    setFromDate(DEFAULT_DATE)
+    setToDate(DEFAULT_DATE)
     setTo('All')
+    setApplied({
+      fromDate: DEFAULT_DATE,
+      toDate: DEFAULT_DATE,
+      to: 'All',
+    })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Purchase Order Variance Report
         </h1>
-        <ExportMenu onExportAll={() => showToast('Exported all')} />
+        <ExportMenu
+          onExportAll={() => {
+            downloadCsv(
+              ['from_date', 'to_date', 'to'],
+              [[applied.fromDate, applied.toDate, applied.to]],
+              'raised-po-variance-all.csv',
+            )
+            showToast('Exported all')
+          }}
+        />
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
@@ -116,9 +141,7 @@ export default function RaisedPoVarianceReport() {
             onChange={setTo}
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -134,6 +157,10 @@ export default function RaisedPoVarianceReport() {
         </span>
         <p className="text-base font-semibold text-ink">
           Purchase Order Variance Report Record Not Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: start={applied.fromDate} · end={applied.toDate} · to=
+          {applied.to}
         </p>
       </div>
     </InventoryPageShell>

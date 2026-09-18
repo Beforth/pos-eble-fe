@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -18,6 +19,9 @@ const CATEGORY_OPTIONS = [
   'Fruits/vegetables',
   'No Category',
 ]
+
+const DEFAULT_START = '2026-08-04'
+const DEFAULT_END = '2026-08-11'
 
 function ExportMenu({
   onExportPage,
@@ -84,27 +88,75 @@ function ExportMenu({
 }
 
 export default function ManualStockEntryReport() {
-  const [startDate, setStartDate] = useState('2026-08-04')
-  const [endDate, setEndDate] = useState('2026-08-11')
+  const [startDate, setStartDate] = useState(DEFAULT_START)
+  const [endDate, setEndDate] = useState(DEFAULT_END)
   const [rawMaterial, setRawMaterial] = useState('')
   const [category, setCategory] = useState('All')
+  const [applied, setApplied] = useState({
+    startDate: DEFAULT_START,
+    endDate: DEFAULT_END,
+    rawMaterial: '',
+    category: 'All',
+  })
 
+  function handleSearch() {
+    setApplied({
+      startDate,
+      endDate,
+      rawMaterial: rawMaterial.trim(),
+      category,
+    })
+    showToast('Search applied')
+  }
 
   function handleClear() {
-    setStartDate('2026-08-04')
-    setEndDate('2026-08-11')
+    setStartDate(DEFAULT_START)
+    setEndDate(DEFAULT_END)
     setRawMaterial('')
     setCategory('All')
+    setApplied({
+      startDate: DEFAULT_START,
+      endDate: DEFAULT_END,
+      rawMaterial: '',
+      category: 'All',
+    })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Manual Adjustment List</h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => {
+            downloadCsv(
+              ['start_date', 'end_date', 'raw_material', 'category'],
+              [
+                [
+                  applied.startDate,
+                  applied.endDate,
+                  applied.rawMaterial,
+                  applied.category,
+                ],
+              ],
+              'manual-stock-entry-page.csv',
+            )
+            showToast('Exported current page')
+          }}
+          onExportAll={() => {
+            downloadCsv(
+              ['start_date', 'end_date', 'raw_material', 'category'],
+              [
+                [
+                  applied.startDate,
+                  applied.endDate,
+                  applied.rawMaterial,
+                  applied.category,
+                ],
+              ],
+              'manual-stock-entry-all.csv',
+            )
+            showToast('Exported all')
+          }}
         />
       </div>
 
@@ -153,9 +205,7 @@ export default function ManualStockEntryReport() {
             onChange={setCategory}
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -171,6 +221,10 @@ export default function ManualStockEntryReport() {
         </span>
         <p className="text-base font-semibold text-ink">
           Manual Adjustment Report Record Not Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: start={applied.startDate} · end={applied.endDate} · material=
+          {applied.rawMaterial || '—'} · category={applied.category}
         </p>
       </div>
     </InventoryPageShell>

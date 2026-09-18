@@ -1,7 +1,7 @@
 import { useEffect, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import type { RawMaterialRow } from '../../mocks/rawMaterialsData'
+import type { RawMaterial } from '../../services/inventoryService'
 
 export interface RawMaterialDetails {
   name: string
@@ -76,51 +76,43 @@ function DetailRow({
   )
 }
 
-export function buildRawMaterialDetails(
-  row: RawMaterialRow,
-): RawMaterialDetails {
-  const purchaseUnitsByCategory: Record<string, string> = {
-    'Oils/masala/salt/sugar': 'BOX, pkt, jar, TIN, GM, Kg',
-    'Fruits/vegetables': 'Kg, GM, BOX',
-    'Bread/dairy': 'Ltr, Kg, Pcs, BOX',
-    'Rice/pulses/flours': 'Kg, GM, pkt, BOX',
-    Snacks: 'pkt, BOX, Kg',
-    'Sauces/dressings/marinades': 'jar, bottle, Ltr, GM',
-    'Ready To Cook/ready To Eat': 'pkt, BOX, Pcs',
-    'Packaging/storage': 'Pcs, BOX, pkt',
-  }
+function yesNo(value: boolean): string {
+  return value ? 'Yes' : 'No'
+}
 
+export function buildRawMaterialDetails(row: RawMaterial): RawMaterialDetails {
   return {
     name: row.name,
-    barcode: '',
-    reconciliationPrice: '0',
-    purchasePrice: '0',
-    transferPrice: '0',
-    taxType: 'GST',
-    taxPercent: '0',
-    purchaseUnit:
-      purchaseUnitsByCategory[row.category] ?? 'Kg, GM, BOX',
-    closingStockOn: 'Daily',
-    consumptionUnit: 'GM',
-    conversionQty: '1000',
-    hsnCode: '',
-    normalLoss: '0',
-    category: row.category,
-    favorite: row.favourite ? 'Yes' : 'No',
-    minStockLevel: '0',
-    minStockUnit: '',
-    atParStockLevel: '0',
-    atParStockUnit: '',
-    maxStockLevel: '',
-    exclusive: 'No',
-    isExpiry: 'No',
-    description: '',
-    quantityGmMl: '0',
-    gtin: '',
-    subCategory: '',
+    barcode: row.barcode,
+    reconciliationPrice: row.reconciliation_price,
+    purchasePrice: row.purchase_price,
+    transferPrice: row.transfer_price,
+    taxType: row.tax_type.toUpperCase(),
+    taxPercent: row.tax_percent,
+    purchaseUnit: row.purchase_units.map((unit) => unit.name).join(', '),
+    closingStockOn: row.closing_cycles.join(', '),
+    consumptionUnit: row.consumption_unit.name,
+    conversionQty: row.conversion_qty,
+    hsnCode: row.hsn_code,
+    normalLoss: row.normal_loss_percent,
+    category: row.category?.name ?? '',
+    favorite: yesNo(row.is_favourite),
+    minStockLevel: row.min_stock_level,
+    minStockUnit: row.min_stock_unit?.name ?? '',
+    atParStockLevel: row.at_par_level,
+    atParStockUnit: row.at_par_unit?.name ?? '',
+    maxStockLevel: row.max_stock_rows
+      .map((item) => `${item.qty} ${item.unit_name}`)
+      .join(', '),
+    exclusive: yesNo(row.exclusive_to_outlet),
+    isExpiry: yesNo(row.is_expiry),
+    description: row.description,
+    quantityGmMl: row.excise_qty,
+    gtin: row.gtin,
+    subCategory: row.sub_category?.name ?? '',
     rank: '',
-    brand: '',
-    allowDecimal: 'Yes',
+    brand: row.brand,
+    allowDecimal: yesNo(row.allow_decimal),
   }
 }
 

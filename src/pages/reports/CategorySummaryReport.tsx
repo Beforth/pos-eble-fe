@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Printer, Search } from 'lucide-react'
+import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { menuItems, baseMenuCategories } from '../../mocks/menuItemsData'
 
 export default function CategorySummaryReport() {
   const navigate = useNavigate()
   const [billNo, setBillNo] = useState('')
-  const [search, setSearch] = useState('')
 
-  const rows = useMemo(() => {
-    const q = search.trim().toLowerCase()
+  const groupedRows = useMemo(() => {
     const grouped: Record<string, { items: number; revenue: number }> = {}
     for (const item of menuItems) {
       const cat = baseMenuCategories.find((c) => c.id === item.categoryId)
@@ -19,16 +20,25 @@ export default function CategorySummaryReport() {
       grouped[catName].items += 1
       grouped[catName].revenue += item.price
     }
-    let result = Object.entries(grouped).map(([category, data]) => ({
+    return Object.entries(grouped).map(([category, data]) => ({
       category,
       items: data.items,
       revenue: data.revenue,
     }))
-    if (q) {
-      result = result.filter((r) => r.category.toLowerCase().includes(q))
-    }
-    return result
-  }, [search])
+  }, [])
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      groupedRows,
+      (row) => [row.category, row.items, row.revenue],
+      (row, key) => {
+        if (key === 'items') return row.items
+        if (key === 'revenue') return row.revenue
+        return row.category
+      },
+    )
+
+  const rows = visible
 
   const totalItems = rows.reduce((s, r) => s + r.items, 0)
   const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0)
@@ -74,19 +84,20 @@ export default function CategorySummaryReport() {
         </div>
 
         <div className="rounded-xl border border-line bg-card">
-          <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search categories..." className="h-9 w-full rounded-lg border border-line bg-page pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary" />
-            </div>
+          <div className="border-b border-line p-3">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search categories"
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Category</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Items</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</th>
+                  <SortableTh columnKey="category" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Category</SortableTh>
+                  <SortableTh columnKey="items" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Items</SortableTh>
+                  <SortableTh columnKey="revenue" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

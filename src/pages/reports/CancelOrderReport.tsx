@@ -4,7 +4,9 @@ import { showToast } from '../../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, Home } from 'lucide-react'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useListQuery } from '../../hooks/useListQuery'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
 import { brand } from '../../theme/brand'
 
@@ -129,6 +131,30 @@ export default function CancelOrderReport() {
     )
   }, [applied.fromDate, applied.toDate])
 
+  const qtyList = useListQuery(
+    rows,
+    (row) => [
+      row.dateLabel,
+      ...restaurantColumns.map((name) => row.qtyByRestaurant[name] ?? 0),
+    ],
+    (row, key) => {
+      if (key === 'date') return row.dateKey
+      return row.qtyByRestaurant[key] ?? 0
+    },
+  )
+
+  const amountList = useListQuery(
+    rows,
+    (row) => [
+      row.dateLabel,
+      ...restaurantColumns.map((name) => row.amountByRestaurant[name] ?? 0),
+    ],
+    (row, key) => {
+      if (key === 'date') return row.dateKey
+      return row.amountByRestaurant[key] ?? 0
+    },
+  )
+
 
   function handleSearch() {
     setApplied({ fromDate, toDate, restaurant })
@@ -244,21 +270,31 @@ export default function CancelOrderReport() {
               <table className="w-full min-w-[480px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line bg-page">
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink">
+                    <SortableTh
+                      columnKey="date"
+                      sortKey={qtyList.sortKey}
+                      sortDir={qtyList.sortDir}
+                      onSort={qtyList.toggleSort}
+                      className="px-4 py-2.5 text-xs font-semibold text-ink"
+                    >
                       Date
-                    </th>
+                    </SortableTh>
                     {restaurantColumns.map((name) => (
-                      <th
+                      <SortableTh
                         key={name}
-                        className="px-4 py-2.5 text-left text-xs font-semibold text-ink"
+                        columnKey={name}
+                        sortKey={qtyList.sortKey}
+                        sortDir={qtyList.sortDir}
+                        onSort={qtyList.toggleSort}
+                        className="px-4 py-2.5 text-xs font-semibold text-ink"
                       >
                         {name}
-                      </th>
+                      </SortableTh>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.length === 0 ? (
+                  {qtyList.visible.length === 0 ? (
                     <tr>
                       <td
                         colSpan={1 + restaurantColumns.length}
@@ -268,7 +304,7 @@ export default function CancelOrderReport() {
                       </td>
                     </tr>
                   ) : (
-                    rows.map((row) => (
+                    qtyList.visible.map((row) => (
                       <tr
                         key={`qty-${row.dateKey}`}
                         className="border-b border-line last:border-b-0"
@@ -300,21 +336,31 @@ export default function CancelOrderReport() {
               <table className="w-full min-w-[480px] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-line bg-page">
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink">
+                    <SortableTh
+                      columnKey="date"
+                      sortKey={amountList.sortKey}
+                      sortDir={amountList.sortDir}
+                      onSort={amountList.toggleSort}
+                      className="px-4 py-2.5 text-xs font-semibold text-ink"
+                    >
                       Date
-                    </th>
+                    </SortableTh>
                     {restaurantColumns.map((name) => (
-                      <th
+                      <SortableTh
                         key={name}
-                        className="px-4 py-2.5 text-left text-xs font-semibold text-ink"
+                        columnKey={name}
+                        sortKey={amountList.sortKey}
+                        sortDir={amountList.sortDir}
+                        onSort={amountList.toggleSort}
+                        className="px-4 py-2.5 text-xs font-semibold text-ink"
                       >
                         {name}
-                      </th>
+                      </SortableTh>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.length === 0 ? (
+                  {amountList.visible.length === 0 ? (
                     <tr>
                       <td
                         colSpan={1 + restaurantColumns.length}
@@ -324,7 +370,7 @@ export default function CancelOrderReport() {
                       </td>
                     </tr>
                   ) : (
-                    rows.map((row) => (
+                    amountList.visible.map((row) => (
                       <tr
                         key={`amt-${row.dateKey}`}
                         className="border-b border-line last:border-b-0"

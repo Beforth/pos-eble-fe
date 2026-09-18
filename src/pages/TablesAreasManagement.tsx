@@ -13,6 +13,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
+import { SortableTh } from '../components/common/SortableTh'
+import { useListQuery } from '../hooks/useListQuery'
 import {
   ActionDropdown,
   OutlineButton,
@@ -68,8 +70,50 @@ export default function TablesAreasManagement() {
     return areas.filter((row) => row.name.toLowerCase().includes(q))
   }, [appliedAreaName, areas])
 
+  const {
+    sortKey: tableSortKey,
+    sortDir: tableSortDir,
+    toggleSort: toggleTableSort,
+    visible: visibleTables,
+  } = useListQuery(
+    filtered,
+    (row) => [
+      row.tableNo,
+      row.persons,
+      row.extraInfo,
+      row.areaName,
+      row.statusOn ? 'Active' : 'Inactive',
+      row.discountPercent,
+    ],
+    (row, key) => {
+      if (key === 'persons') return row.persons
+      if (key === 'extraInfo') return row.extraInfo
+      if (key === 'areaName') return row.areaName
+      if (key === 'status') return row.statusOn ? 'Active' : 'Inactive'
+      if (key === 'discountPercent') return row.discountPercent
+      return row.tableNo
+    },
+  )
+
+  const {
+    sortKey: areaSortKey,
+    sortDir: areaSortDir,
+    toggleSort: toggleAreaSort,
+    visible: visibleAreas,
+  } = useListQuery(
+    filteredAreas,
+    (row) => [row.name, row.tables, row.status, row.created, row.discountPercent],
+    (row, key) => {
+      if (key === 'tables') return row.tables
+      if (key === 'status') return row.status
+      if (key === 'created') return row.created
+      if (key === 'discountPercent') return row.discountPercent
+      return row.name
+    },
+  )
+
   const allSelected =
-    filtered.length > 0 && filtered.every((row) => selected.has(row.id))
+    visibleTables.length > 0 && visibleTables.every((row) => selected.has(row.id))
 
   function requireSelection(action: () => void) {
     if (selected.size === 0) {
@@ -340,23 +384,71 @@ export default function TablesAreasManagement() {
                         setSelected(
                           allSelected
                             ? new Set()
-                            : new Set(filtered.map((r) => r.id)),
+                            : new Set(visibleTables.map((r) => r.id)),
                         )
                       }
                       className="cursor-pointer accent-primary"
                     />
                   </th>
-                  <th className="px-3 py-3">Table No</th>
-                  <th className="px-3 py-3">No. Of Persons</th>
-                  <th className="px-3 py-3">Extra Information</th>
-                  <th className="px-3 py-3">Area Name</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Discount (%)</th>
+                  <SortableTh
+                    columnKey="tableNo"
+                    sortKey={tableSortKey}
+                    sortDir={tableSortDir}
+                    onSort={toggleTableSort}
+                    className="px-3 py-3"
+                  >
+                    Table No
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="persons"
+                    sortKey={tableSortKey}
+                    sortDir={tableSortDir}
+                    onSort={toggleTableSort}
+                    className="px-3 py-3"
+                  >
+                    No. Of Persons
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="extraInfo"
+                    sortKey={tableSortKey}
+                    sortDir={tableSortDir}
+                    onSort={toggleTableSort}
+                    className="px-3 py-3"
+                  >
+                    Extra Information
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="areaName"
+                    sortKey={tableSortKey}
+                    sortDir={tableSortDir}
+                    onSort={toggleTableSort}
+                    className="px-3 py-3"
+                  >
+                    Area Name
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="status"
+                    sortKey={tableSortKey}
+                    sortDir={tableSortDir}
+                    onSort={toggleTableSort}
+                    className="px-3 py-3"
+                  >
+                    Status
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="discountPercent"
+                    sortKey={tableSortKey}
+                    sortDir={tableSortDir}
+                    onSort={toggleTableSort}
+                    className="px-3 py-3"
+                  >
+                    Discount (%)
+                  </SortableTh>
                   <th className="px-3 py-3">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
+                {visibleTables.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-b-0 hover:bg-page/80"
@@ -448,7 +540,7 @@ export default function TablesAreasManagement() {
             </table>
           </div>
           <p className="mt-3 text-sm text-muted">
-            Showing 1 to {filtered.length} of {filtered.length} records
+            Showing 1 to {visibleTables.length} of {visibleTables.length} records
           </p>
         </>
       ) : (
@@ -457,16 +549,56 @@ export default function TablesAreasManagement() {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-line bg-page text-sm font-semibold text-ink">
                 <tr>
-                  <th className="px-3 py-3">Area Name</th>
-                  <th className="px-3 py-3">Tables</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Created Date</th>
-                  <th className="px-3 py-3">Discount (%)</th>
+                  <SortableTh
+                    columnKey="name"
+                    sortKey={areaSortKey}
+                    sortDir={areaSortDir}
+                    onSort={toggleAreaSort}
+                    className="px-3 py-3"
+                  >
+                    Area Name
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="tables"
+                    sortKey={areaSortKey}
+                    sortDir={areaSortDir}
+                    onSort={toggleAreaSort}
+                    className="px-3 py-3"
+                  >
+                    Tables
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="status"
+                    sortKey={areaSortKey}
+                    sortDir={areaSortDir}
+                    onSort={toggleAreaSort}
+                    className="px-3 py-3"
+                  >
+                    Status
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="created"
+                    sortKey={areaSortKey}
+                    sortDir={areaSortDir}
+                    onSort={toggleAreaSort}
+                    className="px-3 py-3"
+                  >
+                    Created Date
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="discountPercent"
+                    sortKey={areaSortKey}
+                    sortDir={areaSortDir}
+                    onSort={toggleAreaSort}
+                    className="px-3 py-3"
+                  >
+                    Discount (%)
+                  </SortableTh>
                   <th className="px-3 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredAreas.map((row) => (
+                {visibleAreas.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-b-0 hover:bg-page/80"
@@ -544,7 +676,7 @@ export default function TablesAreasManagement() {
             </table>
           </div>
           <p className="mt-3 text-sm text-muted">
-            Showing 1 to {filteredAreas.length} of {filteredAreas.length}{' '}
+            Showing 1 to {visibleAreas.length} of {visibleAreas.length}{' '}
             records
           </p>
         </>

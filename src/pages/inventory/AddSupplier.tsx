@@ -1,7 +1,7 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronDown,
   ClipboardList,
@@ -16,6 +16,14 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_SUPPLIER_WRITE_PERMISSION,
+  createSupplierApi,
+  getSupplierApi,
+  updateSupplierApi,
+} from '../../services/inventoryService'
 
 const GST_OPTIONS = ['Yes', 'No']
 
@@ -175,6 +183,10 @@ function TextInput({
 
 export default function AddSupplier() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  const { hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_SUPPLIER_WRITE_PERMISSION)
+  const isEdit = Boolean(id)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [name, setName] = useState('')
@@ -207,12 +219,52 @@ export default function AddSupplier() {
   const [deliveryTerms, setDeliveryTerms] = useState('')
 
   const [errors, setErrors] = useState<{ name?: string; company?: string }>({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!id) return
+    getSupplierApi(id)
+      .then((row) => {
+        setName(row.name)
+        setCompany(row.company)
+        setEmail(row.email)
+        setPhone(row.phone)
+        setRegisteredUnderGst(row.registered_under_gst ? 'Yes' : 'No')
+        setGstNo(row.gst_no)
+        setRegisterAddress(row.register_address)
+        setState(row.state || 'Maharashtra')
+        setCity(row.city || 'Bhiwandi')
+        setPinCode(row.pin_code)
+        setShippingAddress(row.shipping_address)
+        setShippingState(row.shipping_state || 'Maharashtra')
+        setShippingCity(row.shipping_city || 'Bhiwandi')
+        setShippingPinCode(row.shipping_pin_code)
+        setFssai(row.fssai_lic_no)
+        setPan(row.pan)
+        setMsme(row.msme_number)
+        setTan(row.tan)
+        setCin(row.cin)
+        setTcs(row.tcs_percent)
+        const typeLabel = TYPE_OPTIONS.find(
+          (option) => option.toLowerCase() === row.type,
+        )
+        setType(typeLabel ?? 'Both')
+        setPaymentTerms(row.payment_terms)
+        setDeliveryTerms(row.delivery_terms)
+      })
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load supplier',
+        )
+      })
+  }, [id])
 
   const cities = CITY_OPTIONS[state] ?? ['Other']
   const shippingCities = CITY_OPTIONS[shippingState] ?? ['Other']
 
 
-  function handleSave() {
+  async function handleSave() {
+    if (!canWrite) return
     const nextErrors: { name?: string; company?: string } = {}
     if (!name.trim()) nextErrors.name = 'Name is required'
     if (!company.trim()) nextErrors.company = 'Company is required'
@@ -221,15 +273,53 @@ export default function AddSupplier() {
       showToast('Please fill required fields')
       return
     }
-    showToast('Supplier saved')
-    window.setTimeout(() => navigate('/inventory/suppliers'), 600)
+    setSaving(true)
+    const payload = {
+      name: name.trim(),
+      company: company.trim(),
+      email,
+      phone,
+      registered_under_gst: registeredUnderGst === 'Yes',
+      gst_no: gstNo,
+      register_address: registerAddress,
+      state,
+      city,
+      pin_code: pinCode,
+      shipping_address: shippingAddress,
+      shipping_state: shippingState,
+      shipping_city: shippingCity,
+      shipping_pin_code: shippingPinCode,
+      fssai_lic_no: fssai,
+      pan,
+      msme_number: msme,
+      tan,
+      cin,
+      tcs_percent: tcs || '0',
+      type: type.toLowerCase(),
+      payment_terms: paymentTerms,
+      delivery_terms: deliveryTerms,
+    }
+    try {
+      if (isEdit && id) await updateSupplierApi(id, payload)
+      else await createSupplierApi(payload)
+      showToast(isEdit ? 'Supplier updated' : 'Supplier saved')
+      navigate('/inventory/suppliers')
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : 'Unable to save supplier',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <InventoryPageShell activeItem="suppliers-third-party">
+    <InventoryPageShell activeItem="suppliers">
 
       <div className="mb-4">
-        <h1 className="text-lg font-bold text-ink">Add Supplier/Third Party</h1>
+        <h1 className="text-lg font-bold text-ink">
+          {isEdit ? 'Edit Supplier/Third Party' : 'Add Supplier/Third Party'}
+        </h1>
       </div>
 
       <SectionCard icon={<ClipboardList size={16} />} title="Basic Details">
@@ -481,7 +571,11 @@ export default function AddSupplier() {
         >
           Cancel
         </OutlineButton>
-        <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+        {canWrite ? (
+          <PrimaryButton onClick={() => void handleSave()}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
+        ) : null}
       </div>
     </InventoryPageShell>
   )

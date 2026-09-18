@@ -4,6 +4,9 @@ import { showToast } from '../../utils/toast'
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
 
 interface DeliveryDistanceRow {
@@ -18,6 +21,16 @@ export default function DeliveryDistance() {
   const [rows, setRows] = useState<DeliveryDistanceRow[]>([])
 
   const hasRows = useMemo(() => rows.length > 0, [rows])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      rows,
+      (row) => [row.fromKm, row.toKm, row.charge],
+      (row, key) => {
+        if (key === 'toKm') return Number(row.toKm) || row.toKm
+        if (key === 'charge') return Number(row.charge) || row.charge
+        return Number(row.fromKm) || row.fromKm
+      },
+    )
 
 
   function handleDelete(id: string) {
@@ -53,18 +66,49 @@ export default function DeliveryDistance() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-line bg-card">
+          <div className="border-b border-line p-4">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search distances"
+            />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
                 <tr>
-                  <th className="px-4 py-3">From</th>
-                  <th className="px-4 py-3">To</th>
-                  <th className="px-4 py-3">Price</th>
+                  <SortableTh
+                    columnKey="fromKm"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    From
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="toKm"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    To
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="charge"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Price
+                  </SortableTh>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {visible.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-0 hover:bg-page/50"

@@ -1,16 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import {
-  Plus,
-  RotateCcw,
-  Search,
-  Star,
-  X,
-} from 'lucide-react'
+import { Plus, RotateCcw, Search, Star, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { HistoryMenu } from '../../components/inventory/HistoryMenu'
 import { ImportStockExcel } from '../../components/inventory/ImportStockExcel'
+import { StockStepGuideModal } from '../../components/inventory/StockStepGuideModal'
 import {
   StockUpdateCycleSelect,
   type StockUpdateCycle,
@@ -19,6 +14,16 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  getInventorySettingsApi,
+  listAllRawMaterialsApi,
+  updateInventorySettingsApi,
+  type RawMaterial,
+} from '../../services/inventoryService'
+import { downloadCsv } from '../../utils/downloadFile'
 
 interface StockRow {
   id: string
@@ -28,73 +33,125 @@ interface StockRow {
   favourite?: boolean
 }
 
-const CATEGORIES = [
-  'All categories',
-  'No category',
-  'Bread/dairy',
-  'Fruits/vegetables',
-  'Grocery',
-  'Oils & spices',
-  'Packaging',
-  'Snacks',
-]
-
-const RAW_MATERIALS: StockRow[] = [
-  {
-    id: '1',
-    name: 'Bhel Mixture',
-    unit: 'carton',
-    category: 'Snacks',
-    favourite: true,
-  },
-  { id: '2', name: 'Bhel Mixture', unit: 'BOX', category: 'Snacks' },
-  { id: '3', name: 'Bhel Mixture', unit: 'pkt', category: 'Snacks' },
-  { id: '4', name: 'Bhel Mixture', unit: 'Bag', category: 'Snacks' },
-  { id: '5', name: 'Bhel Mixture', unit: 'Kg', category: 'Snacks' },
-  { id: '6', name: 'Bhujia Namkeen', unit: 'carton', category: 'Snacks' },
-  { id: '7', name: 'Bhujia Namkeen', unit: 'BOX', category: 'Snacks' },
-  { id: '8', name: 'Bhujia Namkeen', unit: 'pkt', category: 'Snacks' },
-  { id: '9', name: 'Bhujia Namkeen', unit: 'Bag', category: 'Snacks' },
-  {
-    id: '10',
-    name: 'Bhujia Namkeen',
-    unit: 'Kg',
-    category: 'Snacks',
-    favourite: true,
-  },
-  { id: '11', name: 'Milk', unit: 'Ltr', category: 'Bread/dairy' },
-  { id: '12', name: 'Butter', unit: 'Kg', category: 'Bread/dairy' },
-  { id: '13', name: 'Tomato', unit: 'Kg', category: 'Fruits/vegetables' },
-  { id: '14', name: 'Onion', unit: 'Kg', category: 'Fruits/vegetables' },
-  { id: '15', name: 'Flour', unit: 'Kg', category: 'Grocery' },
-]
-
 type TabId = 'add' | 'import'
 
+function draftKey(outletId: string, kind: string) {
+  return `rajubhai.inv.${kind}.${outletId}`
+}
+
 export default function AvailableStock() {
+  const { encryptedOutletId } = useAuth()
+  const { categories, loadMasters } = useInventoryMasters()
   const [tab, setTab] = useState<TabId>('add')
-  const [stockDate, setStockDate] = useState('2026-08-11')
+  const [stockDate, setStockDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [query, setQuery] = useState('')
   const [cycle, setCycle] = useState<StockUpdateCycle>('daily')
   const [category, setCategory] = useState('All categories')
   const [favouritesOnly, setFavouritesOnly] = useState(false)
   const [enteredTodayOnly, setEnteredTodayOnly] = useState(false)
   const [stockValues, setStockValues] = useState<Record<string, string>>({})
+  const [materials, setMaterials] = useState<RawMaterial[]>([])
+  const [loading, setLoading] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
+
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    getInventorySettingsApi(encryptedOutletId)
+      .then((settings) => {
+        const value = settings.stock_update_cycle
+        if (
+          value === 'all' ||
+          value === 'daily' ||
+          value === 'weekly' ||
+          value === 'bi-weekly' ||
+          value === 'monthly' ||
+          value === 'yearly'
+        ) {
+          setCycle(value)
+        }
+      })
+      .catch(() => undefined)
+  }, [encryptedOutletId])
+
+  const loadMaterials = useCallback(async () => {
+    if (!encryptedOutletId) return
+    setLoading(true)
+    try {
+      const rows = await listAllRawMaterialsApi(encryptedOutletId)
+      setMaterials(rows)
+      const raw = localStorage.getItem(
+        draftKey(encryptedOutletId, 'availableStock'),
+      )
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          date?: string
+          values?: Record<string, string>
+        }
+        if (parsed.date) setStockDate(parsed.date)
+        if (parsed.values) setStockValues(parsed.values)
+      }
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load raw materials',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    void loadMaterials()
+  }, [loadMaterials])
+
+  const categoryOptions = useMemo(
+    () => [
+      'All categories',
+      'No category',
+      ...categories.map((row) => row.name),
+    ],
+    [categories],
+  )
+
+  const rows: StockRow[] = useMemo(
+    () =>
+      materials.map((row) => ({
+        id: row.id,
+        name: row.name,
+        unit: row.consumption_unit?.name ?? '',
+        category: row.category?.name || 'No category',
+        favourite: row.is_favourite,
+      })),
+    [materials],
+  )
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return RAW_MATERIALS.filter((row) => {
+    return rows.filter((row) => {
       if (category !== 'All categories' && row.category !== category) return false
       if (favouritesOnly && !row.favourite) return false
       if (enteredTodayOnly && !stockValues[row.id]?.trim()) return false
       if (!q) return true
       return (
         row.name.toLowerCase().includes(q) ||
-        row.unit.toLowerCase().includes(q) ||
-        row.id.includes(q)
+        row.unit.toLowerCase().includes(q)
       )
     })
-  }, [query, category, favouritesOnly, enteredTodayOnly, stockValues])
+  }, [rows, query, category, favouritesOnly, enteredTodayOnly, stockValues])
+
+  const enteredRows = useMemo(
+    () =>
+      rows.filter((row) => (stockValues[row.id] || '').trim().length > 0),
+    [rows, stockValues],
+  )
 
   function setValue(id: string, value: string) {
     setStockValues((prev) => ({ ...prev, [id]: value }))
@@ -117,10 +174,49 @@ export default function AvailableStock() {
     setValue(id, String(Number.isFinite(current) ? current + 1 : 1))
   }
 
+  function exportDraft() {
+    downloadCsv(
+      ['raw_material', 'unit', 'category', 'qty', 'stock_date', 'cycle'],
+      enteredRows.map((row) => [
+        row.name,
+        row.unit,
+        row.category,
+        stockValues[row.id] ?? '',
+        stockDate,
+        cycle,
+      ]),
+      `available-stock-${stockDate}.csv`,
+    )
+    showToast('Available stock PDF exported')
+  }
+
+  async function persistCycle(next: StockUpdateCycle) {
+    setCycle(next)
+    if (!encryptedOutletId) return
+    try {
+      await updateInventorySettingsApi(encryptedOutletId, {
+        stock_update_cycle: next,
+      })
+    } catch {
+      /* keep local cycle even if settings PATCH fails */
+    }
+  }
+
+  function quickSave() {
+    if (!encryptedOutletId) return
+    localStorage.setItem(
+      draftKey(encryptedOutletId, 'availableStock'),
+      JSON.stringify({ date: stockDate, values: stockValues, cycle }),
+    )
+    showToast(
+      enteredRows.length
+        ? `Quick save completed (${enteredRows.length} entries)`
+        : 'Quick save completed (empty draft)',
+    )
+  }
 
   return (
     <InventoryPageShell activeItem="available-stock">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Available Stock</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -131,8 +227,8 @@ export default function AvailableStock() {
             className="h-9 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
           />
           <HistoryMenu
-            exportLabel="Available stock PDF"
-            onExport={() => showToast('Available stock PDF exported')}
+            exportLabel="Available stock CSV"
+            onExport={exportDraft}
           />
           <OutlineButton
             variant="gray"
@@ -143,6 +239,9 @@ export default function AvailableStock() {
           >
             <X size={15} />
             Reset
+          </OutlineButton>
+          <OutlineButton variant="gray" onClick={() => setGuideOpen(true)}>
+            Step-By-Step Guide
           </OutlineButton>
         </div>
       </div>
@@ -186,11 +285,11 @@ export default function AvailableStock() {
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search raw material or barcode"
+                placeholder="Search raw material"
                 className="h-9 w-full rounded-md border border-line bg-card pl-9 pr-3 text-sm outline-none focus:border-primary"
               />
             </label>
-            <StockUpdateCycleSelect value={cycle} onChange={setCycle} />
+            <StockUpdateCycleSelect value={cycle} onChange={persistCycle} />
             <button
               type="button"
               onClick={() => setFavouritesOnly((prev) => !prev)}
@@ -222,7 +321,7 @@ export default function AvailableStock() {
                 Categories
               </p>
               <ul className="max-h-[520px] overflow-y-auto py-1">
-                {CATEGORIES.map((item) => {
+                {categoryOptions.map((item) => {
                   const active = category === item
                   return (
                     <li key={item}>
@@ -250,7 +349,11 @@ export default function AvailableStock() {
                 <span className="text-right">Action</span>
               </div>
               <ul className="max-h-[520px] divide-y divide-line overflow-y-auto">
-                {filteredRows.length === 0 ? (
+                {loading ? (
+                  <li className="px-4 py-12 text-center text-sm text-muted">
+                    Loading…
+                  </li>
+                ) : filteredRows.length === 0 ? (
                   <li className="px-4 py-12 text-center text-sm text-muted">
                     No raw materials found
                   </li>
@@ -312,17 +415,46 @@ export default function AvailableStock() {
             >
               Clear All Entries
             </button>
-            <OutlineButton
-              onClick={() => showToast('Quick save completed')}
-            >
-              Quick Save
-            </OutlineButton>
-            <PrimaryButton onClick={() => showToast('Review stock entries')}>
+            <OutlineButton onClick={quickSave}>Quick Save</OutlineButton>
+            <PrimaryButton onClick={() => setReviewOpen(true)}>
               Review →
             </PrimaryButton>
           </div>
         </>
       )}
+
+      <StockStepGuideModal
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        title="Available stock guide"
+      />
+
+      <StockStepGuideModal
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        title="Review stock entries"
+        steps={[
+          {
+            title: `${enteredRows.length} entries ready`,
+            body: enteredRows.length
+              ? enteredRows
+                  .slice(0, 8)
+                  .map(
+                    (row) =>
+                      `${row.name}: ${stockValues[row.id]} ${row.unit}`,
+                  )
+                  .join(' · ') +
+                (enteredRows.length > 8
+                  ? ` · +${enteredRows.length - 8} more`
+                  : '')
+              : 'No quantities entered yet. Fill New Stock values, then Review again.',
+          },
+          {
+            title: 'Date & cycle',
+            body: `Stock date ${stockDate}, update cycle “${cycle}”. Use Quick Save to keep a local draft until the stock-entry API is connected.`,
+          },
+        ]}
+      />
     </InventoryPageShell>
   )
 }

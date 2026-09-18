@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
-import { ArrowDown, Eye, Info, List, Pencil, PencilLine } from 'lucide-react'
+import { Eye, Info, List, Pencil, PencilLine } from 'lucide-react'
 import type { KotRow, KotStatus } from '../../mocks/kotData'
+import { SortableTh } from '../common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 
 interface KotTableProps {
   rows: KotRow[]
@@ -38,31 +40,135 @@ function ActionButton({
 }
 
 export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    rows,
+    (row) => [
+      row.kotId,
+      row.orderType,
+      row.customerName,
+      row.customerPhone,
+      row.itemCount,
+      row.items,
+      row.status,
+      row.billPrintDate,
+      row.completeDuration,
+      row.created,
+    ],
+    (row, key) => {
+      if (key === 'orderType') return row.orderType
+      if (key === 'customerName') return row.customerName
+      if (key === 'customerPhone') return row.customerPhone
+      if (key === 'itemCount') return row.itemCount
+      if (key === 'items') return row.items
+      if (key === 'status') return row.status
+      if (key === 'billPrintDate') return row.billPrintDate
+      if (key === 'completeDuration') return row.completeDuration
+      if (key === 'created') return row.created
+      return row.kotId
+    },
+  )
+
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
       <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-line bg-page/80 text-[11px] font-semibold uppercase tracking-wide text-muted">
-            <th className="px-3 py-2.5">KOT ID</th>
-            <th className="px-3 py-2.5">Order Type</th>
-            <th className="px-3 py-2.5">Customer Name</th>
-            <th className="px-3 py-2.5">Customer Phone</th>
-            <th className="px-3 py-2.5 text-center">No. Of Items</th>
-            <th className="px-3 py-2.5">Items</th>
-            <th className="px-3 py-2.5">Status</th>
-            <th className="px-3 py-2.5">Bill Print Date</th>
-            <th className="px-3 py-2.5">Complete Duration</th>
-            <th className="px-3 py-2.5">
-              <span className="inline-flex items-center gap-1">
-                Created
-                <ArrowDown size={12} className="text-primary" />
-              </span>
-            </th>
+            <SortableTh
+              columnKey="kotId"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              KOT ID
+            </SortableTh>
+            <SortableTh
+              columnKey="orderType"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              Order Type
+            </SortableTh>
+            <SortableTh
+              columnKey="customerName"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              Customer Name
+            </SortableTh>
+            <SortableTh
+              columnKey="customerPhone"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              Customer Phone
+            </SortableTh>
+            <SortableTh
+              columnKey="itemCount"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              align="center"
+              className="px-3 py-2.5"
+            >
+              No. Of Items
+            </SortableTh>
+            <SortableTh
+              columnKey="items"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              Items
+            </SortableTh>
+            <SortableTh
+              columnKey="status"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              Status
+            </SortableTh>
+            <SortableTh
+              columnKey="billPrintDate"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              Bill Print Date
+            </SortableTh>
+            <SortableTh
+              columnKey="completeDuration"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              Complete Duration
+            </SortableTh>
+            <SortableTh
+              columnKey="created"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+              className="px-3 py-2.5"
+            >
+              Created
+            </SortableTh>
             <th className="px-3 py-2.5">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {visible.map((row) => (
             <tr
               key={row.id}
               className="border-b border-line last:border-0 hover:bg-page/40"

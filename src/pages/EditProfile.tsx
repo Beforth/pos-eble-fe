@@ -11,14 +11,25 @@ import { PageContainer } from '../components/layout/PageContainer'
 import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
+import { ApiError } from '../services/apiClient'
+import {
+  CHANGE_OWN_PASSWORD_PERMISSION,
+  EDIT_OWN_PROFILE_PERMISSION,
+  changePasswordApi,
+  fetchMeApi,
+  updateProfileApi,
+  type AuthUser,
+} from '../services/authService'
 import { brand } from '../theme/brand'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PHONE_RE = /^[6-9]\d{9}$/
 const MAX_PHOTO_BYTES = 500 * 1024
+const MIN_PASSWORD_LENGTH = 8
 
 interface FieldErrors {
-  name?: string
+  firstName?: string
+  lastName?: string
   email?: string
   phone?: string
   currentPassword?: string
@@ -26,19 +37,34 @@ interface FieldErrors {
   confirmPassword?: string
 }
 
+function firstFieldError(errors: unknown, key: string): string | undefined {
+  if (!errors || typeof errors !== 'object') return undefined
+  const value = (errors as Record<string, unknown>)[key]
+  if (Array.isArray(value)) {
+    const parts = value.filter((item): item is string => typeof item === 'string')
+    return parts.length ? parts.join(' ') : undefined
+  }
+  if (typeof value === 'string') return value
+  return undefined
+}
+
 export default function EditProfile() {
   const navigate = useNavigate()
-  const { user, updateProfile } = useAuth()
+  const { user, updateProfile, hasPermission } = useAuth()
+  const canEdit = hasPermission(EDIT_OWN_PROFILE_PERMISSION)
+  const canChangePassword = hasPermission(CHANGE_OWN_PASSWORD_PERMISSION)
 
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
 
-  const [name, setName] = useState(user?.name ?? '')
-  const [email, setEmail] = useState(user?.identifier ?? '')
+  const [firstName, setFirstName] = useState(user?.firstName ?? '')
+  const [lastName, setLastName] = useState(user?.lastName ?? '')
+  const [email, setEmail] = useState(user?.email ?? '')
   const [phone, setPhone] = useState(user?.phone ?? '')
   const [photoUrl, setPhotoUrl] = useState(user?.photoUrl ?? '')
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -46,10 +72,22 @@ export default function EditProfile() {
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
-  const [saving, setSaving] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [loadingProfile, setLoadingProfile] = useState(true)
 
   const fileRef = useRef<HTMLInputElement>(null)
   const objectUrlRef = useRef<string | null>(null)
+
+  function applyUserToForm(next: AuthUser) {
+    setFirstName(next.firstName ?? '')
+    setLastName(next.lastName ?? '')
+    setEmail(next.email ?? '')
+    setPhone(next.phone ?? '')
+    setPhotoUrl(next.photoUrl ?? '')
+    setPhotoFile(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
 
   useEffect(() => {
     return () => {
@@ -57,6 +95,31 @@ export default function EditProfile() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        const next = await fetchMeApi()
+        if (cancelled) return
+        updateProfile(next)
+        applyUserToForm(next)
+      } catch (err) {
+        if (!cancelled && err instanceof ApiError) {
+          showToast(err.message)
+        } else if (!cancelled) {
+          showToast('Unable to load profile')
+        }
+      } finally {
+        if (!cancelled) setLoadingProfile(false)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [updateProfile])
 
   function closeOtherDrawers() {
     setSupportOpen(false)
@@ -64,7 +127,7 @@ export default function EditProfile() {
   }
 
   function handlePhotoChange(file: File | null) {
-    if (!file) return
+    if (!file || !canEdit) return
     if (!/\.(png|jpe?g)$/i.test(file.name) && !file.type.startsWith('image/')) {
       showToast('Please upload a JPEG or PNG image')
       if (fileRef.current) fileRef.current.value = ''
@@ -79,11 +142,14 @@ export default function EditProfile() {
     const url = URL.createObjectURL(file)
     objectUrlRef.current = url
     setPhotoUrl(url)
+    setPhotoFile(file)
   }
 
-  function validate(): boolean {
+  function validateProfile(): boolean {
     const next: FieldErrors = {}
-    if (!name.trim()) next.name = 'Name is required'
+    if (!firstName.trim() && !lastName.trim()) {
+      next.firstName = 'First name or last name is required'
+    }
     if (!email.trim()) next.email = 'Email is required'
     else if (!EMAIL_RE.test(email.trim())) next.email = 'Enter a valid email'
 
@@ -91,44 +157,122 @@ export default function EditProfile() {
       next.phone = 'Enter a valid 10-digit mobile number'
     }
 
-    const changingPassword =
-      Boolean(currentPassword) || Boolean(newPassword) || Boolean(confirmPassword)
-
-    if (changingPassword) {
-      if (!currentPassword) next.currentPassword = 'Current password is required'
-      if (!newPassword) next.newPassword = 'New password is required'
-      else if (newPassword.length < 4) {
-        next.newPassword = 'Password must be at least 4 characters'
-      }
-      if (!confirmPassword) next.confirmPassword = 'Confirm the new password'
-      else if (newPassword && confirmPassword !== newPassword) {
-        next.confirmPassword = 'Passwords do not match'
-      }
-    }
-
-    setErrors(next)
+    setErrors((prev) => ({
+      ...prev,
+      firstName: next.firstName,
+      lastName: next.lastName,
+      email: next.email,
+      phone: next.phone,
+    }))
     return Object.keys(next).length === 0
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function validatePassword(): boolean {
+    const next: FieldErrors = {}
+    if (!currentPassword) next.currentPassword = 'Current password is required'
+    if (!newPassword) next.newPassword = 'New password is required'
+    else if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      next.newPassword = `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
+    }
+    if (!confirmPassword) next.confirmPassword = 'Confirm the new password'
+    else if (newPassword && confirmPassword !== newPassword) {
+      next.confirmPassword = 'Passwords do not match'
+    }
+
+    setErrors((prev) => ({
+      ...prev,
+      currentPassword: next.currentPassword,
+      newPassword: next.newPassword,
+      confirmPassword: next.confirmPassword,
+    }))
+    return Object.keys(next).length === 0
+  }
+
+  async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!validate()) {
+    if (!canEdit) {
+      showToast('You do not have permission to edit your profile')
+      return
+    }
+    if (!validateProfile()) {
       showToast('Please fix the highlighted fields')
       return
     }
 
-    setSaving(true)
-    updateProfile({
-      name: name.trim(),
-      identifier: email.trim(),
-      phone: phone.trim() || undefined,
-      photoUrl: photoUrl || undefined,
-    })
-    setCurrentPassword('')
-    setNewPassword('')
-    setConfirmPassword('')
-    setSaving(false)
-    showToast('Profile updated')
+    setSavingProfile(true)
+    try {
+      const next = await updateProfileApi({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        photo: photoFile,
+      })
+      updateProfile(next)
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+        objectUrlRef.current = null
+      }
+      applyUserToForm(next)
+      showToast('Profile updated')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setErrors((prev) => ({
+          ...prev,
+          firstName: firstFieldError(err.errors, 'first_name') ?? prev.firstName,
+          lastName: firstFieldError(err.errors, 'last_name') ?? prev.lastName,
+          email: firstFieldError(err.errors, 'email') ?? prev.email,
+          phone: firstFieldError(err.errors, 'phone') ?? prev.phone,
+        }))
+        showToast(err.message)
+      } else {
+        showToast('Unable to update profile')
+      }
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!canChangePassword) {
+      showToast('You do not have permission to change your password')
+      return
+    }
+    if (!validatePassword()) {
+      showToast('Please fix the highlighted fields')
+      return
+    }
+
+    setSavingPassword(true)
+    try {
+      await changePasswordApi(currentPassword, newPassword)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setErrors((prev) => ({
+        ...prev,
+        currentPassword: undefined,
+        newPassword: undefined,
+        confirmPassword: undefined,
+      }))
+      showToast('Password changed')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setErrors((prev) => ({
+          ...prev,
+          currentPassword:
+            firstFieldError(err.errors, 'current_password') ?? prev.currentPassword,
+          newPassword:
+            firstFieldError(err.errors, 'new_password') ?? prev.newPassword,
+        }))
+        showToast(err.message)
+      } else {
+        showToast('Unable to change password')
+      }
+    } finally {
+      setSavingPassword(false)
+    }
   }
 
   return (
@@ -173,37 +317,50 @@ export default function EditProfile() {
               <Button variant="outline" onClick={() => navigate('/dashboard')}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                form="edit-profile-form"
-                loading={saving}
-              >
-                Save
-              </Button>
+              {canEdit ? (
+                <Button
+                  type="submit"
+                  form="edit-profile-form"
+                  loading={savingProfile}
+                  disabled={loadingProfile}
+                >
+                  Save
+                </Button>
+              ) : null}
             </div>
           }
         >
-
           <form
             id="edit-profile-form"
-            onSubmit={handleSubmit}
+            onSubmit={handleProfileSubmit}
             noValidate
             className="w-full space-y-4"
           >
             <section className="rounded-xl border border-line bg-card p-4 sm:p-6">
-              <h2 className="text-sm font-semibold text-deep">Basic details</h2>
+              <h2 className="text-sm font-semibold text-deep">Personal info</h2>
               <p className="mt-0.5 text-xs text-muted">
-                Update how this account appears across the POS.
+                {canEdit
+                  ? 'Update how this account appears across the POS.'
+                  : 'You can view your profile. Editing requires the Edit Profile permission.'}
               </p>
 
               <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-start">
                 <div className="shrink-0">
                   <p className="mb-2 text-sm font-medium text-ink">Photo</p>
-                  <label className="flex size-28 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-line bg-page text-center hover:border-primary/40">
+                  <label
+                    className={`flex size-28 flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-line bg-page text-center ${
+                      canEdit
+                        ? 'cursor-pointer hover:border-primary/40'
+                        : 'cursor-not-allowed opacity-80'
+                    }`}
+                  >
                     {photoUrl ? (
                       <img
                         src={photoUrl}
-                        alt={name || 'Profile'}
+                        alt={
+                          [firstName, lastName].filter(Boolean).join(' ') ||
+                          'Profile'
+                        }
                         className="size-full object-cover"
                       />
                     ) : (
@@ -217,6 +374,7 @@ export default function EditProfile() {
                       type="file"
                       accept="image/png,image/jpeg"
                       className="sr-only"
+                      disabled={!canEdit}
                       onChange={(event) =>
                         handlePhotoChange(event.target.files?.[0] ?? null)
                       }
@@ -229,11 +387,18 @@ export default function EditProfile() {
 
                 <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <Input
-                    label="Name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    error={errors.name}
-                    required
+                    label="First name"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    error={errors.firstName}
+                    disabled={!canEdit || loadingProfile}
+                  />
+                  <Input
+                    label="Last name"
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    error={errors.lastName}
+                    disabled={!canEdit || loadingProfile}
                   />
                   <Input
                     label="Email"
@@ -242,9 +407,10 @@ export default function EditProfile() {
                     onChange={(event) => setEmail(event.target.value)}
                     error={errors.email}
                     required
+                    disabled={!canEdit || loadingProfile}
                   />
                   <Input
-                    label="Mobile"
+                    label="Phone"
                     type="tel"
                     inputMode="numeric"
                     maxLength={10}
@@ -254,6 +420,7 @@ export default function EditProfile() {
                     }
                     error={errors.phone}
                     hint="10-digit Indian mobile number"
+                    disabled={!canEdit || loadingProfile}
                   />
                   <Input
                     label="Username"
@@ -261,7 +428,7 @@ export default function EditProfile() {
                     readOnly
                     disabled
                   />
-                  <div className="sm:col-span-2 xl:col-span-4">
+                  <div className="sm:col-span-2 xl:col-span-3">
                     <Input
                       label="Outlet"
                       value={user?.outlet ?? brand.outletName}
@@ -272,12 +439,61 @@ export default function EditProfile() {
                 </div>
               </div>
             </section>
+          </form>
 
+          <section className="mt-4 rounded-xl border border-line bg-card p-4 sm:p-6">
+            <h2 className="text-sm font-semibold text-deep">POS profile</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              These details are set by an administrator and cannot be edited here.
+            </p>
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <Input
+                label="User code"
+                value={user?.userCode ?? ''}
+                readOnly
+                disabled
+              />
+              <Input
+                label="Role"
+                value={user?.role?.name ?? ''}
+                readOnly
+                disabled
+              />
+              <Input
+                label="Last login IP"
+                value={user?.lastLoginIp ?? ''}
+                readOnly
+                disabled
+              />
+            </div>
+          </section>
+
+          <form
+            id="change-password-form"
+            onSubmit={handlePasswordSubmit}
+            noValidate
+            className="mt-4 w-full"
+          >
             <section className="rounded-xl border border-line bg-card p-4 sm:p-6">
-              <h2 className="text-sm font-semibold text-deep">Change password</h2>
-              <p className="mt-0.5 text-xs text-muted">
-                Leave blank to keep the current password.
-              </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-deep">Change password</h2>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {canChangePassword
+                      ? 'Leave blank to keep the current password.'
+                      : 'Changing password requires the Change Password permission.'}
+                  </p>
+                </div>
+                {canChangePassword ? (
+                  <Button
+                    type="submit"
+                    loading={savingPassword}
+                    disabled={loadingProfile}
+                  >
+                    Update password
+                  </Button>
+                ) : null}
+              </div>
 
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <Input
@@ -287,6 +503,7 @@ export default function EditProfile() {
                   value={currentPassword}
                   onChange={(event) => setCurrentPassword(event.target.value)}
                   error={errors.currentPassword}
+                  disabled={!canChangePassword}
                   rightSlot={
                     <button
                       type="button"
@@ -305,6 +522,8 @@ export default function EditProfile() {
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
                   error={errors.newPassword}
+                  hint={`At least ${MIN_PASSWORD_LENGTH} characters`}
+                  disabled={!canChangePassword}
                   rightSlot={
                     <button
                       type="button"
@@ -323,6 +542,7 @@ export default function EditProfile() {
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   error={errors.confirmPassword}
+                  disabled={!canChangePassword}
                   rightSlot={
                     <button
                       type="button"

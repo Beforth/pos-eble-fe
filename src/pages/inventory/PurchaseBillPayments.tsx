@@ -8,15 +8,37 @@ import { OutlineButton } from '../../components/menu/MenuActionButtons'
 
 const FROM_OPTIONS = ['Supplier/Third Party', 'Restaurant']
 
+const DEFAULT_START = '2026-08-05'
+const DEFAULT_END = '2026-08-12'
+
 export default function PurchaseBillPayments() {
   const [from, setFrom] = useState('')
-  const [startDate, setStartDate] = useState('2026-08-05')
-  const [endDate, setEndDate] = useState('2026-08-12')
+  const [startDate, setStartDate] = useState(DEFAULT_START)
+  const [endDate, setEndDate] = useState(DEFAULT_END)
+  const [applied, setApplied] = useState({
+    from: '',
+    startDate: DEFAULT_START,
+    endDate: DEFAULT_END,
+  })
 
+  function handleSearch() {
+    setApplied({ from, startDate, endDate })
+    showToast('Search applied')
+  }
+
+  function handleClear() {
+    setFrom('')
+    setStartDate(DEFAULT_START)
+    setEndDate(DEFAULT_END)
+    setApplied({
+      from: '',
+      startDate: DEFAULT_START,
+      endDate: DEFAULT_END,
+    })
+  }
 
   return (
     <InventoryPageShell activeItem="purchase-bill-payments">
-
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">
           Bulk Purchase Bill Payments
@@ -57,8 +79,9 @@ export default function PurchaseBillPayments() {
             className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
+        <OutlineButton variant="gray" onClick={handleClear}>
+          Clear
         </OutlineButton>
       </div>
 
@@ -72,6 +95,10 @@ export default function PurchaseBillPayments() {
         </span>
         <p className="text-base font-semibold text-ink">
           Purchase Invoice Settlement Record Not Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: from={applied.from || '—'} · start={applied.startDate} · end=
+          {applied.endDate}
         </p>
       </div>
     </InventoryPageShell>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronDown,
   FilePlus2,
@@ -19,6 +19,22 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import { listOutletsApi } from '../../services/outletService'
+import {
+  INV_SALES_WRITE_PERMISSION,
+  createTransferApi,
+  getTransferApi,
+  listAllRawMaterialsApi,
+  listCategoriesApi,
+  listSuppliersApi,
+  updateTransferApi,
+  type InventoryCategory,
+  type RawMaterial,
+  type Supplier,
+} from '../../services/inventoryService'
 
 interface LineItem {
   id: string
@@ -31,31 +47,6 @@ interface LineItem {
   note: string
 }
 
-const RESTAURANTS = [
-  'The Bandhan',
-  "Annapurna's Rajubhai Dabeliwale — Dadar",
-  "Annapurna's Rajubhai Dabeliwale — Andheri",
-]
-const SUPPLIERS = ['The Bandhan', 'Fresh Mart', 'Daily Dairy', 'Veggie Hub']
-const CATEGORIES = [
-  'Rice/pulses/flours',
-  'Bread/dairy',
-  'Oils/masala/salt/sugar',
-  'Ready To Cook/ready To Eat',
-  'Sauces/dressings/marinades',
-  'Snacks',
-  'Packaging/storage',
-  'Fruits/vegetables',
-]
-const RAW_MATERIALS = [
-  { name: 'Tomatoes', unit: 'Kg' },
-  { name: 'Onion', unit: 'Kg' },
-  { name: 'Paneer', unit: 'Kg' },
-  { name: 'Milk', unit: 'Ltr' },
-  { name: 'Butter', unit: 'Kg' },
-  { name: 'Flour', unit: 'Kg' },
-]
-const UNITS = ['Kg', 'Ltr', 'Pcs', 'Box', 'Packet']
 const PAYMENT_METHODS = ['Cash', 'Card', 'Cheque', 'Other']
 
 function emptyLine(): LineItem {
@@ -82,16 +73,25 @@ function formatAmount(value: number) {
 
 export default function AddTransfer() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_SALES_WRITE_PERMISSION)
+  const isEdit = Boolean(id)
+  const { units, loadMasters } = useInventoryMasters()
   const [transferTo, setTransferTo] = useState<'supplier' | 'restaurant'>(
     'restaurant',
   )
   const [party, setParty] = useState('')
-  const [invoiceDate, setInvoiceDate] = useState('2026-08-11')
+  const [invoiceDate, setInvoiceDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [challanNo, setChallanNo] = useState('')
   const [category, setCategory] = useState('')
   const [lines, setLines] = useState<LineItem[]>([emptyLine()])
   const [paymentType, setPaymentType] = useState<'unpaid' | 'paid'>('unpaid')
-  const [paymentDate, setPaymentDate] = useState('2026-08-11')
+  const [paymentDate, setPaymentDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [paidAmount, setPaidAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [updateStock, setUpdateStock] = useState(true)
@@ -103,6 +103,13 @@ export default function AddTransfer() {
   const [otherDetailsOpen, setOtherDetailsOpen] = useState(false)
   const [moreActionOpen, setMoreActionOpen] = useState(false)
   const moreActionRef = useRef<HTMLDivElement>(null)
+  const [saving, setSaving] = useState(false)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
+  const [categories, setCategories] = useState<InventoryCategory[]>([])
+  const [restaurants, setRestaurants] = useState<
+    { id: string; name: string }[]
+  >([])
 
   useEffect(() => {
     if (!moreActionOpen) return
@@ -118,6 +125,67 @@ export default function AddTransfer() {
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [moreActionOpen])
 
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    void listSuppliersApi().then(setSuppliers).catch(() => setSuppliers([]))
+    void listCategoriesApi().then(setCategories).catch(() => setCategories([]))
+    void listAllRawMaterialsApi(encryptedOutletId)
+      .then(setRawMaterials)
+      .catch(() => setRawMaterials([]))
+    void listOutletsApi()
+      .then((rows) =>
+        setRestaurants(
+          rows
+            .filter((row) => row.encrypted_id !== encryptedOutletId)
+            .map((row) => ({
+              id: row.encrypted_id,
+              name: row.outlet_name,
+            })),
+        ),
+      )
+      .catch(() => setRestaurants([]))
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!id || !encryptedOutletId) return
+    getTransferApi(encryptedOutletId, id)
+      .then((row) => {
+        setTransferTo(row.source_type === 'supplier' ? 'supplier' : 'restaurant')
+        setParty(row.supplier_name || row.restaurant_name || '')
+        setInvoiceDate(row.invoice_date)
+        setChallanNo(row.challan_number)
+        setPaymentType(row.payment_status === 'paid' ? 'paid' : 'unpaid')
+        setPaymentDate(row.payment_date || new Date().toISOString().slice(0, 10))
+        setPaidAmount(row.paid_amount)
+        setPaymentMethod(row.payment_method || 'Cash')
+        setUpdateStock(row.update_inventory_stock)
+        setRecipientCanEdit(row.recipient_can_edit)
+        setLines(
+          row.lines.length
+            ? row.lines.map((line) => ({
+                id: `line-${line.raw_material_id}-${Math.random()}`,
+                selected: false,
+                rawMaterial: line.raw_material_name,
+                qty: line.qty,
+                unit: line.unit_name,
+                price: line.price,
+                amount: line.amount,
+                note: line.note,
+              }))
+            : [emptyLine()],
+        )
+      })
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load transfer',
+        )
+      })
+  }, [id, encryptedOutletId])
+
   const grandTotal = useMemo(
     () =>
       lines.reduce((sum, line) => {
@@ -128,6 +196,15 @@ export default function AddTransfer() {
     [lines],
   )
 
+  const visibleRawMaterials = useMemo(() => {
+    if (!category) return rawMaterials
+    return rawMaterials.filter((row) => row.category?.name === category)
+  }, [rawMaterials, category])
+  const rawNames = visibleRawMaterials.map((row) => row.name)
+  const unitNames = units.filter((row) => row.is_active).map((row) => row.name)
+  const categoryNames = categories.map((row) => row.name)
+  const supplierNames = suppliers.filter((row) => row.is_active).map((row) => row.name)
+  const restaurantNames = restaurants.map((row) => row.name)
 
   function clearAllLines() {
     setLines([emptyLine()])
@@ -149,10 +226,10 @@ export default function AddTransfer() {
         if (line.id !== id) return line
         const next = { ...line, ...patch }
         if ('rawMaterial' in patch) {
-          const material = RAW_MATERIALS.find(
+          const material = visibleRawMaterials.find(
             (m) => m.name === patch.rawMaterial,
           )
-          if (material && !next.unit) next.unit = material.unit
+          if (material && !next.unit) next.unit = material.consumption_unit.name
         }
         if ('qty' in patch || 'price' in patch) {
           const qty = toNumber(next.qty)
@@ -170,7 +247,8 @@ export default function AddTransfer() {
     setLines((prev) => prev.map((line) => ({ ...line, selected: checked })))
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (!canWrite || !encryptedOutletId) return
     if (!party) {
       setError(
         transferTo === 'restaurant'
@@ -183,10 +261,10 @@ export default function AddTransfer() {
       setError('Invoice date is required')
       return
     }
-    const validLine = lines.some(
+    const validLines = lines.filter(
       (line) => line.rawMaterial && toNumber(line.qty) > 0 && line.unit,
     )
-    if (!validLine) {
+    if (validLines.length === 0) {
       setError('Add at least one raw material with qty and unit')
       return
     }
@@ -204,23 +282,74 @@ export default function AddTransfer() {
         return
       }
     }
+    let payloadLines
+    try {
+      payloadLines = validLines.map((line) => {
+        const raw = rawMaterials.find((row) => row.name === line.rawMaterial)
+        const unit = units.find((row) => row.name === line.unit)
+        if (!raw || !unit) {
+          throw new Error('Select a saved raw material and unit')
+        }
+        return {
+          raw_material_id: raw.id,
+          qty: line.qty,
+          unit_id: unit.id,
+          price: line.price || '0',
+          amount: line.amount || String(toNumber(line.qty) * toNumber(line.price)),
+          note: line.note,
+        }
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save transfer')
+      return
+    }
     setError('')
-    showToast('Transfer saved')
-    window.setTimeout(() => {
+    setSaving(true)
+    try {
+      const payload = {
+        source_type: transferTo,
+        supplier_id:
+          transferTo === 'supplier'
+            ? suppliers.find((row) => row.name === party)?.id ?? null
+            : null,
+        restaurant_id:
+          transferTo === 'restaurant'
+            ? restaurants.find((row) => row.name === party)?.id ?? null
+            : null,
+        invoice_date: invoiceDate,
+        challan_number: challanNo,
+        grand_total: String(grandTotal),
+        payment_status: paymentType,
+        payment_date: paymentType === 'paid' ? paymentDate : null,
+        paid_amount: paymentType === 'paid' ? paidAmount : '0',
+        payment_method: paymentType === 'paid' ? paymentMethod : '',
+        update_inventory_stock: updateStock,
+        recipient_can_edit: recipientCanEdit,
+        lines: payloadLines,
+      }
+      if (isEdit && id) await updateTransferApi(encryptedOutletId, id, payload)
+      else await createTransferApi(encryptedOutletId, payload)
+      showToast(isEdit ? 'Transfer updated' : 'Transfer saved')
       navigate('/inventory/transfer')
-    }, 900)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to save transfer')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const allSelected = lines.length > 0 && lines.every((line) => line.selected)
   const noteLine = lines.find((line) => line.id === noteLineId)
-  const partyOptions = transferTo === 'restaurant' ? RESTAURANTS : SUPPLIERS
+  const partyOptions = transferTo === 'restaurant' ? restaurantNames : supplierNames
 
   return (
     <InventoryPageShell activeItem="transfer">
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
-          <h1 className="text-lg font-bold text-ink">Add Transfer</h1>
+          <h1 className="text-lg font-bold text-ink">
+            {isEdit ? 'Edit Transfer' : 'Add Transfer'}
+          </h1>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-semibold text-ink">To</span>
             <div className="inline-flex overflow-hidden rounded-md border border-line">
@@ -317,7 +446,7 @@ export default function AddTransfer() {
           <SearchableSelect
             label="Category"
             value={category}
-            options={CATEGORIES}
+            options={categoryNames}
             placeholder="Please Select Category"
             searchPlaceholder="Search"
             includePlaceholderOption
@@ -448,16 +577,18 @@ export default function AddTransfer() {
                 <td className="min-w-[200px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
                   <SearchableSelect
                     value={line.rawMaterial}
-                    options={RAW_MATERIALS.map((m) => m.name)}
+                    options={rawNames}
                     placeholder="Select/Add Raw Material"
                     searchPlaceholder="Search materials..."
                     compact
                     dropdownPlacement="auto"
                     onChange={(value) => {
-                      const material = RAW_MATERIALS.find((m) => m.name === value)
+                      const material = visibleRawMaterials.find(
+                        (m) => m.name === value,
+                      )
                       updateLine(line.id, {
                         rawMaterial: value,
-                        unit: material?.unit ?? line.unit,
+                        unit: material?.consumption_unit.name ?? line.unit,
                       })
                     }}
                   />
@@ -482,7 +613,7 @@ export default function AddTransfer() {
                     className="h-9 w-24 rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
                   >
                     <option value="">Unit</option>
-                    {UNITS.map((unit) => (
+                    {unitNames.map((unit) => (
                       <option key={unit} value={unit}>
                         {unit}
                       </option>
@@ -668,7 +799,9 @@ export default function AddTransfer() {
           >
             Cancel
           </button>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          <PrimaryButton onClick={() => void handleSave()} disabled={saving || !canWrite}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
         </div>
       </div>
 

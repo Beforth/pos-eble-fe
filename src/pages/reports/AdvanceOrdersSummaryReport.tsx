@@ -4,7 +4,9 @@ import { showToast } from '../../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Home } from 'lucide-react'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useListQuery } from '../../hooks/useListQuery'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
 import { brand } from '../../theme/brand'
 
@@ -45,6 +47,13 @@ export default function AdvanceOrdersSummaryReport() {
   const [toDate, setToDate] = useState('2026-08-12')
   const [restaurant, setRestaurant] = useState('')
   const [reports, setReports] = useState<GeneratedReport[]>([])
+
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    reports,
+    (row) => [row.dateLabel, row.downloadLabel],
+    (row, key) =>
+      key === 'downloadLabel' ? row.downloadLabel : row.dateLabel,
+  )
 
 
   function handleExport() {
@@ -153,16 +162,28 @@ export default function AdvanceOrdersSummaryReport() {
           <table className="w-full min-w-[480px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line bg-page">
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink">
+                <SortableTh
+                  columnKey="dateLabel"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-2.5 text-xs font-semibold text-ink"
+                >
                   Date
-                </th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-ink">
+                </SortableTh>
+                <SortableTh
+                  columnKey="downloadLabel"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-2.5 text-xs font-semibold text-ink"
+                >
                   Download Link
-                </th>
+                </SortableTh>
               </tr>
             </thead>
             <tbody>
-              {reports.length === 0 ? (
+              {visible.length === 0 ? (
                 <tr>
                   <td
                     colSpan={2}
@@ -172,7 +193,7 @@ export default function AdvanceOrdersSummaryReport() {
                   </td>
                 </tr>
               ) : (
-                reports.map((report) => (
+                visible.map((report) => (
                   <tr
                     key={report.id}
                     className="border-b border-line last:border-b-0"

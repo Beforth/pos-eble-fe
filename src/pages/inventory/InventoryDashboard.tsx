@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bar,
@@ -17,17 +17,15 @@ import {
   Lightbulb,
   Package,
   RefreshCw,
-  TrendingDown,
-  TrendingUp,
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
+import { useAuth } from '../../auth/AuthContext'
+import { ApiError } from '../../services/apiClient'
 import {
-  inventoryLowStock,
-  inventoryPurchaseBySupplier,
-  inventoryRawMaterials,
-  inventorySupplierPrices,
-  inventoryTopRawShare,
-} from '../../mocks/inventoryDashboardData'
+  getDashboardSummaryApi,
+  type DashboardSummary,
+} from '../../services/inventoryService'
+import { showToast } from '../../utils/toast'
 
 const MONTHS = [
   'January',
@@ -44,132 +42,88 @@ const MONTHS = [
   'December',
 ]
 
+const PIE_COLORS = [
+  '#ff0917',
+  '#f67d00',
+  '#0d9488',
+  '#2563eb',
+  '#7c3aed',
+  '#db2777',
+  '#ca8a04',
+  '#64748b',
+]
+
+function money(value: string | number) {
+  const n = typeof value === 'string' ? Number(value) : value
+  return Number.isFinite(n)
+    ? n.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+    : '0'
+}
+
+function toDateKey(year: number, monthIndex: number, day: number) {
+  const m = String(monthIndex + 1).padStart(2, '0')
+  const d = String(day).padStart(2, '0')
+  return `${year}-${m}-${d}`
+}
+
 export default function InventoryDashboard() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const today = new Date()
   const [monthIndex, setMonthIndex] = useState(today.getMonth())
   const year = today.getFullYear()
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
   const todayDate = today.getDate()
-  const [selectedDay, setSelectedDay] = useState<number>(
+  const [selectedDay, setSelectedDay] = useState(
     monthIndex === today.getMonth() ? todayDate : 1,
   )
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const calendarDays = useMemo(
     () => Array.from({ length: daysInMonth }, (_, i) => i + 1),
     [daysInMonth],
   )
 
-  // Dynamic values calculated based on selectedDay & month
-  const dynamicStockStats = useMemo(() => {
-    const worth = 240000 + selectedDay * 3150
-    const wastagePct = Math.max(8, 38 - ((selectedDay * 3) % 25))
-    const belowPar = Math.max(2, ((selectedDay * 3) % 9) + 3)
-    const belowMin = Math.max(4, ((selectedDay * 4) % 11) + 5)
+  const dateKey = toDateKey(year, monthIndex, selectedDay)
 
-    const lowStock = inventoryLowStock.map((item, idx) => {
-      const days = Math.max(1, ((item.days + selectedDay + idx) % 9) + 1)
-      const pct = Math.min(
-        95,
-        Math.max(15, ((item.pct + selectedDay * 4 + idx * 6) % 80) + 18),
+  const load = useCallback(async () => {
+    if (!encryptedOutletId) return
+    setLoading(true)
+    try {
+      const data = await getDashboardSummaryApi(encryptedOutletId, dateKey)
+      setSummary(data)
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load dashboard summary',
       )
-      return { ...item, days, pct }
-    })
-
-    const topRaw = inventoryTopRawShare.map((item, idx) => {
-      const delta = ((selectedDay * (idx + 1)) % 7) - 3
-      return { ...item, value: Math.max(6, item.value + delta) }
-    })
-
-    return { worth, wastagePct, belowPar, belowMin, lowStock, topRaw }
-  }, [selectedDay])
-
-  const dynamicCogs = useMemo(() => {
-    const cogsAmount = 105000 + selectedDay * 1850
-    const profitItems = [
-      { name: 'Matar Paneer', margin: '68% Profit Margin' },
-      { name: 'Paneer Butter Masala', margin: '64% Profit Margin' },
-      { name: 'Dal Makhani', margin: '71% Profit Margin' },
-      { name: 'Kaju Curry', margin: '62% Profit Margin' },
-    ]
-    const lossItems = [
-      { name: 'Bhindi Masala', margin: '22% Profit Margin' },
-      { name: 'Veg Kadai', margin: '28% Profit Margin' },
-      { name: 'Mix Veg', margin: '25% Profit Margin' },
-      { name: 'Palak Paneer', margin: '30% Profit Margin' },
-    ]
-
-    const highestProfit = profitItems[selectedDay % profitItems.length]
-    const leastProfit = lossItems[selectedDay % lossItems.length]
-
-    const barData = inventoryRawMaterials.map((item, idx) => {
-      const variance = (selectedDay * 32 * (idx % 2 === 0 ? 1 : -0.7))
-      return {
-        ...item,
-        value: Math.max(400, Math.round(item.value + variance)),
-      }
-    })
-
-    return { cogsAmount, highestProfit, leastProfit, barData }
-  }, [selectedDay])
-
-  const dynamicPurchase = useMemo(() => {
-    const totalPurchase = 920000 + selectedDay * 13800
-    const pendingPayment = 8400 + selectedDay * 580
-
-    const supplierPrices = inventorySupplierPrices.map((row, rIdx) => ({
-      ...row,
-      prices: row.prices.map((p, cIdx) =>
-        Math.round(p + ((selectedDay + rIdx + cIdx) % 7) - 3),
-      ),
-    }))
-
-    const supplierPurchases = inventoryPurchaseBySupplier.map((s, idx) => ({
-      ...s,
-      current: Math.round(s.current + selectedDay * 2200 * (idx % 2 === 0 ? 1 : 0.7)),
-      pending: Math.round(s.pending + selectedDay * 750 * (idx % 2 === 0 ? 0.8 : 1.1)),
-    }))
-
-    return { totalPurchase, pendingPayment, supplierPrices, supplierPurchases }
-  }, [selectedDay])
-
-  const dynamicPendingTasks = useMemo(() => {
-    const isCurrentOrFuture =
-      monthIndex === today.getMonth() ? selectedDay >= todayDate - 4 : true
-
-    if (isCurrentOrFuture) {
-      return [
-        {
-          id: `PO-88${selectedDay}1`,
-          supplier: 'Amul Dairy Distribution',
-          items: 'Milk, Butter, Paneer (50kg)',
-          amount: 34200 + selectedDay * 400,
-          stage: 'Pending Delivery',
-          stageTone: 'bg-accent/15 text-accent',
-          due: `Expected by 5:00 PM`,
-        },
-        {
-          id: `PO-88${selectedDay}4`,
-          supplier: 'Metro Wholesale Traders',
-          items: 'Flour, Spices & Packaging',
-          amount: 19800 + selectedDay * 300,
-          stage: 'Vendor Confirmed',
-          stageTone: 'bg-primary/10 text-primary',
-          due: `Order placed on ${selectedDay} ${MONTHS[monthIndex]}`,
-        },
-      ]
+    } finally {
+      setLoading(false)
     }
-    return []
-  }, [selectedDay, monthIndex, todayDate])
+  }, [encryptedOutletId, dateKey])
 
-  const accuracyPct = Math.min(
-    100,
-    Math.max(0, Math.round(((daysInMonth - selectedDay) / daysInMonth) * 100)),
-  )
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const pieData =
+    summary?.top_materials.map((row, index) => ({
+      name: row.name,
+      value: row.share_pct || Number(row.worth) || 0,
+      fill: PIE_COLORS[index % PIE_COLORS.length],
+    })) ?? []
+
+  const supplierBars =
+    summary?.purchase_by_supplier.map((row) => ({
+      name: row.name.length > 12 ? `${row.name.slice(0, 12)}…` : row.name,
+      current: Number(row.current) || 0,
+      pending: Number(row.pending) || 0,
+    })) ?? []
 
   return (
     <InventoryPageShell activeItem="dashboard">
-      {/* Daily Stock Closing Tracker */}
       <section className="mb-6 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -183,7 +137,8 @@ export default function InventoryDashboard() {
               </span>
             </div>
             <p className="mt-1 text-sm text-muted">
-              Click any date to inspect inventory progress, COGS, and purchase metrics for that day.
+              Click any date to inspect inventory progress and purchase metrics
+              for that day.
             </p>
           </div>
           <button
@@ -199,21 +154,17 @@ export default function InventoryDashboard() {
           <div className="flex flex-col justify-between rounded-xl border border-line bg-page/50 p-4">
             <div>
               <p className="text-2xl font-bold text-ink">
-                {accuracyPct}% Update Accuracy
+                {summary?.accuracy_pct ?? 0}% Update Accuracy
               </p>
               <p className="mt-2 text-sm font-medium text-primary">
-                {selectedDay === todayDate && monthIndex === today.getMonth()
-                  ? "Today's stock record in progress"
-                  : selectedDay < todayDate
-                    ? `Records verified for ${MONTHS[monthIndex]} ${selectedDay}`
-                    : `Upcoming scheduled cycle for ${MONTHS[monthIndex]} ${selectedDay}`}
+                Days with stock activity this month (up to selected day)
               </p>
               <p className="mt-1 text-sm text-muted">
                 Viewing data for{' '}
                 <span className="font-semibold text-ink">
                   Day {selectedDay} of {daysInMonth}
                 </span>
-                .
+                {loading ? ' · Loading…' : ''}.
               </p>
             </div>
             <div className="mt-4">
@@ -261,7 +212,8 @@ export default function InventoryDashboard() {
                   day === todayDate && monthIndex === today.getMonth()
                 const isFuture =
                   year > today.getFullYear() ||
-                  (year === today.getFullYear() && monthIndex > today.getMonth()) ||
+                  (year === today.getFullYear() &&
+                    monthIndex > today.getMonth()) ||
                   (year === today.getFullYear() &&
                     monthIndex === today.getMonth() &&
                     day > todayDate)
@@ -274,19 +226,14 @@ export default function InventoryDashboard() {
                     onClick={() => {
                       if (!isFuture) setSelectedDay(day)
                     }}
-                    title={
-                      isFuture
-                        ? `Future date (${MONTHS[monthIndex]} ${day}) - unavailable`
-                        : `View data for ${MONTHS[monthIndex]} ${day}`
-                    }
                     className={`flex h-9 items-center justify-center rounded-md border text-sm font-medium transition-all ${
                       isFuture
                         ? 'cursor-not-allowed border-line/40 bg-page/30 text-muted/40 opacity-50'
                         : isSelected
                           ? 'cursor-pointer border-primary bg-primary font-bold text-white shadow-sm ring-2 ring-primary/30'
                           : isToday
-                            ? 'cursor-pointer border-dashed border-primary text-primary hover:scale-105 hover:bg-primary/5 active:scale-95'
-                            : 'cursor-pointer border-line text-ink hover:scale-105 hover:border-primary/40 hover:bg-page active:scale-95'
+                            ? 'cursor-pointer border-dashed border-primary text-primary hover:bg-primary/5'
+                            : 'cursor-pointer border-line text-ink hover:border-primary/40 hover:bg-page'
                     }`}
                   >
                     {day}
@@ -314,18 +261,15 @@ export default function InventoryDashboard() {
         </div>
       </section>
 
-      {/* Current Inventory */}
       <section className="mb-6 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-ink">Current Inventory</h2>
             <p className="mt-1 text-sm text-muted">
-              Inventory status and restock alerts for {MONTHS[monthIndex]} {selectedDay}, {year}.
+              Live stock balances and restock alerts
+              {summary ? ` · ${summary.date}` : ''}.
             </p>
           </div>
-          <span className="rounded-lg bg-page px-2.5 py-1 text-xs font-medium text-muted">
-            Day {selectedDay} Metrics
-          </span>
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[220px_1fr_280px]">
@@ -333,13 +277,14 @@ export default function InventoryDashboard() {
             <article className="rounded-xl border border-line bg-page/40 p-4">
               <p className="text-xs font-medium text-muted">Worth of Stocks</p>
               <p className="mt-2 text-xl font-bold text-ink">
-                ₹ {dynamicStockStats.worth.toLocaleString('en-IN')}
+                ₹ {money(summary?.stock_worth ?? 0)}
               </p>
             </article>
             <article className="rounded-xl border border-line bg-page/40 p-4">
-              <p className="text-xs font-medium text-muted">Wastage Alert</p>
+              <p className="text-xs font-medium text-muted">Wastage (day)</p>
               <p className="mt-2 text-sm font-semibold text-primary">
-                {dynamicStockStats.wastagePct}% Stock is getting wasted if not used
+                ₹ {money(summary?.wastage_total ?? 0)} ·{' '}
+                {summary?.wastage_count ?? 0} docs
               </p>
             </article>
             <article className="rounded-xl border border-line bg-page/40 p-4">
@@ -347,7 +292,7 @@ export default function InventoryDashboard() {
                 Raw Materials Below Par Level
               </p>
               <p className="mt-2 text-xl font-bold text-ink">
-                {dynamicStockStats.belowPar}
+                {summary?.below_par_count ?? 0}
               </p>
             </article>
             <article className="rounded-xl border border-line bg-page/40 p-4">
@@ -355,7 +300,7 @@ export default function InventoryDashboard() {
                 Raw Materials Below Min. Level
               </p>
               <p className="mt-2 text-xl font-bold text-ink">
-                {dynamicStockStats.belowMin}
+                {summary?.below_min_count ?? 0}
               </p>
             </article>
           </div>
@@ -363,219 +308,121 @@ export default function InventoryDashboard() {
           <div className="rounded-xl border border-line p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-ink">Low Stock Alert</h3>
-              <select className="h-8 rounded-md border border-line bg-card px-2 text-xs outline-none">
-                <option>All Categories</option>
-              </select>
             </div>
-            <ul className="space-y-2.5">
-              {dynamicStockStats.lowStock.map((item) => (
-                <li key={item.name} className="flex items-center gap-3">
-                  <span className="w-20 shrink-0 text-sm font-medium text-ink">
-                    {item.name}
-                  </span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-line">
-                    <div
-                      className="h-full rounded-full bg-accent transition-all duration-300"
-                      style={{ width: `${item.pct}%` }}
-                    />
-                  </div>
-                  <span className="w-14 shrink-0 text-right text-xs text-muted">
-                    {item.days} Days
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {!summary?.low_stock.length ? (
+              <p className="py-8 text-center text-sm text-muted">
+                No materials below min / at-par
+              </p>
+            ) : (
+              <ul className="space-y-2.5">
+                {summary.low_stock.map((item) => (
+                  <li
+                    key={item.raw_material_id}
+                    className="flex items-center gap-3"
+                  >
+                    <span className="w-28 shrink-0 truncate text-sm font-medium text-ink">
+                      {item.name}
+                    </span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-line">
+                      <div
+                        className="h-full rounded-full bg-accent transition-all duration-300"
+                        style={{ width: `${item.pct}%` }}
+                      />
+                    </div>
+                    <span className="w-20 shrink-0 text-right text-xs text-muted">
+                      {item.stock_qty} {item.unit_name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="rounded-xl border border-line p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-ink">
-                Top 10 Raw Materials
+                Top Raw Materials
               </h3>
-              <select className="h-8 rounded-md border border-line bg-card px-2 text-xs outline-none">
-                <option>All Categories</option>
-              </select>
             </div>
             <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={dynamicStockStats.topRaw}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={48}
-                    outerRadius={72}
-                    paddingAngle={2}
-                  >
-                    {dynamicStockStats.topRaw.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {pieData.length === 0 ? (
+                <p className="flex h-full items-center justify-center text-sm text-muted">
+                  No stock value yet
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={48}
+                      outerRadius={72}
+                      paddingAngle={2}
+                    >
+                      {pieData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
       </section>
 
-      {/* COGS Breakdown */}
       <section className="mb-6 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-ink">COGS Breakdown</h2>
             <p className="mt-1 text-sm text-muted">
-              Cost of goods sold and ingredient consumption for {MONTHS[monthIndex]} {selectedDay}.
+              Food costing is not available yet — recipe/sales cost engine
+              pending.
             </p>
           </div>
           <span className="rounded-lg bg-page px-2.5 py-1 text-xs font-medium text-muted">
-            ₹ {dynamicCogs.cogsAmount.toLocaleString('en-IN')} Total COGS
+            COGS unavailable
           </span>
         </div>
-        <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-          <div className="space-y-3">
-            <article className="rounded-xl border border-line bg-page/40 p-4">
-              <p className="text-xs text-muted">COGS</p>
-              <p className="mt-1 text-xl font-bold text-ink">
-                ₹ {dynamicCogs.cogsAmount.toLocaleString('en-IN')}
-              </p>
-            </article>
-            <article className="rounded-xl border border-line bg-page/40 p-4">
-              <div className="flex items-center gap-1 text-success">
-                <TrendingUp size={14} />
-                <p className="text-sm font-semibold text-ink">
-                  {dynamicCogs.highestProfit.name}
-                </p>
-              </div>
-              <p className="mt-1 text-xs text-muted">
-                {dynamicCogs.highestProfit.margin}
-              </p>
-            </article>
-            <article className="rounded-xl border border-line bg-page/40 p-4">
-              <div className="flex items-center gap-1 text-primary">
-                <TrendingDown size={14} />
-                <p className="text-sm font-semibold text-ink">
-                  {dynamicCogs.leastProfit.name}
-                </p>
-              </div>
-              <p className="mt-1 text-xs text-muted">
-                {dynamicCogs.leastProfit.margin}
-              </p>
-            </article>
-          </div>
-          <div className="h-64 rounded-xl border border-line p-3">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={dynamicCogs.barData}
-                layout="vertical"
-                margin={{ left: 16, right: 16 }}
-              >
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={90}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip />
-                <Bar dataKey="value" fill="#ff0917" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-line text-sm text-muted">
+          Item margins and ingredient COGS will appear here once costing is
+          implemented.
         </div>
       </section>
 
-      {/* Purchase Insights */}
       <section className="mb-6 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-ink">Purchase Insights</h2>
-            <p className="mt-1 text-sm text-muted">
-              Purchase history and supplier-wise breakdown for {MONTHS[monthIndex]} {selectedDay}.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <select className="h-8 rounded-md border border-line bg-card px-2 text-xs">
-              <option>Top 10 Suppliers</option>
-            </select>
-            <select className="h-8 rounded-md border border-line bg-card px-2 text-xs">
-              <option>Selected Day View</option>
-            </select>
-          </div>
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-ink">Purchase Insights</h2>
+          <p className="mt-1 text-sm text-muted">
+            Selected-day purchase totals and month supplier breakdown.
+          </p>
         </div>
 
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <article className="rounded-xl border border-line bg-page/40 p-4">
-            <p className="text-xs text-muted">Total Purchase</p>
+            <p className="text-xs text-muted">Total Purchase (day)</p>
             <p className="mt-1 text-xl font-bold text-ink">
-              ₹ {dynamicPurchase.totalPurchase.toLocaleString('en-IN')}
+              ₹ {money(summary?.purchase_total ?? 0)}
             </p>
           </article>
           <article className="rounded-xl border border-line bg-page/40 p-4">
-            <p className="text-xs text-muted">Pending Payment</p>
+            <p className="text-xs text-muted">Pending Payment (day)</p>
             <p className="mt-1 text-xl font-bold text-ink">
-              ₹ {dynamicPurchase.pendingPayment.toLocaleString('en-IN')}
+              ₹ {money(summary?.pending_payment ?? 0)}
             </p>
           </article>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <div className="overflow-x-auto rounded-xl border border-line">
-            <div className="flex items-center justify-between border-b border-line px-3 py-2">
-              <p className="text-sm font-semibold text-ink">
-                Supplier Price Comparison
-              </p>
-              <span className="text-xs text-muted">Latest Prices</span>
-            </div>
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-page text-xs text-muted">
-                <tr>
-                  <th className="px-3 py-2">Item</th>
-                  {['A', 'B', 'C', 'D', 'E'].map((s) => (
-                    <th key={s} className="px-3 py-2">
-                      Supplier {s}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {dynamicPurchase.supplierPrices.map((row) => (
-                  <tr key={row.item} className="border-t border-line">
-                    <td className="px-3 py-2.5 font-medium text-ink">
-                      {row.item}
-                    </td>
-                    {row.prices.map((price, index) => (
-                      <td key={`${row.item}-${index}`} className="px-3 py-2.5">
-                        <span
-                          className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ${
-                            index === 0
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-page text-ink'
-                          }`}
-                        >
-                          ₹{price}
-                        </span>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="flex gap-4 border-t border-line px-3 py-2 text-xs text-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 rounded-full border border-primary" />
-                Current Purchase
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-accent" />
-                Pending Purchase
-              </span>
-            </div>
-          </div>
-
-          <div className="h-72 rounded-xl border border-line p-3">
+        <div className="h-72 rounded-xl border border-line p-3">
+          {supplierBars.length === 0 ? (
+            <p className="flex h-full items-center justify-center text-sm text-muted">
+              No purchases this month
+            </p>
+          ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dynamicPurchase.supplierPurchases}>
+              <BarChart data={supplierBars}>
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
@@ -583,17 +430,16 @@ export default function InventoryDashboard() {
                 <Bar dataKey="pending" name="Pending Purchase" fill="#f67d00" />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          )}
         </div>
       </section>
 
-      {/* Pending Tasks */}
       <section className="mb-6 rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-ink">Pending Tasks</h2>
             <p className="mt-1 text-sm text-muted">
-              Purchase orders pending delivery or approval for {MONTHS[monthIndex]} {selectedDay}, {year}.
+              Purchase orders with delivery on or after the selected day.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -607,6 +453,7 @@ export default function InventoryDashboard() {
             <button
               type="button"
               aria-label="Refresh"
+              onClick={() => void load()}
               className="inline-flex size-8 items-center justify-center rounded-md border border-line text-muted hover:bg-page hover:text-ink"
             >
               <RefreshCw size={14} />
@@ -614,9 +461,9 @@ export default function InventoryDashboard() {
           </div>
         </div>
 
-        {dynamicPendingTasks.length > 0 ? (
+        {summary?.pending_tasks && summary.pending_tasks.length > 0 ? (
           <div className="divide-y divide-line rounded-xl border border-line">
-            {dynamicPendingTasks.map((task) => (
+            {summary.pending_tasks.map((task) => (
               <div
                 key={task.id}
                 className="flex flex-wrap items-center justify-between gap-3 p-3.5 hover:bg-page/50"
@@ -628,10 +475,10 @@ export default function InventoryDashboard() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-ink">
-                        {task.supplier}
+                        {task.supplier || '—'}
                       </p>
                       <span className="font-mono text-xs text-muted">
-                        ({task.id})
+                        ({task.po_number})
                       </span>
                     </div>
                     <p className="text-xs text-muted">{task.items}</p>
@@ -640,13 +487,13 @@ export default function InventoryDashboard() {
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <p className="text-sm font-bold text-ink">
-                      ₹{task.amount.toLocaleString('en-IN')}
+                      ₹{money(task.amount)}
                     </p>
-                    <p className="text-xs text-muted">{task.due}</p>
+                    <p className="text-xs text-muted">
+                      Due {task.delivery_date}
+                    </p>
                   </div>
-                  <span
-                    className={`rounded-md px-2 py-1 text-xs font-semibold ${task.stageTone}`}
-                  >
+                  <span className="rounded-md bg-accent/15 px-2 py-1 text-xs font-semibold text-accent">
                     {task.stage}
                   </span>
                 </div>
@@ -659,29 +506,23 @@ export default function InventoryDashboard() {
               <CheckCircle2 size={24} />
             </span>
             <p className="text-sm font-semibold text-ink">
-              All Orders Cleared for {MONTHS[monthIndex]} {selectedDay}
+              No pending POs from {MONTHS[monthIndex]} {selectedDay}
             </p>
             <p className="mt-1 text-xs text-muted">
-              No pending purchase orders or stock discrepancies recorded for this date.
+              Create a purchase order to see it here.
             </p>
           </div>
         )}
       </section>
 
-      {/* Customize banner */}
       <div className="mb-2 flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2.5">
           <Lightbulb size={18} className="mt-0.5 shrink-0 text-accent" />
           <p className="text-sm text-ink">
-            You can customize the inventory dashboard widgets, view key metrics, and adjust widget priorities.
+            Dashboard KPIs use live stock and documents. COGS widgets stay empty
+            until costing is built.
           </p>
         </div>
-        <button
-          type="button"
-          className="h-9 shrink-0 rounded-lg border border-primary bg-card px-4 text-sm font-semibold text-primary hover:bg-primary/5"
-        >
-          Customize
-        </button>
       </div>
     </InventoryPageShell>
   )

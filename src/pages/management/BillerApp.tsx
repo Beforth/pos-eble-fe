@@ -20,6 +20,9 @@ import {
 } from '../../services/userService'
 import { useRoles } from '../../state/RoleContext'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
@@ -121,9 +124,22 @@ export default function BillerApp() {
     return users.filter((user) => userMatchesRole(user, activeTabId))
   }, [users, activeTabId])
 
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      rows,
+      (user) => [user.name, user.username, user.user_code, user.role?.name],
+      (user, key) => {
+        if (key === 'username') return user.username
+        if (key === 'role') return user.role?.name
+        if (key === 'user_code') return user.user_code
+        if (key === 'status') return user.is_active ? 1 : 0
+        return user.name
+      },
+    )
+
   const allSelected = useMemo(
-    () => rows.length > 0 && selectedIds.size === rows.length,
-    [rows, selectedIds],
+    () => visible.length > 0 && selectedIds.size === visible.length,
+    [visible, selectedIds],
   )
 
   useEffect(() => {
@@ -165,7 +181,7 @@ export default function BillerApp() {
       setSelectedIds(new Set())
       return
     }
-    setSelectedIds(new Set(rows.map((row) => row.id)))
+    setSelectedIds(new Set(visible.map((row) => row.id)))
   }
 
   async function setActive(user: UserSummary, active: boolean) {
@@ -258,7 +274,14 @@ export default function BillerApp() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-line bg-card">
-          {rows.length === 0 ? (
+          <div className="border-b border-line p-4">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search users"
+            />
+          </div>
+          {visible.length === 0 ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center">
               <span className="mb-4 flex size-20 items-center justify-center rounded-full bg-page text-muted">
                 <Search size={36} strokeWidth={1.75} />
@@ -284,18 +307,58 @@ export default function BillerApp() {
                         aria-label="Select all"
                       />
                     </th>
-                    <th className="px-4 py-3">{activeTab.nameColumn}</th>
-                    <th className="px-4 py-3">User Name</th>
+                    <SortableTh
+                      columnKey="name"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      {activeTab.nameColumn}
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="username"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      User Name
+                    </SortableTh>
                     {activeTabId === 'all' ? (
-                      <th className="px-4 py-3">Role</th>
+                      <SortableTh
+                        columnKey="role"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                        className="px-4 py-3"
+                      >
+                        Role
+                      </SortableTh>
                     ) : null}
-                    <th className="px-4 py-3">User Code</th>
-                    <th className="px-4 py-3">Status</th>
+                    <SortableTh
+                      columnKey="user_code"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      User Code
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="status"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Status
+                    </SortableTh>
                     <th className="px-4 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
+                  {visible.map((row) => (
                     <tr
                       key={row.id}
                       className="border-b border-line last:border-0 hover:bg-page/50"

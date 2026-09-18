@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -89,24 +90,95 @@ export default function ExpiryBatchwiseInsightReport() {
   const [reportView, setReportView] = useState('Expire and batchwise')
   const [expiryIn, setExpiryIn] = useState('30 Days')
   const [rawMaterialName, setRawMaterialName] = useState('')
+  const [batchNo, setBatchNo] = useState('')
+  const [includeExpired, setIncludeExpired] = useState(false)
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
+  const [applied, setApplied] = useState({
+    reportView: 'Expire and batchwise',
+    expiryIn: '30 Days',
+    rawMaterialName: '',
+    batchNo: '',
+    includeExpired: false,
+  })
 
+  function handleSearch() {
+    setApplied({
+      reportView,
+      expiryIn,
+      rawMaterialName: rawMaterialName.trim(),
+      batchNo: batchNo.trim(),
+      includeExpired,
+    })
+    showToast('Search applied')
+  }
 
   function handleClear() {
     setReportView('Expire and batchwise')
     setExpiryIn('30 Days')
     setRawMaterialName('')
+    setBatchNo('')
+    setIncludeExpired(false)
+    setMoreFiltersOpen(false)
+    setApplied({
+      reportView: 'Expire and batchwise',
+      expiryIn: '30 Days',
+      rawMaterialName: '',
+      batchNo: '',
+      includeExpired: false,
+    })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Expiry & Batchwise Insight
         </h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => {
+            downloadCsv(
+              [
+                'report_view',
+                'expiry_in',
+                'raw_material',
+                'batch_no',
+                'include_expired',
+              ],
+              [
+                [
+                  applied.reportView,
+                  applied.expiryIn,
+                  applied.rawMaterialName,
+                  applied.batchNo,
+                  applied.includeExpired ? 'yes' : 'no',
+                ],
+              ],
+              'expiry-batchwise-page.csv',
+            )
+            showToast('Exported current page')
+          }}
+          onExportAll={() => {
+            downloadCsv(
+              [
+                'report_view',
+                'expiry_in',
+                'raw_material',
+                'batch_no',
+                'include_expired',
+              ],
+              [
+                [
+                  applied.reportView,
+                  applied.expiryIn,
+                  applied.rawMaterialName,
+                  applied.batchNo,
+                  applied.includeExpired ? 'yes' : 'no',
+                ],
+              ],
+              'expiry-batchwise-all.csv',
+            )
+            showToast('Exported all')
+          }}
         />
       </div>
 
@@ -146,17 +218,40 @@ export default function ExpiryBatchwiseInsightReport() {
         </div>
         <OutlineButton
           variant="gray"
-          onClick={() => showToast('More filters')}
+          onClick={() => setMoreFiltersOpen((prev) => !prev)}
         >
-          More Filters
+          {moreFiltersOpen ? 'Hide Filters' : 'More Filters'}
         </OutlineButton>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
       </div>
+
+      {moreFiltersOpen ? (
+        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-line bg-page/40 p-4">
+          <div className="min-w-[160px] flex-1">
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              Batch No.
+            </label>
+            <input
+              type="text"
+              value={batchNo}
+              onChange={(event) => setBatchNo(event.target.value)}
+              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
+          <label className="mb-1 inline-flex h-10 cursor-pointer items-center gap-2 text-sm font-medium text-ink">
+            <input
+              type="checkbox"
+              checked={includeExpired}
+              onChange={(event) => setIncludeExpired(event.target.checked)}
+              className="size-4 rounded border-line"
+            />
+            Include already expired
+          </label>
+        </div>
+      ) : null}
 
       <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
         <span className="relative mb-4 text-muted">
@@ -167,6 +262,12 @@ export default function ExpiryBatchwiseInsightReport() {
           />
         </span>
         <p className="text-base font-semibold text-ink">No Records Found</p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: view={applied.reportView} · expiry={applied.expiryIn} ·
+          material={applied.rawMaterialName || '—'} · batch=
+          {applied.batchNo || '—'} · includeExpired=
+          {applied.includeExpired ? 'yes' : 'no'}
+        </p>
       </div>
     </InventoryPageShell>
   )

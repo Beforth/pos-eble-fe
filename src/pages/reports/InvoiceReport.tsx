@@ -4,7 +4,9 @@ import { showToast } from '../../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, Home, Printer } from 'lucide-react'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useListQuery } from '../../hooks/useListQuery'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
 import {
   INVOICE_REPORT_COLUMNS,
@@ -137,6 +139,21 @@ export default function InvoiceReport() {
 
   const totals = useMemo(() => summarizeInvoiceReport(rows), [rows])
 
+  const { sortKey, sortDir, toggleSort, visible: listedRows } = useListQuery(
+    rows,
+    (row) => [
+      row.restaurant,
+      row.billStarting,
+      row.billEnding,
+      row.totalBills,
+      row.salesBillCount,
+      row.salesBillAmount,
+      row.cancelBillCount,
+      row.cancelBillAmount,
+    ],
+    (row, key) => row[key as InvoiceReportColumnKey],
+  )
+
 
   function handleSearch() {
     setAppliedRestaurant(restaurant)
@@ -249,18 +266,17 @@ export default function InvoiceReport() {
             <thead>
               <tr className="border-b border-line bg-page">
                 {columns.map((column) => (
-                  <th
+                  <SortableTh
                     key={column.key}
-                    className={`whitespace-nowrap px-3 py-2.5 text-xs font-semibold text-ink ${
-                      column.align === 'right'
-                        ? 'text-right'
-                        : column.align === 'center'
-                          ? 'text-center'
-                          : 'text-left'
-                    }`}
+                    columnKey={column.key}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    align={column.align ?? 'left'}
+                    className="whitespace-nowrap px-3 py-2.5 text-xs font-semibold text-ink"
                   >
                     {column.label}
-                  </th>
+                  </SortableTh>
                 ))}
               </tr>
             </thead>
@@ -282,7 +298,7 @@ export default function InvoiceReport() {
                 ))}
               </tr>
 
-              {rows.length === 0 ? (
+              {listedRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={columns.length}
@@ -292,7 +308,7 @@ export default function InvoiceReport() {
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                listedRows.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-b-0 hover:bg-page/50"
@@ -318,7 +334,7 @@ export default function InvoiceReport() {
           </table>
         </div>
         <div className="border-t border-line px-4 py-2.5 text-xs text-muted">
-          Showing {rows.length === 0 ? 0 : 1} to {rows.length} of {rows.length}{' '}
+          Showing {listedRows.length === 0 ? 0 : 1} to {listedRows.length} of {listedRows.length}{' '}
           entries
         </div>
       </div>

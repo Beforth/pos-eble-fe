@@ -4,6 +4,8 @@ import { showToast } from '../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { FileUp, Pencil, Plus } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
+import { SortableTh } from '../components/common/SortableTh'
+import { useListQuery } from '../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
@@ -81,7 +83,47 @@ export default function SetItemCommission() {
     })
   }, [applied, tab])
 
-  const activeRows = tab === 'item' ? filtered : addonFiltered
+  const itemList = useListQuery(
+    filtered,
+    (row) => [
+      row.itemName,
+      row.categoryName,
+      row.itemPrice,
+      row.commissionType,
+      row.commissionValue,
+    ],
+    (row, key) => {
+      if (key === 'category') return row.categoryName
+      if (key === 'price') return row.itemPrice
+      if (key === 'commissionType') return row.commissionType
+      if (key === 'commissionValue') return row.commissionValue ?? ''
+      return row.itemName
+    },
+  )
+
+  const addonList = useListQuery(
+    addonFiltered,
+    (row) => [
+      row.addonName,
+      row.groupName,
+      row.price,
+      row.commissionType,
+      row.commissionValue,
+    ],
+    (row, key) => {
+      if (key === 'category') return row.groupName
+      if (key === 'price') return row.price
+      if (key === 'commissionType') return row.commissionType
+      if (key === 'commissionValue') return row.commissionValue ?? ''
+      return row.addonName
+    },
+  )
+
+  const listed = tab === 'item' ? itemList.visible : addonList.visible
+  const sortKey = tab === 'item' ? itemList.sortKey : addonList.sortKey
+  const sortDir = tab === 'item' ? itemList.sortDir : addonList.sortDir
+  const toggleSort = tab === 'item' ? itemList.toggleSort : addonList.toggleSort
+  const activeRows = listed
   const total = activeRows.length
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -271,15 +313,51 @@ export default function SetItemCommission() {
                     aria-label="Select all on page"
                   />
                 </th>
-                <th className="px-4 py-3">
+                <SortableTh
+                  columnKey="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-3"
+                >
                   {tab === 'item' ? 'Item' : 'Addon Item'}
-                </th>
-                <th className="px-4 py-3">
+                </SortableTh>
+                <SortableTh
+                  columnKey="category"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-3"
+                >
                   {tab === 'item' ? 'Category' : 'Group'}
-                </th>
-                <th className="px-4 py-3">Item Price</th>
-                <th className="px-4 py-3">Commission Type</th>
-                <th className="px-4 py-3">Commission Value</th>
+                </SortableTh>
+                <SortableTh
+                  columnKey="price"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-3"
+                >
+                  Item Price
+                </SortableTh>
+                <SortableTh
+                  columnKey="commissionType"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-3"
+                >
+                  Commission Type
+                </SortableTh>
+                <SortableTh
+                  columnKey="commissionValue"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-3"
+                >
+                  Commission Value
+                </SortableTh>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -294,7 +372,7 @@ export default function SetItemCommission() {
                   </td>
                 </tr>
               ) : tab === 'item' ? (
-                filtered
+                itemList.visible
                   .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
                   .map((row) => (
                     <tr
@@ -346,7 +424,7 @@ export default function SetItemCommission() {
                     </tr>
                   ))
               ) : (
-                addonFiltered
+                addonList.visible
                   .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
                   .map((row) => (
                     <tr

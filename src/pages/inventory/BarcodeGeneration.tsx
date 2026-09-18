@@ -1,9 +1,12 @@
-import { useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
-import { Info, Trash2, Upload } from 'lucide-react'
+import { Info, Trash2, Upload, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
@@ -18,6 +21,12 @@ interface BarcodeRow {
   barcode: string
 }
 
+interface PrinterSettings {
+  printerName: string
+  copies: string
+  paperSize: string
+}
+
 const RAW_MATERIALS = [
   { name: 'Tomatoes', barcode: 'RM-TOM-001' },
   { name: 'Onion', barcode: 'RM-ONI-002' },
@@ -29,12 +38,165 @@ const RAW_MATERIALS = [
 ]
 
 const MAX_BARCODES = 500
+const PRINTER_SETTINGS_KEY = 'rajubhai.barcode.printerSettings'
+const PAPER_SIZE_OPTIONS = ['A4', 'Label 50x25', 'Label 40x30', 'Letter']
+
+const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
+  printerName: '',
+  copies: '1',
+  paperSize: 'Label 50x25',
+}
+
+function loadPrinterSettings(): PrinterSettings {
+  try {
+    const raw = localStorage.getItem(PRINTER_SETTINGS_KEY)
+    if (!raw) return { ...DEFAULT_PRINTER_SETTINGS }
+    const parsed = JSON.parse(raw) as Partial<PrinterSettings>
+    return {
+      printerName: parsed.printerName ?? DEFAULT_PRINTER_SETTINGS.printerName,
+      copies: parsed.copies ?? DEFAULT_PRINTER_SETTINGS.copies,
+      paperSize: parsed.paperSize ?? DEFAULT_PRINTER_SETTINGS.paperSize,
+    }
+  } catch {
+    return { ...DEFAULT_PRINTER_SETTINGS }
+  }
+}
 
 function InfoHint({ title }: { title: string }) {
   return (
     <span title={title}>
       <Info size={13} className="text-muted" />
     </span>
+  )
+}
+
+function PrinterSettingsModal({
+  open,
+  initial,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  initial: PrinterSettings
+  onClose: () => void
+  onSave: (settings: PrinterSettings) => void
+}) {
+  const titleId = useId()
+  const [printerName, setPrinterName] = useState(initial.printerName)
+  const [copies, setCopies] = useState(initial.copies)
+  const [paperSize, setPaperSize] = useState(initial.paperSize)
+
+  useEffect(() => {
+    if (!open) return
+    setPrinterName(initial.printerName)
+    setCopies(initial.copies)
+    setPaperSize(initial.paperSize)
+  }, [open, initial])
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previous
+    }
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 cursor-pointer bg-ink/40"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-line bg-card shadow-xl [background-color:var(--color-card)]"
+      >
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <h2 id={titleId} className="text-base font-semibold text-ink">
+            Printer Settings
+          </h2>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onClose}
+            className="rounded p-1 text-muted transition-colors hover:bg-page hover:text-ink"
+          >
+            <X size={16} strokeWidth={1.75} />
+          </button>
+        </div>
+        <div className="space-y-3 px-4 py-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              Printer name
+            </label>
+            <input
+              type="text"
+              value={printerName}
+              onChange={(event) => setPrinterName(event.target.value)}
+              placeholder="e.g. Barcode Label Printer"
+              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              Copies
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={copies}
+              onChange={(event) => setCopies(event.target.value)}
+              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <SearchableSelect
+              label="Paper size"
+              value={paperSize}
+              options={PAPER_SIZE_OPTIONS}
+              placeholder="Label 50x25"
+              searchPlaceholder="Search"
+              includePlaceholderOption={false}
+              onChange={setPaperSize}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-line px-4 py-3">
+          <OutlineButton variant="gray" onClick={onClose}>
+            Close
+          </OutlineButton>
+          <PrimaryButton
+            onClick={() => {
+              const nextCopies = Number(copies)
+              if (!Number.isFinite(nextCopies) || nextCopies < 1) {
+                showToast('Copies must be at least 1')
+                return
+              }
+              onSave({
+                printerName: printerName.trim(),
+                copies: String(Math.floor(nextCopies)),
+                paperSize,
+              })
+            }}
+          >
+            Save
+          </PrimaryButton>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -49,9 +211,20 @@ export default function BarcodeGeneration() {
   const [error, setError] = useState('')
   const [alertOpen, setAlertOpen] = useState(false)
   const [alertMessage, setAlertMessage] = useState('')
+  const [printerSettingsOpen, setPrinterSettingsOpen] = useState(false)
+  const [printerSettings, setPrinterSettings] = useState(loadPrinterSettings)
 
   const totalPrints = rows.reduce((sum, row) => sum + row.prints, 0)
 
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    rows,
+    (row) => [row.rawMaterial, row.prints, row.barcode],
+    (row, key) => {
+      if (key === 'prints') return row.prints
+      if (key === 'barcode') return row.barcode
+      return row.rawMaterial
+    },
+  )
 
   function showAlert(message: string) {
     setAlertMessage(message)
@@ -120,9 +293,15 @@ export default function BarcodeGeneration() {
     showToast(`Uploaded ${file.name}`)
   }
 
+  function handleSavePrinterSettings(settings: PrinterSettings) {
+    localStorage.setItem(PRINTER_SETTINGS_KEY, JSON.stringify(settings))
+    setPrinterSettings(settings)
+    setPrinterSettingsOpen(false)
+    showToast('Printer settings saved')
+  }
+
   return (
     <InventoryPageShell activeItem="barcode-generation">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Barcode Generation</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -133,7 +312,7 @@ export default function BarcodeGeneration() {
           >
             Barcode Configuration
           </OutlineButton>
-          <OutlineButton onClick={() => showToast('Printer Settings')}>
+          <OutlineButton onClick={() => setPrinterSettingsOpen(true)}>
             Printer Settings
           </OutlineButton>
         </div>
@@ -270,14 +449,38 @@ export default function BarcodeGeneration() {
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
               <tr>
-                <th className="px-3 py-2.5">Raw Material</th>
-                <th className="px-3 py-2.5">Number Of Prints</th>
-                <th className="px-3 py-2.5">Raw Material Barcode</th>
+                <SortableTh
+                  columnKey="rawMaterial"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Raw Material
+                </SortableTh>
+                <SortableTh
+                  columnKey="prints"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Number Of Prints
+                </SortableTh>
+                <SortableTh
+                  columnKey="barcode"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Raw Material Barcode
+                </SortableTh>
                 <th className="px-3 py-2.5">Action</th>
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {visible.length === 0 ? (
                 <tr>
                   <td
                     colSpan={4}
@@ -287,7 +490,7 @@ export default function BarcodeGeneration() {
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                visible.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-b-0"
@@ -330,6 +533,13 @@ export default function BarcodeGeneration() {
         open={alertOpen}
         message={alertMessage}
         onClose={() => setAlertOpen(false)}
+      />
+
+      <PrinterSettingsModal
+        open={printerSettingsOpen}
+        initial={printerSettings}
+        onClose={() => setPrinterSettingsOpen(false)}
+        onSave={handleSavePrinterSettings}
       />
     </InventoryPageShell>
   )

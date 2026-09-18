@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -10,6 +11,8 @@ import {
 } from '../../components/menu/MenuActionButtons'
 
 const ORDER_TYPE_OPTIONS = ['Orders', 'Production Execution']
+
+const DEFAULT_DATE = '2026-08-11'
 
 function ExportMenu({ onExportAll }: { onExportAll?: () => void }) {
   const [open, setOpen] = useState(false)
@@ -59,21 +62,41 @@ function ExportMenu({ onExportAll }: { onExportAll?: () => void }) {
 
 export default function OrderwiseConsumptionReport() {
   const [orderNumber, setOrderNumber] = useState('')
-  const [fromDate, setFromDate] = useState('2026-08-11')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState(DEFAULT_DATE)
+  const [toDate, setToDate] = useState(DEFAULT_DATE)
   const [orderType, setOrderType] = useState('Orders')
+  const [applied, setApplied] = useState({
+    orderNumber: '',
+    fromDate: DEFAULT_DATE,
+    toDate: DEFAULT_DATE,
+    orderType: 'Orders',
+  })
 
+  function handleSearch() {
+    setApplied({
+      orderNumber: orderNumber.trim(),
+      fromDate,
+      toDate,
+      orderType,
+    })
+    showToast('Search applied')
+  }
 
   function handleClear() {
     setOrderNumber('')
-    setFromDate('2026-08-11')
-    setToDate('2026-08-11')
+    setFromDate(DEFAULT_DATE)
+    setToDate(DEFAULT_DATE)
     setOrderType('Orders')
+    setApplied({
+      orderNumber: '',
+      fromDate: DEFAULT_DATE,
+      toDate: DEFAULT_DATE,
+      orderType: 'Orders',
+    })
   }
 
   return (
     <InventoryPageShell activeItem="orderwise-consumption">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Orderwise Consumption Report
@@ -86,7 +109,23 @@ export default function OrderwiseConsumptionReport() {
           >
             In Queue Orders
           </button>
-          <ExportMenu onExportAll={() => showToast('Exported all')} />
+          <ExportMenu
+            onExportAll={() => {
+              downloadCsv(
+                ['order_number', 'from_date', 'to_date', 'order_type'],
+                [
+                  [
+                    applied.orderNumber,
+                    applied.fromDate,
+                    applied.toDate,
+                    applied.orderType,
+                  ],
+                ],
+                'orderwise-consumption-all.csv',
+              )
+              showToast('Exported all')
+            }}
+          />
         </div>
       </div>
 
@@ -135,9 +174,7 @@ export default function OrderwiseConsumptionReport() {
             onChange={setOrderType}
           />
         </div>
-        <PrimaryButton onClick={() => showToast('Search applied')}>
-          Search
-        </PrimaryButton>
+        <PrimaryButton onClick={handleSearch}>Search</PrimaryButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -153,6 +190,10 @@ export default function OrderwiseConsumptionReport() {
         </span>
         <p className="text-base font-semibold text-ink">
           Orderwise Consumption Report Record Not Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: order={applied.orderNumber || '—'} · from={applied.fromDate}{' '}
+          · to={applied.toDate} · type={applied.orderType}
         </p>
       </div>
     </InventoryPageShell>

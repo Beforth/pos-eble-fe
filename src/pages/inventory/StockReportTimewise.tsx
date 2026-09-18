@@ -30,25 +30,54 @@ function defaultToDate() {
   return new Date(2026, 7, 11, 23, 59, 59)
 }
 
+function formatDateTime(value: Date) {
+  return value.toLocaleString()
+}
+
 export default function StockReportTimewise() {
   const [rawMaterial, setRawMaterial] = useState('')
   const [unit, setUnit] = useState('Purchase Unit')
   const [category, setCategory] = useState('All')
   const [fromDateTime, setFromDateTime] = useState(defaultFromDate)
   const [toDateTime, setToDateTime] = useState(defaultToDate)
+  const [applied, setApplied] = useState({
+    rawMaterial: '',
+    unit: 'Purchase Unit',
+    category: 'All',
+    fromDateTime: defaultFromDate(),
+    toDateTime: defaultToDate(),
+  })
 
+  function handleSearch() {
+    setApplied({
+      rawMaterial: rawMaterial.trim(),
+      unit,
+      category,
+      fromDateTime,
+      toDateTime,
+    })
+    showToast('Search applied')
+  }
 
   function handleClear() {
+    const from = defaultFromDate()
+    const to = defaultToDate()
     setRawMaterial('')
     setUnit('Purchase Unit')
     setCategory('All')
-    setFromDateTime(defaultFromDate())
-    setToDateTime(defaultToDate())
+    setFromDateTime(from)
+    setToDateTime(to)
+    setApplied({
+      rawMaterial: '',
+      unit: 'Purchase Unit',
+      category: 'All',
+      fromDateTime: from,
+      toDateTime: to,
+    })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Stock Report Timewise</h1>
       </div>
@@ -99,9 +128,7 @@ export default function StockReportTimewise() {
           onChange={setToDateTime}
           defaultTime={{ hours: 23, minutes: 59, seconds: 59 }}
         />
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -118,6 +145,12 @@ export default function StockReportTimewise() {
         <p className="text-base font-semibold text-ink">No Record Found</p>
         <p className="mt-1 max-w-sm text-sm text-muted">
           We could not find what you searched for Try searching again
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: material={applied.rawMaterial || '—'} · unit={applied.unit}{' '}
+          · category={applied.category} · from=
+          {formatDateTime(applied.fromDateTime)} · to=
+          {formatDateTime(applied.toDateTime)}
         </p>
       </div>
     </InventoryPageShell>

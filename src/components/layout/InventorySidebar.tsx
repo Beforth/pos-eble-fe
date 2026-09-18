@@ -74,7 +74,7 @@ const INVENTORY_ROUTES: Record<string, string> = {
   suppliers: '/inventory/suppliers',
   units: '/inventory/units',
   categories: '/inventory/categories',
-  settings: '/inventory',
+  settings: '/inventory/settings',
 }
 
 const TOP_NAV: NavBranch[] = [
@@ -347,7 +347,7 @@ export function InventorySidebar({
                 {item.label}
                 {item.id === 'settings' ? (
                   <span className="mt-0.5 block text-[10px] font-normal text-muted">
-                    (RestId - 133856)
+                    Outlet preferences
                   </span>
                 ) : null}
               </span>

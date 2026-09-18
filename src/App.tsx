@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Slide, ToastContainer } from 'react-toastify'
 import { AuthProvider, ProtectedRoute } from './auth/AuthContext'
 import { RoleProvider } from './state/RoleContext'
+import { InventoryMastersProvider } from './state/InventoryMastersContext'
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
 import EditProfile from './pages/EditProfile'
@@ -60,6 +61,7 @@ import ScheduleChanges from './pages/ScheduleChanges'
 import ScheduleChannelMenu from './pages/ScheduleChannelMenu'
 import PhysicalMenu from './pages/PhysicalMenu'
 import InventoryDashboard from './pages/inventory/InventoryDashboard'
+import InventorySettings from './pages/inventory/InventorySettings'
 import InventoryOldDashboard from './pages/inventory/InventoryOldDashboard'
 import StockPurchase, {
   PurchaseOrder,
@@ -78,7 +80,6 @@ import Wastage from './pages/inventory/Wastage'
 import AddWastage from './pages/inventory/AddWastage'
 import SalesReturn from './pages/inventory/SalesReturn'
 import AddSalesReturn from './pages/inventory/AddSalesReturn'
-import InventoryPlaceholder from './pages/inventory/InventoryPlaceholder'
 import ProductionMaster from './pages/inventory/ProductionMaster'
 import AddProduction from './pages/inventory/AddProduction'
 import ProductionExecution from './pages/inventory/ProductionExecution'
@@ -115,6 +116,8 @@ import AddSupplier from './pages/inventory/AddSupplier'
 import PurchaseBillPayments from './pages/inventory/PurchaseBillPayments'
 import Units from './pages/inventory/Units'
 import AddUnit from './pages/inventory/AddUnit'
+import InventoryCategories from './pages/inventory/InventoryCategories'
+import AddInventoryCategory from './pages/inventory/AddInventoryCategory'
 import InvoiceTemplates from './pages/inventory/InvoiceTemplates'
 import InvoiceTemplateFullscreen from './pages/inventory/InvoiceTemplateFullscreen'
 import FinanceDashboard from './pages/finance/FinanceDashboard'
@@ -224,6 +227,7 @@ import VariantsManagement from './pages/VariantsManagement'
 export default function App() {
   return (
     <RoleProvider>
+      <InventoryMastersProvider>
       <AuthProvider>
         <BrowserRouter>
           <ToastContainer position="top-right" autoClose={2200} transition={Slide} />
@@ -614,6 +618,14 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/settings"
+            element={
+              <ProtectedRoute>
+                <InventorySettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/old"
             element={
               <ProtectedRoute>
@@ -638,6 +650,14 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/purchase/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddPurchase />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/purchase-order"
             element={
               <ProtectedRoute>
@@ -654,6 +674,14 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/purchase-order/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddPurchaseOrder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/purchase-return"
             element={
               <ProtectedRoute>
@@ -663,6 +691,14 @@ export default function App() {
           />
           <Route
             path="/inventory/purchase-return/new"
+            element={
+              <ProtectedRoute>
+                <AddPurchaseReturn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/purchase-return/:id/edit"
             element={
               <ProtectedRoute>
                 <AddPurchaseReturn />
@@ -702,6 +738,14 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/sales/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddSales />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/transfer"
             element={
               <ProtectedRoute>
@@ -711,6 +755,14 @@ export default function App() {
           />
           <Route
             path="/inventory/transfer/new"
+            element={
+              <ProtectedRoute>
+                <AddTransfer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/transfer/:id/edit"
             element={
               <ProtectedRoute>
                 <AddTransfer />
@@ -734,6 +786,14 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/wastage/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddWastage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/sales-return"
             element={
               <ProtectedRoute>
@@ -743,6 +803,14 @@ export default function App() {
           />
           <Route
             path="/inventory/sales-return/new"
+            element={
+              <ProtectedRoute>
+                <AddSalesReturn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/sales-return/:id/edit"
             element={
               <ProtectedRoute>
                 <AddSalesReturn />
@@ -1022,6 +1090,14 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/suppliers/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddSupplier />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/purchase-bill-payments"
             element={
               <ProtectedRoute>
@@ -1057,10 +1133,23 @@ export default function App() {
             path="/inventory/categories"
             element={
               <ProtectedRoute>
-                <InventoryPlaceholder
-                  activeItem="categories"
-                  title="Categories"
-                />
+                <InventoryCategories />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/categories/new"
+            element={
+              <ProtectedRoute>
+                <AddInventoryCategory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/categories/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddInventoryCategory />
               </ProtectedRoute>
             }
           />
@@ -2094,6 +2183,7 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+      </InventoryMastersProvider>
   </RoleProvider>
   )
 }

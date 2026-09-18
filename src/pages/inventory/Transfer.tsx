@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileCog, FileText, Plus, Search } from 'lucide-react'
+import { ChevronDown, FileCog, FileText, Pencil, Plus, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { TransferSettingsDrawer } from '../../components/inventory/TransferSettingsDrawer'
+import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import {
   OutlineButton,
   PrimaryButton,
+  RowActionButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_SALES_WRITE_PERMISSION,
+  deleteTransferApi,
+  listAllTransfersApi,
+  type StockTransfer,
+} from '../../services/inventoryService'
 
 function ExportMenu({
   onExportPage,
@@ -74,29 +85,140 @@ function ExportMenu({
   )
 }
 
+type ListRow = {
+  id: string
+  date: string
+  counterparty: string
+  number: string
+  total: string
+  paymentStatus: string
+  updateStock: boolean
+}
+
+function toRow(row: StockTransfer): ListRow {
+  return {
+    id: row.id,
+    date: row.invoice_date,
+    counterparty: row.supplier_name || row.restaurant_name || '—',
+    number: row.challan_number || '—',
+    total: row.grand_total,
+    paymentStatus: row.payment_status,
+    updateStock: row.update_inventory_stock,
+  }
+}
+
+const EXPORT_HEADERS = ['date', 'party', 'number', 'total', 'payment_status']
+
+function exportRows(rows: ListRow[]) {
+  return rows.map((row) => [
+    row.date,
+    row.counterparty,
+    row.number,
+    row.total,
+    row.paymentStatus,
+  ])
+}
+
 export default function Transfer() {
   const navigate = useNavigate()
-  const [startDate, setStartDate] = useState('2026-08-04')
-  const [endDate, setEndDate] = useState('2026-08-11')
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_SALES_WRITE_PERMISSION)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [to, setTo] = useState('all')
   const [challanNo, setChallanNo] = useState('')
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState('all')
+  const [updateStockFilter, setUpdateStockFilter] = useState('all')
+  const [applied, setApplied] = useState({
+    startDate: '',
+    endDate: '',
+    to: 'all',
+    challanNo: '',
+    paymentStatus: 'all',
+    updateStockFilter: 'all',
+  })
+  const [rows, setRows] = useState<ListRow[]>([])
+  const [loading, setLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<ListRow | null>(null)
+
+  useEffect(() => {
+    if (!encryptedOutletId) {
+      setRows([])
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    listAllTransfersApi(encryptedOutletId, {
+      search: applied.challanNo || undefined,
+      dateFrom: applied.startDate || undefined,
+      dateTo: applied.endDate || undefined,
+      sourceType: applied.to,
+    })
+      .then((items) => {
+        if (cancelled) return
+        const filtered = items.map(toRow).filter((row) => {
+          if (
+            applied.paymentStatus !== 'all' &&
+            row.paymentStatus !== applied.paymentStatus
+          ) {
+            return false
+          }
+          if (applied.updateStockFilter === 'yes' && !row.updateStock) {
+            return false
+          }
+          if (applied.updateStockFilter === 'no' && row.updateStock) {
+            return false
+          }
+          return true
+        })
+        setRows(filtered)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          showToast(
+            err instanceof ApiError ? err.message : 'Unable to load transfers',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, applied])
+
+  async function confirmDelete() {
+    if (!pendingDelete || !encryptedOutletId) return
+    try {
+      await deleteTransferApi(encryptedOutletId, pendingDelete.id)
+      setRows((prev) => prev.filter((row) => row.id !== pendingDelete.id))
+      showToast('Deleted')
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Unable to delete')
+    }
+  }
 
   return (
     <InventoryPageShell activeItem="transfer">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Transfer</h1>
         <div className="flex flex-wrap gap-2">
-          <PrimaryButton onClick={() => navigate('/inventory/transfer/new')}>
-            <Plus size={15} />
-            Create New
-          </PrimaryButton>
+          {canWrite ? (
+            <PrimaryButton onClick={() => navigate('/inventory/transfer/new')}>
+              <Plus size={15} />
+              Create New
+            </PrimaryButton>
+          ) : null}
           <ExportMenu
             onExportPage={() => {
+              downloadCsv(EXPORT_HEADERS, exportRows(rows), 'transfer-page.csv')
               showToast('Exported current page')
             }}
             onExportAll={() => {
+              downloadCsv(EXPORT_HEADERS, exportRows(rows), 'transfer-all.csv')
               showToast('Exported all')
             }}
           />
@@ -143,8 +265,8 @@ export default function Transfer() {
             className="h-9 min-w-[120px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
           >
             <option value="all">All</option>
-            <option value="dadar">Dadar</option>
-            <option value="andheri">Andheri</option>
+            <option value="restaurant">Restaurant</option>
+            <option value="supplier">Supplier</option>
           </select>
         </div>
         <div className="min-w-[160px] flex-1">
@@ -158,30 +280,153 @@ export default function Transfer() {
             className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton variant="gray">More Filters</OutlineButton>
-        <OutlineButton>Search</OutlineButton>
+        <OutlineButton
+          variant="gray"
+          onClick={() => setMoreFiltersOpen((prev) => !prev)}
+        >
+          {moreFiltersOpen ? 'Hide Filters' : 'More Filters'}
+        </OutlineButton>
+        <OutlineButton
+          onClick={() =>
+            setApplied({
+              startDate,
+              endDate,
+              to,
+              challanNo: challanNo.trim(),
+              paymentStatus,
+              updateStockFilter,
+            })
+          }
+        >
+          Search
+        </OutlineButton>
         <OutlineButton
           variant="gray"
           onClick={() => {
             setTo('all')
             setChallanNo('')
-            setStartDate('2026-08-04')
-            setEndDate('2026-08-11')
+            setStartDate('')
+            setEndDate('')
+            setPaymentStatus('all')
+            setUpdateStockFilter('all')
+            setMoreFiltersOpen(false)
+            setApplied({
+              startDate: '',
+              endDate: '',
+              to: 'all',
+              challanNo: '',
+              paymentStatus: 'all',
+              updateStockFilter: 'all',
+            })
           }}
         >
           Clear
         </OutlineButton>
       </div>
 
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-        <span className="relative mb-4 text-muted">
-          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
-          <Search
-            size={24}
-            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-          />
-        </span>
-        <p className="text-base font-semibold text-ink">Record Not Found</p>
+      {moreFiltersOpen ? (
+        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-line bg-page/40 p-4">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-ink">
+              Payment Status
+            </label>
+            <select
+              value={paymentStatus}
+              onChange={(event) => setPaymentStatus(event.target.value)}
+              className="h-9 min-w-[140px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            >
+              <option value="all">All</option>
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-ink">
+              Update Stock
+            </label>
+            <select
+              value={updateStockFilter}
+              onChange={(event) => setUpdateStockFilter(event.target.value)}
+              className="h-9 min-w-[140px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            >
+              <option value="all">All</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-line bg-card">
+        <div className="overflow-x-auto">
+          <table className="min-w-[720px] w-full text-left text-sm">
+            <thead className="border-b border-line bg-page text-xs font-semibold text-ink">
+              <tr>
+                <th className="px-3 py-2.5">Date</th>
+                <th className="px-3 py-2.5">Counterparty</th>
+                <th className="px-3 py-2.5">Challan No</th>
+                <th className="px-3 py-2.5">Total</th>
+                <th className="px-3 py-2.5 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-16 text-center">
+                    <span className="relative mb-4 inline-flex text-muted">
+                      <FileText
+                        size={56}
+                        strokeWidth={1.25}
+                        className="text-muted/50"
+                      />
+                    </span>
+                    <p className="text-base font-semibold text-ink">
+                      {loading ? 'Loading…' : 'Record Not Found'}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row, index) => (
+                  <tr
+                    key={row.id}
+                    className={`border-b border-line last:border-b-0 ${
+                      index % 2 === 1 ? 'bg-page/50' : 'bg-card'
+                    }`}
+                  >
+                    <td className="px-3 py-2.5 text-ink">{row.date}</td>
+                    <td className="px-3 py-2.5 text-ink">{row.counterparty}</td>
+                    <td className="px-3 py-2.5 text-ink">{row.number}</td>
+                    <td className="px-3 py-2.5 text-ink">{row.total}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {canWrite ? (
+                          <RowActionButton
+                            boxed
+                            label="Edit"
+                            onClick={() =>
+                              navigate(`/inventory/transfer/${row.id}/edit`)
+                            }
+                          >
+                            <Pencil size={15} strokeWidth={1.75} />
+                          </RowActionButton>
+                        ) : null}
+                        {canWrite ? (
+                          <RowActionButton
+                            boxed
+                            label="Delete"
+                            onClick={() => setPendingDelete(row)}
+                          >
+                            <X size={15} strokeWidth={1.75} />
+                          </RowActionButton>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <TransferSettingsDrawer
@@ -190,6 +435,14 @@ export default function Transfer() {
         onSave={() => {
           showToast('Settings saved')
         }}
+      />
+      <ConfirmDeleteModal
+        open={Boolean(pendingDelete)}
+        title="Confirm Delete"
+        message={`Are you sure you want to delete "${pendingDelete?.number ?? 'this document'}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => void confirmDelete()}
+        onClose={() => setPendingDelete(null)}
       />
     </InventoryPageShell>
   )

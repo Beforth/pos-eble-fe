@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { Download, FileText } from 'lucide-react'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
+import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useListQuery } from '../../hooks/useListQuery'
 import { DayEndSummaryModal } from '../../components/reports/DayEndSummaryModal'
 import {
   DAY_END_SUMMARY_ROWS,
@@ -46,10 +48,20 @@ export default function DayEndSummary() {
     )
   }, [appliedEnd, appliedStart, ignoreDates])
 
-  const totalRecords = filtered.length
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filtered,
+    (row) => [row.createdDate, row.orders, row.total],
+    (row, key) => {
+      if (key === 'orders') return row.orders
+      if (key === 'total') return row.total
+      return row.dateKey
+    },
+  )
+
+  const totalRecords = visible.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const pageRows = filtered.slice(
+  const pageRows = visible.slice(
     (safePage - 1) * PAGE_SIZE,
     safePage * PAGE_SIZE,
   )
@@ -130,15 +142,35 @@ export default function DayEndSummary() {
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line bg-page text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                <th className="px-4 py-3 font-semibold normal-case tracking-normal text-ink">
+                <SortableTh
+                  columnKey="createdDate"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-3 font-semibold normal-case tracking-normal text-ink"
+                >
                   Created Date
-                </th>
-                <th className="px-4 py-3 text-center font-semibold normal-case tracking-normal text-ink">
+                </SortableTh>
+                <SortableTh
+                  columnKey="orders"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="center"
+                  className="px-4 py-3 font-semibold normal-case tracking-normal text-ink"
+                >
                   No. Of Orders
-                </th>
-                <th className="px-4 py-3 text-center font-semibold normal-case tracking-normal text-ink">
+                </SortableTh>
+                <SortableTh
+                  columnKey="total"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="center"
+                  className="px-4 py-3 font-semibold normal-case tracking-normal text-ink"
+                >
                   Total (₹)
-                </th>
+                </SortableTh>
                 <th className="px-4 py-3 text-center font-semibold normal-case tracking-normal text-ink">
                   Actions
                 </th>

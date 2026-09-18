@@ -5,6 +5,8 @@ import { ChevronDown, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
@@ -120,15 +122,21 @@ export default function ExpenseWithdrawal() {
     [filtered],
   )
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filtered,
+    (row) => [row.title, row.total],
+    (row, key) => (key === 'total' ? row.total : row.title),
+  )
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
-  const pageRows = filtered.slice(
+  const pageRows = visible.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   )
   const fromRecord =
-    filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-  const toRecord = Math.min(currentPage * PAGE_SIZE, filtered.length)
+    visible.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const toRecord = Math.min(currentPage * PAGE_SIZE, visible.length)
 
 
   function handleSearch() {
@@ -271,10 +279,25 @@ export default function ExpenseWithdrawal() {
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b border-line bg-primary/5 text-sm font-semibold text-ink">
                   <tr>
-                    <th className="px-4 py-3">Title</th>
-                    <th className="px-4 py-3 text-right">
+                    <SortableTh
+                      columnKey="title"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Title
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="total"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-4 py-3"
+                    >
                       Total Expense Reported ({brand.currency})
-                    </th>
+                    </SortableTh>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -309,9 +332,9 @@ export default function ExpenseWithdrawal() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-page/50 px-4 py-3">
               <p className="text-sm text-muted">
-                {filtered.length === 0
+                {visible.length === 0
                   ? 'Showing 0 records'
-                  : `Showing ${fromRecord} to ${toRecord} of ${filtered.length} records`}
+                  : `Showing ${fromRecord} to ${toRecord} of ${visible.length} records`}
               </p>
               <div className="flex flex-wrap items-center gap-1">
                 {Array.from({ length: totalPages }, (_, index) => index + 1).map(

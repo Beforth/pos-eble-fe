@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
@@ -71,16 +72,39 @@ function ExportMenu({
 
 export default function SemiFinishedFoodCostingReport() {
   const [productionName, setProductionName] = useState('')
+  const [applied, setApplied] = useState({ productionName: '' })
 
+  function handleSearch() {
+    setApplied({ productionName: productionName.trim() })
+    showToast('Search applied')
+  }
+
+  function handleClear() {
+    setProductionName('')
+    setApplied({ productionName: '' })
+  }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Semi FCR Report</h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => {
+            downloadCsv(
+              ['production_name'],
+              [[applied.productionName]],
+              'semi-finished-fcr-page.csv',
+            )
+            showToast('Exported current page')
+          }}
+          onExportAll={() => {
+            downloadCsv(
+              ['production_name'],
+              [[applied.productionName]],
+              'semi-finished-fcr-all.csv',
+            )
+            showToast('Exported all')
+          }}
         />
       </div>
 
@@ -96,8 +120,9 @@ export default function SemiFinishedFoodCostingReport() {
             className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
+        <OutlineButton variant="gray" onClick={handleClear}>
+          Clear
         </OutlineButton>
       </div>
 
@@ -111,6 +136,9 @@ export default function SemiFinishedFoodCostingReport() {
         </span>
         <p className="text-base font-semibold text-ink">
           No Semi FCR Report Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: production={applied.productionName || '—'}
         </p>
       </div>
     </InventoryPageShell>

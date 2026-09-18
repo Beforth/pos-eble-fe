@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -18,6 +19,8 @@ const FROM_OPTIONS = [
   'Dairy Vendors',
   'Other Restaurant',
 ]
+
+const DEFAULT_DATE = '2026-08-11'
 
 function ExportMenu({
   onExportPage,
@@ -84,29 +87,58 @@ function ExportMenu({
 }
 
 export default function SalesTransferVarianceReport() {
-  const [fromDate, setFromDate] = useState('2026-08-11')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState(DEFAULT_DATE)
+  const [toDate, setToDate] = useState(DEFAULT_DATE)
   const [type, setType] = useState('With Purchase Order')
   const [from, setFrom] = useState('All')
+  const [applied, setApplied] = useState({
+    fromDate: DEFAULT_DATE,
+    toDate: DEFAULT_DATE,
+    type: 'With Purchase Order',
+    from: 'All',
+  })
 
+  function handleSearch() {
+    setApplied({ fromDate, toDate, type, from })
+    showToast('Search applied')
+  }
 
   function handleClear() {
-    setFromDate('2026-08-11')
-    setToDate('2026-08-11')
+    setFromDate(DEFAULT_DATE)
+    setToDate(DEFAULT_DATE)
     setType('With Purchase Order')
     setFrom('All')
+    setApplied({
+      fromDate: DEFAULT_DATE,
+      toDate: DEFAULT_DATE,
+      type: 'With Purchase Order',
+      from: 'All',
+    })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Sales And Transfer Variance Report
         </h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => {
+            downloadCsv(
+              ['from_date', 'to_date', 'type', 'from'],
+              [[applied.fromDate, applied.toDate, applied.type, applied.from]],
+              'sales-transfer-variance-page.csv',
+            )
+            showToast('Exported current page')
+          }}
+          onExportAll={() => {
+            downloadCsv(
+              ['from_date', 'to_date', 'type', 'from'],
+              [[applied.fromDate, applied.toDate, applied.type, applied.from]],
+              'sales-transfer-variance-all.csv',
+            )
+            showToast('Exported all')
+          }}
         />
       </div>
 
@@ -155,9 +187,7 @@ export default function SalesTransferVarianceReport() {
             onChange={setFrom}
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -173,6 +203,10 @@ export default function SalesTransferVarianceReport() {
         </span>
         <p className="text-base font-semibold text-ink">
           Sales And Transfer Variance Report Record Not Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: start={applied.fromDate} · end={applied.toDate} · type=
+          {applied.type} · from={applied.from}
         </p>
       </div>
     </InventoryPageShell>

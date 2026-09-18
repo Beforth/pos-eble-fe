@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -18,6 +19,8 @@ const CATEGORY_OPTIONS = [
   'Fruits/vegetables',
   'No Category',
 ]
+
+const DEFAULT_DATE = '2026-08-11'
 
 function ExportMenu({
   onExportPage,
@@ -86,27 +89,75 @@ function ExportMenu({
 export default function OpeningClosingStockReport() {
   const [rawMaterial, setRawMaterial] = useState('')
   const [category, setCategory] = useState('All')
-  const [fromDate, setFromDate] = useState('2026-08-11')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState(DEFAULT_DATE)
+  const [toDate, setToDate] = useState(DEFAULT_DATE)
+  const [applied, setApplied] = useState({
+    rawMaterial: '',
+    category: 'All',
+    fromDate: DEFAULT_DATE,
+    toDate: DEFAULT_DATE,
+  })
 
+  function handleSearch() {
+    setApplied({
+      rawMaterial: rawMaterial.trim(),
+      category,
+      fromDate,
+      toDate,
+    })
+    showToast('Search applied')
+  }
 
   function handleClear() {
     setRawMaterial('')
     setCategory('All')
-    setFromDate('2026-08-11')
-    setToDate('2026-08-11')
+    setFromDate(DEFAULT_DATE)
+    setToDate(DEFAULT_DATE)
+    setApplied({
+      rawMaterial: '',
+      category: 'All',
+      fromDate: DEFAULT_DATE,
+      toDate: DEFAULT_DATE,
+    })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Opening - Closing Stock Report
         </h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => {
+            downloadCsv(
+              ['raw_material', 'category', 'from_date', 'to_date'],
+              [
+                [
+                  applied.rawMaterial,
+                  applied.category,
+                  applied.fromDate,
+                  applied.toDate,
+                ],
+              ],
+              'opening-closing-stock-page.csv',
+            )
+            showToast('Exported current page')
+          }}
+          onExportAll={() => {
+            downloadCsv(
+              ['raw_material', 'category', 'from_date', 'to_date'],
+              [
+                [
+                  applied.rawMaterial,
+                  applied.category,
+                  applied.fromDate,
+                  applied.toDate,
+                ],
+              ],
+              'opening-closing-stock-all.csv',
+            )
+            showToast('Exported all')
+          }}
         />
       </div>
 
@@ -155,9 +206,7 @@ export default function OpeningClosingStockReport() {
             className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -173,6 +222,10 @@ export default function OpeningClosingStockReport() {
         </span>
         <p className="text-base font-semibold text-ink">
           Opening/Closing Report Record Not Found
+        </p>
+        <p className="mt-2 max-w-lg text-sm text-muted">
+          Filters: material={applied.rawMaterial || '—'} · category=
+          {applied.category} · from={applied.fromDate} · to={applied.toDate}
         </p>
       </div>
     </InventoryPageShell>

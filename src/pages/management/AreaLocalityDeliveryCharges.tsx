@@ -4,7 +4,10 @@ import { showToast } from '../../utils/toast'
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/common/Badge'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
@@ -30,6 +33,18 @@ export default function AreaLocalityDeliveryCharges() {
     const wantActive = appliedStatus === 'Active'
     return rows.filter((row) => row.active === wantActive)
   }, [rows, appliedStatus])
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      filtered,
+      (row) => [row.area, row.locality, row.charge, row.active],
+      (row, key) => {
+        if (key === 'locality') return row.locality
+        if (key === 'charge') return Number(row.charge) || row.charge
+        if (key === 'status') return row.active ? 1 : 0
+        return row.area
+      },
+    )
 
 
   function handleSearch() {
@@ -89,7 +104,7 @@ export default function AreaLocalityDeliveryCharges() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center">
             <span className="mb-4 flex size-20 items-center justify-center rounded-full bg-page">
               <Search
@@ -104,19 +119,59 @@ export default function AreaLocalityDeliveryCharges() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <div className="border-b border-line p-4">
+              <ListSearch
+                value={search}
+                onChange={setSearch}
+                placeholder="Search areas"
+              />
+            </div>
+            <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
                 <tr>
-                  <th className="px-4 py-3">Area</th>
-                  <th className="px-4 py-3">Locality</th>
-                  <th className="px-4 py-3">Charge ({brand.currency})</th>
-                  <th className="px-4 py-3">Status</th>
+                  <SortableTh
+                    columnKey="area"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Area
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="locality"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Locality
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="charge"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Charge ({brand.currency})
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="status"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Status
+                  </SortableTh>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
+                {visible.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-0 hover:bg-page/50"
@@ -160,6 +215,7 @@ export default function AreaLocalityDeliveryCharges() {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         )}
       </div>

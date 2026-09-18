@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -65,19 +66,33 @@ function ExportMenu({ onExportAll }: { onExportAll?: () => void }) {
 export default function PaymentLedgerReport() {
   const [from, setFrom] = useState('Supplier')
   const [supplier, setSupplier] = useState('')
+  const [applied, setApplied] = useState({ from: 'Supplier', supplier: '' })
 
+  function handleSearch() {
+    setApplied({ from, supplier })
+    showToast('Search applied')
+  }
 
   function handleClear() {
     setFrom('Supplier')
     setSupplier('')
+    setApplied({ from: 'Supplier', supplier: '' })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Ledger Payment Report</h1>
-        <ExportMenu onExportAll={() => showToast('Exported all')} />
+        <ExportMenu
+          onExportAll={() => {
+            downloadCsv(
+              ['from', 'supplier'],
+              [[applied.from, applied.supplier]],
+              'payment-ledger-all.csv',
+            )
+            showToast('Exported all')
+          }}
+        />
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
@@ -103,9 +118,7 @@ export default function PaymentLedgerReport() {
             onChange={setSupplier}
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
-          Search
-        </OutlineButton>
+        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -140,6 +153,10 @@ export default function PaymentLedgerReport() {
                     </span>
                     <p className="text-base font-semibold text-ink">
                       Ledger Payment Report Record Not Found
+                    </p>
+                    <p className="mt-2 max-w-lg text-sm text-muted">
+                      Filters: from={applied.from} · supplier=
+                      {applied.supplier || '—'}
                     </p>
                   </div>
                 </td>

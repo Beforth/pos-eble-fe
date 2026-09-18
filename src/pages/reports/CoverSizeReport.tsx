@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Printer, Search, Settings2 } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   buildCoverSizeReportRows,
   coverSizeReportGeneratedLabel,
@@ -32,6 +34,21 @@ export default function CoverSizeReport() {
     })
     return buildCoverSizeReportRows(entries)
   }, [appliedFrom, appliedTo, refreshKey])
+
+  const dataRows = useMemo(
+    () => displayRows.filter((row) => !row.isTotal),
+    [displayRows],
+  )
+  const totalRow = useMemo(
+    () => displayRows.find((row) => row.isTotal),
+    [displayRows],
+  )
+
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    dataRows,
+    (row) => [row.label, row.persons],
+    (row, key) => (key === 'persons' ? row.persons : row.label),
+  )
 
   function handlePrint() {
     window.print()
@@ -190,16 +207,30 @@ export default function CoverSizeReport() {
             <table className="w-full min-w-[420px] border-collapse text-sm">
               <thead>
                 <tr className="bg-white">
-                  <th className="border-b border-r border-line px-3 py-2 text-left font-semibold text-ink" />
+                  <SortableTh
+                    columnKey="label"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="border-b border-r border-line px-3 py-2 font-semibold text-ink"
+                  >
+                    {' '}
+                  </SortableTh>
                   {showPersonsCol ? (
-                    <th className="border-b border-line px-3 py-2 text-left font-semibold text-ink">
+                    <SortableTh
+                      columnKey="persons"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="border-b border-line px-3 py-2 font-semibold text-ink"
+                    >
                       No. of Persons (Success Orders)
-                    </th>
+                    </SortableTh>
                   ) : null}
                 </tr>
               </thead>
               <tbody>
-                {displayRows.length <= 1 && displayRows[0]?.persons === 0 ? (
+                {visible.length === 0 && (!totalRow || totalRow.persons === 0) ? (
                   <tr>
                     <td
                       colSpan={showPersonsCol ? 2 : 1}
@@ -210,7 +241,7 @@ export default function CoverSizeReport() {
                     </td>
                   </tr>
                 ) : (
-                  displayRows.map((row) => (
+                  [...visible, ...(totalRow ? [totalRow] : [])].map((row) => (
                     <tr key={row.label} className="bg-white hover:bg-page/50">
                       <td
                         className={`border-b border-r border-line px-3 py-2 text-ink ${

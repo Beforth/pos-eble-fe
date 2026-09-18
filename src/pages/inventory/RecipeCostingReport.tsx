@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { Calculator, ChevronDown, FileText } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -263,13 +264,16 @@ export default function RecipeCostingReport() {
   const [calculateFrom, setCalculateFrom] = useState(
     'Latest average purchase price',
   )
-  const [appliedMenu, setAppliedMenu] = useState('All')
+  const [applied, setApplied] = useState({
+    menuName: 'All',
+    calculateFrom: 'Latest average purchase price',
+  })
   const [selectedRow, setSelectedRow] = useState<RecipeRow | null>(null)
 
   const rows = useMemo(() => {
-    if (appliedMenu === 'All') return ALL_ROWS
-    return ALL_ROWS.filter((row) => row.menuName === appliedMenu)
-  }, [appliedMenu])
+    if (applied.menuName === 'All') return ALL_ROWS
+    return ALL_ROWS.filter((row) => row.menuName === applied.menuName)
+  }, [applied.menuName])
 
 
   return (
@@ -278,8 +282,32 @@ export default function RecipeCostingReport() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Recipe Costing Report</h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => {
+            downloadCsv(
+              ['menu_name', 'recipe_costing', 'selling_price', 'margin'],
+              rows.map((row) => [
+                row.menuName,
+                row.recipeCosting,
+                row.sellingPrice,
+                row.margin,
+              ]),
+              'recipe-costing-page.csv',
+            )
+            showToast('Exported current page')
+          }}
+          onExportAll={() => {
+            downloadCsv(
+              ['menu_name', 'recipe_costing', 'selling_price', 'margin'],
+              ALL_ROWS.map((row) => [
+                row.menuName,
+                row.recipeCosting,
+                row.sellingPrice,
+                row.margin,
+              ]),
+              'recipe-costing-all.csv',
+            )
+            showToast('Exported all')
+          }}
         />
       </div>
 
@@ -308,7 +336,7 @@ export default function RecipeCostingReport() {
         </div>
         <OutlineButton
           onClick={() => {
-            setAppliedMenu(menuName)
+            setApplied({ menuName, calculateFrom })
             showToast('Search applied')
           }}
         >
@@ -319,13 +347,19 @@ export default function RecipeCostingReport() {
           onClick={() => {
             setMenuName('All')
             setCalculateFrom('Latest average purchase price')
-            setAppliedMenu('All')
-            showToast('Filters cleared')
+            setApplied({
+              menuName: 'All',
+              calculateFrom: 'Latest average purchase price',
+            })
           }}
         >
           Clear Filter
         </OutlineButton>
       </div>
+
+      <p className="mb-3 text-xs text-muted">
+        Applied: menu={applied.menuName} · calculateFrom={applied.calculateFrom}
+      </p>
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="overflow-x-auto">

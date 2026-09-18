@@ -1,19 +1,20 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Printer, Search } from 'lucide-react'
+import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { menuCategories } from '../../mocks/menuCategoriesData'
 import { menuItems } from '../../mocks/menuItemsData'
 
 export default function GroupSummaryReport() {
   const navigate = useNavigate()
   const [billNo, setBillNo] = useState('')
-  const [search, setSearch] = useState('')
 
-  const rows = useMemo(() => {
-    const q = search.trim().toLowerCase()
+  const groupedRows = useMemo(() => {
     const topLevel = menuCategories.filter((c) => !c.parentCategory)
-    let result = topLevel.map((cat) => {
+    return topLevel.map((cat) => {
       const children = menuCategories.filter((c) => c.parentCategory === cat.name)
       const childIds = new Set(children.map((c) => c.id))
       const catItems = menuItems.filter(
@@ -26,9 +27,21 @@ export default function GroupSummaryReport() {
         revenue: catItems.reduce((s, item) => s + item.price, 0),
       }
     })
-    if (q) result = result.filter((r) => r.group.toLowerCase().includes(q))
-    return result
-  }, [search])
+  }, [])
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      groupedRows,
+      (row) => [row.group, row.categories, row.items, row.revenue],
+      (row, key) => {
+        if (key === 'categories') return row.categories
+        if (key === 'items') return row.items
+        if (key === 'revenue') return row.revenue
+        return row.group
+      },
+    )
+
+  const rows = visible
 
   const totalGroups = rows.length
   const totalItems = rows.reduce((s, r) => s + r.items, 0)
@@ -76,20 +89,21 @@ export default function GroupSummaryReport() {
         </div>
 
         <div className="rounded-xl border border-line bg-card">
-          <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search groups..." className="h-9 w-full rounded-lg border border-line bg-page pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary" />
-            </div>
+          <div className="border-b border-line p-3">
+            <ListSearch
+              value={search}
+              onChange={setSearch}
+              placeholder="Search groups"
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[500px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Group</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Categories</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Items</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</th>
+                  <SortableTh columnKey="group" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Group</SortableTh>
+                  <SortableTh columnKey="categories" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Categories</SortableTh>
+                  <SortableTh columnKey="items" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Items</SortableTh>
+                  <SortableTh columnKey="revenue" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

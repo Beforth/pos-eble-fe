@@ -46,3 +46,17 @@ export async function getPermissionCatalogApi(): Promise<PermissionCatalog> {
     token: authToken(),
   })
 }
+
+export interface PermissionGroup {
+  id: string
+  name: string
+  permissions: string[]
+}
+
+/** Django Groups with POS catalog Chosen permissions. */
+export async function getPermissionGroupsApi(): Promise<PermissionGroup[]> {
+  return apiRequest<PermissionGroup[]>('/api/v1/accounts/groups/', {
+    method: 'GET',
+    token: authToken(),
+  })
+}

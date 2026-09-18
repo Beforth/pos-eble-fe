@@ -1,7 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Printer, Search } from 'lucide-react'
+import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
+import { ListSearch } from '../components/common/ListSearch'
+import { SortableTh } from '../components/common/SortableTh'
+import { useListQuery } from '../hooks/useListQuery'
 
 interface LogRow {
   id: string
@@ -47,23 +50,22 @@ const PAGE_SIZE = 10
 export default function LogsPage() {
   const navigate = useNavigate()
   const [billNo, setBillNo] = useState('')
-  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return LOG_ROWS
-    return LOG_ROWS.filter(
-      (r) =>
-        r.action.toLowerCase().includes(q) ||
-        r.user.toLowerCase().includes(q) ||
-        r.details.toLowerCase().includes(q),
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      LOG_ROWS,
+      (row) => [row.timestamp, row.user, row.action, row.details],
+      (row, key) => {
+        if (key === 'user') return row.user
+        if (key === 'action') return row.action
+        if (key === 'details') return row.details
+        return row.timestamp
+      },
     )
-  }, [search])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const pageRows = filtered.slice(
+  const pageRows = visible.slice(
     (safePage - 1) * PAGE_SIZE,
     safePage * PAGE_SIZE,
   )
@@ -133,27 +135,58 @@ export default function LogsPage() {
 
         <div className="rounded-xl border border-line bg-card">
           <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                placeholder="Search logs..."
-                className="h-9 w-full rounded-lg border border-line bg-page pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
-              />
-            </div>
-            <span className="text-xs text-muted">{filtered.length} events</span>
+            <ListSearch
+              value={search}
+              onChange={(value) => {
+                setSearch(value)
+                setPage(1)
+              }}
+              placeholder="Search logs..."
+              className="sm:max-w-xs"
+            />
+            <span className="text-xs text-muted">{visible.length} events</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Timestamp</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">User</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Action</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Details</th>
+                  <SortableTh
+                    columnKey="timestamp"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
+                  >
+                    Timestamp
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="user"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
+                  >
+                    User
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="action"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
+                  >
+                    Action
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="details"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
+                  >
+                    Details
+                  </SortableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
