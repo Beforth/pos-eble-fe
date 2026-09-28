@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
-import { showToast } from '../../utils/toast'
-import { downloadCsv } from '../../utils/downloadFile'
-import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  DisabledExportButton,
+  REPORT_UNAVAILABLE_MESSAGE,
+  ReportEmptyState,
+  ReportUnavailableNotice,
+} from '../../components/inventory/ReportUnavailableNotice'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
 
 const FROM_OPTIONS = ['Supplier', 'Customer', 'Third Party', 'All']
@@ -17,83 +20,23 @@ const SUPPLIER_OPTIONS = [
   'Packaging Hub',
 ]
 
-function ExportMenu({ onExportAll }: { onExportAll?: () => void }) {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
-      >
-        <FileText size={15} className="text-muted" />
-        Export
-        <ChevronDown size={14} className="text-muted" />
-      </button>
-      {open ? (
-        <ul className="absolute right-0 z-40 mt-1.5 min-w-[140px] overflow-hidden rounded-md border border-line bg-card py-1 shadow-lg">
-          <li>
-            <button
-              type="button"
-              onClick={() => {
-                onExportAll?.()
-                setOpen(false)
-              }}
-              className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
-            >
-              Export All
-            </button>
-          </li>
-        </ul>
-      ) : null}
-    </div>
-  )
-}
-
 export default function PaymentLedgerReport() {
   const [from, setFrom] = useState('Supplier')
   const [supplier, setSupplier] = useState('')
-  const [applied, setApplied] = useState({ from: 'Supplier', supplier: '' })
-
-  function handleSearch() {
-    setApplied({ from, supplier })
-    showToast('Search applied')
-  }
 
   function handleClear() {
     setFrom('Supplier')
     setSupplier('')
-    setApplied({ from: 'Supplier', supplier: '' })
   }
 
   return (
     <InventoryPageShell activeItem="other-reports">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Ledger Payment Report</h1>
-        <ExportMenu
-          onExportAll={() => {
-            downloadCsv(
-              ['from', 'supplier'],
-              [[applied.from, applied.supplier]],
-              'payment-ledger-all.csv',
-            )
-            showToast('Exported all')
-          }}
-        />
+        <DisabledExportButton />
       </div>
+
+      <ReportUnavailableNotice />
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
         <div className="min-w-[160px]">
@@ -118,7 +61,9 @@ export default function PaymentLedgerReport() {
             onChange={setSupplier}
           />
         </div>
-        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
+        <OutlineButton disabled title={REPORT_UNAVAILABLE_MESSAGE}>
+          Search
+        </OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
           Clear
         </OutlineButton>
@@ -139,26 +84,10 @@ export default function PaymentLedgerReport() {
             <tbody>
               <tr>
                 <td colSpan={5} className="px-3 py-16">
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <span className="relative mb-4 text-muted">
-                      <FileText
-                        size={56}
-                        strokeWidth={1.25}
-                        className="text-muted/50"
-                      />
-                      <Search
-                        size={24}
-                        className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-                      />
-                    </span>
-                    <p className="text-base font-semibold text-ink">
-                      Ledger Payment Report Record Not Found
-                    </p>
-                    <p className="mt-2 max-w-lg text-sm text-muted">
-                      Filters: from={applied.from} · supplier=
-                      {applied.supplier || '—'}
-                    </p>
-                  </div>
+                  <ReportEmptyState
+                    variant="plain"
+                    title="Ledger Payment Report Record Not Found"
+                  />
                 </td>
               </tr>
             </tbody>

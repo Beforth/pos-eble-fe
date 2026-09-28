@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/downloadFile'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileCog, FileText, Pencil, Plus, X } from 'lucide-react'
+import { ChevronDown, FileCog, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SalesSettingsDrawer } from '../../components/inventory/SalesSettingsDrawer'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
@@ -155,6 +155,8 @@ export default function Sales() {
       dateFrom: applied.startDate || undefined,
       dateTo: applied.endDate || undefined,
       sourceType: applied.to,
+      paymentStatus: applied.paymentStatus,
+      updateInventoryStock: applied.updateStockFilter,
     })
       .then((items) => {
         if (cancelled) return
@@ -337,6 +339,7 @@ export default function Sales() {
             >
               <option value="all">All</option>
               <option value="paid">Paid</option>
+              <option value="partial">Partially Paid</option>
               <option value="unpaid">Unpaid</option>
             </select>
           </div>
@@ -416,7 +419,7 @@ export default function Sales() {
                             label="Delete"
                             onClick={() => setPendingDelete(row)}
                           >
-                            <X size={15} strokeWidth={1.75} />
+                            <Trash2 size={15} strokeWidth={1.75} />
                           </RowActionButton>
                         ) : null}
                       </div>

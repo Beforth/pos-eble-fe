@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileCog, FileText, Pencil, Plus, ScanLine, X } from 'lucide-react'
+import { ChevronDown, FileCog, FileText, Pencil, Plus, ScanLine, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ScanPurchaseModal } from '../../components/inventory/ScanPurchaseModal'
 import { PurchaseOrderSettingsDrawer } from '../../components/inventory/PurchaseOrderSettingsDrawer'
@@ -128,6 +128,14 @@ function toOrderRow(row: PurchaseOrder): ListRow {
   }
 }
 
+function toReturnRow(row: PurchaseOrder): ListRow {
+  return {
+    ...toOrderRow(row),
+    number: row.invoice_number || row.po_number || '—',
+    paymentStatus: row.payment_status,
+  }
+}
+
 interface PurchaseListPageProps {
   kind: Kind
   title: string
@@ -189,6 +197,10 @@ function PurchaseListPage({
       dateFrom: applied.startDate || undefined,
       dateTo: applied.endDate || undefined,
       sourceType: applied.from,
+      paymentStatus:
+        kind !== 'order' ? applied.paymentStatus : undefined,
+      updateInventoryStock:
+        kind === 'purchase' ? applied.updateStockFilter : undefined,
     }
     const loader =
       kind === 'purchase'
@@ -200,7 +212,7 @@ function PurchaseListPage({
               items.map(toOrderRow),
             )
           : listAllPurchaseReturnsApi(encryptedOutletId, params).then((items) =>
-              items.map(toOrderRow),
+              items.map(toReturnRow),
             )
     loader
       .then((items) => {
@@ -343,7 +355,11 @@ function PurchaseListPage({
         </div>
         <div className="min-w-[160px] flex-1">
           <label className="mb-1.5 block text-xs font-semibold text-ink">
-            Invoice No.
+            {kind === 'order'
+              ? 'PO No.'
+              : kind === 'return'
+                ? 'Return / Debit Note No.'
+                : 'Invoice No.'}
           </label>
           <input
             type="text"
@@ -352,12 +368,14 @@ function PurchaseListPage({
             className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton
-          variant="gray"
-          onClick={() => setMoreFiltersOpen((prev) => !prev)}
-        >
-          {moreFiltersOpen ? 'Hide Filters' : 'More Filters'}
-        </OutlineButton>
+        {kind !== 'order' ? (
+          <OutlineButton
+            variant="gray"
+            onClick={() => setMoreFiltersOpen((prev) => !prev)}
+          >
+            {moreFiltersOpen ? 'Hide Filters' : 'More Filters'}
+          </OutlineButton>
+        ) : null}
         <OutlineButton
           onClick={() =>
             setApplied({
@@ -396,7 +414,7 @@ function PurchaseListPage({
         </OutlineButton>
       </div>
 
-      {moreFiltersOpen ? (
+      {kind !== 'order' && moreFiltersOpen ? (
         <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-line bg-page/40 p-4">
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-ink">
@@ -408,11 +426,14 @@ function PurchaseListPage({
               className="h-9 min-w-[140px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
             >
               <option value="all">All</option>
-              <option value="paid">Paid</option>
-              <option value="unpaid">Unpaid</option>
+              <option value="paid">{kind === 'return' ? 'Refunded' : 'Paid'}</option>
+              <option value="partial">
+                {kind === 'return' ? 'Partially Refunded' : 'Partially Paid'}
+              </option>
+              <option value="unpaid">{kind === 'return' ? 'Pending' : 'Unpaid'}</option>
             </select>
           </div>
-          <div>
+          {kind === 'purchase' ? <div>
             <label className="mb-1.5 block text-xs font-semibold text-ink">
               Update Stock
             </label>
@@ -425,7 +446,7 @@ function PurchaseListPage({
               <option value="yes">Yes</option>
               <option value="no">No</option>
             </select>
-          </div>
+          </div> : null}
         </div>
       ) : null}
 
@@ -488,7 +509,7 @@ function PurchaseListPage({
                             label="Delete"
                             onClick={() => setPendingDelete(row)}
                           >
-                            <X size={15} strokeWidth={1.75} />
+                            <Trash2 size={15} strokeWidth={1.75} />
                           </RowActionButton>
                         ) : null}
                       </div>

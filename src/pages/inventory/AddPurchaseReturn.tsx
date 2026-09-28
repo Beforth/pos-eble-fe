@@ -12,6 +12,18 @@ import {
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { PaymentHistoryPanel } from '../../components/inventory/PaymentHistoryPanel'
+import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import { OtherDetailsDrawer } from '../../components/inventory/OtherDetailsDrawer'
 import {
   ActionDropdown,
@@ -42,6 +54,9 @@ interface LineItem {
   unit: string
   price: string
   amount: string
+  cgst: string
+  sgst: string
+  igst: string
 }
 
 function emptyLine(): LineItem {
@@ -53,6 +68,9 @@ function emptyLine(): LineItem {
     unit: '',
     price: '',
     amount: '',
+    cgst: '',
+    sgst: '',
+    igst: '',
   }
 }
 
@@ -82,9 +100,11 @@ export default function AddPurchaseReturn() {
   )
   const [deliveryTime, setDeliveryTime] = useState('')
   const [poNumber, setPoNumber] = useState('')
+  const [invoiceNo, setInvoiceNo] = useState('')
   const [lines, setLines] = useState<LineItem[]>([emptyLine()])
   const [deliveryCharges, setDeliveryCharges] = useState(0)
   const [recipientCanEdit, setRecipientCanEdit] = useState(true)
+  const [paymentType, setPaymentType] = useState<'unpaid' | 'paid'>('unpaid')
   const [error, setError] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -93,17 +113,57 @@ export default function AddPurchaseReturn() {
   const [restaurants, setRestaurants] = useState<{ id: string; name: string }[]>(
     [],
   )
+  const quickAdd = useInventoryQuickAdd({
+    onSupplierCreated: (row) => setSuppliers((prev) => prependById(prev, row)),
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.purchase-return.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    {
+      returnTo,
+      supplier,
+      restaurant,
+      deliveryDate,
+      deliveryTime,
+      poNumber,
+      invoiceNo,
+      lines,
+      deliveryCharges,
+      recipientCanEdit,
+      paymentType,
+    },
+    (saved) => {
+      setReturnTo(saved.returnTo)
+      setSupplier(saved.supplier)
+      setRestaurant(saved.restaurant)
+      setDeliveryDate(saved.deliveryDate)
+      setDeliveryTime(saved.deliveryTime)
+      setPoNumber(saved.poNumber)
+      setInvoiceNo(saved.invoiceNo)
+      setLines(saved.lines)
+      setDeliveryCharges(saved.deliveryCharges)
+      setRecipientCanEdit(saved.recipientCanEdit)
+      setPaymentType(saved.paymentType)
+    },
+  )
 
   const totals = useMemo(() => {
     let subTotal = 0
+    let lineTax = 0
     for (const line of lines) {
       const amount =
         toNumber(line.amount) || toNumber(line.qty) * toNumber(line.price)
       subTotal += amount
+      lineTax +=
+        (amount *
+          (toNumber(line.cgst) + toNumber(line.sgst) + toNumber(line.igst))) /
+        100
     }
     return {
       subTotal,
-      grand: Math.max(0, subTotal + deliveryCharges),
+      lineTax,
+      grand: Math.max(0, subTotal + lineTax + deliveryCharges),
     }
   }, [lines, deliveryCharges])
 
@@ -121,7 +181,14 @@ export default function AddPurchaseReturn() {
     void listSuppliersApi().then(setSuppliers).catch(() => setSuppliers([]))
     void listAllRawMaterialsApi(encryptedOutletId)
       .then(setRawMaterials)
-      .catch(() => setRawMaterials([]))
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
     void listOutletsApi()
       .then((rows) =>
         setRestaurants(
@@ -146,8 +213,10 @@ export default function AddPurchaseReturn() {
         setDeliveryDate(row.delivery_date)
         setDeliveryTime(row.delivery_time ? String(row.delivery_time).slice(0, 5) : '')
         setPoNumber(row.po_number)
+        setInvoiceNo(row.invoice_number ?? '')
         setDeliveryCharges(Number(row.delivery_charges) || 0)
         setRecipientCanEdit(row.recipient_can_edit)
+        setPaymentType(row.payment_status === 'paid' ? 'paid' : 'unpaid')
         setLines(
           row.lines.length
             ? row.lines.map((line) => ({
@@ -158,6 +227,9 @@ export default function AddPurchaseReturn() {
                 unit: line.unit_name,
                 price: line.price,
                 amount: line.amount,
+                cgst: line.cgst,
+                sgst: line.sgst,
+                igst: line.igst,
               }))
             : [emptyLine()],
         )
@@ -226,13 +298,16 @@ export default function AddPurchaseReturn() {
 
   function exportLinesCsv() {
     downloadCsv(
-      ['raw_material', 'qty', 'unit', 'price', 'amount'],
+      ['raw_material', 'qty', 'unit', 'price', 'amount', 'cgst', 'sgst', 'igst'],
       lines.map((line) => [
         line.rawMaterial,
         line.qty,
         line.unit,
         line.price,
         line.amount,
+        line.cgst,
+        line.sgst,
+        line.igst,
       ]),
       `purchase-return-lines-${poNumber || 'draft'}.csv`,
     )
@@ -276,10 +351,12 @@ export default function AddPurchaseReturn() {
         delivery_date: deliveryDate,
         delivery_time: deliveryTime || null,
         po_number: poNumber,
+        invoice_number: invoiceNo,
         recipient_can_edit: recipientCanEdit,
         subtotal: String(totals.subTotal),
         delivery_charges: String(deliveryCharges),
         grand_total: String(totals.grand),
+        payment_status: paymentType,
         lines: validLines.map((line) => {
           const raw = rawMaterials.find((row) => row.name === line.rawMaterial)
           const unit = units.find((row) => row.name === line.unit)
@@ -290,11 +367,15 @@ export default function AddPurchaseReturn() {
             unit_id: unit.id,
             price: line.price || '0',
             amount: line.amount || String(toNumber(line.qty) * toNumber(line.price)),
+            cgst: line.cgst || '0',
+            sgst: line.sgst || '0',
+            igst: line.igst || '0',
           }
         }),
       }
       if (isEdit && id) await updatePurchaseReturnApi(encryptedOutletId, id, payload)
       else await createPurchaseReturnApi(encryptedOutletId, payload)
+      draft.clearDraft()
       showToast(isEdit ? 'Purchase return updated' : 'Purchase return saved')
       navigate('/inventory/purchase-return')
     } catch (err) {
@@ -310,6 +391,11 @@ export default function AddPurchaseReturn() {
 
   return (
     <InventoryPageShell activeItem="purchase-return">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
@@ -354,6 +440,9 @@ export default function AddPurchaseReturn() {
               placeholder="Select Supplier"
               searchPlaceholder="Search suppliers..."
               onChange={setSupplier}
+              onAddNew={quickAdd.handler('supplier', (row) =>
+                setSupplier(row.name),
+              )}
             />
           </div>
         ) : (
@@ -394,13 +483,26 @@ export default function AddPurchaseReturn() {
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">
-            PO Number
+            Purchase Return No.
           </label>
           <input
             type="text"
             value={poNumber}
             readOnly
+            placeholder="Generated on save"
             className="h-10 w-40 rounded-md border border-line bg-page px-3 text-sm text-ink outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink">
+            Return Invoice / Debit Note No.
+          </label>
+          <input
+            type="text"
+            value={invoiceNo}
+            onChange={(event) => setInvoiceNo(event.target.value)}
+            placeholder="Optional reference"
+            className="h-10 w-52 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
           />
         </div>
         <OutlineButton variant="gray" onClick={() => setDetailsOpen(true)}>
@@ -455,12 +557,22 @@ export default function AddPurchaseReturn() {
               </th>
               <th className="px-3 py-3">Price</th>
               <th className="px-3 py-3">Amount</th>
+              <th className="px-3 py-3">CGST %</th>
+              <th className="px-3 py-3">SGST %</th>
+              <th className="px-3 py-3">IGST %</th>
               <th className="px-3 py-3">Action</th>
             </tr>
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -487,7 +599,37 @@ export default function AddPurchaseReturn() {
                         unit: material?.consumption_unit.name ?? line.unit,
                       })
                     }}
+                    onAddNew={quickAdd.handler('raw-material', (row) =>
+                      updateLine(line.id, {
+                        rawMaterial: row.name,
+                        unit: row.consumption_unit.name,
+                      }),
+                    )}
                   />
+                  {encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -538,6 +680,19 @@ export default function AddPurchaseReturn() {
                     className="h-9 w-24 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
                   />
                 </td>
+                {(['cgst', 'sgst', 'igst'] as const).map((tax) => (
+                  <td key={tax} className="px-3 py-2.5">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={line[tax]}
+                      onChange={(event) =>
+                        updateLine(line.id, { [tax]: event.target.value })
+                      }
+                      className="h-9 w-20 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
+                    />
+                  </td>
+                ))}
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-1">
                     <button
@@ -588,14 +743,65 @@ export default function AddPurchaseReturn() {
               {formatAmount(deliveryCharges)}
             </span>
           </button>
+          <div className="flex items-center justify-between text-ink">
+            <span>GST Total</span>
+            <span className="font-semibold">{formatAmount(totals.lineTax)}</span>
+          </div>
           <div className="flex items-center justify-between border-t border-line pt-2 text-base font-bold text-ink">
             <span>Grand Total</span>
             <span>{formatAmount(totals.grand)}</span>
           </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="font-medium text-ink">Refund Status</span>
+            <div className="inline-flex overflow-hidden rounded-md border border-line">
+              <button
+                type="button"
+                onClick={() => setPaymentType('unpaid')}
+                className={`h-8 px-3 text-xs font-semibold ${
+                  paymentType === 'unpaid'
+                    ? 'bg-primary text-white'
+                    : 'bg-card text-ink hover:bg-page'
+                }`}
+              >
+                Pending
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentType('paid')}
+                className={`h-8 px-3 text-xs font-semibold ${
+                  paymentType === 'paid'
+                    ? 'bg-primary text-white'
+                    : 'bg-card text-ink hover:bg-page'
+                }`}
+              >
+                Refunded
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {isEdit && id && encryptedOutletId ? (
+        <PaymentHistoryPanel
+          outletId={encryptedOutletId}
+          documentType="purchase_return"
+          documentId={id}
+          canAdd={canWrite}
+          terminology="refund"
+        />
+      ) : null}
+
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -628,6 +834,7 @@ export default function AddPurchaseReturn() {
         onClose={() => setDetailsOpen(false)}
         variant="sales"
       />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

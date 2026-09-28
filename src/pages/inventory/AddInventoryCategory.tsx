@@ -4,6 +4,7 @@ import { showToast } from '../../utils/toast'
 import { useNavigate, useParams } from 'react-router-dom'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { useInventoryQuickAdd } from '../../components/inventory/InventoryQuickAdd'
 import {
   OutlineButton,
   PrimaryButton,
@@ -40,6 +41,7 @@ export default function AddInventoryCategory() {
   const [parentName, setParentName] = useState(existing?.parent_name ?? '')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const quickAdd = useInventoryQuickAdd()
 
   useEffect(() => {
     void loadMasters()
@@ -119,6 +121,9 @@ export default function AddInventoryCategory() {
               searchPlaceholder="Search"
               includePlaceholderOption
               onChange={setParentName}
+              onAddNew={quickAdd.handler('category', (row) =>
+                setParentName(row.name),
+              )}
             />
             {error ? <p className="text-xs text-primary">{error}</p> : null}
           </div>
@@ -135,6 +140,7 @@ export default function AddInventoryCategory() {
           ) : null}
         </div>
       </div>
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

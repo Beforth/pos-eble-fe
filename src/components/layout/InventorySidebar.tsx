@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react'
 import { brand } from '../../theme/brand'
+import type { StockCountKind } from '../../services/inventoryService'
 import { BrandLogo } from '../brand/BrandLogo'
 
 type IconType = typeof ArrowLeft
@@ -180,6 +181,12 @@ interface InventorySidebarProps {
   onToggleCollapse: () => void
   onCloseMobile: () => void
   activeItem: string
+  /**
+   * Per-leaf Manage Stock visibility. Available and Closing are separate
+   * rights on the backend, so a role holding only one must still see the page
+   * it is allowed to open.
+   */
+  canCountStock?: Record<StockCountKind, boolean>
 }
 
 export function InventorySidebar({
@@ -188,8 +195,22 @@ export function InventorySidebar({
   onToggleCollapse,
   onCloseMobile,
   activeItem,
+  canCountStock = { available: true, closing: true },
 }: InventorySidebarProps) {
   const navigate = useNavigate()
+
+  /** Drops Manage Stock leaves the user has no right for; hides the branch when both are gone. */
+  const stockCountBranch = (branch: NavBranch): NavBranch | null => {
+    const children = (branch.children ?? []).filter((child) =>
+      child.id === 'available-stock'
+        ? canCountStock.available
+        : child.id === 'closing-stock'
+          ? canCountStock.closing
+          : true,
+    )
+    if (!children.length) return null
+    return { ...branch, children }
+  }
   const [consumptionMore, setConsumptionMore] = useState(() =>
     CONSUMPTION_MORE.some((item) => item.id === activeItem),
   )
@@ -440,11 +461,16 @@ export function InventorySidebar({
 
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2">
           <ul className="space-y-0.5">
-            {TOP_NAV.map((item) =>
-              item.id === 'back-billing' || item.id === 'dashboard'
-                ? renderLeaf(item)
-                : renderBranch(item),
-            )}
+            {TOP_NAV.map((item) => {
+              if (item.id === 'back-billing' || item.id === 'dashboard') {
+                return renderLeaf(item)
+              }
+              if (item.id === 'manage-stock') {
+                const branch = stockCountBranch(item)
+                return branch ? renderBranch(branch) : null
+              }
+              return renderBranch(item)
+            })}
           </ul>
 
           <div className="my-2 border-t border-line" />

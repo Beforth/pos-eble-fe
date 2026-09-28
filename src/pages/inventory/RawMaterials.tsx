@@ -17,8 +17,8 @@ import {
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
-  QuickAddRawMaterialModal,
-} from '../../components/inventory/QuickAddRawMaterialModal'
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import {
   buildRawMaterialDetails,
   RawMaterialDetailsModal,
@@ -40,10 +40,8 @@ import { ApiError } from '../../services/apiClient'
 import {
   INV_WRITE_PERMISSION,
   categoryIdByName,
-  createRawMaterialApi,
   deleteRawMaterialApi,
   listRawMaterialsApi,
-  unitIdByName,
   updateRawMaterialApi,
   type RawMaterial,
 } from '../../services/inventoryService'
@@ -269,7 +267,7 @@ export default function RawMaterials() {
   const navigate = useNavigate()
   const { encryptedOutletId, hasPermission } = useAuth()
   const canWrite = hasPermission(INV_WRITE_PERMISSION)
-  const { units, categories, loadMasters } = useInventoryMasters()
+  const { categories, loadMasters } = useInventoryMasters()
   const [nameInput, setNameInput] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [appliedName, setAppliedName] = useState('')
@@ -281,18 +279,19 @@ export default function RawMaterials() {
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [details, setDetails] = useState<RawMaterialDetails | null>(null)
   const [logMaterialName, setLogMaterialName] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState(false)
+  const quickAdd = useInventoryQuickAdd({
+    onRawMaterialCreated: (row) => {
+      setRows((prev) => [toListRow(row), ...prev])
+      setPage(1)
+    },
+  })
 
   const categoryNames = useMemo(
     () => categories.map((row) => row.name),
     [categories],
-  )
-  const unitNames = useMemo(
-    () => units.filter((row) => row.is_active).map((row) => row.name),
-    [units],
   )
   const filterCategoryOptions = useMemo(
     () => ['All', ...categoryNames],
@@ -341,8 +340,10 @@ export default function RawMaterials() {
   const filteredRows = useMemo(() => {
     const q = appliedName.trim().toLowerCase()
     return rows.filter((row) => {
-      if (cardCategory !== 'all' && row.category !== cardCategory) return false
-      if (appliedCategory !== 'All' && row.category !== appliedCategory) {
+      const matchesCategory = (name: string) =>
+        row.category === name || row.source.sub_category?.name === name
+      if (cardCategory !== 'all' && !matchesCategory(cardCategory)) return false
+      if (appliedCategory !== 'All' && !matchesCategory(appliedCategory)) {
         return false
       }
       if (q && !row.name.toLowerCase().includes(q)) return false
@@ -507,47 +508,6 @@ export default function RawMaterials() {
     }
   }
 
-  async function handleQuickAdd(values: {
-    name: string
-    category: string
-    purchaseUnits: string[]
-    consumptionUnit: string
-  }): Promise<boolean> {
-    if (!encryptedOutletId) {
-      showToast('Select an outlet before adding raw materials')
-      return false
-    }
-    const purchaseIds = values.purchaseUnits
-      .map((name) => unitIdByName(units, name))
-      .filter((id): id is string => Boolean(id))
-    const consumptionId = unitIdByName(units, values.consumptionUnit)
-    if (purchaseIds.length === 0 || !consumptionId) {
-      showToast('Create a unit before adding raw materials')
-      return false
-    }
-    setSaving(true)
-    try {
-      const created = await createRawMaterialApi(encryptedOutletId, {
-        name: values.name,
-        purchase_unit_ids: purchaseIds,
-        consumption_unit_id: consumptionId,
-        conversion_purchase_unit_id: purchaseIds[0],
-        category_id: categoryIdByName(categories, values.category) ?? null,
-      })
-      setRows((prev) => [toListRow(created), ...prev])
-      setPage(1)
-      showToast(`${values.name} added`)
-      return true
-    } catch (err) {
-      showToast(
-        err instanceof ApiError ? err.message : 'Unable to add raw material',
-      )
-      return false
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <InventoryPageShell activeItem="raw-materials">
 
@@ -563,7 +523,7 @@ export default function RawMaterials() {
             </PrimaryButton>
           ) : null}
           {canWrite ? (
-            <OutlineButton onClick={() => setQuickAddOpen(true)}>
+            <OutlineButton onClick={() => quickAdd.open('raw-material')}>
               <Plus size={15} />
               Quick Add
             </OutlineButton>
@@ -804,6 +764,12 @@ export default function RawMaterials() {
                               categoryIdByName(categories, value) ?? null,
                           })
                         }}
+                        onAddNew={quickAdd.handler('category', (created) =>
+                          updateRow(row.id, {
+                            category: created.name,
+                            categoryId: created.id,
+                          }),
+                        )}
                       />
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -916,14 +882,7 @@ export default function RawMaterials() {
         </div>
       </div>
 
-      <QuickAddRawMaterialModal
-        open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
-        unitOptions={unitNames}
-        categoryOptions={[...categoryNames, 'No Category']}
-        saving={saving}
-        onSave={handleQuickAdd}
-      />
+      {quickAdd.host}
       <RawMaterialDetailsModal
         open={Boolean(details)}
         details={details}

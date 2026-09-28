@@ -7,6 +7,17 @@ import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ProductionMoreOptionsDrawer } from '../../components/inventory/ProductionMoreOptionsDrawer'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
+import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
@@ -50,6 +61,35 @@ export default function AddProduction() {
     description: '',
     autoProduction: false,
   })
+  const quickAdd = useInventoryQuickAdd({
+    onRawMaterialCreated: (row) =>
+      setMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.production.${encryptedOutletId ?? 'unknown'}.new`,
+    {
+      productionName,
+      toMaterial,
+      toQty,
+      toUnit,
+      fromMaterial,
+      fromQty,
+      fromUnit,
+      fromRows,
+      moreOptions,
+    },
+    (saved) => {
+      setProductionName(saved.productionName)
+      setToMaterial(saved.toMaterial)
+      setToQty(saved.toQty)
+      setToUnit(saved.toUnit)
+      setFromMaterial(saved.fromMaterial)
+      setFromQty(saved.fromQty)
+      setFromUnit(saved.fromUnit)
+      setFromRows(saved.fromRows)
+      setMoreOptions(saved.moreOptions)
+    },
+  )
 
   useEffect(() => {
     void loadMasters()
@@ -158,6 +198,7 @@ export default function AddProduction() {
         auto_production: moreOptions.autoProduction,
         lines,
       })
+      draft.clearDraft()
       showToast('Production process saved')
       navigate('/inventory/production-master')
     } catch (err) {
@@ -171,6 +212,11 @@ export default function AddProduction() {
 
   return (
     <InventoryPageShell activeItem="production-master">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Add Production Process</h1>
         <p className="mt-1 text-sm text-muted">
@@ -212,22 +258,34 @@ export default function AddProduction() {
               className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
             />
           </div>
-          <SearchableSelect
-            label="Raw Material"
-            required
-            value={toMaterial}
-            options={materialNames}
-            placeholder="Select Raw Material"
-            searchPlaceholder="Search"
-            includePlaceholderOption={false}
-            onChange={(value) => {
-              setToMaterial(value)
-              const material = materialByName(value)
-              if (material?.consumption_unit?.name && !toUnit) {
-                setToUnit(material.consumption_unit.name)
-              }
-            }}
-          />
+          <div>
+            <SearchableSelect
+              label="Raw Material"
+              required
+              value={toMaterial}
+              options={materialNames}
+              placeholder="Select Raw Material"
+              searchPlaceholder="Search"
+              includePlaceholderOption={false}
+              onChange={(value) => {
+                setToMaterial(value)
+                const material = materialByName(value)
+                if (material?.consumption_unit?.name && !toUnit) {
+                  setToUnit(material.consumption_unit.name)
+                }
+              }}
+              onAddNew={quickAdd.handler('raw-material', (row) => {
+                setToMaterial(row.name)
+                if (!toUnit) setToUnit(row.consumption_unit.name)
+              })}
+            />
+            {encryptedOutletId ? (
+              <StockAvailabilityButton
+                outletId={encryptedOutletId}
+                material={materials.find((row) => row.name === toMaterial)}
+              />
+            ) : null}
+          </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">
               Quantity <span className="text-primary">*</span>
@@ -250,6 +308,7 @@ export default function AddProduction() {
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={setToUnit}
+            onAddNew={quickAdd.handler('unit', (row) => setToUnit(row.name))}
           />
         </div>
       </div>
@@ -270,22 +329,34 @@ export default function AddProduction() {
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[1.4fr_0.7fr_0.8fr_auto] lg:items-end">
-          <SearchableSelect
-            label="Raw Material"
-            required
-            value={fromMaterial}
-            options={materialNames}
-            placeholder="Select Raw Material"
-            searchPlaceholder="Search"
-            includePlaceholderOption={false}
-            onChange={(value) => {
-              setFromMaterial(value)
-              const material = materialByName(value)
-              if (material?.consumption_unit?.name && !fromUnit) {
-                setFromUnit(material.consumption_unit.name)
-              }
-            }}
-          />
+          <div>
+            <SearchableSelect
+              label="Raw Material"
+              required
+              value={fromMaterial}
+              options={materialNames}
+              placeholder="Select Raw Material"
+              searchPlaceholder="Search"
+              includePlaceholderOption={false}
+              onChange={(value) => {
+                setFromMaterial(value)
+                const material = materialByName(value)
+                if (material?.consumption_unit?.name && !fromUnit) {
+                  setFromUnit(material.consumption_unit.name)
+                }
+              }}
+              onAddNew={quickAdd.handler('raw-material', (row) => {
+                setFromMaterial(row.name)
+                if (!fromUnit) setFromUnit(row.consumption_unit.name)
+              })}
+            />
+            {encryptedOutletId ? (
+              <StockAvailabilityButton
+                outletId={encryptedOutletId}
+                material={materials.find((row) => row.name === fromMaterial)}
+              />
+            ) : null}
+          </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">
               Quantity <span className="text-primary">*</span>
@@ -308,6 +379,7 @@ export default function AddProduction() {
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={setFromUnit}
+            onAddNew={quickAdd.handler('unit', (row) => setFromUnit(row.name))}
           />
           <div className="flex items-end">
             <OutlineButton onClick={handleAddFrom}>
@@ -332,9 +404,40 @@ export default function AddProduction() {
                 {fromRows.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b border-line last:border-b-0"
+                    className={`border-b border-line last:border-b-0 ${
+                      getInsufficientStockMaterial(error) === row.rawMaterial
+                        ? 'bg-red-50 outline outline-1 outline-red-200'
+                        : ''
+                    }`}
                   >
-                    <td className="px-3 py-2.5 text-ink">{row.rawMaterial}</td>
+                    <td className="px-3 py-2.5 text-ink">
+                      {row.rawMaterial}
+                      {encryptedOutletId ? (
+                        <StockAvailabilityButton
+                          outletId={encryptedOutletId}
+                          material={materials.find(
+                            (m) => m.name === row.rawMaterial,
+                          )}
+                        />
+                      ) : null}
+                      {getInsufficientStockMaterial(error) ===
+                      row.rawMaterial ? (
+                        <StockShortfallNote
+                          available={
+                            materials.find(
+                              (m) => m.name === row.rawMaterial,
+                            )?.stock_qty ?? '0'
+                          }
+                          availableUnit={
+                            materials.find(
+                              (m) => m.name === row.rawMaterial,
+                            )?.consumption_unit.name
+                          }
+                          required={row.qty || '0'}
+                          requiredUnit={row.unit}
+                        />
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2.5 text-ink">{row.qty}</td>
                     <td className="px-3 py-2.5 text-ink">{row.unit}</td>
                     <td className="px-3 py-2.5">
@@ -358,7 +461,17 @@ export default function AddProduction() {
           </div>
         ) : null}
 
-        {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+        {error ? (
+          <p
+            className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+              getInsufficientStockMaterial(error)
+                ? 'border border-red-200 bg-red-50 text-red-700'
+                : 'text-primary'
+            }`}
+          >
+            {error}
+          </p>
+        ) : null}
 
         <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
           <button
@@ -388,6 +501,7 @@ export default function AddProduction() {
           setMoreOpen(false)
         }}
       />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

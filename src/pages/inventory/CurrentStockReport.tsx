@@ -96,6 +96,7 @@ export default function CurrentStockReport() {
   const [stockLevel, setStockLevel] = useState('All')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [appliedCategory, setAppliedCategory] = useState('All')
+  const [appliedStockLevel, setAppliedStockLevel] = useState('All')
   const [rows, setRows] = useState<CurrentStockRow[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -147,16 +148,16 @@ export default function CurrentStockReport() {
       const qty = Number(row.stock_qty)
       const min = Number(row.min_stock ?? NaN)
       const atPar = Number(row.at_par_stock ?? NaN)
-      if (stockLevel === 'Negative stock') return qty < 0
-      if (stockLevel === 'Minimum stock') {
+      if (appliedStockLevel === 'Negative stock') return qty < 0
+      if (appliedStockLevel === 'Minimum stock') {
         return Number.isFinite(min) && qty <= min
       }
-      if (stockLevel === 'At-par stock') {
+      if (appliedStockLevel === 'At-par stock') {
         return Number.isFinite(atPar) && qty <= atPar
       }
       return true
     })
-  }, [rows, stockLevel])
+  }, [rows, appliedStockLevel])
 
   return (
     <InventoryPageShell activeItem="current-stock">
@@ -248,9 +249,23 @@ export default function CurrentStockReport() {
           onClick={() => {
             setAppliedSearch(rawMaterial.trim())
             setAppliedCategory(category)
+            setAppliedStockLevel(stockLevel)
           }}
         >
           Search
+        </OutlineButton>
+        <OutlineButton
+          variant="gray"
+          onClick={() => {
+            setRawMaterial('')
+            setCategory('All')
+            setStockLevel('All')
+            setAppliedSearch('')
+            setAppliedCategory('All')
+            setAppliedStockLevel('All')
+          }}
+        >
+          Clear
         </OutlineButton>
       </div>
 

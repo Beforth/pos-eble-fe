@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/downloadFile'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileCog, FileText, Info, Pencil, Plus, X } from 'lucide-react'
+import { ChevronDown, FileCog, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { WastageSettingsDrawer } from '../../components/inventory/WastageSettingsDrawer'
@@ -24,7 +24,6 @@ import {
   type Wastage,
 } from '../../services/inventoryService'
 
-const VIEW_OPTIONS = ['Date wise', 'Category wise'] as const
 const STATUS_OPTIONS = [
   'All',
   'Saved',
@@ -128,7 +127,6 @@ export default function Wastage() {
   const [endDate, setEndDate] = useState('')
   const [status, setStatus] = useState<string>('All')
   const [category, setCategory] = useState<string>('All')
-  const [view, setView] = useState<string>('Date wise')
   const [categories, setCategories] = useState<InventoryCategory[]>([])
   const [applied, setApplied] = useState({
     startDate: '',
@@ -167,7 +165,15 @@ export default function Wastage() {
       categoryId,
     })
       .then((items) => {
-        if (!cancelled) setRows(items.map(toRow))
+        if (cancelled) return
+        setRows(
+          items
+            .map(toRow)
+            .sort(
+              (a, b) =>
+                b.date.localeCompare(a.date) || a.kind.localeCompare(b.kind),
+            ),
+        )
       })
       .catch((err) => {
         if (!cancelled) {
@@ -281,24 +287,6 @@ export default function Wastage() {
             onChange={setCategory}
           />
         </div>
-        <div className="min-w-[160px]">
-          <SearchableSelect
-            label={
-              <>
-                View
-                <span title="Choose how wastage records are grouped in the list">
-                  <Info size={13} className="text-muted" />
-                </span>
-              </>
-            }
-            value={view}
-            options={[...VIEW_OPTIONS]}
-            placeholder="Select view"
-            searchPlaceholder="Search"
-            includePlaceholderOption={false}
-            onChange={setView}
-          />
-        </div>
         <OutlineButton
           onClick={() =>
             setApplied({
@@ -316,7 +304,6 @@ export default function Wastage() {
           onClick={() => {
             setStatus('All')
             setCategory('All')
-            setView('Date wise')
             setStartDate('')
             setEndDate('')
             setApplied({
@@ -398,7 +385,7 @@ export default function Wastage() {
                             label="Delete"
                             onClick={() => setPendingDelete(row)}
                           >
-                            <X size={15} strokeWidth={1.75} />
+                            <Trash2 size={15} strokeWidth={1.75} />
                           </RowActionButton>
                         ) : null}
                       </div>

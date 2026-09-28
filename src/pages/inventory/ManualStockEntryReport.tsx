@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/downloadFile'
@@ -6,30 +6,19 @@ import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  categoryIdByName,
+  listAllManualStockEntryReportApi,
+  type ManualStockEntryReportRow,
+} from '../../services/inventoryService'
 
-const CATEGORY_OPTIONS = [
-  'All',
-  'Rice/pulses/flours',
-  'Bread/dairy',
-  'Oils/masala/salt/sugar',
-  'Ready To Cook/ready To Eat',
-  'Sauces/dressings/marinades',
-  'Snacks',
-  'Packaging/storage',
-  'Fruits/vegetables',
-  'No Category',
-]
+const KIND_OPTIONS = ['All', 'Available', 'Closing']
 
-const DEFAULT_START = '2026-08-04'
-const DEFAULT_END = '2026-08-11'
-
-function ExportMenu({
-  onExportPage,
-  onExportAll,
-}: {
-  onExportPage?: () => void
-  onExportAll?: () => void
-}) {
+function ExportMenu({ onExportReport }: { onExportReport?: () => void }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -56,29 +45,17 @@ function ExportMenu({
         <ChevronDown size={14} className="text-muted" />
       </button>
       {open ? (
-        <ul className="absolute right-0 z-40 mt-1.5 min-w-[180px] overflow-hidden rounded-md border border-line bg-card py-1 shadow-lg">
+        <ul className="absolute right-0 z-40 mt-1.5 min-w-[280px] overflow-hidden rounded-md border border-line bg-card py-1 shadow-lg">
           <li>
             <button
               type="button"
               onClick={() => {
-                onExportPage?.()
+                onExportReport?.()
                 setOpen(false)
               }}
               className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
             >
-              Export Current Page
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => {
-                onExportAll?.()
-                setOpen(false)
-              }}
-              className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
-            >
-              Export All
+              Export Manual Adjustment List
             </button>
           </li>
         </ul>
@@ -88,101 +65,103 @@ function ExportMenu({
 }
 
 export default function ManualStockEntryReport() {
-  const [startDate, setStartDate] = useState(DEFAULT_START)
-  const [endDate, setEndDate] = useState(DEFAULT_END)
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
+  const { categories, loadMasters } = useInventoryMasters()
   const [rawMaterial, setRawMaterial] = useState('')
   const [category, setCategory] = useState('All')
+  const [kind, setKind] = useState('All')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [applied, setApplied] = useState({
-    startDate: DEFAULT_START,
-    endDate: DEFAULT_END,
-    rawMaterial: '',
+    search: '',
     category: 'All',
+    kind: 'All',
+    fromDate: '',
+    toDate: '',
   })
+  const [rows, setRows] = useState<ManualStockEntryReportRow[]>([])
+  const [loading, setLoading] = useState(false)
 
-  function handleSearch() {
-    setApplied({
-      startDate,
-      endDate,
-      rawMaterial: rawMaterial.trim(),
-      category,
-    })
-    showToast('Search applied')
-  }
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
 
-  function handleClear() {
-    setStartDate(DEFAULT_START)
-    setEndDate(DEFAULT_END)
-    setRawMaterial('')
-    setCategory('All')
-    setApplied({
-      startDate: DEFAULT_START,
-      endDate: DEFAULT_END,
-      rawMaterial: '',
-      category: 'All',
-    })
-  }
+  const categoryOptions = useMemo(
+    () => ['All', ...categories.map((row) => row.name), 'No Category'],
+    [categories],
+  )
+
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    setLoading(true)
+    try {
+      const categoryId =
+        applied.category === 'All'
+          ? undefined
+          : applied.category === 'No Category'
+            ? 'no-category'
+            : categoryIdByName(categories, applied.category)
+      const data = await listAllManualStockEntryReportApi(encryptedOutletId, {
+        search: applied.search || undefined,
+        categoryId,
+        kind: applied.kind,
+        dateFrom: applied.fromDate || undefined,
+        dateTo: applied.toDate || undefined,
+      })
+      setRows(data)
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load manual stock entry report',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, canRead, applied, categories])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   return (
     <InventoryPageShell activeItem="other-reports">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Manual Adjustment List</h1>
         <ExportMenu
-          onExportPage={() => {
+          onExportReport={() => {
             downloadCsv(
-              ['start_date', 'end_date', 'raw_material', 'category'],
               [
-                [
-                  applied.startDate,
-                  applied.endDate,
-                  applied.rawMaterial,
-                  applied.category,
-                ],
+                'date',
+                'type',
+                'cycle',
+                'raw_material',
+                'category',
+                'qty',
+                'unit',
+                'value',
+                'reason',
               ],
-              'manual-stock-entry-page.csv',
+              rows.map((row) => [
+                row.stock_date,
+                row.kind_label,
+                row.cycle,
+                row.raw_material_name,
+                row.category_name || '',
+                row.qty,
+                row.unit_name,
+                row.value,
+                row.reason,
+              ]),
+              'manual-stock-entry-report.csv',
             )
-            showToast('Exported current page')
-          }}
-          onExportAll={() => {
-            downloadCsv(
-              ['start_date', 'end_date', 'raw_material', 'category'],
-              [
-                [
-                  applied.startDate,
-                  applied.endDate,
-                  applied.rawMaterial,
-                  applied.category,
-                ],
-              ],
-              'manual-stock-entry-all.csv',
-            )
-            showToast('Exported all')
+            showToast('Exported report')
           }}
         />
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink">
-            Start Date
-          </label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink">
-            End Date
-          </label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
-          />
-        </div>
         <div className="min-w-[160px] flex-1">
           <label className="mb-1.5 block text-sm font-medium text-ink">
             Raw Material
@@ -198,35 +177,136 @@ export default function ManualStockEntryReport() {
           <SearchableSelect
             label="Category"
             value={category}
-            options={CATEGORY_OPTIONS}
+            options={categoryOptions}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={setCategory}
           />
         </div>
-        <OutlineButton onClick={handleSearch}>Search</OutlineButton>
-        <OutlineButton variant="gray" onClick={handleClear}>
+        <div className="min-w-[160px]">
+          <SearchableSelect
+            label="Type"
+            value={kind}
+            options={KIND_OPTIONS}
+            placeholder="All"
+            searchPlaceholder="Search"
+            includePlaceholderOption={false}
+            onChange={setKind}
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink">
+            From
+          </label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(event) => setFromDate(event.target.value)}
+            className="h-10 rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink">To</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(event) => setToDate(event.target.value)}
+            className="h-10 rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
+          />
+        </div>
+        <OutlineButton
+          onClick={() =>
+            setApplied({
+              search: rawMaterial.trim(),
+              category,
+              kind,
+              fromDate,
+              toDate,
+            })
+          }
+        >
+          Search
+        </OutlineButton>
+        <OutlineButton
+          variant="gray"
+          onClick={() => {
+            setRawMaterial('')
+            setCategory('All')
+            setKind('All')
+            setFromDate('')
+            setToDate('')
+            setApplied({
+              search: '',
+              category: 'All',
+              kind: 'All',
+              fromDate: '',
+              toDate: '',
+            })
+          }}
+        >
           Clear
         </OutlineButton>
       </div>
 
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-        <span className="relative mb-4 text-muted">
-          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
-          <Search
-            size={24}
-            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-          />
-        </span>
-        <p className="text-base font-semibold text-ink">
-          Manual Adjustment Report Record Not Found
-        </p>
-        <p className="mt-2 max-w-lg text-sm text-muted">
-          Filters: start={applied.startDate} · end={applied.endDate} · material=
-          {applied.rawMaterial || '—'} · category={applied.category}
-        </p>
-      </div>
+      {!canRead ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          You do not have permission to view inventory reports.
+        </div>
+      ) : loading ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          Loading…
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+          <span className="relative mb-4 text-muted">
+            <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
+            <Search
+              size={24}
+              className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+            />
+          </span>
+          <p className="text-base font-semibold text-ink">No records found</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-line bg-card">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
+              <tr>
+                <th className="px-3 py-2.5">Date</th>
+                <th className="px-3 py-2.5">Type</th>
+                <th className="px-3 py-2.5">Cycle</th>
+                <th className="px-3 py-2.5">Raw Material</th>
+                <th className="px-3 py-2.5">Category</th>
+                <th className="px-3 py-2.5">Qty</th>
+                <th className="px-3 py-2.5">Unit</th>
+                <th className="px-3 py-2.5">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={`${row.entry_id}-${row.raw_material_id}`}
+                  className="border-b border-line last:border-b-0"
+                >
+                  <td className="px-3 py-2.5 text-ink">{row.stock_date}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.kind_label}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.cycle}</td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.raw_material_name}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.category_name || '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">{row.qty}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.unit_name}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </InventoryPageShell>
   )
 }

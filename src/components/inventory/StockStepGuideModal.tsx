@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { BookOpen, X } from 'lucide-react'
 import { OutlineButton, PrimaryButton } from '../menu/MenuActionButtons'
@@ -27,6 +27,7 @@ interface StockStepGuideModalProps {
   onClose: () => void
   title?: string
   steps?: { title: string; body: string }[]
+  footerActions?: ReactNode
 }
 
 export function StockStepGuideModal({
@@ -34,6 +35,7 @@ export function StockStepGuideModal({
   onClose,
   title = 'Step-by-step guide',
   steps = DEFAULT_STEPS,
+  footerActions,
 }: StockStepGuideModalProps) {
   const titleId = useId()
 
@@ -96,7 +98,8 @@ export function StockStepGuideModal({
             </article>
           ))}
         </div>
-        <footer className="flex justify-end gap-2 border-t border-line px-5 py-3">
+        <footer className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">
+          {footerActions}
           <OutlineButton variant="gray" onClick={onClose}>
             Close
           </OutlineButton>

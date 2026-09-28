@@ -13,6 +13,17 @@ import {
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import { OtherDetailsDrawer } from '../../components/inventory/OtherDetailsDrawer'
 import {
   ActionDropdown,
@@ -43,6 +54,9 @@ interface LineItem {
   unit: string
   price: string
   amount: string
+  cgst: string
+  sgst: string
+  igst: string
   note: string
 }
 
@@ -55,6 +69,9 @@ function emptyLine(): LineItem {
     unit: '',
     price: '',
     amount: '',
+    cgst: '',
+    sgst: '',
+    igst: '',
     note: '',
   }
 }
@@ -97,17 +114,51 @@ export default function AddPurchaseOrder() {
   const [restaurants, setRestaurants] = useState<{ id: string; name: string }[]>(
     [],
   )
+  const quickAdd = useInventoryQuickAdd({
+    onSupplierCreated: (row) => setSuppliers((prev) => prependById(prev, row)),
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.purchase-order.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    {
+      orderFrom,
+      supplier,
+      restaurant,
+      deliveryDate,
+      deliveryTime,
+      lines,
+      deliveryCharges,
+      recipientCanEdit,
+    },
+    (saved) => {
+      setOrderFrom(saved.orderFrom)
+      setSupplier(saved.supplier)
+      setRestaurant(saved.restaurant)
+      setDeliveryDate(saved.deliveryDate)
+      setDeliveryTime(saved.deliveryTime)
+      setLines(saved.lines)
+      setDeliveryCharges(saved.deliveryCharges)
+      setRecipientCanEdit(saved.recipientCanEdit)
+    },
+  )
 
   const totals = useMemo(() => {
     let subTotal = 0
+    let lineTax = 0
     for (const line of lines) {
       const amount =
         toNumber(line.amount) || toNumber(line.qty) * toNumber(line.price)
       subTotal += amount
+      lineTax +=
+        (amount *
+          (toNumber(line.cgst) + toNumber(line.sgst) + toNumber(line.igst))) /
+        100
     }
     return {
       subTotal,
-      grand: Math.max(0, subTotal + deliveryCharges),
+      lineTax,
+      grand: Math.max(0, subTotal + lineTax + deliveryCharges),
     }
   }, [lines, deliveryCharges])
 
@@ -125,7 +176,14 @@ export default function AddPurchaseOrder() {
     void listSuppliersApi().then(setSuppliers).catch(() => setSuppliers([]))
     void listAllRawMaterialsApi(encryptedOutletId)
       .then(setRawMaterials)
-      .catch(() => setRawMaterials([]))
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
     void listOutletsApi()
       .then((rows) =>
         setRestaurants(
@@ -162,6 +220,9 @@ export default function AddPurchaseOrder() {
                 unit: line.unit_name,
                 price: line.price,
                 amount: line.amount,
+                cgst: line.cgst,
+                sgst: line.sgst,
+                igst: line.igst,
                 note: line.note,
               }))
             : [emptyLine()],
@@ -215,13 +276,16 @@ export default function AddPurchaseOrder() {
 
   function exportLinesCsv() {
     downloadCsv(
-      ['raw_material', 'qty', 'unit', 'price', 'amount', 'note'],
+      ['raw_material', 'qty', 'unit', 'price', 'amount', 'cgst', 'sgst', 'igst', 'note'],
       lines.map((line) => [
         line.rawMaterial,
         line.qty,
         line.unit,
         line.price,
         line.amount,
+        line.cgst,
+        line.sgst,
+        line.igst,
         line.note,
       ]),
       `purchase-order-lines-${poNumber || 'draft'}.csv`,
@@ -280,12 +344,16 @@ export default function AddPurchaseOrder() {
             unit_id: unit.id,
             price: line.price || '0',
             amount: line.amount || String(toNumber(line.qty) * toNumber(line.price)),
+            cgst: line.cgst || '0',
+            sgst: line.sgst || '0',
+            igst: line.igst || '0',
             note: line.note,
           }
         }),
       }
       if (isEdit && id) await updatePurchaseOrderApi(encryptedOutletId, id, payload)
       else await createPurchaseOrderApi(encryptedOutletId, payload)
+      draft.clearDraft()
       showToast(isEdit ? 'Purchase order updated' : 'Purchase order saved')
       navigate('/inventory/purchase-order')
     } catch (err) {
@@ -302,6 +370,11 @@ export default function AddPurchaseOrder() {
 
   return (
     <InventoryPageShell activeItem="purchase-order">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
@@ -346,6 +419,9 @@ export default function AddPurchaseOrder() {
               placeholder="Select Supplier"
               searchPlaceholder="Search suppliers..."
               onChange={setSupplier}
+              onAddNew={quickAdd.handler('supplier', (row) =>
+                setSupplier(row.name),
+              )}
             />
           </div>
         ) : (
@@ -448,12 +524,22 @@ export default function AddPurchaseOrder() {
               </th>
               <th className="px-3 py-3">Price</th>
               <th className="px-3 py-3">Amount</th>
+              <th className="px-3 py-3">CGST %</th>
+              <th className="px-3 py-3">SGST %</th>
+              <th className="px-3 py-3">IGST %</th>
               <th className="px-3 py-3">Action</th>
             </tr>
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -480,7 +566,37 @@ export default function AddPurchaseOrder() {
                         unit: material?.consumption_unit.name ?? line.unit,
                       })
                     }}
+                    onAddNew={quickAdd.handler('raw-material', (row) =>
+                      updateLine(line.id, {
+                        rawMaterial: row.name,
+                        unit: row.consumption_unit.name,
+                      }),
+                    )}
                   />
+                  {encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -531,6 +647,19 @@ export default function AddPurchaseOrder() {
                     className="h-9 w-24 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
                   />
                 </td>
+                {(['cgst', 'sgst', 'igst'] as const).map((tax) => (
+                  <td key={tax} className="px-3 py-2.5">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={line[tax]}
+                      onChange={(event) =>
+                        updateLine(line.id, { [tax]: event.target.value })
+                      }
+                      className="h-9 w-20 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
+                    />
+                  </td>
+                ))}
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-1">
                     <button
@@ -589,6 +718,10 @@ export default function AddPurchaseOrder() {
               {formatAmount(deliveryCharges)}
             </span>
           </button>
+          <div className="flex items-center justify-between text-ink">
+            <span>GST Total</span>
+            <span className="font-semibold">{formatAmount(totals.lineTax)}</span>
+          </div>
           <div className="flex items-center justify-between border-t border-line pt-2 text-base font-bold text-ink">
             <span>Grand Total</span>
             <span>{formatAmount(totals.grand)}</span>
@@ -596,7 +729,17 @@ export default function AddPurchaseOrder() {
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -657,6 +800,7 @@ export default function AddPurchaseOrder() {
         onClose={() => setDetailsOpen(false)}
         variant="sales"
       />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

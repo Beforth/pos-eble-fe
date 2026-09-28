@@ -3,6 +3,23 @@ import { AUTH_TOKEN_KEY } from '../auth/storage'
 
 export const INV_READ_PERMISSION = 'accounts.inv_raw_material_master_read'
 export const INV_WRITE_PERMISSION = 'accounts.inv_raw_material_master_write'
+// Manual counts accept their own rights feature, with the raw-material master
+// rights kept as a fallback so existing roles keep access.
+export type StockCountKind = 'available' | 'closing'
+
+/**
+ * Manual stock counts are guarded per count type on the backend. The
+ * raw-material master right stays in every set because roles created before the
+ * split only hold that one.
+ */
+export const INV_STOCK_COUNT_READ_PERMISSIONS: Record<StockCountKind, readonly string[]> = {
+  available: ['accounts.inv_manual_stock_available_read', INV_READ_PERMISSION],
+  closing: ['accounts.inv_manual_stock_closing_read', INV_READ_PERMISSION],
+}
+export const INV_STOCK_COUNT_WRITE_PERMISSIONS: Record<StockCountKind, readonly string[]> = {
+  available: ['accounts.inv_manual_stock_available_write', INV_WRITE_PERMISSION],
+  closing: ['accounts.inv_manual_stock_closing_write', INV_WRITE_PERMISSION],
+}
 export const INV_SUPPLIER_READ_PERMISSION = 'accounts.inv_supplier_inventory_read'
 export const INV_SUPPLIER_WRITE_PERMISSION = 'accounts.inv_supplier_inventory_write'
 export const INV_PURCHASE_READ_PERMISSION = 'accounts.inv_purchase_inventory_read'
@@ -14,6 +31,14 @@ export const INV_SALES_WRITE_PERMISSION =
 export const INV_WASTAGE_READ_PERMISSION = 'accounts.inv_wastage_inventory_read'
 export const INV_WASTAGE_WRITE_PERMISSION =
   'accounts.inv_wastage_inventory_write'
+
+/** True when the user holds at least one of the given codenames. */
+export function hasAnyPermission(
+  has: (codename: string) => boolean,
+  candidates: readonly string[],
+): boolean {
+  return candidates.some((codename) => has(codename))
+}
 
 export type InventoryUnit = {
   id: string
@@ -83,6 +108,7 @@ export type RawMaterial = {
   is_favourite: boolean
   is_active: boolean
   max_stock_rows: MaxStockRow[]
+  stock_qty: string
   created_at: string
   updated_at: string
 }
@@ -248,6 +274,35 @@ export async function getRawMaterialApi(
     method: 'GET',
     token: authToken(),
   })
+}
+
+export type StockMovement = {
+  id: string
+  qty: string
+  reason: string
+  reason_label: string
+  created_at: string
+  document_type: string | null
+  document_id: string | null
+  document_number: string
+}
+
+export type RawMaterialStockActivity = {
+  raw_material_id: string
+  raw_material_name: string
+  stock_qty: string
+  consumption_unit_name: string
+  movements: StockMovement[]
+}
+
+export async function getRawMaterialStockActivityApi(
+  outletId: string,
+  rawMaterialId: string,
+): Promise<RawMaterialStockActivity> {
+  return apiRequest<RawMaterialStockActivity>(
+    rawPath(outletId, `${rawMaterialId}/stock-movements/`),
+    { method: 'GET', token: authToken() },
+  )
 }
 
 export async function createRawMaterialApi(
@@ -450,6 +505,9 @@ export type SimpleDocLine = {
   unit_name: string
   price: string
   amount: string
+  cgst: string
+  sgst: string
+  igst: string
   note: string
 }
 
@@ -463,10 +521,12 @@ export type PurchaseOrder = {
   delivery_date: string
   delivery_time: string | null
   po_number: string
+  invoice_number?: string
   recipient_can_edit: boolean
   subtotal: string
   delivery_charges: string
   grand_total: string
+  payment_status?: 'unpaid' | 'partial' | 'paid'
   lines: SimpleDocLine[]
   created_at: string
   updated_at: string
@@ -479,16 +539,21 @@ export type PurchaseOrderPayload = {
   delivery_date: string
   delivery_time?: string | null
   po_number?: string
+  invoice_number?: string
   recipient_can_edit?: boolean
   subtotal?: string
   delivery_charges?: string
   grand_total?: string
+  payment_status?: 'unpaid' | 'partial' | 'paid'
   lines: {
     raw_material_id: string
     qty: string
     unit_id: string
     price?: string
     amount?: string
+    cgst?: string
+    sgst?: string
+    igst?: string
     note?: string
   }[]
 }
@@ -533,6 +598,8 @@ export type DocListParams = {
   dateFrom?: string
   dateTo?: string
   sourceType?: string
+  paymentStatus?: string
+  updateInventoryStock?: string
   page?: number
 }
 
@@ -558,6 +625,15 @@ function docQuery(params?: DocListParams): string {
   if (params?.dateTo) query.set('date_to', params.dateTo)
   if (params?.sourceType && params.sourceType !== 'all') {
     query.set('source_type', params.sourceType)
+  }
+  if (params?.paymentStatus && params.paymentStatus !== 'all') {
+    query.set('payment_status', params.paymentStatus)
+  }
+  if (
+    params?.updateInventoryStock &&
+    params.updateInventoryStock !== 'all'
+  ) {
+    query.set('update_inventory_stock', params.updateInventoryStock)
   }
   if (params?.page) query.set('page', String(params.page))
   query.set('page_size', '100')
@@ -1093,6 +1169,76 @@ export type SalesReturnPayload = {
   }[]
 }
 
+export type InventoryDocumentType =
+  | 'purchase'
+  | 'purchase_return'
+  | 'sale'
+  | 'transfer'
+  | 'sales_return'
+
+export type InventoryDocumentPayment = {
+  id: string
+  amount: string
+  payment_method: string
+  payment_method_label: string
+  paid_at: string
+  note: string
+  created_by: string | null
+  created_at: string
+}
+
+export type InventoryDocumentPaymentSummary = {
+  payments: InventoryDocumentPayment[]
+  grand_total: string
+  paid_total: string
+  due_amount: string
+  payment_status: 'unpaid' | 'partial' | 'paid'
+}
+
+function documentPaymentsPath(
+  outletId: string,
+  documentType: InventoryDocumentType,
+  documentId: string,
+): string {
+  const query = new URLSearchParams({
+    document_type: documentType,
+    document_id: documentId,
+  })
+  return `/api/v1/inventory/${outletId}/document-payments/?${query.toString()}`
+}
+
+export async function getDocumentPaymentsApi(
+  outletId: string,
+  documentType: InventoryDocumentType,
+  documentId: string,
+): Promise<InventoryDocumentPaymentSummary> {
+  return apiRequest<InventoryDocumentPaymentSummary>(
+    documentPaymentsPath(outletId, documentType, documentId),
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function addDocumentPaymentApi(
+  outletId: string,
+  documentType: InventoryDocumentType,
+  documentId: string,
+  payload: {
+    amount: string
+    payment_method: string
+    paid_at: string
+    note?: string
+  },
+): Promise<InventoryDocumentPaymentSummary> {
+  return apiRequest<InventoryDocumentPaymentSummary>(
+    documentPaymentsPath(outletId, documentType, documentId),
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      token: authToken(),
+    },
+  )
+}
+
 export type WastageListParams = DocListParams & {
   status?: string
   categoryId?: string
@@ -1303,6 +1449,220 @@ export async function deleteWastageApi(
     method: 'DELETE',
     token: authToken(),
   })
+}
+
+export type StockEntryLine = {
+  id: string
+  raw_material_id: string
+  raw_material_name: string
+  unit_name: string
+  qty: string
+  value: string
+  reason: string
+  position: number
+}
+
+export type StockEntry = {
+  id: string
+  kind: 'available' | 'closing'
+  kind_label: string
+  stock_date: string
+  cycle: string
+  period_start: string
+  period_end: string
+  period_label: string
+  note: string
+  lines: StockEntryLine[]
+  created_at: string
+  updated_at: string
+}
+
+export type StockEntryLinePayload = {
+  raw_material_id: string
+  qty: string
+  value?: string
+  reason?: string
+}
+
+export type StockEntryPayload = {
+  kind?: 'available' | 'closing'
+  stock_date: string
+  cycle?: string
+  note?: string
+  lines: StockEntryLinePayload[]
+}
+
+export type StockEntryListParams = {
+  search?: string
+  kind?: string
+  dateFrom?: string
+  dateTo?: string
+  page?: number
+}
+
+export type ManualStockEntryReportRow = {
+  entry_id: string
+  kind: string
+  kind_label: string
+  stock_date: string
+  cycle: string
+  raw_material_id: string
+  raw_material_name: string
+  category_name: string
+  unit_name: string
+  qty: string
+  value: string
+  reason: string
+}
+
+function stockEntryPath(outletId: string, suffix = ''): string {
+  return `/api/v1/inventory/${outletId}/stock-entries/${suffix}`
+}
+
+function stockEntryQuery(params?: StockEntryListParams): string {
+  const query = new URLSearchParams()
+  if (params?.search) query.set('search', params.search)
+  if (params?.kind && params.kind !== 'all' && params.kind !== 'All') {
+    query.set('kind', params.kind)
+  }
+  if (params?.dateFrom) query.set('date_from', params.dateFrom)
+  if (params?.dateTo) query.set('date_to', params.dateTo)
+  if (params?.page) query.set('page', String(params.page))
+  query.set('page_size', '100')
+  const qs = query.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export async function listStockEntriesApi(
+  outletId: string,
+  params?: StockEntryListParams,
+): Promise<PaginatedList<StockEntry>> {
+  return apiRequest<PaginatedList<StockEntry>>(
+    `${stockEntryPath(outletId)}${stockEntryQuery(params)}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export interface StockCountMaterial {
+  id: string
+  name: string
+  unit_id: string | null
+  unit_name: string
+  category_name: string
+  book_qty: string
+  min_stock_level: string
+  at_par_level: string
+  purchase_price: string
+  reconciliation_price: string
+  is_favourite: boolean
+}
+
+export interface StockCountContext {
+  kind: string
+  cycle: string
+  available_cycles: string[]
+  period_start: string
+  period_end: string
+  period_label: string
+  counted_entry_id: string | null
+  counted_date: string | null
+  last_counted_date: string | null
+  materials: StockCountMaterial[]
+}
+
+/** Count-sheet bootstrap. Guarded by the stock-count right, not master data. */
+export async function getStockCountContextApi(
+  outletId: string,
+  kind: string,
+  params?: { stockDate?: string; cycle?: string },
+): Promise<StockCountContext> {
+  const query = new URLSearchParams({ kind })
+  if (params?.stockDate) query.set('stock_date', params.stockDate)
+  if (params?.cycle) query.set('cycle', params.cycle)
+  return apiRequest<StockCountContext>(
+    `${stockEntryPath(outletId, 'context/')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function listAllStockEntriesApi(
+  outletId: string,
+  params?: StockEntryListParams,
+): Promise<StockEntry[]> {
+  return loadAllPages((page) =>
+    listStockEntriesApi(outletId, { ...params, page }),
+  )
+}
+
+export async function getStockEntryApi(
+  outletId: string,
+  id: string,
+): Promise<StockEntry> {
+  return apiRequest<StockEntry>(stockEntryPath(outletId, `${id}/`), {
+    method: 'GET',
+    token: authToken(),
+  })
+}
+
+export async function createStockEntryApi(
+  outletId: string,
+  payload: StockEntryPayload,
+): Promise<StockEntry> {
+  return apiRequest<StockEntry>(stockEntryPath(outletId), {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token: authToken(),
+  })
+}
+
+export async function updateStockEntryApi(
+  outletId: string,
+  id: string,
+  payload: Partial<StockEntryPayload>,
+): Promise<StockEntry> {
+  return apiRequest<StockEntry>(stockEntryPath(outletId, `${id}/`), {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    token: authToken(),
+  })
+}
+
+export async function deleteStockEntryApi(
+  outletId: string,
+  id: string,
+): Promise<void> {
+  await apiRequest(stockEntryPath(outletId, `${id}/`), {
+    method: 'DELETE',
+    token: authToken(),
+  })
+}
+
+export type ManualStockEntryReportParams = ReportListParams & {
+  kind?: string
+}
+
+export async function listManualStockEntryReportApi(
+  outletId: string,
+  params?: ManualStockEntryReportParams,
+): Promise<PaginatedList<ManualStockEntryReportRow>> {
+  const query = new URLSearchParams(reportQuery(params).replace(/^\?/, ''))
+  if (params?.kind && params.kind !== 'all' && params.kind !== 'All') {
+    query.set('kind', params.kind)
+  }
+  const qs = query.toString()
+  return apiRequest<PaginatedList<ManualStockEntryReportRow>>(
+    `${reportPath(outletId, 'manual-stock-entry')}${qs ? `?${qs}` : ''}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function listAllManualStockEntryReportApi(
+  outletId: string,
+  params?: ManualStockEntryReportParams,
+): Promise<ManualStockEntryReportRow[]> {
+  return loadAllPages((page) =>
+    listManualStockEntryReportApi(outletId, { ...params, page }),
+  )
 }
 
 export async function listSalesReturnsApi(

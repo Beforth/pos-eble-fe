@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Plus, X } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import { SortableTh } from '../../components/common/SortableTh'
@@ -226,7 +226,7 @@ export default function InventoryCategories() {
                             label="Delete"
                             onClick={() => setPendingDelete(row)}
                           >
-                            <X size={15} strokeWidth={1.75} />
+                            <Trash2 size={15} strokeWidth={1.75} />
                           </RowActionButton>
                         ) : null}
                       </div>

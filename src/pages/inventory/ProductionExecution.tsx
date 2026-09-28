@@ -14,10 +14,19 @@ import { SelectRecordAlert } from '../../components/menu/SelectRecordAlert'
 import { useAuth } from '../../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
 import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
   INV_PRODUCTION_WRITE_PERMISSION,
   createProductionRunApi,
   listAllProductionProcessesApi,
+  listAllRawMaterialsApi,
   type ProductionProcess,
+  type RawMaterial,
 } from '../../services/inventoryService'
 
 const PRODUCTION_TYPES = [
@@ -110,12 +119,26 @@ export default function ProductionExecution() {
     useState<string>('Direct Production')
   const [processQuery, setProcessQuery] = useState('')
   const [processes, setProcesses] = useState<ProductionProcess[]>([])
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [outputQty, setOutputQty] = useState('')
   const [withPrice, setWithPrice] = useState(false)
   const [noRecordAlertOpen, setNoRecordAlertOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.production-execution.${
+      encryptedOutletId ?? 'unknown'
+    }`,
+    { productionType, selectedId, outputQty, withPrice },
+    (saved) => {
+      setProductionType(saved.productionType)
+      setSelectedId(saved.selectedId)
+      setOutputQty(saved.outputQty)
+      setWithPrice(saved.withPrice)
+    },
+  )
 
   const load = useCallback(async () => {
     if (!encryptedOutletId) return
@@ -137,6 +160,13 @@ export default function ProductionExecution() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    listAllRawMaterialsApi(encryptedOutletId)
+      .then(setRawMaterials)
+      .catch(() => setRawMaterials([]))
+  }, [encryptedOutletId])
 
   const filtered = useMemo(() => {
     const q = processQuery.trim().toLowerCase()
@@ -171,6 +201,7 @@ export default function ProductionExecution() {
       return
     }
     setSaving(true)
+    setError('')
     try {
       await createProductionRunApi(encryptedOutletId, {
         process_id: selected.id,
@@ -178,10 +209,11 @@ export default function ProductionExecution() {
         output_qty: outputQty,
         with_price: withPrice,
       })
+      draft.clearDraft()
       showToast('Converted to production')
       setSelectedId(null)
     } catch (err) {
-      showToast(
+      setError(
         err instanceof ApiError
           ? err.message
           : 'Unable to create production run',
@@ -193,6 +225,11 @@ export default function ProductionExecution() {
 
   return (
     <InventoryPageShell activeItem="production-execution">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[220px]">
@@ -377,18 +414,51 @@ export default function ProductionExecution() {
                     </tr>
                   </thead>
                   <tbody>
-                    {selected.lines.map((line) => (
-                      <tr
-                        key={`${line.raw_material_id}-${line.unit_id}`}
-                        className="border-b border-line last:border-b-0"
-                      >
-                        <td className="px-3 py-2 text-ink">
-                          {line.raw_material_name}
-                        </td>
-                        <td className="px-3 py-2 text-ink">{line.qty}</td>
-                        <td className="px-3 py-2 text-ink">{line.unit_name}</td>
-                      </tr>
-                    ))}
+                    {selected.lines.map((line) => {
+                      const failing =
+                        getInsufficientStockMaterial(error) ===
+                        line.raw_material_name
+                      const stockMaterial = rawMaterials.find(
+                        (raw) => raw.id === line.raw_material_id,
+                      )
+                      const baseQty = Number(selected.output_qty) || 1
+                      const scale =
+                        (Number(outputQty) || baseQty) / baseQty
+                      return (
+                        <tr
+                          key={`${line.raw_material_id}-${line.unit_id}`}
+                          className={`border-b border-line last:border-b-0 ${
+                            failing
+                              ? 'bg-red-50 outline outline-1 outline-red-200'
+                              : ''
+                          }`}
+                        >
+                          <td className="px-3 py-2 text-ink">
+                            {line.raw_material_name}
+                            {encryptedOutletId && stockMaterial ? (
+                              <StockAvailabilityButton
+                                outletId={encryptedOutletId}
+                                material={stockMaterial}
+                              />
+                            ) : null}
+                            {failing ? (
+                              <StockShortfallNote
+                                available={
+                                  stockMaterial?.stock_qty ?? '0'
+                                }
+                                availableUnit={
+                                  stockMaterial?.consumption_unit.name
+                                }
+                                required={(Number(line.qty) * scale).toFixed(3)}
+                                requiredUnit={line.unit_name}
+                              />
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2 text-ink">{line.qty}</td>
+                          <td className="px-3 py-2 text-ink">{line.unit_name}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -396,6 +466,18 @@ export default function ProductionExecution() {
           )}
         </section>
       </div>
+
+      {error ? (
+        <p
+          className={`rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
         <button

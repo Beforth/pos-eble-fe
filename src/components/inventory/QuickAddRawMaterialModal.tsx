@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Package, Scale, X } from 'lucide-react'
-import { SearchableSelect } from './SearchableSelect'
+import { AddNewMenuRow, SearchableSelect } from './SearchableSelect'
 import {
   OutlineButton,
   PrimaryButton,
@@ -21,6 +21,9 @@ interface QuickAddRawMaterialModalProps {
   unitOptions: string[]
   categoryOptions: string[]
   saving?: boolean
+  onAddUnit?: (apply: (name: string) => void) => void
+  onAddCategory?: (apply: (name: string) => void) => void
+  captureEscape?: boolean
 }
 
 function MultiUnitSelect({
@@ -30,6 +33,7 @@ function MultiUnitSelect({
   options,
   placeholder,
   onChange,
+  onAddNew,
 }: {
   label: string
   required?: boolean
@@ -37,6 +41,7 @@ function MultiUnitSelect({
   options: string[]
   placeholder: string
   onChange: (values: string[]) => void
+  onAddNew?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -159,6 +164,14 @@ function MultiUnitSelect({
                 <li className="px-3 py-2 text-sm text-muted">No matches</li>
               ) : null}
             </ul>
+            {onAddNew ? (
+              <AddNewMenuRow
+                onClick={() => {
+                  setOpen(false)
+                  onAddNew()
+                }}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -190,6 +203,9 @@ export function QuickAddRawMaterialModal({
   unitOptions,
   categoryOptions,
   saving = false,
+  onAddUnit,
+  onAddCategory,
+  captureEscape = true,
 }: QuickAddRawMaterialModalProps) {
   const titleId = useId()
   const nameId = useId()
@@ -198,20 +214,27 @@ export function QuickAddRawMaterialModal({
   const [purchaseUnits, setPurchaseUnits] = useState<string[]>([])
   const [consumptionUnit, setConsumptionUnit] = useState('')
   const [error, setError] = useState('')
+  const wasOpen = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    setName('')
-    setCategory('')
-    setPurchaseUnits([])
-    setConsumptionUnit('')
-    setError('')
+    if (open && !wasOpen.current) {
+      setName('')
+      setCategory('')
+      setPurchaseUnits([])
+      setConsumptionUnit('')
+      setError('')
+    }
+    wasOpen.current = open
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !captureEscape) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+  }, [open, captureEscape, onClose])
 
   if (!open) return null
 
@@ -302,6 +325,11 @@ export function QuickAddRawMaterialModal({
             searchPlaceholder="Search"
             includePlaceholderOption
             onChange={setCategory}
+            onAddNew={
+              onAddCategory
+                ? () => onAddCategory((name) => setCategory(name))
+                : undefined
+            }
           />
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -313,6 +341,16 @@ export function QuickAddRawMaterialModal({
                 options={unitOptions}
                 placeholder="Select multiple unit"
                 onChange={setPurchaseUnits}
+                onAddNew={
+                  onAddUnit
+                    ? () =>
+                        onAddUnit((name) =>
+                          setPurchaseUnits((prev) =>
+                            prev.includes(name) ? prev : [...prev, name],
+                          ),
+                        )
+                    : undefined
+                }
               />
               <UnitHint icon={<Package size={14} />}>
                 A purchase unit in inventory is the unit used to order or
@@ -329,6 +367,11 @@ export function QuickAddRawMaterialModal({
                 searchPlaceholder="Search"
                 includePlaceholderOption={false}
                 onChange={setConsumptionUnit}
+                onAddNew={
+                  onAddUnit
+                    ? () => onAddUnit((name) => setConsumptionUnit(name))
+                    : undefined
+                }
               />
               <UnitHint icon={<Scale size={14} />}>
                 A consumption unit in inventory is the unit in which goods are

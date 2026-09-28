@@ -18,8 +18,20 @@ import {
   Upload,
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
+import { PaymentHistoryPanel } from '../../components/inventory/PaymentHistoryPanel'
 import { SelectPurchaseOrderModal } from '../../components/inventory/SelectPurchaseOrderModal'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import { SelectRecordAlert } from '../../components/menu/SelectRecordAlert'
 import {
   OutlineButton,
@@ -127,6 +139,46 @@ export default function AddSalesReturn() {
   const [restaurants, setRestaurants] = useState<
     { id: string; name: string }[]
   >([])
+  const quickAdd = useInventoryQuickAdd({
+    onSupplierCreated: (row) => setSuppliers((prev) => prependById(prev, row)),
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.sales-return.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    {
+      returnFrom,
+      party,
+      invoiceDate,
+      creditNoteNo,
+      saleInvoiceNo,
+      lines,
+      discount,
+      otherCharges,
+      otherTaxes,
+      paymentType,
+      paymentDate,
+      paidAmount,
+      paymentMethod,
+      updateStock,
+    },
+    (saved) => {
+      setReturnFrom(saved.returnFrom)
+      setParty(saved.party)
+      setInvoiceDate(saved.invoiceDate)
+      setCreditNoteNo(saved.creditNoteNo)
+      setSaleInvoiceNo(saved.saleInvoiceNo)
+      setLines(saved.lines)
+      setDiscount(saved.discount)
+      setOtherCharges(saved.otherCharges)
+      setOtherTaxes(saved.otherTaxes)
+      setPaymentType(saved.paymentType)
+      setPaymentDate(saved.paymentDate)
+      setPaidAmount(saved.paidAmount)
+      setPaymentMethod(saved.paymentMethod)
+      setUpdateStock(saved.updateStock)
+    },
+  )
 
   useEffect(() => {
     if (!discountTypeOpen) return
@@ -165,7 +217,14 @@ export default function AddSalesReturn() {
     void listSuppliersApi().then(setSuppliers).catch(() => setSuppliers([]))
     void listAllRawMaterialsApi(encryptedOutletId)
       .then(setRawMaterials)
-      .catch(() => setRawMaterials([]))
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
     void listOutletsApi()
       .then((rows) =>
         setRestaurants(
@@ -374,6 +433,7 @@ export default function AddSalesReturn() {
       }
       if (isEdit && id) await updateSalesReturnApi(encryptedOutletId, id, payload)
       else await createSalesReturnApi(encryptedOutletId, payload)
+      draft.clearDraft()
       showToast(isEdit ? 'Sales return updated' : 'Sales return saved')
       navigate('/inventory/sales-return')
     } catch (err) {
@@ -391,6 +451,11 @@ export default function AddSalesReturn() {
 
   return (
     <InventoryPageShell activeItem="sales-return">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
@@ -453,6 +518,11 @@ export default function AddSalesReturn() {
             placeholder="Please select"
             searchPlaceholder="Search"
             onChange={setParty}
+            onAddNew={
+              returnFrom === 'supplier'
+                ? quickAdd.handler('supplier', (row) => setParty(row.name))
+                : undefined
+            }
           />
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">
@@ -684,7 +754,14 @@ export default function AddSalesReturn() {
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -711,7 +788,37 @@ export default function AddSalesReturn() {
                         unit: material?.consumption_unit.name ?? line.unit,
                       })
                     }}
+                    onAddNew={quickAdd.handler('raw-material', (row) =>
+                      updateLine(line.id, {
+                        rawMaterial: row.name,
+                        unit: row.consumption_unit.name,
+                      }),
+                    )}
                   />
+                  {encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -959,7 +1066,26 @@ export default function AddSalesReturn() {
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {isEdit && id && encryptedOutletId ? (
+        <PaymentHistoryPanel
+          outletId={encryptedOutletId}
+          documentType="sales_return"
+          documentId={id}
+          canAdd={canWrite}
+        />
+      ) : null}
+
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -1028,6 +1154,7 @@ export default function AddSalesReturn() {
         message="Please select Item."
         onClose={() => setSelectItemAlertOpen(false)}
       />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

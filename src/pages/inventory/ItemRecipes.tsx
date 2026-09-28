@@ -232,12 +232,9 @@ export default function ItemRecipes() {
   const canWrite = hasPermission(INV_WRITE_PERMISSION)
   const [itemFilter, setItemFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
-  const [createdFilter, setCreatedFilter] = useState('All')
   const [appliedItem, setAppliedItem] = useState('All')
   const [appliedCategory, setAppliedCategory] = useState('All')
-  const [appliedCreated, setAppliedCreated] = useState('All')
   const [cardCategory, setCardCategory] = useState('all')
-  const [autoConsumption, setAutoConsumption] = useState(false)
   const [rows, setRows] = useState<ItemRecipe[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [viewRecipe, setViewRecipe] = useState<ItemRecipe | null>(null)
@@ -297,10 +294,9 @@ export default function ItemRecipes() {
         return false
       }
       if (appliedItem !== 'All' && row.item_name !== appliedItem) return false
-      if (appliedCreated === 'Not Created') return false
       return true
     })
-  }, [rows, cardCategory, appliedCategory, appliedItem, appliedCreated])
+  }, [rows, cardCategory, appliedCategory, appliedItem])
 
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
     filteredRows,
@@ -317,7 +313,6 @@ export default function ItemRecipes() {
   function applySearch() {
     setAppliedItem(itemFilter)
     setAppliedCategory(categoryFilter)
-    setAppliedCreated(createdFilter)
     if (categoryFilter !== 'All') setCardCategory(categoryFilter)
     showToast('Search applied')
   }
@@ -325,10 +320,8 @@ export default function ItemRecipes() {
   function clearFilters() {
     setItemFilter('All')
     setCategoryFilter('All')
-    setCreatedFilter('All')
     setAppliedItem('All')
     setAppliedCategory('All')
-    setAppliedCreated('All')
     setCardCategory('all')
   }
 
@@ -502,47 +495,10 @@ export default function ItemRecipes() {
             onChange={setCategoryFilter}
           />
         </div>
-        <div className="min-w-[180px] flex-1">
-          <SearchableSelect
-            label="Created Recipes"
-            value={createdFilter}
-            options={['All', 'Created', 'Not Created']}
-            placeholder="All"
-            searchPlaceholder="Search"
-            includePlaceholderOption={false}
-            compact
-            onChange={setCreatedFilter}
-          />
-        </div>
         <OutlineButton onClick={applySearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={clearFilters}>
           Clear
         </OutlineButton>
-        <div className="ml-auto flex items-center gap-2 pb-1">
-          <span className="text-sm font-medium text-ink">Auto Consumption</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={autoConsumption}
-            onClick={() => {
-              setAutoConsumption((prev) => !prev)
-              showToast(
-                autoConsumption
-                  ? 'Auto Consumption disabled'
-                  : 'Auto Consumption enabled',
-              )
-            }}
-            className={`relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full transition-colors ${
-              autoConsumption ? 'bg-primary' : 'bg-line'
-            }`}
-          >
-            <span
-              className={`inline-block size-3.5 rounded-full bg-card transition-transform ${
-                autoConsumption ? 'translate-x-4' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
       </div>
 
       <CategoryTabBar

@@ -12,8 +12,20 @@ import {
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { OtherDetailsDrawer } from '../../components/inventory/OtherDetailsDrawer'
+import { PaymentHistoryPanel } from '../../components/inventory/PaymentHistoryPanel'
 import { SelectPurchaseOrderModal } from '../../components/inventory/SelectPurchaseOrderModal'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import { SelectRecordAlert } from '../../components/menu/SelectRecordAlert'
 import {
   OutlineButton,
@@ -110,6 +122,43 @@ export default function AddTransfer() {
   const [restaurants, setRestaurants] = useState<
     { id: string; name: string }[]
   >([])
+  const quickAdd = useInventoryQuickAdd({
+    onSupplierCreated: (row) => setSuppliers((prev) => prependById(prev, row)),
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+    onCategoryCreated: (row) => setCategories((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.transfer.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    {
+      transferTo,
+      party,
+      invoiceDate,
+      challanNo,
+      category,
+      lines,
+      paymentType,
+      paymentDate,
+      paidAmount,
+      paymentMethod,
+      updateStock,
+      recipientCanEdit,
+    },
+    (saved) => {
+      setTransferTo(saved.transferTo)
+      setParty(saved.party)
+      setInvoiceDate(saved.invoiceDate)
+      setChallanNo(saved.challanNo)
+      setCategory(saved.category)
+      setLines(saved.lines)
+      setPaymentType(saved.paymentType)
+      setPaymentDate(saved.paymentDate)
+      setPaidAmount(saved.paidAmount)
+      setPaymentMethod(saved.paymentMethod)
+      setUpdateStock(saved.updateStock)
+      setRecipientCanEdit(saved.recipientCanEdit)
+    },
+  )
 
   useEffect(() => {
     if (!moreActionOpen) return
@@ -135,7 +184,14 @@ export default function AddTransfer() {
     void listCategoriesApi().then(setCategories).catch(() => setCategories([]))
     void listAllRawMaterialsApi(encryptedOutletId)
       .then(setRawMaterials)
-      .catch(() => setRawMaterials([]))
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
     void listOutletsApi()
       .then((rows) =>
         setRestaurants(
@@ -198,7 +254,11 @@ export default function AddTransfer() {
 
   const visibleRawMaterials = useMemo(() => {
     if (!category) return rawMaterials
-    return rawMaterials.filter((row) => row.category?.name === category)
+    return rawMaterials.filter(
+      (row) =>
+        row.category?.name === category ||
+        row.sub_category?.name === category,
+    )
   }, [rawMaterials, category])
   const rawNames = visibleRawMaterials.map((row) => row.name)
   const unitNames = units.filter((row) => row.is_active).map((row) => row.name)
@@ -329,6 +389,7 @@ export default function AddTransfer() {
       }
       if (isEdit && id) await updateTransferApi(encryptedOutletId, id, payload)
       else await createTransferApi(encryptedOutletId, payload)
+      draft.clearDraft()
       showToast(isEdit ? 'Transfer updated' : 'Transfer saved')
       navigate('/inventory/transfer')
     } catch (err) {
@@ -344,6 +405,11 @@ export default function AddTransfer() {
 
   return (
     <InventoryPageShell activeItem="transfer">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
@@ -409,6 +475,11 @@ export default function AddTransfer() {
             placeholder="Please select"
             searchPlaceholder="Search"
             onChange={setParty}
+            onAddNew={
+              transferTo === 'supplier'
+                ? quickAdd.handler('supplier', (row) => setParty(row.name))
+                : undefined
+            }
           />
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">
@@ -451,6 +522,9 @@ export default function AddTransfer() {
             searchPlaceholder="Search"
             includePlaceholderOption
             onChange={setCategory}
+            onAddNew={quickAdd.handler('category', (row) =>
+              setCategory(row.name),
+            )}
           />
         </div>
       </div>
@@ -562,7 +636,14 @@ export default function AddTransfer() {
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -591,7 +672,37 @@ export default function AddTransfer() {
                         unit: material?.consumption_unit.name ?? line.unit,
                       })
                     }}
+                    onAddNew={quickAdd.handler('raw-material', (row) =>
+                      updateLine(line.id, {
+                        rawMaterial: row.name,
+                        unit: row.consumption_unit.name,
+                      }),
+                    )}
                   />
+                  {encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -768,7 +879,26 @@ export default function AddTransfer() {
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {isEdit && id && encryptedOutletId ? (
+        <PaymentHistoryPanel
+          outletId={encryptedOutletId}
+          documentType="transfer"
+          documentId={id}
+          canAdd={canWrite}
+        />
+      ) : null}
+
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <div className="flex flex-wrap items-center gap-4">
@@ -852,6 +982,7 @@ export default function AddTransfer() {
         message="Please select Item."
         onClose={() => setSelectItemAlertOpen(false)}
       />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

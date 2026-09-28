@@ -11,6 +11,18 @@ import {
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { PaymentHistoryPanel } from '../../components/inventory/PaymentHistoryPanel'
+import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import {
   ActionDropdown,
   OutlineButton,
@@ -103,6 +115,40 @@ export default function AddPurchase() {
   >([])
   const [invoiceFileName, setInvoiceFileName] = useState<string | null>(null)
   const invoiceInputRef = useRef<HTMLInputElement>(null)
+  const quickAdd = useInventoryQuickAdd({
+    onSupplierCreated: (row) => setSuppliers((prev) => prependById(prev, row)),
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.purchase.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    {
+      purchaseFrom,
+      supplier,
+      restaurant,
+      invoiceDate,
+      invoiceNo,
+      lines,
+      discount,
+      otherCharges,
+      otherTaxes,
+      paymentType,
+      updateStock,
+    },
+    (saved) => {
+      setPurchaseFrom(saved.purchaseFrom)
+      setSupplier(saved.supplier)
+      setRestaurant(saved.restaurant)
+      setInvoiceDate(saved.invoiceDate)
+      setInvoiceNo(saved.invoiceNo)
+      setLines(saved.lines)
+      setDiscount(saved.discount)
+      setOtherCharges(saved.otherCharges)
+      setOtherTaxes(saved.otherTaxes)
+      setPaymentType(saved.paymentType)
+      setUpdateStock(saved.updateStock)
+    },
+  )
 
   const totals = useMemo(() => {
     let subTotal = 0
@@ -139,7 +185,14 @@ export default function AddPurchase() {
     void listSuppliersApi().then(setSuppliers).catch(() => setSuppliers([]))
     void listAllRawMaterialsApi(encryptedOutletId)
       .then(setRawMaterials)
-      .catch(() => setRawMaterials([]))
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
     void listOutletsApi()
       .then((rows) =>
         setRestaurants(
@@ -279,11 +332,32 @@ export default function AddPurchase() {
       setError('Add at least one raw material with qty and unit')
       return
     }
-    const payloadLines = validLines.map((line) => {
+    for (const [index, line] of validLines.entries()) {
       const raw = rawMaterials.find((row) => row.name === line.rawMaterial)
       const unit = units.find((row) => row.name === line.unit)
       if (!raw || !unit) {
-        throw new Error('Select a saved raw material and unit')
+        setError(`Row ${index + 1}: select a saved raw material and unit`)
+        return
+      }
+      if (
+        unit.id !== raw.consumption_unit.id &&
+        unit.id !== raw.conversion_purchase_unit?.id
+      ) {
+        setError(
+          `Row ${index + 1} (${raw.name}): ${unit.name} has no conversion configured. Use ${raw.consumption_unit.name}${
+            raw.conversion_purchase_unit
+              ? ` or ${raw.conversion_purchase_unit.name}`
+              : ''
+          }, or edit the raw material conversion first.`,
+        )
+        return
+      }
+    }
+    const payloadLines = validLines.map((line, index) => {
+      const raw = rawMaterials.find((row) => row.name === line.rawMaterial)
+      const unit = units.find((row) => row.name === line.unit)
+      if (!raw || !unit) {
+        throw new Error(`Row ${index + 1}: invalid raw material or unit`)
       }
       return {
         raw_material_id: raw.id,
@@ -297,9 +371,9 @@ export default function AddPurchase() {
         note: line.note,
       }
     })
-    setError('')
-    setSaving(true)
     try {
+      setError('')
+      setSaving(true)
       const payload = {
         source_type: purchaseFrom,
         supplier_id:
@@ -323,10 +397,15 @@ export default function AddPurchase() {
       }
       if (isEdit && id) await updatePurchaseApi(encryptedOutletId, id, payload)
       else await createPurchaseApi(encryptedOutletId, payload)
+      draft.clearDraft()
       showToast(isEdit ? 'Purchase updated' : 'Purchase saved')
       navigate('/inventory/purchase')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Unable to save purchase')
+      setError(
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : 'Unable to save purchase',
+      )
     } finally {
       setSaving(false)
     }
@@ -337,6 +416,11 @@ export default function AddPurchase() {
 
   return (
     <InventoryPageShell activeItem="stock-purchase">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
@@ -388,6 +472,9 @@ export default function AddPurchase() {
               placeholder="Select Supplier"
               searchPlaceholder="Search suppliers..."
               onChange={setSupplier}
+              onAddNew={quickAdd.handler('supplier', (row) =>
+                setSupplier(row.name),
+              )}
             />
           </div>
         ) : (
@@ -521,7 +608,14 @@ export default function AddPurchase() {
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -548,7 +642,37 @@ export default function AddPurchase() {
                         unit: material?.consumption_unit.name ?? line.unit,
                       })
                     }}
+                    onAddNew={quickAdd.handler('raw-material', (row) =>
+                      updateLine(line.id, {
+                        rawMaterial: row.name,
+                        unit: row.consumption_unit.name,
+                      }),
+                    )}
                   />
+                  {encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -744,7 +868,26 @@ export default function AddPurchase() {
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {isEdit && id && encryptedOutletId ? (
+        <PaymentHistoryPanel
+          outletId={encryptedOutletId}
+          documentType="purchase"
+          documentId={id}
+          canAdd={canWrite}
+        />
+      ) : null}
+
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -799,6 +942,7 @@ export default function AddPurchase() {
           </div>
         </div>
       ) : null}
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

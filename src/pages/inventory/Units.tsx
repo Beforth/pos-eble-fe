@@ -3,7 +3,7 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Pencil, Plus, X } from 'lucide-react'
+import { FileText, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import { SortableTh } from '../../components/common/SortableTh'
@@ -276,7 +276,7 @@ export default function Units() {
                             label="Delete"
                             onClick={() => setPendingDelete(row)}
                           >
-                            <X size={15} strokeWidth={1.75} />
+                            <Trash2 size={15} strokeWidth={1.75} />
                           </RowActionButton>
                         ) : null}
                       </div>

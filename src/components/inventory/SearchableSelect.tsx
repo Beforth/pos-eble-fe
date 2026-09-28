@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Check, ChevronDown, Plus, Search } from 'lucide-react'
 
 interface SearchableSelectProps {
   label?: ReactNode
@@ -15,6 +16,28 @@ interface SearchableSelectProps {
   /** Compact trigger height for dense tables/forms. */
   compact?: boolean
   onChange: (value: string) => void
+  /** Opens a create shortcut for this master. Omit on enums and filters. */
+  onAddNew?: () => void
+  addNewLabel?: string
+}
+
+export function AddNewMenuRow({
+  label = 'Add new',
+  onClick,
+}: {
+  label?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 border-t border-line px-3 py-2.5 text-left text-sm font-semibold text-primary hover:bg-page"
+    >
+      <Plus size={15} className="shrink-0" />
+      {label}
+    </button>
+  )
 }
 
 export function SearchableSelect({
@@ -28,11 +51,20 @@ export function SearchableSelect({
   dropdownPlacement = 'below',
   compact = false,
   onChange,
+  onAddNew,
+  addNewLabel = 'Add new',
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [resolvedPlacement, setResolvedPlacement] = useState<'below' | 'above'>('below')
+  const [menuPosition, setMenuPosition] = useState({
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 0,
+  })
   const rootRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const filtered = useMemo(() => {
@@ -50,14 +82,33 @@ export function SearchableSelect({
       setQuery('')
       return
     }
-    if (dropdownPlacement === 'auto' && rootRef.current) {
+    const updatePosition = () => {
+      if (!rootRef.current) return
       const rect = rootRef.current.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
-      setResolvedPlacement(spaceBelow < 300 ? 'above' : 'below')
+      const placement =
+        dropdownPlacement === 'auto'
+          ? spaceBelow < 300
+            ? 'above'
+            : 'below'
+          : dropdownPlacement
+      setResolvedPlacement(placement)
+      setMenuPosition({
+        left: rect.left,
+        top: rect.bottom + 4,
+        bottom: window.innerHeight - rect.top + 4,
+        width: rect.width,
+      })
     }
+    updatePosition()
     const timer = window.setTimeout(() => inputRef.current?.focus(), 0)
     const onPointerDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
         setOpen(false)
       }
     }
@@ -66,12 +117,16 @@ export function SearchableSelect({
     }
     document.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
     return () => {
       window.clearTimeout(timer)
       document.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [open])
+  }, [open, dropdownPlacement])
 
   function renderOption(option: string, isPlaceholder = false) {
     const selected = isPlaceholder ? !value : value === option
@@ -129,13 +184,17 @@ export function SearchableSelect({
           />
         </button>
 
-        {open ? (
+        {open ? createPortal(
           <div
-            className={`absolute left-0 right-0 z-40 overflow-hidden rounded-md border border-line bg-card shadow-lg ${
-              (dropdownPlacement === 'auto' ? resolvedPlacement : dropdownPlacement) === 'above'
-                ? 'bottom-full mb-1'
-                : 'top-full mt-1'
-            }`}
+            ref={menuRef}
+            className="fixed z-[100] overflow-hidden rounded-md border border-line bg-card shadow-lg"
+            style={{
+              left: menuPosition.left,
+              width: menuPosition.width,
+              ...(resolvedPlacement === 'above'
+                ? { bottom: menuPosition.bottom }
+                : { top: menuPosition.top }),
+            }}
           >
             <div className="border-b border-line p-2">
               <label className="flex h-9 items-center gap-2 rounded-md border border-line px-2.5">
@@ -157,7 +216,17 @@ export function SearchableSelect({
                 <li className="px-3 py-2 text-sm text-muted">No matches</li>
               ) : null}
             </ul>
-          </div>
+            {onAddNew ? (
+              <AddNewMenuRow
+                label={addNewLabel}
+                onClick={() => {
+                  setOpen(false)
+                  onAddNew()
+                }}
+              />
+            ) : null}
+          </div>,
+          document.body,
         ) : null}
       </div>
     </div>

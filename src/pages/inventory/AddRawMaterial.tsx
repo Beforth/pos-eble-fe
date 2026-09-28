@@ -16,7 +16,10 @@ import {
   X,
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
-import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { AddNewMenuRow, SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import {
   OutlineButton,
   PrimaryButton,
@@ -130,6 +133,7 @@ function MultiSelectTags({
   options,
   placeholder,
   onChange,
+  onAddNew,
 }: {
   label: string
   required?: boolean
@@ -137,6 +141,7 @@ function MultiSelectTags({
   options: string[]
   placeholder: string
   onChange: (values: string[]) => void
+  onAddNew?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -258,6 +263,14 @@ function MultiSelectTags({
                 <li className="px-3 py-2 text-sm text-muted">No matches</li>
               ) : null}
             </ul>
+            {onAddNew ? (
+              <AddNewMenuRow
+                onClick={() => {
+                  setOpen(false)
+                  onAddNew()
+                }}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -310,6 +323,7 @@ export default function AddRawMaterial() {
   const { encryptedOutletId, hasPermission } = useAuth()
   const canWrite = hasPermission(INV_WRITE_PERMISSION)
   const { units, categories, loadMasters } = useInventoryMasters()
+  const quickAdd = useInventoryQuickAdd()
 
   const [name, setName] = useState('')
   const [purchaseUnits, setPurchaseUnits] = useState<string[]>([])
@@ -611,6 +625,12 @@ export default function AddRawMaterial() {
                 setConversionPurchaseUnit(values[0])
               }
             }}
+            onAddNew={quickAdd.handler('unit', (row) => {
+              setPurchaseUnits((prev) =>
+                prev.includes(row.name) ? prev : [...prev, row.name],
+              )
+              if (!conversionPurchaseUnit) setConversionPurchaseUnit(row.name)
+            })}
           />
           <SearchableSelect
             label="Consumption Unit"
@@ -621,6 +641,9 @@ export default function AddRawMaterial() {
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={setConsumptionUnit}
+            onAddNew={quickAdd.handler('unit', (row) =>
+              setConsumptionUnit(row.name),
+            )}
           />
         </div>
         <p className="mt-3 flex items-start gap-1.5 text-xs text-muted">
@@ -668,6 +691,10 @@ export default function AddRawMaterial() {
               setCategory(value)
               setSubCategory('')
             }}
+            onAddNew={quickAdd.handler('category', (row) => {
+              setCategory(row.name)
+              setSubCategory('')
+            })}
           />
           <SearchableSelect
             label="Sub Category"
@@ -677,6 +704,9 @@ export default function AddRawMaterial() {
             searchPlaceholder="Search"
             includePlaceholderOption
             onChange={setSubCategory}
+            onAddNew={quickAdd.handler('category', (row) =>
+              setSubCategory(row.name),
+            )}
           />
         </div>
       </SectionCard>
@@ -758,6 +788,9 @@ export default function AddRawMaterial() {
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={setMinStockUnit}
+            onAddNew={quickAdd.handler('unit', (row) =>
+              setMinStockUnit(row.name),
+            )}
           />
           <div>
             <FieldLabel>Minimum Stock Level</FieldLabel>
@@ -771,6 +804,9 @@ export default function AddRawMaterial() {
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={setAtParUnit}
+            onAddNew={quickAdd.handler('unit', (row) =>
+              setAtParUnit(row.name),
+            )}
           />
           <div>
             <FieldLabel>At Par Stock Level</FieldLabel>
@@ -844,6 +880,9 @@ export default function AddRawMaterial() {
               searchPlaceholder="Search"
               includePlaceholderOption={false}
               onChange={setMaxStockUnit}
+              onAddNew={quickAdd.handler('unit', (row) =>
+                setMaxStockUnit(row.name),
+              )}
             />
             <OutlineButton onClick={addMaxStockRow}>Add</OutlineButton>
           </div>
@@ -981,6 +1020,7 @@ export default function AddRawMaterial() {
           </PrimaryButton>
         ) : null}
       </div>
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

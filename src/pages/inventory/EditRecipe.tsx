@@ -6,6 +6,10 @@ import { Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
+import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
@@ -44,6 +48,10 @@ export default function EditRecipe() {
   const [rows, setRows] = useState<EditableIngredient[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const quickAdd = useInventoryQuickAdd({
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
 
   useEffect(() => {
     void loadMasters()
@@ -56,7 +64,14 @@ export default function EditRecipe() {
       .catch(() => setItems([]))
     void listAllRawMaterialsApi(encryptedOutletId)
       .then(setRawMaterials)
-      .catch(() => setRawMaterials([]))
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
   }, [encryptedOutletId])
 
   useEffect(() => {
@@ -242,6 +257,12 @@ export default function EditRecipe() {
                             unit: material?.consumption_unit.name ?? row.unit,
                           })
                         }}
+                        onAddNew={quickAdd.handler('raw-material', (created) =>
+                          updateRow(row.id, {
+                            name: created.name,
+                            unit: created.consumption_unit.name,
+                          }),
+                        )}
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -266,6 +287,9 @@ export default function EditRecipe() {
                           index > rows.length - 3 ? 'above' : 'below'
                         }
                         onChange={(value) => updateRow(row.id, { unit: value })}
+                        onAddNew={quickAdd.handler('unit', (created) =>
+                          updateRow(row.id, { unit: created.name }),
+                        )}
                       />
                     </td>
                     <td className="relative z-10 px-3 py-2">
@@ -318,6 +342,7 @@ export default function EditRecipe() {
           </PrimaryButton>
         ) : null}
       </div>
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

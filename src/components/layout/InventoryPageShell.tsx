@@ -4,6 +4,11 @@ import { ActionCenterDrawer } from './ActionCenterDrawer'
 import { NotificationsDrawer } from './NotificationsDrawer'
 import { SupportAgentDrawer } from './SupportAgentDrawer'
 import { TopBar } from './TopBar'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  INV_STOCK_COUNT_READ_PERMISSIONS,
+  hasAnyPermission,
+} from '../../services/inventoryService'
 import { brand } from '../../theme/brand'
 
 interface InventoryPageShellProps {
@@ -15,11 +20,25 @@ export function InventoryPageShell({
   activeItem = 'dashboard',
   children,
 }: InventoryPageShellProps) {
+  const { hasPermission } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
+
+  // Available and Closing are separate rights, so each Manage Stock leaf is
+  // gated on its own permission rather than on "any stock-count right".
+  const canCountStock = {
+    available: hasAnyPermission(
+      hasPermission,
+      INV_STOCK_COUNT_READ_PERMISSIONS.available,
+    ),
+    closing: hasAnyPermission(
+      hasPermission,
+      INV_STOCK_COUNT_READ_PERMISSIONS.closing,
+    ),
+  }
 
   function closeOtherDrawers() {
     setSupportOpen(false)
@@ -35,6 +54,7 @@ export function InventoryPageShell({
         onToggleCollapse={() => setCollapsed((prev) => !prev)}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem={activeItem}
+        canCountStock={canCountStock}
       />
 
       <SupportAgentDrawer

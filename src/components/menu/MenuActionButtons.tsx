@@ -7,19 +7,27 @@ export function OutlineButton({
   onClick,
   variant = 'primary',
   className = '',
+  disabled = false,
+  title,
 }: {
   children: ReactNode
   onClick?: () => void
   variant?: 'primary' | 'gray'
   className?: string
+  disabled?: boolean
+  title?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-card px-3 text-sm font-medium hover:bg-page ${
+      disabled={disabled}
+      title={title}
+      className={`inline-flex h-9 items-center gap-1.5 rounded-md border bg-card px-3 text-sm font-medium ${
+        disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-page'
+      } ${
         variant === 'primary'
-          ? 'border-primary text-primary hover:bg-primary/5'
+          ? `border-primary text-primary ${disabled ? '' : 'hover:bg-primary/5'}`
           : 'border-line text-ink'
       } ${className}`}
     >
@@ -32,16 +40,19 @@ export function PrimaryButton({
   children,
   onClick,
   disabled,
+  title,
 }: {
   children: ReactNode
   onClick?: () => void
   disabled?: boolean
+  title?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}

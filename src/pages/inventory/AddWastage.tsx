@@ -5,6 +5,17 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Box, FilePenLine, Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import { SelectRecordAlert } from '../../components/menu/SelectRecordAlert'
 import {
   OutlineButton,
@@ -89,6 +100,20 @@ export default function AddWastage() {
   const [saving, setSaving] = useState(false)
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
   const [menuItems, setMenuItems] = useState<MenuItemRef[]>([])
+  const quickAdd = useInventoryQuickAdd({
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.wastage.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    { wastageFor, wastageDate, wastageByArea, lines },
+    (saved) => {
+      setWastageFor(saved.wastageFor)
+      setWastageDate(saved.wastageDate)
+      setWastageByArea(saved.wastageByArea)
+      setLines(saved.lines)
+    },
+  )
 
   useEffect(() => {
     void loadMasters()
@@ -98,7 +123,14 @@ export default function AddWastage() {
     if (!encryptedOutletId) return
     void listAllRawMaterialsApi(encryptedOutletId)
       .then(setRawMaterials)
-      .catch(() => setRawMaterials([]))
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
     void listRecipeMenuItemsApi(encryptedOutletId)
       .then(setMenuItems)
       .catch(() => setMenuItems([]))
@@ -253,6 +285,7 @@ export default function AddWastage() {
       }
       if (isEdit && id) await updateWastageApi(encryptedOutletId, id, payload)
       else await createWastageApi(encryptedOutletId, payload)
+      draft.clearDraft()
       showToast(isEdit ? 'Wastage updated' : 'Wastage saved')
       navigate('/inventory/wastage')
     } catch (err) {
@@ -264,7 +297,11 @@ export default function AddWastage() {
 
   return (
     <InventoryPageShell activeItem="wastage">
-
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">
           {isEdit ? 'Edit Wastage Details' : 'Add Wastage Details'}
@@ -368,7 +405,14 @@ export default function AddWastage() {
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -408,7 +452,43 @@ export default function AddWastage() {
                             : line.amount,
                       })
                     }}
+                    onAddNew={
+                      isItemMode
+                        ? undefined
+                        : quickAdd.handler('raw-material', (row) =>
+                            updateLine(line.id, {
+                              rawMaterial: row.name,
+                              unit: row.consumption_unit.name,
+                              avgPurchasePrice: row.purchase_price,
+                            }),
+                          )
+                    }
                   />
+                  {!isItemMode && encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {!isItemMode &&
+                  getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -567,7 +647,17 @@ export default function AddWastage() {
         </div>
       ) : null}
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
         <button
@@ -635,6 +725,7 @@ export default function AddWastage() {
         message={alertMessage ?? undefined}
         onClose={() => setAlertMessage(null)}
       />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }
