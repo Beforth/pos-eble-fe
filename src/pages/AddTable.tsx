@@ -1,10 +1,17 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import { showToast } from '../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { Info, TableProperties } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { PrimaryButton } from '../components/menu/MenuActionButtons'
+import { useAuth } from '../auth/AuthContext'
+import { ApiError } from '../services/apiClient'
+import {
+  createDiningTableApi,
+  listDiningAreasApi,
+} from '../services/menuService'
+import type { DiningArea } from '../types/menu'
 
 function SectionCard({
   icon,
@@ -33,26 +40,145 @@ function SectionCard({
 const inputClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
 
+function inputCls(hasError: boolean) {
+  return hasError
+    ? 'h-10 w-full rounded-md border border-primary bg-card px-3 text-sm text-ink outline-none focus:border-primary'
+    : inputClass
+}
+
+// Mirrors the backend table-no rules (comma = separator, colon = range) so the
+// user gets live feedback. The backend stays authoritative on save.
+const TABLE_TOKEN_RE = /^([A-Za-z]*)(\d+)$/
+
+function expandTokenCount(token: string): number | null {
+  if (token.includes(':')) {
+    const [start, end] = token.split(':')
+    if (!start || !end || end.includes(':')) return null
+    const m1 = TABLE_TOKEN_RE.exec(start)
+    const m2 = TABLE_TOKEN_RE.exec(end)
+    if (!m1 || !m2 || m1[1].toUpperCase() !== m2[1].toUpperCase()) return null
+    const from = Number(m1[2])
+    const to = Number(m2[2])
+    if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from > to) return null
+    return to - from + 1
+  }
+  return TABLE_TOKEN_RE.test(token) ? 1 : null
+}
+
+function previewTableInput(raw: string): { count?: number; spaceError?: boolean } {
+  const value = raw.trim()
+  if (!value) return {}
+  const parts = value.split(',').map((part) => part.trim())
+  if (parts.length === 1) {
+    // Catch the "1 2 3" mistake: space-separated tokens that all look like table numbers.
+    const words = value.split(/\s+/).filter(Boolean)
+    if (words.length > 1 && words.every((word) => TABLE_TOKEN_RE.test(word))) {
+      return { spaceError: true }
+    }
+    return {}
+  }
+  if (parts.some((part) => !part || part.includes(' '))) return {}
+  let count = 0
+  for (const part of parts) {
+    const tokenCount = expandTokenCount(part)
+    if (tokenCount === null) return {}
+    count += tokenCount
+  }
+  return { count }
+}
+
 export default function AddTable() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
 
   const [tableNo, setTableNo] = useState('')
   const [persons, setPersons] = useState('')
   const [extraInfo, setExtraInfo] = useState('')
-  const [availableForReservation, setAvailableForReservation] = useState(true)
+  const [areaId, setAreaId] = useState('')
+  const [isOn, setIsOn] = useState(true)
+  const [discountPercent, setDiscountPercent] = useState('')
+  const [areas, setAreas] = useState<DiningArea[]>([])
 
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    listDiningAreasApi(encryptedOutletId)
+      .then((data) => {
+        if (!cancelled) setAreas(data)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          showToast(
+            err instanceof Error ? err.message : 'Failed to load areas',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
-  function handleSave() {
+  async function handleSave() {
     if (!tableNo.trim()) {
+      setFieldErrors({ table_no: 'Table number is required' })
       setError('Table number is required')
+      showToast('Table No - This field may not be blank.')
       return
     }
-
+    if (previewTableInput(tableNo).spaceError) {
+      setError('Separate multiple table numbers with commas, e.g. 1,2,3')
+      setFieldErrors({ table_no: 'Separate multiple table numbers with commas, e.g. 1,2,3' })
+      return
+    }
+    if (!areaId.trim()) {
+      setError('Area is required')
+      setFieldErrors({ area: 'Area is required' })
+      showToast('Area - This field is required for creating a table.')
+      return
+    }
+    if (!encryptedOutletId) {
+      setError('Outlet not selected')
+      return
+    }
     setError('')
-    showToast('Table created successfully')
-    window.setTimeout(() => navigate('/menu/tables'), 800)
+    setFieldErrors({})
+    setSaving(true)
+    try {
+      const rows = await createDiningTableApi(encryptedOutletId, {
+        table_no: tableNo.trim(),
+        persons: Number(persons) || 0,
+        extra_info: extraInfo,
+        area_id: areaId,
+        is_on: isOn,
+        discount_percent: discountPercent === '' ? '0' : discountPercent,
+      })
+      showToast(
+        rows.length === 1
+          ? 'Table created successfully'
+          : `${rows.length} tables created successfully`,
+      )
+      window.setTimeout(() => navigate('/menu/tables'), 800)
+    } catch (err) {
+      setSaving(false)
+      // Parse per-field errors from the ApiError and highlight fields
+      if (err instanceof ApiError && err.errors && typeof err.errors === 'object') {
+        const raw = err.errors as Record<string, unknown>
+        const mapped: Record<string, string> = {}
+        for (const [field, messages] of Object.entries(raw)) {
+          mapped[field] = Array.isArray(messages)
+            ? String(messages[0])
+            : String(messages)
+        }
+        setFieldErrors(mapped)
+      }
+      showToast(err instanceof Error ? err.message : 'Failed to create table')
+    }
   }
+
+  const tablePreview = previewTableInput(tableNo)
 
   return (
     <MenuPageShell
@@ -100,10 +226,26 @@ export default function AddTable() {
             <input
               type="text"
               value={tableNo}
-              onChange={(event) => setTableNo(event.target.value)}
+              onChange={(event) => {
+                setTableNo(event.target.value)
+                if (fieldErrors.table_no) setFieldErrors((prev) => ({ ...prev, table_no: '' }))
+              }}
               placeholder="e.g. A10:A20 or 1,2,3"
-              className={inputClass}
+              className={inputCls(Boolean(fieldErrors.table_no))}
             />
+            {fieldErrors.table_no ? (
+              <p className="mt-1 text-xs text-primary">{fieldErrors.table_no}</p>
+            ) : null}
+            {tablePreview.count && tablePreview.count > 1 ? (
+              <p className="mt-1 text-xs text-success">
+                Will create {tablePreview.count} tables
+              </p>
+            ) : null}
+            {tablePreview.spaceError ? (
+              <p className="mt-1 text-xs text-primary">
+                Separate multiple table numbers with commas, e.g. 1,2,3
+              </p>
+            ) : null}
             <div className="mt-3 rounded-lg border border-line bg-page/60 px-3.5 py-3">
               <div className="mb-2 flex items-start gap-2">
                 <Info size={14} className="mt-0.5 shrink-0 text-muted" />
@@ -150,10 +292,42 @@ export default function AddTable() {
               type="text"
               inputMode="numeric"
               value={persons}
-              onChange={(event) => setPersons(event.target.value)}
+              onChange={(event) => {
+                setPersons(event.target.value)
+                if (fieldErrors.persons) setFieldErrors((prev) => ({ ...prev, persons: '' }))
+              }}
               placeholder="Max persons per table"
-              className={inputClass}
+              className={inputCls(Boolean(fieldErrors.persons))}
             />
+            {fieldErrors.persons ? (
+              <p className="mt-1 text-xs text-primary">{fieldErrors.persons}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              Area <span className="text-primary">*</span>
+            </label>
+            <select
+              value={areaId}
+              onChange={(event) => {
+                setAreaId(event.target.value)
+                if (fieldErrors.area) setFieldErrors((prev) => ({ ...prev, area: '' }))
+              }}
+              className={inputCls(Boolean(fieldErrors.area))}
+            >
+              <option value="" disabled>
+                Select Area
+              </option>
+              {areas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.area ? (
+              <p className="mt-1 text-xs text-primary">{fieldErrors.area}</p>
+            ) : null}
           </div>
 
           <div className="md:col-span-2">
@@ -162,32 +336,56 @@ export default function AddTable() {
             </label>
             <textarea
               value={extraInfo}
-              onChange={(event) => setExtraInfo(event.target.value)}
+              onChange={(event) => {
+                setExtraInfo(event.target.value)
+                if (fieldErrors.extra_info) setFieldErrors((prev) => ({ ...prev, extra_info: '' }))
+              }}
               rows={4}
               placeholder="Optional notes about this table..."
-              className="w-full rounded-md border border-line bg-card px-3 py-2.5 text-sm text-ink outline-none focus:border-primary"
+              className={`w-full rounded-md border ${fieldErrors.extra_info ? 'border-primary' : 'border-line'} bg-card px-3 py-2.5 text-sm text-ink outline-none focus:border-primary`}
             />
+            {fieldErrors.extra_info ? (
+              <p className="mt-1 text-xs text-primary">{fieldErrors.extra_info}</p>
+            ) : null}
           </div>
 
-          <div className="md:col-span-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              Discount (%)
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={discountPercent}
+              onChange={(event) => {
+                setDiscountPercent(event.target.value)
+                if (fieldErrors.discount_percent) setFieldErrors((prev) => ({ ...prev, discount_percent: '' }))
+              }}
+              placeholder="0"
+              className={inputCls(Boolean(fieldErrors.discount_percent))}
+            />
+            {fieldErrors.discount_percent ? (
+              <p className="mt-1 text-xs text-primary">{fieldErrors.discount_percent}</p>
+            ) : null}
+          </div>
+
+          <div className="md:col-span-2 flex items-center gap-3">
             <button
               type="button"
               role="switch"
-              aria-checked={availableForReservation}
-              onClick={() => setAvailableForReservation((prev) => !prev)}
+              aria-checked={isOn}
+              onClick={() => setIsOn((prev) => !prev)}
               className={`relative inline-flex h-8 w-14 cursor-pointer items-center rounded-full transition-colors ${
-                availableForReservation ? 'bg-success' : 'bg-line'
+                isOn ? 'bg-success' : 'bg-line'
               }`}
             >
               <span
                 className={`inline-block size-6 rounded-full bg-white shadow-sm transition-transform ${
-                  availableForReservation ? 'translate-x-7' : 'translate-x-1'
+                  isOn ? 'translate-x-7' : 'translate-x-1'
                 }`}
               />
             </button>
-            <span className="ml-3 text-sm font-medium text-ink">
-              Available for Reservation
-            </span>
+            <span className="text-sm font-medium text-ink">Active</span>
           </div>
         </div>
       </SectionCard>
@@ -202,7 +400,9 @@ export default function AddTable() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Save Table</PrimaryButton>
+        <PrimaryButton onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Table'}
+        </PrimaryButton>
       </div>
     </MenuPageShell>
   )

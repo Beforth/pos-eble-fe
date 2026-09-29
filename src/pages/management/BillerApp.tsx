@@ -20,6 +20,7 @@ import {
 } from '../../services/userService'
 import { useRoles } from '../../state/RoleContext'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import {
   OutlineButton,
   PrimaryButton,
@@ -88,6 +89,7 @@ export default function BillerApp() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<UserSummary | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
   const tabs = useMemo<TabMeta[]>(() => {
@@ -96,18 +98,18 @@ export default function BillerApp() {
         ? roles.map((role) => ({
             id: slugify(role.name),
             label: role.name,
-            nameColumn: `${role.name} Name`,
+            nameColumn: 'Name',
           }))
-        : FALLBACK_ROLE_TABS.map((tab) => ({ ...tab, nameColumn: tab.label }))
+        : FALLBACK_ROLE_TABS.map((tab) => ({ ...tab, nameColumn: 'Name' }))
     return [
-      { id: 'all', label: 'All Users', nameColumn: 'User Name' },
+      { id: 'all', label: 'All Users', nameColumn: 'Name' },
       ...roleTabs,
     ]
   }, [roles])
 
   const activeTab =
     tabs.find((tab) => tab.id === activeTabId) ??
-    tabs[0] ?? { id: 'all', label: 'All Users', nameColumn: 'User Name' }
+    tabs[0] ?? { id: 'all', label: 'All Users', nameColumn: 'Name' }
 
   useEffect(() => {
     if (activeTabId !== 'all' && !tabs.some((tab) => tab.id === activeTabId)) {
@@ -202,6 +204,13 @@ export default function BillerApp() {
     } finally {
       setDeletingId(null)
     }
+  }
+
+  async function confirmDeleteUser() {
+    if (!deleteTarget) return
+    const user = deleteTarget
+    setDeleteTarget(null)
+    await handleDelete(user)
   }
 
   return (
@@ -334,7 +343,12 @@ export default function BillerApp() {
                           <button
                             type="button"
                             aria-label={`View ${row.name}`}
-                            onClick={() => showToast(`Viewing ${row.name}`)}
+                            data-tooltip="View details"
+                            onClick={() =>
+                              navigate(
+                                `/management/user-management/biller-app/view/${row.id}`,
+                              )
+                            }
                             className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
                           >
                             <Eye size={15} />
@@ -342,6 +356,7 @@ export default function BillerApp() {
                           <button
                             type="button"
                             aria-label={`Edit ${row.name}`}
+                            data-tooltip="Edit user"
                             onClick={() =>
                               navigate(
                                 `/management/user-management/biller-app/edit/${row.id}`,
@@ -354,6 +369,7 @@ export default function BillerApp() {
                           <button
                             type="button"
                             aria-label={`Copy ${row.name}`}
+                            data-tooltip="Copy user name"
                             onClick={() => {
                               void navigator.clipboard?.writeText(row.username)
                               showToast(`Copied ${row.username}`)
@@ -365,8 +381,9 @@ export default function BillerApp() {
                           <button
                             type="button"
                             aria-label={`Delete ${row.name}`}
+                            data-tooltip="Delete user"
                             disabled={deletingId === row.id}
-                            onClick={() => void handleDelete(row)}
+                            onClick={() => setDeleteTarget(row)}
                             className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {deletingId === row.id ? (
@@ -385,6 +402,22 @@ export default function BillerApp() {
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete user"
+        target={deleteTarget?.name}
+        message={`${deleteTarget?.name ?? 'This user'} will no longer be able to sign in, and will be removed from every outlet and role assignment.`}
+        consequences={[
+          'Sessions end immediately and the account is blocked at login.',
+          'Outlet access and role assignments are revoked.',
+          'Their past orders, bills and reports are kept.',
+        ]}
+        note="The account is archived, not erased — the login name stays reserved so it is never reassigned to someone else."
+        confirmLabel="Delete user"
+        loading={deletingId === deleteTarget?.id}
+        onConfirm={() => void confirmDeleteUser()}
+        onClose={() => setDeleteTarget(null)}
+      />
     </ReportsPageShell>
   )
 }

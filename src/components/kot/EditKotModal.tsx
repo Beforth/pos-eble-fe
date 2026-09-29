@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Pencil, Trash2, X } from 'lucide-react'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { KotRow, KotStatus } from '../../mocks/kotData'
 
 interface EditLineItem {
@@ -44,6 +45,7 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
   const [customerPhone, setCustomerPhone] = useState('')
   const [status, setStatus] = useState<KotStatus>('Used In Bill')
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [pendingRemove, setPendingRemove] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => {
     if (open && kot) {
@@ -100,8 +102,12 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
 
   const handleSave = () => {
     const nextItems = items
-      .map((item) => item.name.trim())
-      .filter(Boolean)
+      .filter((item) => item.name.trim())
+      .map((item) =>
+        item.quantity > 1
+          ? `${item.name.trim()} × ${item.quantity}`
+          : item.name.trim(),
+      )
     const itemsText = nextItems.join(', ')
     onSave?.({
       ...kot,
@@ -252,7 +258,7 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
                           <button
                             type="button"
                             aria-label={`Remove ${item.name}`}
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => setPendingRemove({ id: item.id, name: item.name })}
                             className="flex size-7 items-center justify-center rounded border border-line text-danger hover:bg-page"
                           >
                             <Trash2 size={13} />
@@ -293,6 +299,21 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
             Save Changes
           </button>
         </footer>
+
+        <ConfirmDialog
+          open={Boolean(pendingRemove)}
+          compact
+          title="Remove item from KOT"
+          target={pendingRemove?.name}
+          message="This item will be removed from the KOT being edited."
+          note="The KOT is still in edit — nothing reaches the kitchen until you save."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (pendingRemove) removeItem(pendingRemove.id)
+            setPendingRemove(null)
+          }}
+          onClose={() => setPendingRemove(null)}
+        />
       </div>
     </div>
   )

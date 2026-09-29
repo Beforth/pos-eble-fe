@@ -1,17 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { useNavigate } from 'react-router-dom'
-import { Download, FileText, Search } from 'lucide-react'
+import { Download, FileText, Search, Sun } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
-import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
+import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
 import { formatNumber } from '../../utils/format'
+import {
+  closeDayApi,
+  listDayEndClosuresApi,
+  toDayEndSummaryRow,
+} from '../../services/orderService'
+import { DayEndSummaryModal } from '../../components/reports/DayEndSummaryModal'
+import { useAuth } from '../../auth/AuthContext'
 
 const PAGE_SIZE = 15
 
 export default function BillingDayEnd() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -19,16 +28,27 @@ export default function BillingDayEnd() {
   const [appliedEnd, setAppliedEnd] = useState('')
   const [ignoreDates, setIgnoreDates] = useState(false)
   const [page, setPage] = useState(1)
+  const [rows, setRows] = useState<DayEndSummaryRow[]>([])
+  const [viewRow, setViewRow] = useState<DayEndSummaryRow | null>(null)
+  const [closing, setClosing] = useState(false)
 
+  const loadRows = useCallback(() => {
+    if (!encryptedOutletId) return
+    listDayEndClosuresApi(encryptedOutletId)
+      .then((dtos) => setRows(dtos.map(toDayEndSummaryRow)))
+      .catch(() => setRows([]))
+  }, [encryptedOutletId])
+
+  useEffect(() => loadRows(), [loadRows])
 
   const filtered = useMemo(() => {
-    if (ignoreDates) return DAY_END_SUMMARY_ROWS
-    return DAY_END_SUMMARY_ROWS.filter(
+    if (ignoreDates) return rows
+    return rows.filter(
       (row) =>
         (!appliedStart || row.dateKey >= appliedStart) &&
         (!appliedEnd || row.dateKey <= appliedEnd),
     )
-  }, [appliedEnd, appliedStart, ignoreDates])
+  }, [appliedEnd, appliedStart, ignoreDates, rows])
 
   const totalRecords = filtered.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
@@ -55,6 +75,40 @@ export default function BillingDayEnd() {
     setIgnoreDates(true)
     setPage(1)
     showToast('Filters cleared')
+  }
+
+  async function handleCloseDay() {
+    if (!encryptedOutletId) {
+      showToast('No outlet selected')
+      return
+    }
+    setClosing(true)
+    try {
+      const result = await closeDayApi(encryptedOutletId)
+      showToast(
+        `Day closed · ${new Date(result.closed_at).toLocaleString()}`,
+      )
+      loadRows()
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to close the day',
+      )
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  function exportRows(rowsToExport: readonly DayEndSummaryRow[], suffix: string) {
+    downloadCsv(
+      `billing-day-end-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Orders', 'Total'],
+      rowsToExport.map((row) => [
+        row.createdDate,
+        row.orders,
+        row.total,
+      ]),
+    )
+    showToast(`Exported ${rowsToExport.length} rows`)
   }
 
   function handleExport() {
@@ -91,9 +145,18 @@ export default function BillingDayEnd() {
           <h1 className="text-lg font-bold text-ink">Day End Summary</h1>
           <div className="flex items-center gap-2">
             <ExportExcelMenu
-              onExportPage={() => showToast('Exporting current page...')}
-              onExportAll={() => showToast('Exporting all records...')}
+              onExportPage={() => exportRows(pageRows, 'page')}
+              onExportAll={() => exportRows(filtered, 'all')}
             />
+            <button
+              type="button"
+              onClick={handleCloseDay}
+              disabled={closing}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
+            >
+              <Sun size={14} className="text-white" />
+              {closing ? 'Closing…' : 'Close Day'}
+            </button>
             <button
               type="button"
               onClick={handleExport}
@@ -188,11 +251,7 @@ export default function BillingDayEnd() {
                         <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
-                            onClick={() =>
-                              showToast(
-                                `Opening summary for ${row.createdDate}`,
-                              )
-                            }
+                            onClick={() => setViewRow(row)}
                             className="inline-flex size-7 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
                             title="View summary"
                           >
@@ -201,7 +260,7 @@ export default function BillingDayEnd() {
                           <button
                             type="button"
                             onClick={() =>
-                              showToast(`Downloading ${row.createdDate}`)
+                              exportRows([row], row.dateKey)
                             }
                             className="inline-flex size-7 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
                             title="Download"
@@ -268,6 +327,13 @@ export default function BillingDayEnd() {
           ) : null}
         </div>
       </main>
+
+      <DayEndSummaryModal
+        open={Boolean(viewRow)}
+        row={viewRow}
+        outletId={encryptedOutletId ?? ''}
+        onClose={() => setViewRow(null)}
+      />
     </div>
   )
 }

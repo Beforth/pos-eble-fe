@@ -4,7 +4,9 @@ import {
   Bell,
   BookOpen,
   ChefHat,
+  CookingPot,
   Grid2x2,
+  Home,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -23,13 +25,18 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
+import { QuickTooltip } from '../common/QuickTooltip'
 import { BrandLogo } from '../brand/BrandLogo'
 import { brand } from '../../theme/brand'
 import {
-  menuItems,
-  baseMenuCategories,
-} from '../../mocks/menuItemsData'
-import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
+  useBillingMenu,
+  type MenuItemRow,
+} from '../../utils/menuAdapter'
+import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
+import {
+  listDayEndClosuresApi,
+  toDayEndSummaryRow,
+} from '../../services/orderService'
 
 const SIDEBAR_LINKS = [
   { to: '/billing', label: 'Billing', icon: UtensilsCrossed },
@@ -55,7 +62,7 @@ export function BillingHeader({
 }: BillingHeaderProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { logout, user } = useAuth()
+  const { logout, user, encryptedOutletId, isAdmin } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
@@ -64,6 +71,22 @@ export function BillingHeader({
   const [quickReportsOpen, setQuickReportsOpen] = useState(false)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
   const [menuSearch, setMenuSearch] = useState('')
+  const [recentDayEnd, setRecentDayEnd] = useState<DayEndSummaryRow[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    listDayEndClosuresApi(encryptedOutletId)
+      .then((dtos) => {
+        if (!cancelled) setRecentDayEnd(dtos.map(toDayEndSummaryRow).slice(0, 7))
+      })
+      .catch(() => {
+        if (!cancelled) setRecentDayEnd([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -89,6 +112,11 @@ export function BillingHeader({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [profileOpen])
 
+  const {
+    items: menuItems,
+    categories: menuReferenceCategories,
+  } = useBillingMenu()
+
   const menuGrouped = useMemo(() => {
     const q = menuSearch.trim().toLowerCase()
     const filtered = q
@@ -99,23 +127,25 @@ export function BillingHeader({
               item.shortCode.includes(q)),
         )
       : menuItems.filter((item) => item.available)
-    const groups: Record<string, typeof menuItems> = {}
+    const groups: Record<string, MenuItemRow[]> = {}
     for (const item of filtered) {
-      const cat = baseMenuCategories.find((c) => c.id === item.categoryId)
+      const cat = menuReferenceCategories.find(
+        (c) => c.id === item.categoryId,
+      )
       const catName = cat?.name ?? 'Other'
       if (!groups[catName]) groups[catName] = []
       groups[catName].push(item)
     }
     return groups
-  }, [menuSearch])
+  }, [menuSearch, menuItems, menuReferenceCategories])
 
   const recentSummary = useMemo(() => {
-    const rows = DAY_END_SUMMARY_ROWS.slice(0, 7)
+    const rows = recentDayEnd.slice(0, 7)
     const today = rows[0]
     const weekOrders = rows.reduce((s, r) => s + r.orders, 0)
     const weekTotal = rows.reduce((s, r) => s + r.total, 0)
     return { today, weekOrders, weekTotal, rows }
-  }, [])
+  }, [recentDayEnd])
 
   function handleLogout() {
     logout()
@@ -148,7 +178,6 @@ export function BillingHeader({
         <button
           type="button"
           onClick={onNewOrder}
-          title="New Order"
           aria-label="New Order"
           className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
         >
@@ -177,8 +206,22 @@ export function BillingHeader({
               { icon: Store, label: 'Store', onClick: () => setStoreInfoOpen(true) },
               { icon: Monitor, label: 'Display', onClick: () => navigate('/customer-display') },
               { icon: Grid2x2, label: 'View KOT', onClick: onViewKot },
-              { icon: ChefHat, label: 'Kitchen', onClick: () => navigate('/screens') },
+              { icon: CookingPot, label: 'Kitchen', onClick: () => navigate('/screens') },
               { icon: LayoutDashboard, label: 'Reports', onClick: () => setQuickReportsOpen(true) },
+              ...(isAdmin
+                ? [
+                    {
+                      icon: ChefHat,
+                      label: 'Captain Orders',
+                      onClick: () => navigate('/captain-orders'),
+                    },
+                    {
+                      icon: Home,
+                      label: 'Admin Dashboard',
+                      onClick: () => navigate('/dashboard'),
+                    },
+                  ]
+                : []),
               { icon: Bell, label: 'Notifications', onClick: () => alert('Notifications — coming soon') },
               { icon: Settings, label: 'Settings', onClick: () => setBillingSettingsOpen(true) },
             ] as {
@@ -187,41 +230,49 @@ export function BillingHeader({
               onClick?: () => void
             }[]
           ).map(({ icon: Icon, label, onClick }) => (
-            <button
+            <QuickTooltip
               key={label}
-              type="button"
-              title={label}
-              aria-label={label}
-              onClick={onClick}
-              className="hidden size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink sm:inline-flex lg:size-9"
+              label={label}
+              className="hidden sm:inline-flex"
             >
-              <Icon size={16} />
-            </button>
+              <button
+                type="button"
+                aria-label={label}
+                onClick={onClick}
+                className="inline-flex size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink lg:size-9"
+              >
+                <Icon size={16} />
+              </button>
+            </QuickTooltip>
           ))}
 
           <div className="relative">
-            <button
-              type="button"
-              data-profile-trigger
-              title={user?.name ?? 'Profile'}
-              aria-label={user?.name ?? 'Profile'}
-              onClick={() => setProfileOpen((p) => !p)}
-              className={`hidden size-8 items-center justify-center rounded-lg sm:inline-flex lg:size-9 ${
-                profileOpen
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted hover:bg-page hover:text-ink'
-              }`}
+            <QuickTooltip
+              label={user?.name ?? 'Profile'}
+              className="hidden sm:inline-flex"
             >
-              {user?.photoUrl ? (
-                <img
-                  src={user.photoUrl}
-                  alt={user.name}
-                  className="size-6 rounded-full object-cover"
-                />
-              ) : (
-                <User size={16} />
-              )}
-            </button>
+              <button
+                type="button"
+                data-profile-trigger
+                aria-label={user?.name ?? 'Profile'}
+                onClick={() => setProfileOpen((p) => !p)}
+                className={`inline-flex size-8 items-center justify-center rounded-lg lg:size-9 ${
+                  profileOpen
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted hover:bg-page hover:text-ink'
+                }`}
+              >
+                {user?.photoUrl ? (
+                  <img
+                    src={user.photoUrl}
+                    alt={user.name}
+                    className="size-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <User size={16} />
+                )}
+              </button>
+            </QuickTooltip>
 
             {profileOpen ? (
               <div
@@ -287,15 +338,16 @@ export function BillingHeader({
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            title="Logout"
-            aria-label="Logout"
-            className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-primary"
-          >
-            <LogOut size={16} />
-          </button>
+          <QuickTooltip label="Logout">
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Logout"
+              className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-primary"
+            >
+              <LogOut size={16} />
+            </button>
+          </QuickTooltip>
         </div>
       </header>
 
@@ -355,6 +407,32 @@ export function BillingHeader({
                     </li>
                   )
                 })}
+
+                {isAdmin ? (
+                  <>
+                    <li className="my-2 border-t border-line" />
+                    <li>
+                      <Link
+                        to="/captain-orders"
+                        onClick={closeDrawer}
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
+                      >
+                        <ChefHat size={18} className="text-muted" />
+                        Captain Orders
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/dashboard"
+                        onClick={closeDrawer}
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
+                      >
+                        <Home size={18} className="text-muted" />
+                        Admin Dashboard
+                      </Link>
+                    </li>
+                  </>
+                ) : null}
 
                 <li className="my-2 border-t border-line" />
 
@@ -701,7 +779,9 @@ export function BillingHeader({
                   <span className="font-bold text-ink">
                     ₹
                     {Math.round(
-                      recentSummary.weekTotal / recentSummary.rows.length,
+                      recentSummary.rows.length > 0
+                        ? recentSummary.weekTotal / recentSummary.rows.length
+                        : 0,
                     ).toLocaleString('en-IN')}
                   </span>
                 </p>

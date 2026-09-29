@@ -1,102 +1,144 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Printer, Search } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
-
-interface LogRow {
-  id: string
-  timestamp: string
-  user: string
-  action: string
-  details: string
-}
-
-const LOG_ROWS: LogRow[] = [
-  { id: 'l1', timestamp: '25 Aug 2026, 09:12 AM', user: 'Utkarsh Gosavi', action: 'Order Created', details: 'Bill #56978 — Dine In, ₹300' },
-  { id: 'l2', timestamp: '25 Aug 2026, 09:15 AM', user: 'Utkarsh Gosavi', action: 'KOT Sent', details: 'KOT #1042 — 3 items to Kitchen' },
-  { id: 'l3', timestamp: '25 Aug 2026, 09:30 AM', user: 'System', action: 'Order Settled', details: 'Bill #56978 — Cash, ₹300' },
-  { id: 'l4', timestamp: '25 Aug 2026, 09:45 AM', user: 'Raju Shah', action: 'Item Modified', details: 'Bill #56979 — Added Extra Cheese (+₹30)' },
-  { id: 'l5', timestamp: '25 Aug 2026, 10:02 AM', user: 'Utkarsh Gosavi', action: 'Order Cancelled', details: 'Bill #56980 — Dine In, ₹180' },
-  { id: 'l6', timestamp: '25 Aug 2026, 10:15 AM', user: 'Raju Shah', action: 'Payment Changed', details: 'Bill #56981 — Cash → UPI' },
-  { id: 'l7', timestamp: '25 Aug 2026, 10:30 AM', user: 'Utkarsh Gosavi', action: 'Order Created', details: 'Bill #56982 — Parcel, ₹450' },
-  { id: 'l8', timestamp: '25 Aug 2026, 10:45 AM', user: 'System', action: 'KOT Printed', details: 'KOT #1045 — Auto-print triggered' },
-  { id: 'l9', timestamp: '25 Aug 2026, 11:00 AM', user: 'Raju Shah', action: 'Discount Applied', details: 'Bill #56982 — 10% flat discount (-₹45)' },
-  { id: 'l10', timestamp: '25 Aug 2026, 11:15 AM', user: 'Utkarsh Gosavi', action: 'Order Created', details: 'Bill #56983 — Dine In, ₹720' },
-  { id: 'l11', timestamp: '25 Aug 2026, 11:30 AM', user: 'System', action: 'Order Settled', details: 'Bill #56983 — Card, ₹720' },
-  { id: 'l12', timestamp: '25 Aug 2026, 11:45 AM', user: 'Raju Shah', action: 'Reprint Requested', details: 'Bill #56978 — Receipt reprinted' },
-  { id: 'l13', timestamp: '25 Aug 2026, 12:00 PM', user: 'Utkarsh Gosavi', action: 'Order Created', details: 'Bill #56984 — Dine In, ₹560' },
-  { id: 'l14', timestamp: '25 Aug 2026, 12:15 PM', user: 'System', action: 'Sync Completed', details: 'All data synced to server' },
-  { id: 'l15', timestamp: '25 Aug 2026, 12:30 PM', user: 'Raju Shah', action: 'Item Modified', details: 'Bill #56984 — Removed Item (-₹120)' },
-]
+import { useAuth } from '../auth/AuthContext'
+import { showToast } from '../utils/toast'
+import {
+  listActivityLogsApi,
+  type ActivityLogDto,
+  type ActivityLogSource,
+} from '../services/orderService'
 
 const ACTION_COLORS: Record<string, string> = {
   'Order Created': 'bg-success/10 text-success',
   'KOT Sent': 'bg-primary/10 text-primary',
-  'KOT Printed': 'bg-primary/10 text-primary',
+  'KOT Modified': 'bg-deep/10 text-deep',
+  'KOT Cancelled': 'bg-danger/10 text-danger',
+  'KOT Deleted': 'bg-page text-muted',
   'Order Settled': 'bg-accent/10 text-accent',
   'Order Cancelled': 'bg-danger/10 text-danger',
-  'Item Modified': 'bg-deep/10 text-deep',
+  'Order Modified': 'bg-deep/10 text-deep',
   'Payment Changed': 'bg-secondary/10 text-secondary',
-  'Discount Applied': 'bg-accent/10 text-accent',
+  'Due Collected': 'bg-accent/10 text-accent',
   'Reprint Requested': 'bg-page text-muted',
-  'Sync Completed': 'bg-success/10 text-success',
+  'Bill Split': 'bg-primary/10 text-primary',
+  'Bill No Allocated': 'bg-page text-muted',
 }
 
 const PAGE_SIZE = 10
 
-export default function LogsPage() {
+function formatLogTimestamp(value: string): string {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+interface ActivityLogsViewProps {
+  source: ActivityLogSource
+  header: ReactNode
+  newOrderPath: string
+}
+
+export function ActivityLogsView({
+  source,
+  header,
+  newOrderPath,
+}: ActivityLogsViewProps) {
+  const { encryptedOutletId } = useAuth()
   const navigate = useNavigate()
-  const [billNo, setBillNo] = useState('')
   const [search, setSearch] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [rows, setRows] = useState<ActivityLogDto[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [loading, setLoading] = useState(false)
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return LOG_ROWS
-    return LOG_ROWS.filter(
-      (r) =>
-        r.action.toLowerCase().includes(q) ||
-        r.user.toLowerCase().includes(q) ||
-        r.details.toLowerCase().includes(q),
-    )
-  }, [search])
+  const load = useCallback(async () => {
+    if (!encryptedOutletId) {
+      setRows([])
+      setTotalCount(0)
+      return
+    }
+    setLoading(true)
+    try {
+      const data = await listActivityLogsApi(encryptedOutletId, {
+        source,
+        search: appliedSearch || undefined,
+        page,
+        page_size: PAGE_SIZE,
+      })
+      setRows(data.results)
+      setTotalCount(data.count)
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to load activity logs',
+      )
+      setRows([])
+      setTotalCount(0)
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, source, appliedSearch, page])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const pageRows = filtered.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE,
-  )
+
+  const stats = useMemo(() => {
+    const created = rows.filter((r) => r.action === 'Order Created').length
+    const modified = rows.filter((r) => r.action.includes('Modified')).length
+    const cancelled = rows.filter(
+      (r) => r.action === 'Order Cancelled' || r.action === 'KOT Cancelled',
+    ).length
+    return { created, modified, cancelled }
+  }, [rows])
+
+  function handleSearch() {
+    setPage(1)
+    setAppliedSearch(search.trim())
+  }
 
   function handleExport() {
-    const header = 'Timestamp,User,Action,Details'
+    const headerRow = 'Timestamp,User,Action,Details'
     const lines = [
-      header,
-      ...LOG_ROWS.map(
-        (r) => `"${r.timestamp}","${r.user}","${r.action}","${r.details}"`,
+      headerRow,
+      ...rows.map(
+        (r) =>
+          `"${formatLogTimestamp(r.created_at)}","${r.by || '—'}","${r.action}","${(r.details || '').replace(/"/g, '""')}"`,
       ),
     ]
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'activity-logs.csv'
+    link.download = `${source}-activity-logs.csv`
     link.click()
     URL.revokeObjectURL(url)
   }
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader
-        billNo={billNo}
-        onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view')}
-        onViewKot={() => navigate('/billing?kot=1')}
-      />
+      {header}
 
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-ink">Activity Logs</h1>
+          <h1 className="text-lg font-bold text-ink">
+            Activity Logs
+            <span className="ml-2 text-sm font-medium capitalize text-muted">
+              ({source === 'captain' ? 'Captain Orders' : 'Billing'})
+            </span>
+          </h1>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -114,64 +156,114 @@ export default function LogsPage() {
               <Printer size={14} className="text-muted" />
               Print
             </button>
+            <button
+              type="button"
+              onClick={() => navigate(newOrderPath)}
+              className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
+            >
+              New Order
+            </button>
           </div>
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: 'Total Events', value: LOG_ROWS.length },
-            { label: 'Today\'s Orders', value: LOG_ROWS.filter((r) => r.action === 'Order Created').length },
-            { label: 'Modifications', value: LOG_ROWS.filter((r) => r.action.includes('Modified')).length },
-            { label: 'Cancellations', value: LOG_ROWS.filter((r) => r.action === 'Order Cancelled').length },
+            { label: 'Total Events', value: totalCount },
+            { label: "Page · Orders", value: stats.created },
+            { label: 'Page · Modifications', value: stats.modified },
+            { label: 'Page · Cancellations', value: stats.cancelled },
           ].map(({ label, value }) => (
-            <div key={label} className="rounded-lg border border-line bg-card p-3 text-center">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">{label}</p>
+            <div
+              key={label}
+              className="rounded-lg border border-line bg-card p-3 text-center"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                {label}
+              </p>
               <p className="mt-1 text-xl font-extrabold text-ink">{value}</p>
             </div>
           ))}
         </div>
 
         <div className="rounded-xl border border-line bg-card">
-          <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-            <div className="relative flex-1 sm:max-w-xs">
-              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
+            <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              />
               <input
                 type="text"
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearch()
+                }}
                 placeholder="Search logs..."
                 className="h-9 w-full rounded-lg border border-line bg-page pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
               />
             </div>
-            <span className="text-xs text-muted">{filtered.length} events</span>
+            <button
+              type="button"
+              onClick={handleSearch}
+              className="h-9 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
+            >
+              Search
+            </button>
+            <span className="text-xs text-muted">
+              {loading ? 'Loading…' : `${totalCount} events`}
+            </span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Timestamp</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">User</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Action</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Details</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">
+                    Timestamp
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">
+                    User
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">
+                    Action
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">
+                    Details
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {pageRows.map((row) => (
+                {rows.map((row) => (
                   <tr key={row.id} className="hover:bg-page/40">
-                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted">{row.timestamp}</td>
-                    <td className="px-4 py-2.5 text-sm font-medium text-ink">{row.user}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted">
+                      {formatLogTimestamp(row.created_at)}
+                    </td>
+                    <td className="px-4 py-2.5 text-sm font-medium text-ink">
+                      {row.by || '—'}
+                    </td>
                     <td className="px-4 py-2.5">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${ACTION_COLORS[row.action] ?? 'bg-page text-muted'}`}>
+                      <span
+                        className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                          ACTION_COLORS[row.action] ?? 'bg-page text-muted'
+                        }`}
+                      >
                         {row.action}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-sm text-muted">{row.details}</td>
+                    <td className="px-4 py-2.5 text-sm text-muted">
+                      {row.details || '—'}
+                    </td>
                   </tr>
                 ))}
-                {pageRows.length === 0 ? (
+                {!loading && rows.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-12 text-center text-sm text-muted">No logs found</td>
+                    <td
+                      colSpan={4}
+                      className="px-4 py-12 text-center text-sm text-muted"
+                    >
+                      No logs found
+                    </td>
                   </tr>
                 ) : null}
               </tbody>
@@ -187,7 +279,7 @@ export default function LogsPage() {
                 <button
                   type="button"
                   disabled={safePage <= 1}
-                  onClick={() => setPage((p) => p - 1)}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
                   className="h-8 rounded-lg border border-line bg-card px-3 text-xs font-medium text-ink hover:bg-page disabled:opacity-40"
                 >
                   Prev
@@ -206,5 +298,25 @@ export default function LogsPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function LogsPage() {
+  const navigate = useNavigate()
+  const [billNo, setBillNo] = useState('')
+
+  return (
+    <ActivityLogsView
+      source="billing"
+      newOrderPath="/table-view"
+      header={
+        <BillingHeader
+          billNo={billNo}
+          onBillNoChange={setBillNo}
+          onNewOrder={() => navigate('/table-view')}
+          onViewKot={() => navigate('/billing?kot=1')}
+        />
+      }
+    />
   )
 }

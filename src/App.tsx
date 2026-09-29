@@ -1,7 +1,19 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { Slide, ToastContainer } from 'react-toastify'
-import { AuthProvider, ProtectedRoute } from './auth/AuthContext'
+import { type ReactNode } from 'react'
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
+import { TooltipHost } from './components/common/TooltipHost'
+import { ToastHost } from './components/common/ToastHost'
+import { AuthProvider, ProtectedRoute, useAuth } from './auth/AuthContext'
 import { RoleProvider } from './state/RoleContext'
+import { MenuChannelsProvider } from './state/MenuChannelsContext'
+import { MenuReferenceProvider } from './state/MenuReferenceContext'
+import { ChromeProvider } from './state/ChromeContext'
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
 import EditProfile from './pages/EditProfile'
@@ -30,6 +42,7 @@ import CaptainOrdersLiveOrders from './pages/captainorders/CaptainOrdersLiveOrde
 import CaptainOrdersAllOrders from './pages/captainorders/CaptainOrdersAllOrders'
 import CaptainOrdersKot from './pages/captainorders/CaptainOrdersKot'
 import CaptainOrdersDayEnd from './pages/captainorders/CaptainOrdersDayEnd'
+import CaptainOrdersLogs from './pages/captainorders/CaptainOrdersLogs'
 import CategoryManagement from './pages/CategoryManagement'
 import DineInMenu from './pages/DineInMenu'
 import DiscountsManagement from './pages/DiscountsManagement'
@@ -37,6 +50,7 @@ import EditAddonGroup from './pages/EditAddonGroup'
 import EditCategory from './pages/EditCategory'
 import EditMenuItem from './pages/EditMenuItem'
 import EditParentCategory from './pages/EditParentCategory'
+import AddGroup from './pages/AddGroup'
 import EditTax from './pages/EditTax'
 import HomeDeliveryMenu from './pages/HomeDeliveryMenu'
 import ItemOrderWiseTaxSettings from './pages/ItemOrderWiseTaxSettings'
@@ -166,6 +180,7 @@ import Denomination from './pages/management/Denomination'
 import AddDenomination from './pages/management/AddDenomination'
 import BillerApp from './pages/management/BillerApp'
 import AddBiller from './pages/management/AddBiller'
+import ViewBiller from './pages/management/ViewBiller'
 import RoleManagement from './pages/management/RoleManagement'
 import AddRole from './pages/management/AddRole'
 import OnlineStoreLogs from './pages/management/OnlineStoreLogs'
@@ -221,12 +236,30 @@ import TablesAreasManagement from './pages/TablesAreasManagement'
 import TaxesManagement from './pages/TaxesManagement'
 import VariantsManagement from './pages/VariantsManagement'
 
+function RouteErrorBoundary({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  return (
+    <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
+  )
+}
+
+/** Sends admins to /dashboard and everyone else to their first open screen. */
+function HomeRedirect() {
+  const { homePath } = useAuth()
+  return <Navigate to={homePath()} replace />
+}
+
 export default function App() {
   return (
     <RoleProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <ToastContainer position="top-right" autoClose={2200} transition={Slide} />
+        <MenuChannelsProvider>
+          <MenuReferenceProvider>
+          <BrowserRouter>
+          <ChromeProvider>
+          <TooltipHost />
+          <ToastHost />
+          <RouteErrorBoundary>
           <Routes>
             <Route path="/login" element={<Login />} />
           <Route
@@ -578,6 +611,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <CaptainOrdersDayEnd />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/captain-orders/logs"
+            element={
+              <ProtectedRoute>
+                <CaptainOrdersLogs />
               </ProtectedRoute>
             }
           />
@@ -1257,6 +1298,22 @@ export default function App() {
             }
           />
           <Route
+            path="/menu/categories/group/new"
+            element={
+              <ProtectedRoute>
+                <AddGroup />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/menu/categories/parent/new"
+            element={
+              <ProtectedRoute>
+                <EditParentCategory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/menu/categories/parent/:id/edit"
             element={
               <ProtectedRoute>
@@ -1886,6 +1943,14 @@ export default function App() {
             }
           />
           <Route
+            path="/management/user-management/biller-app/view/:id"
+            element={
+              <ProtectedRoute>
+                <ViewBiller />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/management/user-management/roles"
             element={
               <ProtectedRoute>
@@ -2089,10 +2154,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="*" element={<HomeRedirect />} />
         </Routes>
+        </RouteErrorBoundary>
+          </ChromeProvider>
       </BrowserRouter>
+          </MenuReferenceProvider>
+        </MenuChannelsProvider>
     </AuthProvider>
   </RoleProvider>
   )

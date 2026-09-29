@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -71,6 +72,18 @@ export default function OrderwiseConsumptionReport() {
     setOrderType('Orders')
   }
 
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `orderwise-consumption-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Order Number', 'Order Type', 'Date', 'Raw Material', 'Consumption Qty', 'Unit'],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="orderwise-consumption">
 
@@ -86,7 +99,7 @@ export default function OrderwiseConsumptionReport() {
           >
             In Queue Orders
           </button>
-          <ExportMenu onExportAll={() => showToast('Exported all')} />
+          <ExportMenu onExportAll={() => exportRows([], 'all')} />
         </div>
       </div>
 

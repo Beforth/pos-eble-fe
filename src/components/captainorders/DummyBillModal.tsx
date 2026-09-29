@@ -1,4 +1,5 @@
 import { X, Printer, Mail } from 'lucide-react'
+import type { TaxBreakdownLine } from '../../utils/taxEngine'
 
 export interface DummyBillItem {
   name: string
@@ -19,7 +20,24 @@ export interface DummyBillData {
   kotCount: number
   subtotal: number
   tax: number
+  /** Per-tax amounts so the printed bill shows real CGST/SGST lines. */
+  taxBreakdown?: TaxBreakdownLine[]
   total: number
+  roundOff?: number
+  discount?: number
+  /** Present for delivery orders — shown on the final bill. */
+  orderType?: 'dine-in' | 'delivery' | 'pick-up' | 'other'
+  deliveryCharge?: number
+  containerCharge?: number
+  customerPaid?: number
+  tip?: number
+  /** Hide the backward (tax-inclusive) rows from the printed breakdown. */
+  printBackwardTax?: boolean
+  /**
+   * Show item rates excluding backward tax, with the tax surfaced as a separate
+   * "included in prices" line so the bill still foots.
+   */
+  backwardTaxInItemPrice?: boolean
 }
 
 interface DummyBillModalProps {
@@ -47,6 +65,23 @@ function formatDateTime(ts: number) {
 
 export function DummyBillModal({ open, bill, onClose }: DummyBillModalProps) {
   if (!open || !bill) return null
+
+  const printBackwardTax = bill.printBackwardTax !== false
+  const backwardTaxInItemPrice = bill.backwardTaxInItemPrice !== false
+  const backwardTotal = (bill.taxBreakdown ?? [])
+    .filter((row) => row.mode === 'backward')
+    .reduce((sum, row) => sum + row.amount, 0)
+  const exTaxFactor =
+    !backwardTaxInItemPrice && bill.subtotal > 0
+      ? Math.max(0, (bill.subtotal - backwardTotal) / bill.subtotal)
+      : 1
+  const shownItems = backwardTaxInItemPrice
+    ? bill.items
+    : bill.items.map((item) => ({ ...item, price: item.price * exTaxFactor }))
+  const shownSubtotal = bill.subtotal * exTaxFactor
+  const shownBreakdown = printBackwardTax
+    ? (bill.taxBreakdown ?? [])
+    : (bill.taxBreakdown ?? []).filter((row) => row.mode !== 'backward')
 
   const isEbill = bill.mode === 'ebill'
 
@@ -140,7 +175,7 @@ export function DummyBillModal({ open, bill, onClose }: DummyBillModalProps) {
                 <span className="text-right">Amt</span>
               </div>
               <ul className="space-y-1.5">
-                {bill.items.map((item, index) => (
+                {shownItems.map((item, index) => (
                   <li key={`${item.name}-${index}`}>
                     <div className="grid grid-cols-[1fr_32px_56px_56px] gap-1">
                       <span className="min-w-0 truncate">{item.name}</span>
@@ -161,16 +196,65 @@ export function DummyBillModal({ open, bill, onClose }: DummyBillModalProps) {
             <div className="space-y-1 py-3 text-[11px]">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span>₹{formatMoney(bill.subtotal)}</span>
+                <span>₹{formatMoney(shownSubtotal)}</span>
               </div>
+              {!backwardTaxInItemPrice && backwardTotal > 0 ? (
+                <div className="flex justify-between pl-2 text-[10px] text-muted">
+                  <span>Backward tax (included in item prices)</span>
+                  <span>₹{formatMoney(backwardTotal)}</span>
+                </div>
+              ) : null}
+              {bill.tax > 0 ? (
+                <div className="flex justify-between">
+                  <span>Tax</span>
+                  <span>₹{formatMoney(bill.tax)}</span>
+                </div>
+              ) : null}
+              {shownBreakdown.map((row) => (
+                <div
+                  key={`${row.mode}:${row.label}`}
+                  className="flex justify-between pl-2 text-[10px] text-muted"
+                >
+                  <span>
+                    {row.label}
+                    {row.rate > 0 ? ` @${row.rate}%` : ''}
+                    {row.mode === 'backward' ? ' (incl.)' : ''}
+                  </span>
+                  <span>₹{formatMoney(row.amount)}</span>
+                </div>
+              ))}
+              {bill.orderType === 'delivery' ? (
+                <>
+                  <div className="flex justify-between">
+                    <span>Delivery Charge</span>
+                    <span>₹{formatMoney(bill.deliveryCharge ?? 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Container Charge</span>
+                    <span>₹{formatMoney(bill.containerCharge ?? 0)}</span>
+                  </div>
+                </>
+              ) : null}
               <div className="flex justify-between">
-                <span>Tax (5%)</span>
-                <span>₹{formatMoney(bill.tax)}</span>
+                <span>Round Off</span>
+                <span>₹{formatMoney(bill.roundOff ?? 0)}</span>
               </div>
               <div className="flex justify-between border-t border-dashed border-line pt-2 text-sm font-bold">
                 <span>TOTAL</span>
                 <span>₹{formatMoney(bill.total)}</span>
               </div>
+              {bill.orderType === 'delivery' ? (
+                <>
+                  <div className="flex justify-between pt-1">
+                    <span>Customer Paid</span>
+                    <span>₹{formatMoney(bill.customerPaid ?? 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tip</span>
+                    <span>₹{formatMoney(bill.tip ?? 0)}</span>
+                  </div>
+                </>
+              ) : null}
             </div>
 
             <p className="border-t border-dashed border-line pt-3 text-center text-[10px] text-muted">

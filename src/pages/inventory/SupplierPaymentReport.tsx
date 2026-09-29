@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -90,14 +91,26 @@ export default function SupplierPaymentReport() {
     setToDate('2026-08-11')
   }
 
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `supplier-payment-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Supplier', 'Payment Mode', 'Paid Amount (₹)', 'Balance (₹)'],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="other-reports">
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Supplier Payment Report</h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => exportRows([], 'page')}
+          onExportAll={() => exportRows([], 'all')}
         />
       </div>
 

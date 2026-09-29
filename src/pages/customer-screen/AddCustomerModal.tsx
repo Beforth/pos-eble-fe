@@ -1,34 +1,38 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import type { CustomerRow } from './customersData'
+import { showToast } from '../../utils/toast'
+import {
+  findOrCreateCustomerApi,
+  updateCustomerApi,
+  type CustomerDto,
+} from '../../services/customerService'
 
 interface AddCustomerModalProps {
   open: boolean
-  customer: CustomerRow | null
+  customer: CustomerDto | null
+  outletId: string
   onClose: () => void
-  onSave: (customer: Omit<CustomerRow, 'id' | 'orders' | 'lastVisit'> & {
-    id?: string
-  }) => void
+  onSaved: (customer: CustomerDto) => void
 }
 
 const EMPTY = {
   name: '',
   phone: '',
   email: '',
+  gstin: '',
   address: '',
-  locality: '',
-  dueAmount: '',
-  loyaltyPoints: '',
 }
 
 export function AddCustomerModal({
   open,
   customer,
+  outletId,
   onClose,
-  onSave,
+  onSaved,
 }: AddCustomerModalProps) {
   const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const isEdit = Boolean(customer)
 
   useEffect(() => {
@@ -38,17 +42,14 @@ export function AddCustomerModal({
         name: customer.name,
         phone: customer.phone,
         email: customer.email,
+        gstin: customer.gstin,
         address: customer.address,
-        locality: customer.locality,
-        dueAmount: customer.dueAmount ? String(customer.dueAmount) : '',
-        loyaltyPoints: customer.loyaltyPoints
-          ? String(customer.loyaltyPoints)
-          : '',
       })
     } else {
       setForm(EMPTY)
     }
     setError(null)
+    setSaving(false)
   }, [open, customer])
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export function AddCustomerModal({
 
   if (!open) return null
 
-  function handleSave() {
+  async function handleSave() {
     const name = form.name.trim()
     const phone = form.phone.replace(/\D/g, '').slice(0, 10)
     if (!name) {
@@ -82,16 +83,25 @@ export function AddCustomerModal({
       setError('Enter a valid 10-digit phone number')
       return
     }
-    onSave({
-      id: customer?.id,
-      name,
-      phone,
-      email: form.email.trim(),
-      address: form.address.trim(),
-      locality: form.locality.trim(),
-      dueAmount: Number(form.dueAmount) || 0,
-      loyaltyPoints: Number(form.loyaltyPoints) || 0,
-    })
+    setSaving(true)
+    setError(null)
+    try {
+      const body = {
+        name,
+        phone,
+        gstin: form.gstin.trim(),
+        email: form.email.trim(),
+        address: form.address.trim(),
+      }
+      const saved = customer
+        ? await updateCustomerApi(outletId, customer.id, body)
+        : await findOrCreateCustomerApi(outletId, body)
+      showToast(saved.id === customer?.id ? 'Customer updated' : 'Customer added')
+      onSaved(saved)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save customer')
+      setSaving(false)
+    }
   }
 
   return (
@@ -159,6 +169,16 @@ export function AddCustomerModal({
             />
           </label>
           <label className="block text-sm font-medium text-ink">
+            GSTIN
+            <input
+              value={form.gstin}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, gstin: event.target.value }))
+              }
+              className="mt-1.5 h-10 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <label className="block text-sm font-medium text-ink">
             Address
             <input
               value={form.address}
@@ -168,48 +188,6 @@ export function AddCustomerModal({
               className="mt-1.5 h-10 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-primary"
             />
           </label>
-          <label className="block text-sm font-medium text-ink">
-            Locality
-            <input
-              value={form.locality}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, locality: event.target.value }))
-              }
-              className="mt-1.5 h-10 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-primary"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm font-medium text-ink">
-              Due Amount (₹)
-              <input
-                type="number"
-                min={0}
-                value={form.dueAmount}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    dueAmount: event.target.value,
-                  }))
-                }
-                className="mt-1.5 h-10 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-primary"
-              />
-            </label>
-            <label className="block text-sm font-medium text-ink">
-              Loyalty Points
-              <input
-                type="number"
-                min={0}
-                value={form.loyaltyPoints}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    loyaltyPoints: event.target.value,
-                  }))
-                }
-                className="mt-1.5 h-10 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none focus:border-primary"
-              />
-            </label>
-          </div>
           {error ? <p className="text-xs text-primary">{error}</p> : null}
         </div>
 
@@ -224,9 +202,10 @@ export function AddCustomerModal({
           <button
             type="button"
             onClick={handleSave}
-            className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            disabled={saving}
+            className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
           >
-            Save
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </footer>
       </div>

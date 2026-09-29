@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import {
   Plus,
   RotateCcw,
@@ -117,6 +118,18 @@ export default function AvailableStock() {
     setValue(id, String(Number.isFinite(current) ? current + 1 : 1))
   }
 
+  function exportRows(rows: StockRow[], suffix: 'all') {
+    downloadCsv(
+      `available-stock-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Raw Material', 'New Stock', 'Action'],
+      rows.map((row) => [
+        `${row.name} / ${row.unit}`,
+        stockValues[row.id] ?? '',
+        '',
+      ]),
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
 
   return (
     <InventoryPageShell activeItem="available-stock">
@@ -132,7 +145,7 @@ export default function AvailableStock() {
           />
           <HistoryMenu
             exportLabel="Available stock PDF"
-            onExport={() => showToast('Available stock PDF exported')}
+            onExport={() => exportRows(filteredRows, 'all')}
           />
           <OutlineButton
             variant="gray"

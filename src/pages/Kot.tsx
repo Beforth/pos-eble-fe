@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useChrome } from '../state/ChromeContext'
+import { useNavigate } from 'react-router-dom'
 
 import { showToast } from '../utils/toast'
+import { useAuth } from '../auth/AuthContext'
 import { PencilLine } from 'lucide-react'
 import { ExportExcelMenu } from '../components/all-orders/ExportExcelMenu'
 import { FilterSelect } from '../components/all-orders/FilterSelect'
@@ -15,9 +18,18 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
 import { parseKotDate, type KotRow } from '../mocks/kotData'
+import { billingUrlForKot, parseKotItems } from '../utils/kotListStore'
+import {
+  listKotsApi,
+  toKotRow,
+  updateKotApi,
+  type KotEventData,
+  type KotRowStatus,
+} from '../services/orderService'
+import { subscribeToRail } from '../services/liveRailClient'
 import { brand } from '../theme/brand'
 import { formatNumber } from '../utils/format'
-import { loadKotRows } from '../utils/kotListStore'
+import { downloadCsv } from '../utils/exportCsv'
 
 const PAGE_SIZE = 15
 
@@ -88,7 +100,9 @@ function createDefaultFilters(): KotFilters {
 }
 
 export default function Kot() {
-  const [collapsed, setCollapsed] = useState(false)
+  const navigate = useNavigate()
+  const { encryptedOutletId, token } = useAuth()
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -102,10 +116,91 @@ export default function Kot() {
   const [page, setPage] = useState(1)
   const [searchFlash, setSearchFlash] = useState(false)
   const [showAllFlash, setShowAllFlash] = useState(false)
-  const [rows, setRows] = useState<KotRow[]>(loadKotRows)
+  const [rows, setRows] = useState<KotRow[]>([])
   const [editKot, setEditKot] = useState<KotRow | null>(null)
   const [viewKot, setViewKot] = useState<KotRow | null>(null)
   const [detailsKot, setDetailsKot] = useState<KotRow | null>(null)
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    const statusOpt =
+      applied.status === 'all'
+        ? {}
+        : { status: applied.status as KotRowStatus }
+    const loadAll = async () => {
+      try {
+        const first = await listKotsApi(encryptedOutletId, {
+          ...statusOpt,
+          page: 1,
+          page_size: 100,
+        })
+        if (cancelled) return
+        const all = [...first.results]
+        const pages = Math.max(1, Math.ceil(first.count / 100))
+        for (let p = 2; p <= pages; p += 1) {
+          if (cancelled) return
+          const next = await listKotsApi(encryptedOutletId, {
+            ...statusOpt,
+            page: p,
+            page_size: 100,
+          })
+          all.push(...next.results)
+        }
+        if (!cancelled) setRows(all.map(toKotRow))
+      } catch (error) {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load KOTs',
+          )
+        }
+      }
+    }
+    loadAll()
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, applied.status])
+
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event, data) => {
+        if (event === 'kot.prep') {
+          setRows((prev) => [toKotRow(data as KotEventData), ...prev])
+          return
+        }
+        if (event === 'kot.modified') {
+          const row = toKotRow(data as KotEventData)
+          setRows((prev) => {
+            const index = prev.findIndex((existing) => existing.id === row.id)
+            if (index === -1) return [row, ...prev]
+            const next = [...prev]
+            next[index] = row
+            return next
+          })
+          return
+        }
+        if (event === 'kot.deleted') {
+          const payload = data as { id: string }
+          setRows((prev) => prev.filter((row) => row.id !== payload.id))
+          return
+        }
+        if (event === 'kot.used_in_bill') {
+          const payload = data as KotEventData
+          setRows((prev) =>
+            prev.map((row) =>
+              row.id === payload.id
+                ? { ...row, status: 'Used In Bill' as const }
+                : row,
+            ),
+          )
+        }
+      },
+    })
+  }, [encryptedOutletId, token])
 
   const closeOtherDrawers = () => {
     setSupportOpen(false)
@@ -147,10 +242,58 @@ export default function Kot() {
     })
   }, [applied, ignoreDateFilter, rows, searched])
 
-  function handleSaveKot(updated: KotRow) {
-    setRows((prev) =>
-      prev.map((row) => (row.id === updated.id ? updated : row)),
+  async function handleSaveKot(updated: KotRow) {
+    if (!encryptedOutletId) return
+    try {
+      const dto = await updateKotApi(encryptedOutletId, updated.id, {
+        customer_name: updated.customerName,
+        customer_phone: updated.customerPhone,
+        status: updated.status as KotRowStatus,
+        item_count: updated.itemCount,
+        items: parseKotItems(updated.items),
+      })
+      setRows((prev) =>
+        prev.map((row) => (row.id === updated.id ? toKotRow(dto) : row)),
+      )
+      showToast(`KOT #${updated.kotId} updated`)
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to update KOT',
+      )
+    }
+  }
+
+  function exportRows(rowsToExport: KotRow[], suffix: string) {
+    downloadCsv(
+      `kots-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        'KOT ID',
+        'Order Type',
+        'Source',
+        'Customer Name',
+        'Customer Phone',
+        'Items',
+        'Item Count',
+        'Status',
+        'Modified',
+        'Complete Duration',
+        'Created',
+      ],
+      rowsToExport.map((row) => [
+        row.kotId,
+        row.orderType,
+        row.source,
+        row.customerName,
+        row.customerPhone,
+        row.items,
+        row.itemCount,
+        row.status,
+        row.modified ? 'Yes' : 'No',
+        row.completeDuration,
+        row.created,
+      ]),
     )
+    showToast(`Exported ${rowsToExport.length} KOT records`)
   }
 
   const totalRecords = filtered.length
@@ -188,7 +331,7 @@ export default function Kot() {
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem="kot"
       />
@@ -242,7 +385,10 @@ export default function Kot() {
         <main className="px-4 py-4 sm:px-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-lg font-bold text-ink sm:text-xl">KOT</h1>
-            <ExportExcelMenu />
+            <ExportExcelMenu
+              onExportPage={() => exportRows(pageRows, 'page')}
+              onExportAll={() => exportRows(filtered, 'all')}
+            />
           </div>
 
           <div className="mb-4 space-y-2 rounded-xl border border-line bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
@@ -404,6 +550,7 @@ export default function Kot() {
                 onEdit={setEditKot}
                 onView={setViewKot}
                 onDetails={setDetailsKot}
+                onOpenInBilling={(row) => navigate(billingUrlForKot(row))}
               />
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">

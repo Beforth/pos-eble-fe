@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 import {
   ArrowLeft,
   Bike,
@@ -13,13 +14,22 @@ import {
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { CurrentOrderDetailsModal } from '../../components/configuration/CurrentOrderDetailsModal'
 import {
-  currentOrdersList,
   money,
   rowClassForStatus,
   type CurrentOrderRow,
   type CurrentOrderType,
   type OrdersMainTab,
 } from '../../mocks/currentOrdersData'
+import {
+  cancelOrderApi,
+  listOrdersApi,
+  reprintOrderApi,
+  toOrderRow,
+  toOrderRows,
+  type OrderEventData,
+  type OrderStatus,
+} from '../../services/orderService'
+import { subscribeToRail } from '../../services/liveRailClient'
 
 type TypeFilter = 'all' | CurrentOrderType
 
@@ -47,36 +57,131 @@ const LEGEND = [
   { label: 'Paid', className: 'bg-secondary' },
 ] as const
 
+type StatusFilter = 'all' | OrderStatus
+
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'saved', label: 'Saved Bill' },
+  { id: 'printed', label: 'Printed Bill' },
+  { id: 'cancelled', label: 'Cancelled Bill' },
+  { id: 'paid', label: 'Paid' },
+]
+
+const PAGE_SIZE = 50
+
 export default function CurrentOrders() {
   const navigate = useNavigate()
+  const { encryptedOutletId, token } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [mainTab, setMainTab] = useState<OrdersMainTab>('current')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [search, setSearch] = useState('')
-  const [orders, setOrders] = useState<CurrentOrderRow[]>(() => [
-    ...currentOrdersList,
-  ])
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [orders, setOrders] = useState<CurrentOrderRow[]>([])
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null)
   const [cancelPassword, setCancelPassword] = useState('')
   const [cancelReason, setCancelReason] = useState('')
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [viewOrder, setViewOrder] = useState<CurrentOrderRow | null>(null)
 
+  const gateRef = useRef({ page: 1, search: '', status: 'all' as StatusFilter })
+  useEffect(() => {
+    gateRef.current = { page, search, status: statusFilter }
+  }, [page, search, statusFilter])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return orders.filter((order) => {
-      if (typeFilter !== 'all' && order.orderType !== typeFilter) return false
-      if (!q) return true
-      return (
-        order.orderNo.includes(q) ||
-        order.customerName.toLowerCase().includes(q) ||
-        order.customerPhone.includes(q) ||
-        order.orderTypeLabel.toLowerCase().includes(q) ||
-        (order.source?.toLowerCase().includes(q) ?? false)
-      )
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    const trimmed = search.trim()
+    const delay = trimmed === '' ? 0 : 300
+    const handle = window.setTimeout(() => {
+      setLoading(true)
+      listOrdersApi(encryptedOutletId, {
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        search: trimmed === '' ? undefined : trimmed,
+        page,
+        page_size: PAGE_SIZE,
+      })
+        .then((pageData) => {
+          if (cancelled) return
+          setOrders(toOrderRows(pageData.results))
+          setTotalCount(pageData.count)
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            showToast(
+              error instanceof Error ? error.message : 'Failed to load orders',
+            )
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }, delay)
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [encryptedOutletId, statusFilter, search, page])
+
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event, data) => {
+        if (event === 'order.created') {
+          const gate = gateRef.current
+          if (gate.page === 1 && gate.search.trim() === '' && gate.status === 'all') {
+            setOrders((prev) => [toOrderRow(data as OrderEventData), ...prev])
+          }
+          return
+        }
+        if (
+          event === 'order.settle' ||
+          event === 'order.printed' ||
+          event === 'order.modified'
+        ) {
+          const row = toOrderRow(data as OrderEventData)
+          setOrders((prev) => upsertOrder(prev, row))
+          return
+        }
+        if (event === 'order.cancelled') {
+          const payload = data as OrderEventData
+          setOrders((prev) =>
+            prev.map((order) =>
+              order.id === payload.id
+                ? { ...order, status: 'cancelled' as const }
+                : order,
+            ),
+          )
+        }
+      },
     })
-  }, [orders, search, typeFilter])
+  }, [encryptedOutletId, token])
+
+  function upsertOrder(
+    prev: CurrentOrderRow[],
+    row: CurrentOrderRow,
+  ): CurrentOrderRow[] {
+    const exists = prev.some((order) => order.id === row.id)
+    if (!exists) return [row, ...prev]
+    return prev.map((order) =>
+      order.id === row.id
+        ? { ...order, ...row, status: row.status as CurrentOrderRow['status'] }
+        : order,
+    )
+  }
+
+  const visible = useMemo(() => {
+    if (typeFilter === 'all') return orders
+    return orders.filter((order) => order.orderType === typeFilter)
+  }, [orders, typeFilter])
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
   function openCancel(orderId: string) {
     setCancelOrderId(orderId)
@@ -92,7 +197,7 @@ export default function CurrentOrders() {
     setCancelError(null)
   }
 
-  function submitCancel() {
+  async function submitCancel() {
     if (!cancelPassword.trim()) {
       setCancelError('Password is required')
       return
@@ -101,30 +206,39 @@ export default function CurrentOrders() {
       setCancelError('Cancel reason is required')
       return
     }
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === cancelOrderId
-          ? { ...order, status: 'cancelled' as const }
-          : order,
-      ),
-    )
-    showToast(`Order cancelled`)
-    closeCancel()
+    if (!encryptedOutletId || !cancelOrderId) {
+      setCancelError('Missing order to cancel')
+      return
+    }
+    try {
+      const updated = await cancelOrderApi(encryptedOutletId, cancelOrderId)
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === cancelOrderId ? toOrderRow(updated) : order,
+        ),
+      )
+      showToast('Order cancelled')
+      closeCancel()
+    } catch (error) {
+      setCancelError(
+        error instanceof Error ? error.message : 'Failed to cancel order',
+      )
+    }
   }
 
-  function handleReprint(order: CurrentOrderRow) {
-    setOrders((prev) =>
-      prev.map((row) =>
-        row.id === order.id
-          ? {
-              ...row,
-              status: row.status === 'cancelled' ? row.status : 'printed',
-              printCount: (row.printCount ?? 0) + 1,
-            }
-          : row,
-      ),
-    )
-    showToast(`Order #${order.orderNo} sent to reprint`)
+  async function handleReprint(order: CurrentOrderRow) {
+    if (!encryptedOutletId) return
+    try {
+      const updated = await reprintOrderApi(encryptedOutletId, order.id)
+      setOrders((prev) =>
+        prev.map((row) => (row.id === order.id ? toOrderRow(updated) : row)),
+      )
+      showToast(`Order #${order.orderNo} sent to reprint`)
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to reprint order',
+      )
+    }
   }
 
   return (
@@ -209,7 +323,10 @@ export default function CurrentOrders() {
             <input
               type="search"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPage(1)
+              }}
               placeholder="Search"
               className="h-9 w-full rounded-lg border border-line bg-card pl-8 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
             />
@@ -225,6 +342,29 @@ export default function CurrentOrders() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {STATUS_FILTERS.map(({ id, label }) => {
+            const active = statusFilter === id
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(id)
+                  setPage(1)
+                }}
+                className={`h-8 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                  active
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-line bg-card text-muted hover:border-muted hover:text-ink'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto rounded border border-line">
@@ -259,7 +399,7 @@ export default function CurrentOrders() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {visible.length === 0 ? (
                 <tr>
                   <td
                     colSpan={11}
@@ -269,7 +409,7 @@ export default function CurrentOrders() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((order) => {
+                visible.map((order) => {
                   const cancelling = cancelOrderId === order.id
                   const canCancel = order.status !== 'cancelled'
                   const struck = order.status === 'cancelled'
@@ -424,6 +564,37 @@ export default function CurrentOrders() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-muted">
+            {loading
+              ? 'Loading…'
+              : totalCount === 0
+                ? 'No orders'
+                : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, totalCount)} of ${totalCount}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              className="h-8 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-ink transition-colors hover:border-muted disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span className="text-xs font-medium text-ink">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage((prev) => prev + 1)}
+              className="h-8 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-ink transition-colors hover:border-muted disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </main>
 

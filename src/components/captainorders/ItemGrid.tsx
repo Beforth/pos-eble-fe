@@ -1,6 +1,11 @@
+import { useMemo } from 'react'
 import { Heart } from 'lucide-react'
-import type { MenuItemRow } from '../../mocks/menuItemsData'
+import type { MenuItemRow } from '../../utils/menuAdapter'
 import { getDietType } from '../../utils/dietType'
+import {
+  SelectDropdown,
+  type SelectDropdownOption,
+} from '../common/SelectDropdown'
 
 interface ItemGridProps {
   items: MenuItemRow[]
@@ -76,21 +81,26 @@ export function ItemGrid({
   const hasItems = items.length > 0
   const showEmpty = !hasItems && !showOpenItem
 
+  const categoryFilterOptions = useMemo<SelectDropdownOption[]>(
+    () => [
+      { value: 'all', label: 'All Categories' },
+      ...categoryOptions.map((cat) => ({ value: cat.id, label: cat.name })),
+    ],
+    [categoryOptions],
+  )
+
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-page">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-card px-3 py-3 sm:py-2.5">
-        <select
+        <SelectDropdown
           value={categoryFilter}
-          onChange={(event) => onCategoryFilterChange(event.target.value)}
-          className="h-12 w-full min-w-0 rounded-lg border border-line bg-card px-2.5 text-base text-ink outline-none focus:border-primary sm:h-9 sm:w-auto sm:min-w-[140px] sm:text-sm"
-        >
-          <option value="all">All Categories</option>
-          {categoryOptions.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
+          options={categoryFilterOptions}
+          onChange={onCategoryFilterChange}
+          caption="Select category"
+          placeholder="All Categories"
+          searchPlaceholder="Search category"
+          triggerClassName="h-12 w-full text-base sm:h-9 sm:w-auto sm:min-w-[140px] sm:text-sm"
+        />
         <div className="flex w-full min-w-0 flex-1 flex-col gap-2.5 sm:min-w-[220px] sm:flex-row sm:items-center sm:gap-2">
           <input
             type="search"

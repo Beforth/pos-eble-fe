@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Heart } from 'lucide-react'
-import type { MenuItemRow } from '../../mocks/menuItemsData'
+import type { MenuItemRow } from '../../utils/menuAdapter'
 import { getDietType } from '../../utils/dietType'
+import {
+  SelectDropdown,
+  type SelectDropdownOption,
+} from '../common/SelectDropdown'
 
 interface ItemGridProps {
   items: MenuItemRow[]
@@ -79,6 +83,14 @@ export function ItemGrid({
   const [tapFlash, setTapFlash] = useState<{ id: string; key: number } | null>(
     null,
   )
+
+  const categoryFilterOptions = useMemo<SelectDropdownOption[]>(
+    () => [
+      { value: 'all', label: 'All Categories' },
+      ...categoryOptions.map((cat) => ({ value: cat.id, label: cat.name })),
+    ],
+    [categoryOptions],
+  )
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -102,18 +114,18 @@ export function ItemGrid({
       {/* Search / filter bar — stacks on phone, row on tablet+ */}
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-card px-3 py-3 sm:py-2.5">
         {/* Category select — hidden on phone (CategoryRail strip handles it), shown md+ */}
-        <select
-          value={categoryFilter}
-          onChange={(event) => onCategoryFilterChange(event.target.value)}
-          className="hidden h-9 min-w-[130px] rounded-lg border border-line bg-card px-2.5 text-sm text-ink outline-none focus:border-primary md:block"
-        >
-          <option value="all">All Categories</option>
-          {categoryOptions.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
+        <div className="hidden md:block">
+          <SelectDropdown
+            value={categoryFilter}
+            options={categoryFilterOptions}
+            onChange={onCategoryFilterChange}
+            caption="Select category"
+            placeholder="All Categories"
+            searchPlaceholder="Search category"
+            className="w-full"
+            triggerClassName="h-9 min-w-[130px] w-full justify-between"
+          />
+        </div>
         <div className="flex w-full min-w-0 flex-1 flex-col gap-2.5 sm:min-w-[260px] sm:flex-row sm:items-center sm:gap-2">
           <input
             type="search"

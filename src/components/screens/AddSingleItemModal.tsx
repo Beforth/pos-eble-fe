@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ListPlus, X } from 'lucide-react'
+import { ListPlus, Loader2, X } from 'lucide-react'
 import { CategoryMultiSelect } from '../menu/CategoryMultiSelect'
-import { menuItems } from '../../mocks/menuItemsData'
+import { useAuth } from '../../auth/AuthContext'
+import { fetchAllItemsCached } from '../../state/menuItemsCache'
+import { setScreenMenuLookup, type ScreenMenuRow } from '../../mocks/screensData'
 
 interface AddSingleItemModalProps {
   open: boolean
@@ -10,22 +12,56 @@ interface AddSingleItemModalProps {
   onConfirm: (ids: string[]) => void
 }
 
-const ITEM_OPTIONS = menuItems.map((item) => ({
-  id: item.id,
-  name: item.name,
-}))
-
 export function AddSingleItemModal({
   open,
   initialSelectedIds,
   onClose,
   onConfirm,
 }: AddSingleItemModalProps) {
+  const { encryptedOutletId } = useAuth()
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds)
+  const [options, setOptions] = useState<{ id: string; name: string }[]>([])
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (open) setSelectedIds(initialSelectedIds)
   }, [open, initialSelectedIds])
+
+  useEffect(() => {
+    if (!open || !encryptedOutletId) return
+    let cancelled = false
+    setLoading(true)
+    fetchAllItemsCached(encryptedOutletId)
+      .then((items) => {
+        if (cancelled) return
+        const rows: ScreenMenuRow[] = items.map((item) => {
+          const tags = [...(item.tags ?? [])]
+          if (item.choice && !tags.includes(item.choice)) tags.push(item.choice)
+          return {
+            id: item.id,
+            name: item.name,
+            categoryId: item.category_id ?? '',
+            tags,
+            onlineDisplayName: item.online_display_name || item.name,
+          }
+        })
+        setScreenMenuLookup(rows)
+        setOptions(
+          items
+            .map((item) => ({ id: item.id, name: item.name }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setOptions([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, encryptedOutletId])
 
   useEffect(() => {
     if (!open) return
@@ -84,11 +120,18 @@ export function AddSingleItemModal({
             Pick one or more items (e.g. Paani Puri, Dahi Puri, Cheese Dabeli).
             KOTs containing them will show on this screen.
           </p>
-          <CategoryMultiSelect
-            options={ITEM_OPTIONS}
-            selectedIds={selectedIds}
-            onChange={setSelectedIds}
-          />
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted">
+              <Loader2 size={16} className="animate-spin" />
+              Loading items…
+            </div>
+          ) : (
+            <CategoryMultiSelect
+              options={options}
+              selectedIds={selectedIds}
+              onChange={setSelectedIds}
+            />
+          )}
         </div>
 
         <footer className="flex justify-end gap-2 border-t border-line px-5 py-3">
@@ -102,7 +145,7 @@ export function AddSingleItemModal({
           <button
             type="button"
             onClick={() => onConfirm(selectedIds)}
-            disabled={selectedIds.length === 0}
+            disabled={selectedIds.length === 0 || loading}
             className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ListPlus size={15} />

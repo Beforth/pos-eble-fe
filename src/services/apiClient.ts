@@ -89,6 +89,68 @@ export async function apiRequest<T>(
   return envelope.data
 }
 
+/** DRF paginated list response (used by items, commissions, trigger-logs). */
+export interface Paginated<T> {
+  count: number
+  next: string | null
+  previous: string | null
+  results: T[]
+}
+
+/**
+ * Fetch a DRF paginated list endpoint. These responses are NOT wrapped in the
+ * standard envelope — they are `{count, next, previous, results}`.
+ */
+export async function paginatedApiRequest<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<Paginated<T>> {
+  const { token, headers: extraHeaders, ...init } = options
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...(extraHeaders ?? {}),
+  }
+
+  if (init.body !== undefined && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+    })
+  } catch {
+    throw new ApiError(
+      'Unable to reach the server. Check that the API is running.',
+      0,
+    )
+  }
+
+  if (response.status === 401) {
+    handleUnauthorized()
+  }
+
+  type PaginatedBody = Paginated<T> & { detail?: string }
+  let body: PaginatedBody | null = null
+  try {
+    body = (await response.json()) as PaginatedBody
+  } catch {
+    throw new ApiError('Unexpected server response.', response.status)
+  }
+
+  if (!response.ok || body == null || !Array.isArray(body.results)) {
+    throw new ApiError(body?.detail || 'Request failed.', response.status)
+  }
+
+  return body
+}
+
 type MultipartRequestOptions = Omit<RequestInit, 'headers' | 'body'> & {
   token?: string
   headers?: Record<string, string>

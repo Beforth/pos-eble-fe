@@ -33,6 +33,7 @@ export interface CatalogFeature {
 export interface PermissionCatalog {
   categories: CatalogCategory[]
   features: CatalogFeature[]
+  screens: Record<string, string>
 }
 
 function authToken(): string | undefined {

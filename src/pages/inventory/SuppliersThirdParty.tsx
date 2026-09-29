@@ -250,8 +250,12 @@ export default function SuppliersThirdParty() {
       />
       <ConfirmDeleteModal
         open={pendingDelete}
-        title="Confirm Delete"
-        message={`Are you sure you want to delete ${selectedIds.size} selected supplier${selectedIds.size === 1 ? '' : 's'}? This action cannot be undone.`}
+        title="Delete suppliers"
+        target={`${selectedIds.size} selected`}
+        message={`${selectedIds.size} selected supplier${selectedIds.size === 1 ? '' : 's'} will be removed.`}
+        consequences={[
+          'They stop appearing when you raise purchases for raw materials.',
+        ]}
         confirmLabel="Delete"
         onConfirm={confirmDeleteSelected}
         onClose={() => setPendingDelete(false)}

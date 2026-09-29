@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../utils/toast'
+import { useAuth } from '../auth/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
@@ -20,11 +21,13 @@ import {
 } from '../components/menu/MenuActionButtons'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
-import { menuAddonGroups } from '../mocks/menuSectionData'
+import type { AddonGroup } from '../types/menu'
+import { useMenuReference } from '../state/MenuReferenceContext'
 
 export default function AddonsManagement() {
   const navigate = useNavigate()
-  const [groups, setGroups] = useState(menuAddonGroups)
+  const { encryptedOutletId } = useAuth()
+  const [groups, setGroups] = useState<AddonGroup[]>([])
   const [departmentQuery, setDepartmentQuery] = useState('')
   const [itemQuery, setItemQuery] = useState('')
   const [searchBy, setSearchBy] = useState<SearchByFilterValue>('all')
@@ -35,6 +38,17 @@ export default function AddonsManagement() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [changesName, setChangesName] = useState<string | null>(null)
 
+  const { addonGroups: refAddonGroups, reload } = useMenuReference([
+    'addonGroups',
+  ])
+
+  useEffect(() => {
+    if (encryptedOutletId) void reload('addonGroups', { force: true })
+  }, [encryptedOutletId, reload])
+
+  useEffect(() => {
+    setGroups(refAddonGroups)
+  }, [refAddonGroups])
 
   const rows = useMemo(() => {
     const dept = appliedDept.trim().toLowerCase()
@@ -42,22 +56,22 @@ export default function AddonsManagement() {
 
     return groups.filter((row) => {
       const matchesDept =
-        !dept || row.departmentName.toLowerCase().includes(dept)
+        !dept || row.department_name.toLowerCase().includes(dept)
       const matchesItem =
         !item ||
-        row.onlineDisplayName.toLowerCase().includes(item) ||
-        row.departmentName.toLowerCase().includes(item)
+        row.online_display_name.toLowerCase().includes(item) ||
+        row.department_name.toLowerCase().includes(item)
 
       const matchesFilter =
         appliedSearchBy === 'all'
           ? true
           : appliedSearchBy === 'active'
-            ? row.status === 'Active'
+            ? row.is_active
             : appliedSearchBy === 'inactive'
-              ? row.status === 'Inactive'
+              ? !row.is_active
               : appliedSearchBy === 'assigned'
-                ? Boolean(row.onlineDisplayName.trim())
-                : !row.onlineDisplayName.trim()
+                ? Boolean(row.online_display_name.trim())
+                : !row.online_display_name.trim()
 
       return matchesDept && matchesItem && matchesFilter
     })
@@ -70,7 +84,9 @@ export default function AddonsManagement() {
     if (selected.size === 0) return
     setGroups((prev) =>
       prev.map((row) =>
-        selected.has(row.id) ? { ...row, status } : row,
+        selected.has(row.id)
+          ? { ...row, is_active: status === 'Active' }
+          : row,
       ),
     )
   }
@@ -225,8 +241,7 @@ export default function AddonsManagement() {
               <th className="px-3 py-3">Online Display Name</th>
               <th className="px-3 py-3">Rank</th>
               <th className="px-3 py-3">Status</th>
-              <th className="px-3 py-3">Created</th>
-              <th className="px-3 py-3">Modified</th>
+              <th className="px-3 py-3">Addons</th>
               <th className="px-3 py-3">Action</th>
             </tr>
           </thead>
@@ -259,24 +274,29 @@ export default function AddonsManagement() {
                     className="inline-flex cursor-pointer items-center gap-1.5 font-medium text-ink hover:text-primary"
                   >
                     <ChevronDown size={14} className="text-muted" />
-                    {row.departmentName}
+                    {row.department_name}
                   </button>
                 </td>
-                <td className="px-3 py-3.5 text-ink">{row.onlineDisplayName}</td>
-                <td className="px-3 py-3.5 tabular-nums text-ink">{row.rank}</td>
+                <td className="px-3 py-3.5 text-ink">
+                  {row.online_display_name}
+                </td>
+                <td className="px-3 py-3.5 tabular-nums text-ink">
+                  {row.position}
+                </td>
                 <td className="px-3 py-3.5">
                   <span
                     className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      row.status === 'Active'
+                      row.is_active
                         ? 'bg-success/10 text-success'
                         : 'bg-muted/15 text-muted'
                     }`}
                   >
-                    {row.status}
+                    {row.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td className="px-3 py-3.5 text-muted">{row.created}</td>
-                <td className="px-3 py-3.5 text-muted">{row.modified}</td>
+                <td className="px-3 py-3.5 tabular-nums text-ink">
+                  {row.addons.length}
+                </td>
                 <td className="px-3 py-3.5">
                   <div className="flex items-center gap-1">
                     <RowActionButton
@@ -287,7 +307,7 @@ export default function AddonsManagement() {
                     </RowActionButton>
                     <RowActionButton
                       label="Show Changes"
-                      onClick={() => setChangesName(row.departmentName)}
+                      onClick={() => setChangesName(row.department_name)}
                     >
                       <ClipboardList size={16} />
                     </RowActionButton>

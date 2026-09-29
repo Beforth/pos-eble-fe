@@ -3,10 +3,10 @@ import { ListPlus, Loader2, MonitorSmartphone, Search, X } from 'lucide-react'
 import { Input } from '../common/Input'
 import {
   categoryName,
+  getScreenItemName,
   type KotScreen,
   type ScreenCategory,
 } from '../../mocks/screensData'
-import { getMenuItemById } from '../../mocks/menuItemsData'
 import { createScreen, fetchCategories } from '../../services/screenService'
 import { AddSingleItemModal } from './AddSingleItemModal'
 
@@ -280,14 +280,14 @@ export function CreateScreenModal({
                       </span>
                     ))}
                     {selectedItemIds.map((id) => {
-                      const item = getMenuItemById(id)
-                      if (!item) return null
+                      const name = getScreenItemName(id)
+                      if (!name) return null
                       return (
                         <span
                           key={id}
                           className="rounded-md border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs text-ink"
                         >
-                          {item.name}
+                          {name}
                         </span>
                       )
                     })}

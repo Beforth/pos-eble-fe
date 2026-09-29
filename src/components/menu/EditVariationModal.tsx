@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Search, X } from 'lucide-react'
-import type { MenuVariation } from '../../mocks/menuSectionData'
+import { Check, ChevronDown, Plus, Search, Trash2, X } from 'lucide-react'
+import { ConfirmDialog } from '../common/ConfirmDialog'
+import type {
+  Channel,
+  ChannelPriceInput,
+  VariationGroup,
+  VariationInput,
+} from '../../types/menu'
+import {
+  createVariationGroupApi,
+  updateVariationGroupApi,
+} from '../../services/menuService'
+import { useMenuChannels } from '../../state/MenuChannelsContext'
+import { showToast } from '../../utils/toast'
 
 const DEPARTMENT_OPTIONS = [
   'Select',
@@ -15,15 +27,117 @@ const DEPARTMENT_OPTIONS = [
 interface VariationModalProps {
   open: boolean
   mode: 'add' | 'edit'
-  variation: MenuVariation | null
+  variation: VariationGroup | null
+  outletId: string
   onClose: () => void
-  onSave: (variation: MenuVariation) => void
+  onSave: (variation: VariationGroup) => void
+}
+
+function VariationRowPrices({
+  areaPrices,
+  channels,
+  errorChannelIds,
+  onPriceChange,
+  onClearPriceError,
+}: {
+  areaPrices: ChannelPriceInput[]
+  channels: Channel[]
+  errorChannelIds: string[]
+  onPriceChange: (
+    channelId: string,
+    patch: Partial<ChannelPriceInput>,
+  ) => void
+  onClearPriceError: (channelId: string) => void
+}) {
+  const sorted = useMemo(
+    () => [...channels].sort((a, b) => a.position - b.position),
+    [channels],
+  )
+
+  if (sorted.length === 0) {
+    return (
+      <p className="mt-3 text-xs text-muted">No channels configured.</p>
+    )
+  }
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-md border border-line">
+      <table className="min-w-full text-left text-sm">
+        <thead className="border-b border-line bg-page">
+          <tr>
+            <th className="px-3 py-2 text-xs font-semibold text-ink">
+              Channel
+            </th>
+            <th className="px-3 py-2 text-xs font-semibold text-ink">
+              Price
+            </th>
+            <th className="px-3 py-2 text-xs font-semibold text-ink">
+              Active
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((channel) => {
+            const price = areaPrices.find(
+              (item) => item.outlet_channel_id === channel.id,
+            )
+            return (
+              <tr
+                key={channel.id}
+                className="border-b border-line last:border-b-0"
+              >
+                <td className="px-3 py-2 font-medium text-ink">
+                  {channel.channel_label}
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={String(price?.price ?? '')}
+                    onChange={(event) => {
+                      onPriceChange(channel.id, {
+                        price: event.target.value,
+                      })
+                      onClearPriceError(channel.id)
+                    }}
+                    className={`h-8 w-24 rounded-md border px-2.5 text-sm outline-none focus:border-primary ${
+                      errorChannelIds.includes(channel.id)
+                        ? 'border-error'
+                        : 'border-line'
+                    }`}
+                  />
+                  {errorChannelIds.includes(channel.id) ? (
+                    <p className="mt-1 text-xs text-error">
+                      Enter a valid price
+                    </p>
+                  ) : null}
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={price?.is_active ?? true}
+                    onChange={(event) =>
+                      onPriceChange(channel.id, {
+                        is_active: event.target.checked,
+                      })
+                    }
+                    className="size-4 cursor-pointer accent-primary"
+                  />
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 export function VariationModal({
   open,
   mode,
   variation,
+  outletId,
   onClose,
   onSave,
 }: VariationModalProps) {
@@ -33,23 +147,56 @@ export function VariationModal({
   const [status, setStatus] = useState(true)
   const [deptOpen, setDeptOpen] = useState(false)
   const [deptQuery, setDeptQuery] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [variationInputs, setVariationInputs] = useState<VariationInput[]>([])
+  const [pendingRemove, setPendingRemove] = useState<{ index: number; name: string } | null>(null)
+  const [groupNameError, setGroupNameError] = useState(false)
+  const [variationNameErrors, setVariationNameErrors] = useState<Set<number>>(
+    new Set(),
+  )
+  const [priceErrorChannels, setPriceErrorChannels] = useState<
+    Record<number, string[]>
+  >({})
+  const { channels } = useMenuChannels()
   const deptRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     if (mode === 'edit' && variation) {
-      setName(variation.name)
-      setOnlineDisplayName(variation.onlineDisplayName)
-      setDepartment(variation.departmentName || 'Select')
-      setStatus(variation.status === 'Active')
+      setName(variation.department_name)
+      setOnlineDisplayName(variation.online_display_name)
+      setDepartment(
+        DEPARTMENT_OPTIONS.includes(variation.department_name as (typeof DEPARTMENT_OPTIONS)[number])
+          ? variation.department_name
+          : 'Select',
+      )
+      setStatus(variation.is_active)
+      setVariationInputs(
+        variation.variations.map((row) => ({
+          id: row.id,
+          name: row.name,
+          online_display_name: row.online_display_name,
+          is_active: row.is_active,
+          area_prices: row.area_prices.map((price) => ({
+            outlet_channel_id: price.outlet_channel_id,
+            price: String(price.price),
+            is_active: price.is_active,
+          })),
+        })),
+      )
     } else {
       setName('')
       setOnlineDisplayName('')
       setDepartment('Select')
       setStatus(true)
+      setVariationInputs([])
     }
     setDeptOpen(false)
     setDeptQuery('')
+    setSaving(false)
+    setGroupNameError(false)
+    setVariationNameErrors(new Set())
+    setPriceErrorChannels({})
   }, [open, mode, variation])
 
   useEffect(() => {
@@ -94,33 +241,135 @@ export function VariationModal({
   if (!open) return null
   if (mode === 'edit' && !variation) return null
 
-  function handleSave() {
-    const trimmedName = name.trim()
-    if (!trimmedName) return
+  function updateVariation(index: number, patch: Partial<VariationInput>) {
+    setVariationInputs((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    )
+  }
 
-    const next: MenuVariation = {
-      id: mode === 'edit' && variation ? variation.id : `v-${Date.now()}`,
-      name: trimmedName,
-      onlineDisplayName: onlineDisplayName.trim(),
-      departmentName: department === 'Select' ? '' : department,
-      status: status ? 'Active' : 'Inactive',
-      created:
-        mode === 'edit' && variation
-          ? variation.created
-          : new Date().toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            }),
-      modified: new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
+  function updateVariationAreaPrice(
+    index: number,
+    channelId: string,
+    patch: Partial<ChannelPriceInput>,
+  ) {
+    setVariationInputs((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row
+        const area_prices = [...(row.area_prices ?? [])]
+        const at = area_prices.findIndex(
+          (price) => price.outlet_channel_id === channelId,
+        )
+        if (at >= 0) {
+          area_prices[at] = { ...area_prices[at], ...patch }
+        } else {
+          area_prices.push({
+            outlet_channel_id: channelId,
+            price: '',
+            is_active: true,
+            ...patch,
+          })
+        }
+        return { ...row, area_prices }
       }),
-    }
+    )
+  }
 
-    onSave(next)
-    onClose()
+  function removeVariation(index: number) {
+    setVariationInputs((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function handleSave() {
+    const trimmedName = name.trim()
+
+    if (!trimmedName) {
+      setGroupNameError(true)
+      showToast('Name is required.')
+      return
+    }
+    setGroupNameError(false)
+
+    const emptyNameIndexes = variationInputs
+      .map((row, index) => (row.name.trim() === '' ? index : -1))
+      .filter((index) => index >= 0)
+    if (emptyNameIndexes.length > 0) {
+      setVariationNameErrors(new Set(emptyNameIndexes))
+      showToast(`Variation #${emptyNameIndexes[0] + 1} name is required.`)
+      return
+    }
+    setVariationNameErrors(new Set())
+
+    const invalidPriceChannels: Record<number, string[]> = {}
+    for (const [index, row] of variationInputs.entries()) {
+      for (const price of row.area_prices ?? []) {
+        const value = String(price.price).trim()
+        if (value === '') continue
+        const parsed = Number(value)
+        if (Number.isNaN(parsed) || parsed < 0) {
+          invalidPriceChannels[index] = [
+            ...(invalidPriceChannels[index] ?? []),
+            price.outlet_channel_id,
+          ]
+        }
+      }
+    }
+    if (Object.keys(invalidPriceChannels).length > 0) {
+      setPriceErrorChannels(invalidPriceChannels)
+      const firstIndex = Number(Object.keys(invalidPriceChannels)[0])
+      const channelLabel =
+        channels.find(
+          (channel) => channel.id === invalidPriceChannels[firstIndex][0],
+        )?.channel_label ?? 'Channel'
+      showToast(
+        `Variation #${firstIndex + 1}: enter a valid price for ${channelLabel}.`,
+      )
+      return
+    }
+    setPriceErrorChannels({})
+
+    setSaving(true)
+    try {
+      const variations = variationInputs.map((row) => ({
+        ...(row.id ? { id: row.id } : {}),
+        name: row.name.trim(),
+        online_display_name: (row.online_display_name ?? '').trim(),
+        is_active: row.is_active ?? true,
+        area_prices: (row.area_prices ?? [])
+          .filter((price) => String(price.price).trim() !== '')
+          .map((price) => ({
+            outlet_channel_id: price.outlet_channel_id,
+            price: Number(price.price),
+            is_active: price.is_active ?? true,
+          })),
+      }))
+
+      const payload = {
+        department_name: trimmedName,
+        online_display_name: onlineDisplayName.trim(),
+        is_active: status,
+        variations,
+      }
+
+      if (mode === 'edit' && variation) {
+        const updated = await updateVariationGroupApi(
+          outletId,
+          variation.id,
+          payload,
+        )
+        onSave(updated)
+      } else {
+        const created = await createVariationGroupApi(outletId, payload)
+        onSave(created)
+      }
+      onClose()
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : 'Failed to save variation',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   const title = mode === 'add' ? 'Add Variation' : 'Edit Variation'
@@ -157,7 +406,7 @@ export function VariationModal({
           </button>
         </div>
 
-        <div className="space-y-5 px-5 py-5">
+        <div className="max-h-[70vh] space-y-5 overflow-y-auto px-5 py-5">
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label
@@ -170,9 +419,17 @@ export function VariationModal({
                 id="variation-name"
                 type="text"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="h-10 w-full rounded-md border border-line px-3 text-sm text-ink outline-none focus:border-primary"
+                onChange={(event) => {
+                  setName(event.target.value)
+                  if (groupNameError) setGroupNameError(false)
+                }}
+                className={`h-10 w-full rounded-md border px-3 text-sm text-ink outline-none focus:border-primary ${
+                  groupNameError ? 'border-error' : 'border-line'
+                }`}
               />
+              {groupNameError ? (
+                <p className="mt-1 text-xs text-error">Name is required.</p>
+              ) : null}
             </div>
 
             <div>
@@ -272,6 +529,138 @@ export function VariationModal({
             />
             Status
           </label>
+
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-5">
+              <label className="text-sm font-medium text-ink">Variations</label>
+              <button
+                type="button"
+                onClick={() =>
+                  setVariationInputs((prev) => [
+                    ...prev,
+                    {
+                      name: '',
+                      online_display_name: '',
+                      is_active: true,
+                      area_prices: [],
+                    },
+                  ])
+                }
+                className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-line bg-card px-3 text-xs font-medium text-primary hover:bg-page"
+              >
+                <Plus size={13} />
+                Add Variation
+              </button>
+            </div>
+
+            {variationInputs.length === 0 ? (
+              <p className="mt-3 rounded-md border border-dashed border-line py-5 text-center text-sm text-muted">
+                No variations yet — click “Add Variation” to create options
+                (e.g. Regular, Large).
+              </p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {variationInputs.map((row, index) => (
+                  <div
+                    key={row.id ?? `new-${index}`}
+                    className="rounded-md border border-line p-3"
+                  >
+                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-ink">
+                          Name <span className="text-primary">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={row.name}
+                          onChange={(event) => {
+                            updateVariation(index, {
+                              name: event.target.value,
+                            })
+                            setVariationNameErrors((prev) => {
+                              const next = new Set(prev)
+                              next.delete(index)
+                              return next
+                            })
+                          }}
+                          className={`h-9 w-full rounded-md border px-3 text-sm text-ink outline-none focus:border-primary ${
+                            variationNameErrors.has(index)
+                              ? 'border-error'
+                              : 'border-line'
+                          }`}
+                        />
+                        {variationNameErrors.has(index) ? (
+                          <p className="mt-1 text-xs text-error">
+                            Name is required.
+                          </p>
+                        ) : null}
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-ink">
+                          Online Display Name
+                        </label>
+                        <input
+                          type="text"
+                          value={row.online_display_name ?? ''}
+                          onChange={(event) =>
+                            updateVariation(index, {
+                              online_display_name: event.target.value,
+                            })
+                          }
+                          className="h-9 w-full rounded-md border border-line px-3 text-sm text-ink outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="flex items-end pb-1.5">
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
+                          <input
+                            type="checkbox"
+                            checked={row.is_active ?? true}
+                            onChange={(event) =>
+                              updateVariation(index, {
+                                is_active: event.target.checked,
+                              })
+                            }
+                            className="size-4 cursor-pointer accent-primary"
+                          />
+                          Active
+                        </label>
+                      </div>
+                      <div className="flex items-end pb-1.5">
+                        <button
+                          type="button"
+                          aria-label={`Remove variation ${row.name || index + 1}`}
+                          onClick={() => setPendingRemove({ index, name: row.name })}
+                          className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-line text-muted hover:border-error hover:text-error"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <VariationRowPrices
+                      areaPrices={row.area_prices ?? []}
+                      channels={channels}
+                      errorChannelIds={priceErrorChannels[index] ?? []}
+                      onPriceChange={(channelId, patch) =>
+                        updateVariationAreaPrice(index, channelId, patch)
+                      }
+                      onClearPriceError={(channelId) =>
+                        setPriceErrorChannels((prev) => {
+                          const next = { ...prev }
+                          const list = (next[index] ?? []).filter(
+                            (id) => id !== channelId,
+                          )
+                          if (list.length > 0) next[index] = list
+                          else delete next[index]
+                          return next
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
@@ -285,11 +674,27 @@ export function VariationModal({
           <button
             type="button"
             onClick={handleSave}
-            className="inline-flex h-10 cursor-pointer items-center rounded-md bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover"
+            disabled={saving}
+            className="inline-flex h-10 cursor-pointer items-center rounded-md bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
           >
-            Save Changes
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
+
+        <ConfirmDialog
+          open={Boolean(pendingRemove)}
+          compact
+          title="Remove variation"
+          target={pendingRemove?.name?.trim() || undefined}
+          message="This variation line will be removed from the group being edited."
+          note="Changes reach the menu only after you save — the variation can be re-added."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (pendingRemove) removeVariation(pendingRemove.index)
+            setPendingRemove(null)
+          }}
+          onClose={() => setPendingRemove(null)}
+        />
       </div>
     </div>
   )
@@ -297,7 +702,7 @@ export function VariationModal({
 
 /** @deprecated Use VariationModal */
 export function EditVariationModal(
-  props: Omit<VariationModalProps, 'mode'> & { variation: MenuVariation | null },
+  props: Omit<VariationModalProps, 'mode'> & { variation: VariationGroup | null },
 ) {
   return <VariationModal {...props} mode="edit" />
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { Search } from 'lucide-react'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
 import { DateTimeField } from '../../components/common/DateTimeField'
@@ -46,14 +47,26 @@ export default function PaymentInformation() {
     showToast('Filters cleared')
   }
 
+  function exportRows(
+    rowsToExport: (string | number | null | undefined)[][],
+    suffix: string,
+  ) {
+    downloadCsv(
+      `payment-information-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Status', 'Provider', 'Order ID'],
+      rowsToExport,
+    )
+    showToast(`Exported ${rowsToExport.length} rows`)
+  }
+
   return (
     <ReportsPageShell
       title="Payment Information"
       activeItem="acct-payment-information"
       actions={
         <ExportExcelMenu
-          onExportPage={() => showToast('Exporting current page…')}
-          onExportAll={() => showToast('Exporting all records…')}
+          onExportPage={() => exportRows([], 'page')}
+          onExportAll={() => exportRows([], 'all')}
         />
       }
     >

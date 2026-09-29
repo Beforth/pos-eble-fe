@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import {
   ArrowDownUp,
   Check,
@@ -416,6 +417,15 @@ export default function OnlineOrderReconciliation() {
     }
   }
 
+  function exportRows() {
+    downloadCsv(
+      `online-order-reconciliation-${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`,
+      shownColumns.map((col) => col.label),
+      rows.map((row) => shownColumns.map((col) => cellValue(row, col.key))),
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <ReportsPageShell
       title="Manage Your All Third Party Online Orders Reconciliation"
@@ -591,7 +601,7 @@ export default function OnlineOrderReconciliation() {
                 options={[
                   {
                     label: 'Export Excel',
-                    onClick: () => showToast('Exporting Excel…'),
+                    onClick: () => exportRows(),
                   },
                   {
                     label: 'Mark as Reviewed',

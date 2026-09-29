@@ -1,17 +1,38 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
-import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
+import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
+import {
+  listDayEndClosuresApi,
+  toDayEndSummaryRow,
+} from '../../services/orderService'
+import { useAuth } from '../../auth/AuthContext'
 
 const PAGE_SIZE = 10
 
 export default function OrderSummaryReport() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [page, setPage] = useState(1)
+  const [rows, setRows] = useState<DayEndSummaryRow[]>([])
 
-  const rows = DAY_END_SUMMARY_ROWS
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    listDayEndClosuresApi(encryptedOutletId)
+      .then((dtos) => {
+        if (!cancelled) setRows(dtos.map(toDayEndSummaryRow))
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
   const totalOrders = rows.reduce((s, r) => s + r.orders, 0)
   const totalRevenue = rows.reduce((s, r) => s + r.total, 0)
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))

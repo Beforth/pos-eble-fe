@@ -6,6 +6,8 @@ import { brand } from '../../theme/brand'
 import {
   KOT_STORE_EVENT,
   loadAllKotTickets,
+  removeKotTicket,
+  upsertKotTicketFromServer,
 } from '../../utils/tableStatusStore'
 import {
   messageForStatus,
@@ -13,6 +15,9 @@ import {
   toDisplayTicket,
   type DisplayTicket,
 } from './customerDisplayData'
+import { subscribeToRail } from '../../services/liveRailClient'
+import { kotEventToTicket, type KotEventData } from '../../services/orderService'
+import { useAuth } from '../../auth/AuthContext'
 
 function pad(n: number) {
   return String(n).padStart(2, '0')
@@ -80,6 +85,40 @@ export default function CustomerDisplay() {
       window.clearInterval(poll)
     }
   }, [])
+
+  const { encryptedOutletId, token } = useAuth()
+
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+
+    const handleKotRemoved = (id: string) => {
+      removeKotTicket(id)
+      setTickets(readBoardTickets())
+    }
+
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event, data) => {
+        if (event === 'kot.prep' || event === 'kot.modified') {
+          upsertKotTicketFromServer(kotEventToTicket(data as KotEventData))
+          setTickets(readBoardTickets())
+          return
+        }
+        if (event === 'kot.deleted') {
+          handleKotRemoved((data as { id: string }).id)
+          return
+        }
+        if (event === 'kot.cancelled') {
+          handleKotRemoved((data as KotEventData).id)
+          return
+        }
+        if (event === 'kot.used_in_bill') {
+          handleKotRemoved((data as KotEventData).id)
+        }
+      },
+    })
+  }, [encryptedOutletId, token])
 
   const readyCount = tickets.filter((ticket) => ticket.status === 'ready').length
   const preparingCount = tickets.length - readyCount

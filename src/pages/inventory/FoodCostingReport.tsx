@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { ChevronDown, FileText, Lightbulb, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -103,6 +104,25 @@ export default function FoodCostingReport() {
     setToDate('2026-08-11')
   }
 
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `food-costing-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        'Date',
+        'Menu Item',
+        'Category',
+        'Order Type',
+        'Qty Consumed',
+        'Cost (₹)',
+      ],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="other-reports">
 
@@ -114,8 +134,8 @@ export default function FoodCostingReport() {
             Help Center
           </OutlineButton>
           <ExportMenu
-            onExportPage={() => showToast('Exported current page')}
-            onExportAll={() => showToast('Exported all')}
+            onExportPage={() => exportRows([], 'page')}
+            onExportAll={() => exportRows([], 'all')}
           />
         </div>
       </div>

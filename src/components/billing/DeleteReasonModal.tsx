@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { AlertTriangle, Info, X } from 'lucide-react'
 
 interface DeleteReasonModalProps {
   open: boolean
@@ -52,26 +52,34 @@ export function DeleteReasonModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
       <button
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/45"
+        className="absolute inset-0 bg-ink/40"
       />
       <div
-        role="dialog"
+        role="alertdialog"
         aria-modal="true"
         aria-label={title}
         className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-xl border border-line bg-card shadow-2xl"
       >
-        <header className="flex items-center justify-between border-b border-line px-5 py-3">
-          <h2 className="text-base font-semibold text-ink">{title}</h2>
+        <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-danger/10 text-danger"
+              aria-hidden="true"
+            >
+              <AlertTriangle size={18} />
+            </span>
+            <h2 className="truncate text-base font-semibold text-ink">{title}</h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
+            className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
           </button>
@@ -95,6 +103,13 @@ export function DeleteReasonModal({
             />
           </label>
           {error ? <p className="mt-1.5 text-xs text-primary">{error}</p> : null}
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-line bg-page px-3 py-2.5">
+            <Info size={14} className="mt-0.5 shrink-0 text-muted" aria-hidden="true" />
+            <p className="text-xs leading-relaxed text-muted">
+              The item is removed from the running KOT. The reason is recorded with
+              the removal so it can be reviewed later.
+            </p>
+          </div>
         </div>
 
         <footer className="flex justify-end gap-2 border-t border-line px-5 py-3">
@@ -108,9 +123,9 @@ export function DeleteReasonModal({
           <button
             type="button"
             onClick={handleSave}
-            className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            className="h-9 rounded-lg bg-danger px-4 text-sm font-semibold text-white hover:brightness-95"
           >
-            Save
+            Remove item
           </button>
         </footer>
       </div>

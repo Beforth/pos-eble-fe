@@ -5,7 +5,7 @@ export interface OrdersChartPoint {
   value: number
 }
 
-export type OrderStatus = 'Printed' | 'Settled' | 'Cancelled'
+export type OrderStatus = 'Saved' | 'Printed' | 'Settled' | 'Cancelled'
 export type OrderChannel = 'DINE IN' | 'PARCEL' | 'DELIVERY' | 'PICK UP'
 
 export interface AllOrderRow {
@@ -22,6 +22,8 @@ export interface AllOrderRow {
   payment: string
   status: OrderStatus
   created: string
+  /** Outstanding balance_due — populated by toAllOrderRow; >0 enables Settle Due. */
+  balanceDue?: number
 }
 
 export interface CumulativeItemRow {

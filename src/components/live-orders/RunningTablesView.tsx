@@ -1,6 +1,6 @@
 import { BarChart3, LayoutGrid } from 'lucide-react'
 import { formatINR, formatNumber } from '../../utils/format'
-import type { RunningTablesSummary } from '../../mocks/liveOrdersData'
+import type { RunningTablesSummary } from '../../services/orderService'
 
 interface RunningTablesViewProps {
   data: RunningTablesSummary

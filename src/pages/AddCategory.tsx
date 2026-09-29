@@ -1,13 +1,45 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { CategoryForm } from '../components/menu/CategoryForm'
+import {
+  CategoryForm,
+  type CategoryFormValues,
+} from '../components/menu/CategoryForm'
+import { useAuth } from '../auth/AuthContext'
+import { createCategoryApi } from '../services/menuService'
+import type { CategoryPayload } from '../types/menu'
+import { showToast } from '../utils/toast'
 
 export default function AddCategory() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
 
   function goBack() {
     navigate('/menu/categories?tab=category')
+  }
+
+  async function handleSave(values: CategoryFormValues) {
+    if (!encryptedOutletId) return
+    if (!values.name.trim()) {
+      showToast('Category name is required')
+      return
+    }
+    const payload: CategoryPayload = {
+      name: values.name.trim(),
+      parent_category_id: values.parentCategoryId || null,
+      online_display_name: values.onlineDisplayName || undefined,
+      rank: values.rank,
+      is_active: values.status,
+    }
+    try {
+      await createCategoryApi(encryptedOutletId, payload)
+      showToast('Category created successfully')
+      goBack()
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to create category',
+      )
+    }
   }
 
   return (
@@ -35,6 +67,8 @@ export default function AddCategory() {
         initial={{
           name: '',
           onlineDisplayName: '',
+          parentCategoryId: null,
+          rank: 0,
           tag: '',
           status: true,
           logoName: '',
@@ -42,7 +76,7 @@ export default function AddCategory() {
           offlineImageName: '',
         }}
         onCancel={goBack}
-        onSave={goBack}
+        onSave={handleSave}
         headerActions={
           <button
             type="button"

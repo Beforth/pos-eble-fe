@@ -20,10 +20,10 @@ import {
 import { EditVariationModal, VariationModal } from '../components/menu/EditVariationModal'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
-import {
-  menuVariations,
-  type MenuVariation,
-} from '../mocks/menuSectionData'
+import { useAuth } from '../auth/AuthContext'
+import { updateVariationGroupApi } from '../services/menuService'
+import type { VariationGroup } from '../types/menu'
+import { useMenuReference } from '../state/MenuReferenceContext'
 
 const SEARCH_BY_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -146,7 +146,8 @@ function SearchByDropdown({
 }
 
 export default function VariantsManagement() {
-  const [variations, setVariations] = useState(menuVariations)
+  const { encryptedOutletId } = useAuth()
+  const [variations, setVariations] = useState<VariationGroup[]>([])
   const [nameQuery, setNameQuery] = useState('')
   const [searchBy, setSearchBy] = useState<SearchByValue>('all')
   const [appliedName, setAppliedName] = useState('')
@@ -154,28 +155,39 @@ export default function VariantsManagement() {
     useState<SearchByValue>('all')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [changesName, setChangesName] = useState<string | null>(null)
-  const [editing, setEditing] = useState<MenuVariation | null>(null)
+  const [editing, setEditing] = useState<VariationGroup | null>(null)
   const [adding, setAdding] = useState(false)
 
+  const { variationGroups: refVariationGroups, reload } = useMenuReference([
+    'variationGroups',
+  ])
+
+  useEffect(() => {
+    if (encryptedOutletId) void reload('variationGroups', { force: true })
+  }, [encryptedOutletId, reload])
+
+  useEffect(() => {
+    setVariations(refVariationGroups)
+  }, [refVariationGroups])
 
   const rows = useMemo(() => {
     const q = appliedName.trim().toLowerCase()
     return variations.filter((row) => {
       const matchesName =
         !q ||
-        row.name.toLowerCase().includes(q) ||
-        row.departmentName.toLowerCase().includes(q)
+        row.department_name.toLowerCase().includes(q) ||
+        row.online_display_name.toLowerCase().includes(q)
 
       const matchesFilter =
         appliedSearchBy === 'all'
           ? true
           : appliedSearchBy === 'active'
-            ? row.status === 'Active'
+            ? row.is_active === true
             : appliedSearchBy === 'inactive'
-              ? row.status === 'Inactive'
+              ? row.is_active === false
               : appliedSearchBy === 'assigned'
-                ? Boolean(row.departmentName.trim())
-                : !row.departmentName.trim()
+                ? row.variations.length > 0
+                : row.variations.length === 0
 
       return matchesName && matchesFilter
     })
@@ -184,13 +196,42 @@ export default function VariantsManagement() {
   const allSelected =
     rows.length > 0 && rows.every((row) => selected.has(row.id))
 
-  function setSelectedStatus(status: 'Active' | 'Inactive') {
-    if (selected.size === 0) return
-    setVariations((prev) =>
-      prev.map((row) =>
-        selected.has(row.id) ? { ...row, status } : row,
+  async function setSelectedStatus(status: 'Active' | 'Inactive') {
+    if (selected.size === 0 || !encryptedOutletId) return
+    const isActive = status === 'Active'
+    const selectedRows = variations.filter((row) => selected.has(row.id))
+    const results = await Promise.allSettled(
+      selectedRows.map((row) =>
+        updateVariationGroupApi(encryptedOutletId, row.id, {
+          is_active: isActive,
+        }),
       ),
     )
+    const succeeded = results.filter((r) => r.status === 'fulfilled')
+    const failed = results.filter((r) => r.status === 'rejected')
+
+    if (succeeded.length > 0) {
+      setVariations((prev) =>
+        prev.map((row) => {
+          if (!selected.has(row.id)) return row
+          const match = succeeded.find(
+            (r) => r.status === 'fulfilled' && r.value.id === row.id,
+          )
+          if (match && match.status === 'fulfilled') return match.value
+          return row
+        }),
+      )
+    }
+
+    if (failed.length > 0) {
+      showToast(`Failed to update ${failed.length} variation(s)`)
+    }
+    if (succeeded.length > 0) {
+      showToast(
+        `${succeeded.length} variation(s) updated to ${status}`,
+      )
+    }
+    void reload('variationGroups', { force: true })
   }
 
   function handleSearch() {
@@ -290,10 +331,8 @@ export default function VariantsManagement() {
               </th>
               <th className="px-3 py-3">Name</th>
               <th className="px-3 py-3">Online Display Name</th>
-              <th className="px-3 py-3">Department Name</th>
+              <th className="px-3 py-3">Variations</th>
               <th className="px-3 py-3">Status</th>
-              <th className="px-3 py-3">Created</th>
-              <th className="px-3 py-3">Modified</th>
               <th className="px-3 py-3">Actions</th>
             </tr>
           </thead>
@@ -318,20 +357,22 @@ export default function VariantsManagement() {
                     className="cursor-pointer accent-primary"
                   />
                 </td>
-                <td className="px-3 py-3.5 font-medium text-ink">{row.name}</td>
-                <td className="px-3 py-3.5 text-muted">
-                  {row.onlineDisplayName || '—'}
+                <td className="px-3 py-3.5 font-medium text-ink">
+                  {row.department_name}
                 </td>
-                <td className="px-3 py-3.5 text-ink">{row.departmentName}</td>
+                <td className="px-3 py-3.5 text-muted">
+                  {row.online_display_name || '—'}
+                </td>
+                <td className="px-3 py-3.5 text-ink">
+                  {row.variations.length}
+                </td>
                 <td
                   className={`px-3 py-3.5 font-medium ${
-                    row.status === 'Active' ? 'text-success' : 'text-muted'
+                    row.is_active ? 'text-success' : 'text-muted'
                   }`}
                 >
-                  {row.status}
+                  {row.is_active ? 'Active' : 'Inactive'}
                 </td>
-                <td className="px-3 py-3.5 text-muted">{row.created}</td>
-                <td className="px-3 py-3.5 text-muted">{row.modified}</td>
                 <td className="px-3 py-3.5">
                   <div className="flex items-center gap-1">
                     <RowActionButton
@@ -342,7 +383,7 @@ export default function VariantsManagement() {
                     </RowActionButton>
                     <RowActionButton
                       label="Show Changes"
-                      onClick={() => setChangesName(row.name)}
+                      onClick={() => setChangesName(row.department_name)}
                     >
                       <ClipboardList size={16} />
                     </RowActionButton>
@@ -358,6 +399,7 @@ export default function VariantsManagement() {
         open={adding}
         mode="add"
         variation={null}
+        outletId={encryptedOutletId ?? ''}
         onClose={() => setAdding(false)}
         onSave={(created) => {
           setVariations((prev) => [created, ...prev])
@@ -367,6 +409,7 @@ export default function VariantsManagement() {
       <EditVariationModal
         open={Boolean(editing)}
         variation={editing}
+        outletId={encryptedOutletId ?? ''}
         onClose={() => setEditing(null)}
         onSave={(updated) => {
           setVariations((prev) =>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, ClipboardList, Pencil, Plus } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
@@ -11,18 +11,31 @@ import {
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { SelectRecordAlert } from '../components/menu/SelectRecordAlert'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
-import { menuTaxes } from '../mocks/menuSectionData'
+import type { Tax } from '../types/menu'
+import { useAuth } from '../auth/AuthContext'
+import { useMenuReference } from '../state/MenuReferenceContext'
 
 export default function TaxesManagement() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { encryptedOutletId } = useAuth()
   const savedTaxType =
     (location.state as { taxType?: 'item' | 'order' } | null)?.taxType ?? 'order'
-  const [taxes, setTaxes] = useState(menuTaxes)
+  const [taxes, setTaxes] = useState<Tax[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [taxType] = useState<'item' | 'order'>(savedTaxType)
   const [changesName, setChangesName] = useState<string | null>(null)
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
+
+  const { taxes: refTaxes, reload } = useMenuReference(['taxes'])
+
+  useEffect(() => {
+    if (encryptedOutletId) void reload('taxes', { force: true })
+  }, [encryptedOutletId, reload])
+
+  useEffect(() => {
+    setTaxes(refTaxes)
+  }, [refTaxes])
 
   const allSelected =
     taxes.length > 0 && taxes.every((row) => selected.has(row.id))
@@ -33,7 +46,9 @@ export default function TaxesManagement() {
       return
     }
     setTaxes((prev) =>
-      prev.map((row) => (selected.has(row.id) ? { ...row, status } : row)),
+      prev.map((row) =>
+        selected.has(row.id) ? { ...row, is_active: status === 'Active' } : row,
+      ),
     )
   }
 
@@ -110,7 +125,6 @@ export default function TaxesManagement() {
               <th className="px-3 py-3">Type</th>
               <th className="px-3 py-3">Amount</th>
               <th className="px-3 py-3">Status</th>
-              <th className="px-3 py-3">Created</th>
               <th className="px-3 py-3">Actions</th>
             </tr>
           </thead>
@@ -136,18 +150,21 @@ export default function TaxesManagement() {
                   />
                 </td>
                 <td className="px-3 py-3.5 font-medium text-ink">{row.title}</td>
-                <td className="px-3 py-3.5 text-ink">{row.onlineDisplayName}</td>
-                <td className="px-3 py-3.5 text-ink">{row.taxType}</td>
+                <td className="px-3 py-3.5 text-ink">
+                  {row.online_display_name}
+                </td>
+                <td className="px-3 py-3.5 text-ink">{row.tax_type}</td>
                 <td className="px-3 py-3.5 text-ink">{row.type}</td>
-                <td className="px-3 py-3.5 tabular-nums text-ink">{row.amount}</td>
+                <td className="px-3 py-3.5 tabular-nums text-ink">
+                  {row.amount}
+                </td>
                 <td
                   className={`px-3 py-3.5 font-medium ${
-                    row.status === 'Active' ? 'text-success' : 'text-muted'
+                    row.is_active ? 'text-success' : 'text-muted'
                   }`}
                 >
-                  {row.status}
+                  {row.is_active ? 'Active' : 'Inactive'}
                 </td>
-                <td className="px-3 py-3.5 text-muted">{row.created}</td>
                 <td className="px-3 py-3.5">
                   <div className="flex items-center gap-1">
                     <RowActionButton

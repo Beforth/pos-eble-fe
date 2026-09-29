@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -97,6 +98,18 @@ export default function ExpiryBatchwiseInsightReport() {
     setRawMaterialName('')
   }
 
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `expiry-batchwise-insight-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Raw Material', 'Batch No', 'Expiry Date', 'Stock Qty', 'Unit'],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="other-reports">
 
@@ -105,8 +118,8 @@ export default function ExpiryBatchwiseInsightReport() {
           Expiry & Batchwise Insight
         </h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => exportRows([], 'page')}
+          onExportAll={() => exportRows([], 'all')}
         />
       </div>
 

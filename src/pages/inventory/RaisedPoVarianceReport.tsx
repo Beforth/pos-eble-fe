@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -72,6 +73,27 @@ export default function RaisedPoVarianceReport() {
     setTo('All')
   }
 
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `raised-po-variance-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        'PO Number',
+        'Date',
+        'Supplier',
+        'Raw Material',
+        'Ordered Qty',
+        'Received Qty',
+        'Variance Qty',
+        'Variance Amount (₹)',
+      ],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="other-reports">
 
@@ -79,7 +101,7 @@ export default function RaisedPoVarianceReport() {
         <h1 className="text-lg font-bold text-ink">
           Purchase Order Variance Report
         </h1>
-        <ExportMenu onExportAll={() => showToast('Exported all')} />
+        <ExportMenu onExportAll={() => exportRows([], 'all')} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">

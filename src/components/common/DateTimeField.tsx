@@ -82,6 +82,9 @@ interface DateTimeFieldProps {
   className?: string
   /** Default time when picking a new day (e.g. start-of-day vs end-of-day). */
   defaultTime?: { hours: number; minutes: number; seconds: number }
+  /** Tailwind z-index class for the popup (raise it when the field renders
+   * inside an overlay that would otherwise cover the calendar). */
+  zClassName?: string
 }
 
 export function DateTimeField({
@@ -90,6 +93,7 @@ export function DateTimeField({
   onChange,
   className = '',
   defaultTime,
+  zClassName = 'z-[60]',
 }: DateTimeFieldProps) {
   const [open, setOpen] = useState(false)
   const [viewMonth, setViewMonth] = useState(
@@ -221,7 +225,7 @@ export function DateTimeField({
             role="dialog"
             aria-label={label}
             style={menuStyle}
-            className="fixed z-[60] w-[280px] overflow-hidden rounded-xl border border-line bg-card p-3 shadow-xl"
+            className={`fixed ${zClassName} w-[280px] overflow-hidden rounded-xl border border-line bg-card p-3 shadow-xl`}
           >
             <div className="mb-3 flex items-center justify-between px-1">
               <button

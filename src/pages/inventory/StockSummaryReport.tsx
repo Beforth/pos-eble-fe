@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -103,6 +104,49 @@ function buildRows(): StockSummaryRow[] {
 }
 
 const ALL_ROWS = buildRows()
+
+const STOCK_SUMMARY_HEADERS = [
+  'Raw Material',
+  'Opening (A)',
+  'Purchase (B)',
+  'Excess (C)',
+  'Total (i)',
+  'Consumed (D)',
+  'Wastage (E)',
+  'Normal Loss (F)',
+  'Transfer (G)',
+  'Shortage (H)',
+  'Production (I)',
+  'Total (i)',
+  'Closing Stock',
+  'Closing Summary',
+  'Difference',
+]
+
+function exportRows(rows: StockSummaryRow[], suffix: 'page' | 'all') {
+  downloadCsv(
+    `stock-summary-report-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+    STOCK_SUMMARY_HEADERS,
+    rows.map((row) => [
+      row.rawMaterial,
+      row.opening,
+      row.purchase,
+      row.excess,
+      row.totalIn,
+      row.consumed,
+      row.wastage,
+      row.normalLoss,
+      row.transfer,
+      row.shortage,
+      row.production,
+      row.totalOut,
+      row.closingStock,
+      row.closingSummary,
+      row.difference,
+    ]),
+  )
+  showToast(`Exported ${rows.length} rows`)
+}
 
 function ExportMenu({
   onExportPage,
@@ -386,8 +430,8 @@ export default function StockSummaryReport() {
             </p>
           </div>
           <ExportMenu
-            onExportPage={() => showToast('Exported current page')}
-            onExportAll={() => showToast('Exported all')}
+            onExportPage={() => exportRows(pageRows, 'page')}
+            onExportAll={() => exportRows(filteredRows, 'all')}
             onExportPagePdf={() => showToast('Exported current page to PDF')}
             onExportAllPdf={() => showToast('Exported all to PDF')}
           />

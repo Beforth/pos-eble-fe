@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { Link, Navigate, useParams } from 'react-router-dom'
@@ -12,17 +12,21 @@ import { Table, type Column } from '../../components/common/Table'
 import { formatINR } from '../../utils/format'
 import {
   PAYMENT_MODE_OPTIONS,
-  applyDuePayment,
   billPending,
   billStatus,
   clientDue,
-  getDueClient,
   type DueClient,
   type DuePaymentMode,
   type DueBill,
   type DuePayment,
   type DueSale,
 } from '../../mocks/duePaymentsData'
+import {
+  collectDuePaymentApi,
+  customerHistoryApi,
+  toDueClient,
+} from '../../services/customerService'
+import { useAuth } from '../../auth/AuthContext'
 import { DuePaymentsShell } from './DuePaymentsShell'
 
 type DetailTab = 'outstanding' | 'sales' | 'payments'
@@ -33,15 +37,57 @@ const TABS: { id: DetailTab; label: string }[] = [
   { id: 'payments', label: 'Payment History' },
 ]
 
+function dueClientFromHistory(history: {
+  customer: { id: string; name: string; phone: string }
+  bills: import('../../services/customerService').DueBillDto[]
+  payments: import('../../services/customerService').DuePaymentDto[]
+  total_billed: string
+  total_collected: string
+  outstanding: string
+}): DueClient {
+  return toDueClient({
+    id: history.customer.id,
+    name: history.customer.name,
+    phone: history.customer.phone,
+    bills: history.bills,
+    payments: history.payments,
+    total_billed: history.total_billed,
+    total_collected: history.total_collected,
+    outstanding: history.outstanding,
+  })
+}
+
 export default function DuePaymentClient() {
   const { clientId } = useParams()
-  const [client, setClient] = useState<DueClient | null>(() =>
-    clientId ? getDueClient(clientId) : null,
-  )
+  const { encryptedOutletId } = useAuth()
+  const [client, setClient] = useState<DueClient | null>(null)
+  const [loaded, setLoaded] = useState(false)
   const [amount, setAmount] = useState('0.00')
   const [mode, setMode] = useState<DuePaymentMode>('Cash')
   const [tab, setTab] = useState<DetailTab>('outstanding')
   const [settleOpen, setSettleOpen] = useState(false)
+
+  const loadClient = useCallback(async () => {
+    if (!encryptedOutletId) {
+      showToast('No outlet selected — open from the sidebar')
+      setLoaded(true)
+      return
+    }
+    try {
+      const history = await customerHistoryApi(encryptedOutletId, clientId as string)
+      setClient(dueClientFromHistory(history))
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to load customer',
+      )
+    } finally {
+      setLoaded(true)
+    }
+  }, [encryptedOutletId, clientId])
+
+  useEffect(() => {
+    loadClient()
+  }, [loadClient])
 
   const due = client ? clientDue(client) : 0
 
@@ -50,13 +96,21 @@ export default function DuePaymentClient() {
     [client],
   )
 
-  if (!clientId || !client) {
+  if (!clientId || (!client && loaded)) {
     return <Navigate to="/due-payments" replace />
   }
+  if (!client) {
+    return (
+      <DuePaymentsShell>
+        <main className="px-4 py-4 sm:px-5">
+          <p className="py-8 text-center text-sm text-muted">Loading…</p>
+        </main>
+      </DuePaymentsShell>
+    )
+  }
 
-
-  function receive(value: number) {
-    if (!client) return
+  async function receive(value: number) {
+    if (!client || !encryptedOutletId) return
     if (value <= 0) {
       showToast('Enter an amount greater than 0')
       return
@@ -65,14 +119,19 @@ export default function DuePaymentClient() {
       showToast('Amount cannot exceed current balance')
       return
     }
-    const next = applyDuePayment(client.id, value, mode)
-    if (!next) {
-      showToast('Could not apply payment')
-      return
+    try {
+      await collectDuePaymentApi(encryptedOutletId, client.id, {
+        amount: value,
+        method: mode,
+      })
+      await loadClient()
+      setAmount('0.00')
+      showToast(`Received ${formatINR(value, 2)} via ${mode}`)
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Could not apply payment',
+      )
     }
-    setClient(next)
-    setAmount('0.00')
-    showToast(`Received ${formatINR(value, 2)} via ${mode}`)
   }
 
   const outstandingColumns: Column<DueBill>[] = [

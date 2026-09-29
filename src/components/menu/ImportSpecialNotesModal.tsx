@@ -1,27 +1,33 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { showToast } from '../../utils/toast'
+import { useAuth } from '../../auth/AuthContext'
+import { importSpecialNotesApi } from '../../services/menuService'
 
 interface ImportSpecialNotesModalProps {
   open: boolean
   onClose: () => void
-  onUpload?: (file: File) => void
+  onSuccess?: () => void
 }
 
 export function ImportSpecialNotesModal({
   open,
   onClose,
-  onUpload,
+  onSuccess,
 }: ImportSpecialNotesModalProps) {
+  const { encryptedOutletId } = useAuth()
   const titleId = useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState('')
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setFile(null)
     setError('')
+    setImporting(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -43,13 +49,52 @@ export function ImportSpecialNotesModal({
     URL.revokeObjectURL(url)
   }
 
-  function handleUpload() {
+  async function handleUpload() {
     if (!file) {
       setError('Please choose a file to upload')
       return
     }
-    onUpload?.(file)
-    onClose()
+    if (!encryptedOutletId) {
+      showToast('No outlet selected')
+      return
+    }
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+      const rows = lines.slice(1)
+      const notes: { title: string; note_text?: string; is_active?: boolean }[] =
+        []
+      for (const row of rows) {
+        const parts = row.split(',')
+        const rawName = parts[0]
+        const rawAvailable = parts[1]
+        const title = rawName?.replace(/^"|"$/g, '').trim()
+        if (!title || title.toLowerCase() === 'name') continue
+        const is_active = !/^(no|false|0|inactive)$/i.test(
+          (rawAvailable ?? 'yes').trim(),
+        )
+        notes.push({ title, note_text: '', is_active })
+      }
+      if (notes.length === 0) {
+        showToast('No valid rows found in file')
+        setImporting(false)
+        return
+      }
+      const result = await importSpecialNotesApi(encryptedOutletId, notes)
+      showToast(`${result.imported} special notes imported successfully`)
+      onSuccess?.()
+      onClose()
+    } catch (err: unknown) {
+      showToast(
+        err instanceof Error ? err.message : 'Failed to import notes',
+      )
+    } finally {
+      setImporting(false)
+    }
   }
 
   return createPortal(
@@ -112,16 +157,18 @@ export function ImportSpecialNotesModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
+            disabled={importing}
+            className="inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleUpload}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            disabled={importing}
+            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
           >
-            Upload
+            {importing ? 'Importing...' : 'Upload'}
           </button>
         </div>
       </div>

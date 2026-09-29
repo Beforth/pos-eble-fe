@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { Pencil, Plus, RefreshCcw, Search, Trash2, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import {
   OutlineButton,
   PrimaryButton,
@@ -16,6 +17,8 @@ export default function RoleManagement() {
   const navigate = useNavigate()
   const { roles, status, error, loadRoles, removeRole } = useRoles()
   const loading = status === 'loading'
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
 
   useEffect(() => {
@@ -24,6 +27,7 @@ export default function RoleManagement() {
 
   async function handleDelete(role: Role) {
     try {
+      setDeleting(true)
       await deleteRoleApi(role.id)
       removeRole(role.id)
       showToast(`Deleted ${role.name}`)
@@ -31,7 +35,16 @@ export default function RoleManagement() {
       showToast(
         err instanceof ApiError ? err.message : 'Unable to delete role.',
       )
+    } finally {
+      setDeleting(false)
     }
+  }
+
+  async function confirmDeleteRole() {
+    if (!deleteTarget) return
+    const role = deleteTarget
+    setDeleteTarget(null)
+    await handleDelete(role)
   }
 
   return (
@@ -123,7 +136,7 @@ export default function RoleManagement() {
                         <button
                           type="button"
                           aria-label={`Delete ${role.name}`}
-                          onClick={() => void handleDelete(role)}
+                          onClick={() => setDeleteTarget(role)}
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-danger/10 hover:text-danger"
                         >
                           <Trash2 size={15} />
@@ -137,6 +150,22 @@ export default function RoleManagement() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete role"
+        target={deleteTarget?.name}
+        message={`${deleteTarget?.name ?? 'This role'} will stop appearing when you assign users to outlets.`}
+        consequences={[
+          'Anyone still assigned to this role loses its permissions.',
+          'Its saved permission settings are archived along with it.',
+          'Past orders and bills keep whatever access they were created under.',
+        ]}
+        note="The role is archived, not erased, so it can be brought back if it is needed again."
+        confirmLabel="Delete role"
+        loading={deleting}
+        onConfirm={() => void confirmDeleteRole()}
+        onClose={() => setDeleteTarget(null)}
+      />
     </ReportsPageShell>
   )
 }

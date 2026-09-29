@@ -145,9 +145,6 @@ export default function AddBiller() {
         )
         setEditInitial({
           group: user.memberships?.[0]?.groups?.[0] ?? '',
-          selectedGroup: user.memberships?.[0]?.groups?.[0] ?? '',
-          selectedCodenames: user.permissions ?? [],
-          tables: [],
         })
       })
       .catch((err: unknown) => {
@@ -199,7 +196,6 @@ export default function AddBiller() {
         ? {
             group:
               panelValue.group === 'No Group Selected' ? '' : panelValue.group,
-            permissions: panelValue.selectedCodenames,
           }
         : {}),
     }

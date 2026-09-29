@@ -1,41 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { Calendar, Filter, RotateCcw, Search } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, Filter, RotateCcw, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
-
-interface MenuTriggerLogEntry {
-  id: string
-  dateTime: string
-  thirdPartyUser: string
-  triggerEvent: string
-  status: 'Success' | 'Failed' | 'Pending'
-  responseCode: number
-}
-
-const SAMPLE_TRIGGER_LOGS: MenuTriggerLogEntry[] = [
-  {
-    id: 'mt-1',
-    dateTime: '13 Aug 2026 10:45:10',
-    thirdPartyUser: 'Zomato Integration API',
-    triggerEvent: 'Menu Callback Item Price Update',
-    status: 'Success',
-    responseCode: 200,
-  },
-  {
-    id: 'mt-2',
-    dateTime: '13 Aug 2026 09:12:00',
-    thirdPartyUser: 'Swiggy UrbanPiper Webhook',
-    triggerEvent: 'Item Stock Out Trigger (Vada Pav)',
-    status: 'Success',
-    responseCode: 200,
-  },
-]
+import { useAuth } from '../../auth/AuthContext'
+import { listTriggerLogsApi } from '../../services/menuService'
+import type { MenuTriggerLog } from '../../types/menu'
 
 const THIRDPARTY_USER_OPTIONS = [
   'Select Thirdparty User',
@@ -46,38 +21,68 @@ const THIRDPARTY_USER_OPTIONS = [
   'POS-Eble POS Callback Engine',
 ]
 
+const PAGE_SIZE = 20
+
+function formatDateTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString()
+  } catch {
+    return iso
+  }
+}
+
+function sourceName(log: MenuTriggerLog): string {
+  if (log.template_name) return log.template_name
+  if (log.schedule_name) return log.schedule_name
+  return '—'
+}
+
 export default function MenuTriggerLogs() {
-  const [fromDate, setFromDate] = useState('13 Aug 2026 00:00:00')
-  const [toDate, setToDate] = useState('13 Aug 2026 23:59:59')
+  const { encryptedOutletId } = useAuth()
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [selectedUser, setSelectedUser] = useState('Select Thirdparty User')
   const [showMoreFilters, setShowMoreFilters] = useState(false)
-  const [isSearched, setIsSearched] = useState(true)
-  const [logs, setLogs] = useState<MenuTriggerLogEntry[]>([])
+  const [loading, setLoading] = useState(false)
+  const [logs, setLogs] = useState<MenuTriggerLog[]>([])
+  const [page, setPage] = useState(1)
+  const [count, setCount] = useState(0)
+  const [next, setNext] = useState<string | null>(null)
+  const [previous, setPrevious] = useState<string | null>(null)
 
-
-  function handleSearch() {
-    setIsSearched(true)
-    if (selectedUser === 'Select Thirdparty User') {
-      setLogs([])
-    } else {
-      setLogs(
-        SAMPLE_TRIGGER_LOGS.filter(
-          (l) =>
-            selectedUser === 'All Thirdparty Users' ||
-            l.thirdPartyUser.toLowerCase().includes(selectedUser.toLowerCase()),
-        ),
-      )
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    setLoading(true)
+    listTriggerLogsApi(encryptedOutletId, { page, page_size: PAGE_SIZE })
+      .then((res) => {
+        if (cancelled) return
+        setLogs(res.results)
+        setCount(res.count)
+        setNext(res.next)
+        setPrevious(res.previous)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load trigger logs',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-    showToast('Search applied')
-  }
+  }, [encryptedOutletId, page])
 
   function handleReset() {
-    setFromDate('13 Aug 2026 00:00:00')
-    setToDate('13 Aug 2026 23:59:59')
+    setFromDate('')
+    setToDate('')
     setSelectedUser('Select Thirdparty User')
     setShowMoreFilters(false)
-    setLogs([])
-    setIsSearched(true)
+    setPage(1)
     showToast('Filters reset')
   }
 
@@ -152,7 +157,7 @@ export default function MenuTriggerLogs() {
                 <Filter size={15} />
                 More Filters
               </OutlineButton>
-              <PrimaryButton onClick={handleSearch}>
+              <PrimaryButton onClick={() => setPage(1)}>
                 <Search size={15} />
                 Search
               </PrimaryButton>
@@ -188,7 +193,11 @@ export default function MenuTriggerLogs() {
 
         {/* Content Card / Empty State / Table */}
         <div className="min-h-[380px] overflow-hidden rounded-xl border border-line bg-card p-6">
-          {isSearched && logs.length === 0 ? (
+          {loading ? (
+            <div className="flex min-h-[320px] items-center justify-center">
+              <span className="text-sm text-muted">Loading...</span>
+            </div>
+          ) : logs.length === 0 ? (
             <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
               <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-page text-muted/60">
                 <Search size={28} strokeWidth={1.5} />
@@ -199,43 +208,88 @@ export default function MenuTriggerLogs() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-ink">
-                <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
-                  <tr>
-                    <th className="px-4 py-3">Date & Time</th>
-                    <th className="px-4 py-3">Thirdparty User</th>
-                    <th className="px-4 py-3">Trigger Event</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Response Code</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {logs.map((l) => (
-                    <tr
-                      key={l.id}
-                      className="transition-colors hover:bg-page/50"
-                    >
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-ink">
-                        {l.dateTime}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-ink">
-                        {l.thirdPartyUser}
-                      </td>
-                      <td className="px-4 py-3 text-muted">{l.triggerEvent}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">
-                          {l.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs font-bold text-ink">
-                        {l.responseCode}
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-ink">
+                  <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
+                    <tr>
+                      <th className="px-4 py-3">Date & Time</th>
+                      <th className="px-4 py-3">Source</th>
+                      <th className="px-4 py-3">Action</th>
+                      <th className="px-4 py-3">Details</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {logs.map((l) => (
+                      <tr
+                        key={l.id}
+                        className="transition-colors hover:bg-page/50"
+                      >
+                        <td className="whitespace-nowrap px-4 py-3 font-medium text-ink">
+                          {formatDateTime(l.created_at)}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-ink">
+                          {sourceName(l)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">
+                            {l.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted" title={JSON.stringify(l.details)}>
+                          {(() => {
+                            const raw = JSON.stringify(l.details)
+                            return raw.length > 60 ? raw.slice(0, 57) + '...' : raw
+                          })()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-xs text-muted">
+                  {count} total record{count === 1 ? '' : 's'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <OutlineButton
+                    variant="gray"
+                    className={
+                      page <= 1 || previous === null
+                        ? 'cursor-default opacity-40'
+                        : ''
+                    }
+                    onClick={
+                      page <= 1 || previous === null
+                        ? undefined
+                        : () => setPage((p) => Math.max(1, p - 1))
+                    }
+                  >
+                    <ChevronLeft size={14} />
+                    Previous
+                  </OutlineButton>
+                  <span className="text-xs font-medium text-muted">
+                    Page {page}
+                  </span>
+                  <OutlineButton
+                    variant="gray"
+                    className={
+                      next === null ? 'cursor-default opacity-40' : ''
+                    }
+                    onClick={
+                      next === null
+                        ? undefined
+                        : () => setPage((p) => p + 1)
+                    }
+                  >
+                    Next
+                    <ChevronRight size={14} />
+                  </OutlineButton>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

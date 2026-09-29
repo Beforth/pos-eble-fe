@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
@@ -7,12 +7,10 @@ import {
   Eye,
   HandCoins,
   Search,
-  Trash2,
   TrendingUp,
   Users,
   CheckCircle,
 } from 'lucide-react'
-import { AlertDialog } from '../../components/billing/AlertDialog'
 import { Card } from '../../components/common/Card'
 import { Table, type Column } from '../../components/common/Table'
 import { FilterSelect } from '../../components/all-orders/FilterSelect'
@@ -22,13 +20,12 @@ import {
   MONTH_OPTIONS,
   YEAR_OPTIONS,
   clientDue,
-  getDueClients,
   monthlyPaid,
   monthlyTaken,
-  removeDueClient,
-  setDueClients,
   type DueClient,
 } from '../../mocks/duePaymentsData'
+import { listDueClientsApi, toDueClient } from '../../services/customerService'
+import { useAuth } from '../../auth/AuthContext'
 import { DuePaymentsShell } from './DuePaymentsShell'
 
 const SORT_OPTIONS = [
@@ -59,22 +56,35 @@ function downloadStatement(client: DueClient, month: number, year: number) {
 
 export default function DuePayments() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const now = new Date()
-  const [clients, setClients] = useState<DueClient[]>(() => getDueClients())
+  const [clients, setClients] = useState<DueClient[]>([])
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('name-asc')
   const [month, setMonth] = useState(String(now.getMonth()))
   const [year, setYear] = useState(String(now.getFullYear()))
-  const [removeId, setRemoveId] = useState<string | null>(null)
 
   const monthIndex = Number(month)
   const yearNumber = Number(year)
 
+  const loadClients = useCallback(async () => {
+    if (!encryptedOutletId) {
+      showToast('No outlet selected — open from the sidebar')
+      return
+    }
+    try {
+      const dueClients = await listDueClientsApi(encryptedOutletId)
+      setClients(dueClients.map(toDueClient))
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to load due payments',
+      )
+    }
+  }, [encryptedOutletId])
 
-  function persist(next: DueClient[]) {
-    setDueClients(next)
-    setClients(next)
-  }
+  useEffect(() => {
+    loadClients()
+  }, [loadClients])
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -103,7 +113,6 @@ export default function DuePayments() {
     (sum, client) => sum + monthlyPaid(client, monthIndex, yearNumber),
     0,
   )
-  const removeTarget = clients.find((client) => client.id === removeId) ?? null
 
   const columns: Column<DueClient>[] = [
     {
@@ -117,11 +126,6 @@ export default function DuePayments() {
       key: 'phone',
       header: 'Phone',
       render: (row) => <span className="text-ink">{row.phone}</span>,
-    },
-    {
-      key: 'outlet',
-      header: 'Outlet',
-      render: (row) => <span className="text-ink">{row.outlet}</span>,
     },
     {
       key: 'taken',
@@ -170,15 +174,6 @@ export default function DuePayments() {
           </button>
           <button
             type="button"
-            title="Remove client"
-            aria-label={`Remove ${row.name}`}
-            onClick={() => setRemoveId(row.id)}
-            className="flex size-8 items-center justify-center rounded-md border border-line bg-card text-danger transition-colors hover:border-danger/40 hover:bg-page"
-          >
-            <Trash2 size={15} />
-          </button>
-          <button
-            type="button"
             title="Download statement"
             aria-label={`Download statement for ${row.name}`}
             onClick={() => {
@@ -197,27 +192,9 @@ export default function DuePayments() {
   return (
     <DuePaymentsShell>
 
-      <AlertDialog
-        open={Boolean(removeTarget)}
-        title="Remove client"
-        message={
-          removeTarget
-            ? `Remove ${removeTarget.name} from due payment settlement? Outstanding balance will no longer appear in this list.`
-            : ''
-        }
-        onClose={() => setRemoveId(null)}
-        onOk={() => {
-          if (!removeTarget) return
-          removeDueClient(removeTarget.id)
-          persist(getDueClients())
-          setRemoveId(null)
-          showToast(`${removeTarget.name} removed`)
-        }}
-      />
-
       <PageContainer
         title="Due Payment Settlement"
-        onRefresh={() => setClients(getDueClients())}
+        onRefresh={loadClients}
         refreshHoverRotate={false}
       >
         <p className="-mt-1 mb-4 text-sm text-muted">

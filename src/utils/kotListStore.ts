@@ -10,6 +10,53 @@ import { loadAllKotTickets } from './tableStatusStore'
 
 export type { KotRow } from '../mocks/kotData'
 
+/** Map a KOT list row's order type → Billing `orderType` query value. */
+export function kotRowToBillingOrderType(
+  orderType: KotOrderType,
+): 'dine-in' | 'delivery' | 'pick-up' | 'other' {
+  switch (orderType) {
+    case 'DELIVERY':
+      return 'delivery'
+    case 'PICK UP':
+    case 'PARCEL':
+      return 'pick-up'
+    case 'OTHER':
+      return 'other'
+    case 'DINE IN':
+    default:
+      return 'dine-in'
+  }
+}
+
+/** Deep-link into Billing Order View with this KOT pinned. */
+export function billingUrlForKot(row: KotRow): string {
+  const params = new URLSearchParams()
+  params.set('openKot', row.id)
+  if (row.tableId) params.set('tableId', row.tableId)
+  if (row.tableNo) params.set('tableNo', row.tableNo)
+  if (row.guests && row.guests > 0) {
+    params.set('persons', String(row.guests))
+  }
+  params.set('orderType', kotRowToBillingOrderType(row.orderType))
+  return `/billing?${params.toString()}`
+}
+
+/** `"Dabeli × 2, Vada Pav"` -> `[{name, qty}]` (KOT edit save payload). */
+export function parseKotItems(itemsText: string): { name: string; qty: number }[] {
+  return itemsText
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const qtyMatch = part.match(/[×x]\s*(\d+(?:\.\d+)?)/)
+      const qty = qtyMatch ? Number(qtyMatch[1]) : 1
+      return {
+        name: part.replace(/\s*[×x]\s*\d+/i, '').trim(),
+        qty: Number.isFinite(qty) && qty > 0 ? qty : 1,
+      }
+    })
+}
+
 const MONTHS_SHORT = [
   'Jan',
   'Feb',
@@ -55,6 +102,12 @@ function ticketToKotRow(ticket: KotTicket): KotRow {
     kotId: ticket.kotNo,
     orderType: orderTypeToKot(ticket.orderType),
     source: ticket.source ?? 'billing',
+    tableId:
+      ticket.tableId && ticket.tableId !== 'no-table'
+        ? ticket.tableId
+        : undefined,
+    tableNo: ticket.tableNo || undefined,
+    guests: ticket.persons || undefined,
     customerName: '',
     customerPhone: '',
     itemCount: ticket.items.reduce((sum, item) => sum + item.qty, 0),

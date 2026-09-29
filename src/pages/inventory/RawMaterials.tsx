@@ -673,8 +673,12 @@ export default function RawMaterials() {
       />
       <ConfirmDeleteModal
         open={pendingDelete}
-        title="Confirm Delete"
-        message={`Are you sure you want to delete ${selectedIds.size} selected raw material${selectedIds.size === 1 ? '' : 's'}? This action cannot be undone.`}
+        title="Delete raw materials"
+        target={`${selectedIds.size} selected`}
+        message={`${selectedIds.size} selected raw material${selectedIds.size === 1 ? '' : 's'} will be removed from the stock ledger.`}
+        consequences={[
+          'They stop appearing when you raise production, purchase or wastage entries.',
+        ]}
         confirmLabel="Delete"
         onConfirm={confirmDeleteSelected}
         onClose={() => setPendingDelete(false)}

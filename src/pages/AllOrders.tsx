@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useChrome } from '../state/ChromeContext'
 
 import { showToast } from '../utils/toast'
 import {
@@ -8,15 +9,21 @@ import {
   FileText,
   Globe,
   PiggyBank,
+  Plus,
   Search,
   Split,
 } from 'lucide-react'
 import { AllOrdersChart } from '../components/all-orders/AllOrdersChart'
+import { AdvanceOrderModal } from '../components/all-orders/AdvanceOrderModal'
 import { AllOrdersTable } from '../components/all-orders/AllOrdersTable'
 import { ExportExcelMenu } from '../components/all-orders/ExportExcelMenu'
 import { FilterSelect } from '../components/all-orders/FilterSelect'
 import { OrderDetailsDrawer } from '../components/all-orders/OrderDetailsDrawer'
 import { ChangePaymentModal } from '../components/all-orders/ChangePaymentModal'
+import {
+  SettleDueModal,
+  type SettleDueSavePayload,
+} from '../components/all-orders/SettleDueModal'
 import { EditOrderModal } from '../components/all-orders/EditOrderModal'
 import { KotDetailsModal } from '../components/all-orders/KotDetailsModal'
 import { CheckboxMultiSelect } from '../components/all-orders/OrderTypeMultiSelect'
@@ -28,15 +35,28 @@ import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
 import { ActionDropdown } from '../components/menu/MenuActionButtons'
 import {
-  advanceOrdersChartSeries,
-  allOrdersChartSeries,
-  allOrdersGrandTotal,
-  allOrdersList,
-  cumulativeItems,
   type AllOrderRow,
+  type OrdersChartPoint,
 } from '../mocks/allOrdersData'
+import {
+  cancelOrderApi,
+  changePaymentApi,
+  collectDueApi,
+  dailySummaryApi,
+  listAdvanceOrdersApi,
+  listOrdersApi,
+  reprintOrderApi,
+  toAllOrderRow,
+  type AdvanceOrderDto,
+  type DailySummaryPoint,
+  type OrderDto,
+  type OrderEventData,
+} from '../services/orderService'
+import { subscribeToRail } from '../services/liveRailClient'
+import { useAuth } from '../auth/AuthContext'
 import { brand } from '../theme/brand'
 import { formatDayMonth, formatINR, formatNumber } from '../utils/format'
+import { downloadCsv } from '../utils/exportCsv'
 
 type OrdersTab = 'order' | 'advance'
 
@@ -122,8 +142,30 @@ function filterInputClass() {
   return 'mt-1 h-9 w-full rounded-lg border border-line bg-card px-2.5 text-sm text-ink outline-none focus:border-primary'
 }
 
+function toLocalIsoDate(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function toChartPoints(points: DailySummaryPoint[]): OrdersChartPoint[] {
+  return points.map((point) => ({
+    label: formatDayMonth(new Date(`${point.date}T00:00:00`)),
+    value: Number(point.total ?? 0),
+  }))
+}
+
+function emptyChart(days: number): OrdersChartPoint[] {
+  return Array.from({ length: days }, (_, index) => ({
+    label: formatDayMonth(
+      new Date(new Date().getTime() - (days - 1 - index) * 86_400_000),
+    ),
+    value: 0,
+  }))
+}
+
 export default function AllOrders() {
-  const [collapsed, setCollapsed] = useState(false)
+  const { encryptedOutletId, token } = useAuth()
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -151,11 +193,115 @@ export default function AllOrders() {
   const [kotOrder, setKotOrder] = useState<AllOrderRow | null>(null)
   const [editOrder, setEditOrder] = useState<AllOrderRow | null>(null)
   const [paymentOrder, setPaymentOrder] = useState<AllOrderRow | null>(null)
-  const [orders, setOrders] = useState(allOrdersList)
+  const [dueOrder, setDueOrder] = useState<AllOrderRow | null>(null)
+  const [orders, setOrders] = useState<AllOrderRow[]>([])
+  const [chartOrders, setChartOrders] = useState<OrdersChartPoint[]>([])
+  const [chartAdvance, setChartAdvance] = useState<OrdersChartPoint[]>([])
+  const [advanceOrders, setAdvanceOrders] = useState<AdvanceOrderDto[]>([])
+  const [advanceLoading, setAdvanceLoading] = useState(false)
+  const [advanceModalOpen, setAdvanceModalOpen] = useState(false)
 
   const [startDate, setStartDate] = useState(() => atStartOfDay(new Date()))
   const [endDate, setEndDate] = useState(() => atEndOfDay(new Date()))
   const [advanceDate, setAdvanceDate] = useState(() => atStartOfDay(new Date()))
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    const fetchAllPages = async (): Promise<OrderDto[]> => {
+      const first = await listOrdersApi(encryptedOutletId, {
+        page: 1,
+        page_size: 100,
+      })
+      const all: OrderDto[] = [...first.results]
+      const totalPages = Math.max(1, Math.ceil(first.count / 100))
+      for (let page = 2; page <= totalPages; page += 1) {
+        if (cancelled) return all
+        const next = await listOrdersApi(encryptedOutletId, {
+          page,
+          page_size: 100,
+        })
+        all.push(...next.results)
+      }
+      return all
+    }
+    fetchAllPages()
+      .then((dtos) => {
+        if (cancelled) return
+        setOrders(dtos.map(toAllOrderRow))
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load orders',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    Promise.all([
+      dailySummaryApi(encryptedOutletId, { days: 15, resource: 'orders' }),
+      dailySummaryApi(encryptedOutletId, { days: 15, resource: 'advance' }),
+    ])
+      .then(([ordersResult, advanceResult]) => {
+        if (cancelled) return
+        setChartOrders(toChartPoints(ordersResult.results))
+        setChartAdvance(toChartPoints(advanceResult.results))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setChartOrders(emptyChart(15))
+        setChartAdvance(emptyChart(15))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event, data) => {
+        if (event === 'order.created') {
+          setOrders((prev) => [toAllOrderRow(data as OrderEventData), ...prev])
+          return
+        }
+        if (
+          event === 'order.settle' ||
+          event === 'order.printed' ||
+          event === 'order.modified'
+        ) {
+          const row = toAllOrderRow(data as OrderEventData)
+          setOrders((prev) => upsertOrder(prev, row))
+          return
+        }
+        if (event === 'order.cancelled') {
+          const payload = data as OrderEventData
+          setOrders((prev) =>
+            prev.map((row) =>
+              row.id === payload.id
+                ? { ...row, status: 'Cancelled' as const }
+                : row,
+            ),
+          )
+        }
+      },
+    })
+  }, [encryptedOutletId, token])
+
+  function upsertOrder(prev: AllOrderRow[], row: AllOrderRow): AllOrderRow[] {
+    const exists = prev.some((order) => order.id === row.id)
+    if (!exists) return [row, ...prev]
+    return prev.map((order) => (order.id === row.id ? row : order))
+  }
 
   const closeOtherDrawers = () => {
     setSupportOpen(false)
@@ -179,7 +325,9 @@ export default function AllOrders() {
           .includes(customerName.trim().toLowerCase())
       const paymentOk =
         paymentType === 'all' ||
-        row.payment.toLowerCase().includes(paymentType.toLowerCase())
+        (paymentType === 'not-paid'
+          ? !row.payment.trim()
+          : row.payment.toLowerCase().includes(paymentType.toLowerCase()))
       const statusOk =
         orderStatus === 'all' ||
         row.status.toLowerCase() === orderStatus.toLowerCase()
@@ -230,6 +378,25 @@ export default function AllOrders() {
     showToast('Filters cleared')
   }
 
+  const grandTotal = orders.reduce((sum, row) => sum + row.grandTotal, 0)
+
+  const advanceCumulative = useMemo<Array<{ name: string; quantity: number }>>(
+    () => {
+      const map = new Map<string, number>()
+      for (const adv of advanceOrders) {
+        for (const item of adv.items ?? []) {
+          const qty = Number(item.qty)
+          if (!item.name) continue
+          map.set(item.name, (map.get(item.name) ?? 0) + (Number.isFinite(qty) && qty > 0 ? qty : 0))
+        }
+      }
+      return [...map.entries()]
+        .map(([name, quantity]) => ({ name, quantity }))
+        .sort((a, b) => b.quantity - a.quantity)
+    },
+    [advanceOrders],
+  )
+
   const totalRecords = filteredOrders.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
   const pageRows = filteredOrders.slice(
@@ -273,15 +440,168 @@ export default function AllOrders() {
     fn(rows)
   }
 
-  function updateSelectedStatus(status: AllOrderRow['status'], message: string) {
-    withSelection((rows) => {
+  async function cancelSelected() {
+    withSelection(async (rows) => {
+      if (!encryptedOutletId) return
+      const results = await Promise.allSettled(
+        rows.map((row) => cancelOrderApi(encryptedOutletId, row.id)),
+      )
+      const done = results.filter((r) => r.status === 'fulfilled').length
       const ids = new Set(rows.map((row) => row.id))
       setOrders((prev) =>
-        prev.map((row) => (ids.has(row.id) ? { ...row, status } : row)),
+        prev.map((row) =>
+          ids.has(row.id) ? { ...row, status: 'Cancelled' as const } : row,
+        ),
       )
       setSelected(new Set())
-      showToast(message)
+      if (results.some((r) => r.status === 'rejected')) {
+        showToast(`Cancelled ${done} of ${rows.length} — some failed`)
+      } else {
+        showToast(`Cancelled ${done} order${done === 1 ? '' : 's'}`)
+      }
     })
+  }
+
+  async function reprintSelected() {
+    withSelection(async (rows) => {
+      if (!encryptedOutletId) return
+      showToast(
+        `Printing bill for ${rows.length} order${rows.length === 1 ? '' : 's'}`,
+      )
+      const results = await Promise.allSettled(
+        rows.map((row) => reprintOrderApi(encryptedOutletId, row.id)),
+      )
+      const fulfilled = results.filter(
+        (r): r is PromiseFulfilledResult<OrderDto> => r.status === 'fulfilled',
+      )
+      const byId = new Map(fulfilled.map((r) => [r.value.id, r.value]))
+      setOrders((prev) =>
+        prev.map((row) => {
+          const dto = byId.get(row.id)
+          return dto ? toAllOrderRow(dto) : row
+        }),
+      )
+      setSelected(new Set())
+      const failed = results.length - fulfilled.length
+      if (failed > 0) {
+        showToast(`${failed} order${failed === 1 ? '' : 's'} failed to reprint`)
+      }
+    })
+  }
+
+  async function saveChangePayment(
+    orderId: string,
+    payment: string,
+    reason: string,
+  ) {
+    if (!encryptedOutletId) return
+    try {
+      const updated = await changePaymentApi(encryptedOutletId, orderId, {
+        payment_type: payment,
+        reason,
+      })
+      setOrders((prev) =>
+        prev.map((row) => (row.id === orderId ? toAllOrderRow(updated) : row)),
+      )
+      setPaymentOrder(null)
+      showToast('Payment type updated')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to update payment type',
+      )
+    }
+  }
+
+  async function saveDueCollect(
+    orderId: string,
+    payload: SettleDueSavePayload,
+  ) {
+    if (!encryptedOutletId) return
+    try {
+      const updated = await collectDueApi(encryptedOutletId, orderId, payload)
+      setOrders((prev) =>
+        prev.map((row) => (row.id === orderId ? toAllOrderRow(updated) : row)),
+      )
+      setDueOrder(null)
+      showToast('Due amount collected')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to collect due amount',
+      )
+    }
+  }
+
+  function exportOrders(rows: AllOrderRow[], suffix: string) {
+    downloadCsv(
+      `all-orders-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        'Order No.',
+        'Order Type',
+        'Customer Name',
+        'Assign To',
+        'Items',
+        'My Amount',
+        'Tax',
+        'Discount',
+        'Grand Total',
+        'Payment',
+        'Status',
+        'Created',
+      ],
+      rows.map((row) => [
+        row.orderNo,
+        row.orderType,
+        row.customerName,
+        row.assignTo,
+        row.items,
+        row.myAmount,
+        row.tax,
+        row.discount,
+        row.grandTotal,
+        row.payment,
+        row.status,
+        row.created,
+      ]),
+    )
+    showToast(`Exported ${rows.length} order${rows.length === 1 ? '' : 's'}`)
+  }
+
+  async function handleAdvanceSearch() {
+    if (!encryptedOutletId) return
+    setAdvanceLoading(true)
+    try {
+      const rows = await listAdvanceOrdersApi(
+        encryptedOutletId,
+        toLocalIsoDate(advanceDate),
+      )
+      setAdvanceOrders(rows)
+      setAdvanceSearched(true)
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to load advance orders',
+      )
+      setAdvanceSearched(false)
+    } finally {
+      setAdvanceLoading(false)
+    }
+  }
+
+  function handleAdvanceReset() {
+    setAdvanceOrders([])
+    setAdvanceSearched(false)
+    setAdvanceDate(atStartOfDay(new Date()))
+    setItemGroup('addons')
+  }
+
+  function exportAdvance() {
+    downloadCsv(
+      `advance-orders-${toLocalIsoDate(advanceDate)}.csv`,
+      ['Item Name', 'Quantity'],
+      advanceCumulative.map((row) => [row.name, row.quantity]),
+    )
+    showToast(
+      `Exported ${advanceCumulative.length} cumulated item${advanceCumulative.length === 1 ? '' : 's'}`,
+    )
   }
 
   return (
@@ -289,7 +609,7 @@ export default function AllOrders() {
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem="all-orders"
       />
@@ -325,13 +645,13 @@ export default function AllOrders() {
         open={paymentOrder !== null}
         order={paymentOrder}
         onClose={() => setPaymentOrder(null)}
-        onSave={(orderId, payment) => {
-          setOrders((prev) =>
-            prev.map((row) =>
-              row.id === orderId ? { ...row, payment } : row,
-            ),
-          )
-        }}
+        onSave={saveChangePayment}
+      />
+      <SettleDueModal
+        open={dueOrder !== null}
+        order={dueOrder}
+        onClose={() => setDueOrder(null)}
+        onSave={saveDueCollect}
       />
 
       <div
@@ -389,7 +709,7 @@ export default function AllOrders() {
                 Grand Total :{' '}
                 <span className="font-bold text-ink tabular-nums">
                   {tab === 'order'
-                    ? formatINR(allOrdersGrandTotal, 2)
+                    ? formatINR(grandTotal, 2)
                     : formatINR(0, 2)}
                 </span>
               </p>
@@ -429,10 +749,7 @@ export default function AllOrders() {
                       },
                       {
                         label: 'Print Bill',
-                        onClick: () =>
-                          withSelection((rows) =>
-                            showToast(`Printing bill for ${rows.length} order${rows.length === 1 ? '' : 's'}`),
-                          ),
+                        onClick: reprintSelected,
                       },
                       {
                         label: 'Send eBill',
@@ -474,11 +791,7 @@ export default function AllOrders() {
                       {
                         label: 'Cancel Order',
                         danger: true,
-                        onClick: () =>
-                          updateSelectedStatus(
-                            'Cancelled',
-                            `${selected.size} order${selected.size === 1 ? '' : 's'} cancelled`,
-                          ),
+                        onClick: cancelSelected,
                       },
                     ]}
                   />
@@ -509,7 +822,10 @@ export default function AllOrders() {
                 </>
               )}
 
-              <ExportExcelMenu />
+              <ExportExcelMenu
+                onExportPage={() => exportOrders(pageRows, 'page')}
+                onExportAll={() => exportOrders(filteredOrders, 'all')}
+              />
             </div>
           </div>
 
@@ -523,8 +839,8 @@ export default function AllOrders() {
               <AllOrdersChart
                 series={
                   tab === 'order'
-                    ? allOrdersChartSeries
-                    : advanceOrdersChartSeries
+                    ? chartOrders
+                    : chartAdvance
                 }
               />
             </div>
@@ -707,6 +1023,7 @@ export default function AllOrders() {
                     onViewKot={setKotOrder}
                     onEdit={setEditOrder}
                     onChangePayment={setPaymentOrder}
+                    onSettleDue={setDueOrder}
                   />
                 </div>
 
@@ -814,20 +1131,29 @@ export default function AllOrders() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setAdvanceSearched(true)}
+                  onClick={handleAdvanceSearch}
                   className="h-9 rounded-lg border border-primary px-4 text-sm font-semibold text-primary hover:bg-primary/5"
                 >
                   Search
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAdvanceSearched(false)}
+                  onClick={handleAdvanceReset}
                   className="h-9 rounded-lg border border-line px-4 text-sm font-medium text-ink hover:bg-page"
                 >
                   Reset
                 </button>
                 <button
                   type="button"
+                  onClick={() => setAdvanceModalOpen(true)}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
+                >
+                  <Plus size={14} />
+                  New Advance Order
+                </button>
+                <button
+                  type="button"
+                  onClick={exportAdvance}
                   className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page"
                 >
                   <FileDown size={14} className="text-primary" />
@@ -839,32 +1165,48 @@ export default function AllOrders() {
                 <div className="rounded-xl border border-line bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                   <div className="border-b border-line bg-primary/5 px-4 py-2 text-sm text-primary">
                     Cumulative Items : {formatDayMonth(advanceDate)}
+                    {advanceLoading ? (
+                      <span className="ml-2 text-xs font-medium text-muted">
+                        Loading…
+                      </span>
+                    ) : (
+                      <span className="ml-2 text-xs font-medium text-muted">
+                        {advanceOrders.length} advance order
+                        {advanceOrders.length === 1 ? '' : 's'}
+                      </span>
+                    )}
                   </div>
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-line">
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                          Item Name
-                        </th>
-                        <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted">
-                          Quantity
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cumulativeItems.map((item) => (
-                        <tr
-                          key={item.name}
-                          className="border-b border-line last:border-0"
-                        >
-                          <td className="px-4 py-2.5 text-ink">{item.name}</td>
-                          <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-ink">
-                            {item.quantity}
-                          </td>
+                  {advanceCumulative.length === 0 ? (
+                    <p className="px-4 py-10 text-center text-sm text-muted">
+                      No items booked for this date.
+                    </p>
+                  ) : (
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-line">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                            Item Name
+                          </th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted">
+                            Quantity
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {advanceCumulative.map((item) => (
+                          <tr
+                            key={item.name}
+                            className="border-b border-line last:border-0"
+                          >
+                            <td className="px-4 py-2.5 text-ink">{item.name}</td>
+                            <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-ink">
+                              {item.quantity}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               ) : (
                 <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
@@ -872,10 +1214,12 @@ export default function AllOrders() {
                     <Search size={28} />
                   </span>
                   <p className="text-base font-semibold text-ink">
-                    No Results Found
+                    {advanceLoading ? 'Loading advance orders…' : 'No Results Found'}
                   </p>
                   <p className="mt-1 text-sm text-muted">
-                    We couldn&apos;t find a match for your search.
+                    {advanceLoading
+                      ? 'Fetching bookings for this date.'
+                      : 'Pick a date and hit Search to see cumulative items.'}
                   </p>
                 </div>
               )}
@@ -883,6 +1227,13 @@ export default function AllOrders() {
           )}
         </main>
       </div>
+      <AdvanceOrderModal
+        open={advanceModalOpen}
+        outletId={encryptedOutletId}
+        defaultDate={advanceDate}
+        onClose={() => setAdvanceModalOpen(false)}
+        onCreated={handleAdvanceSearch}
+      />
     </div>
   )
 }

@@ -2,17 +2,21 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { showToast } from '../utils/toast'
 import {
   fetchPermissionsApi,
   loginApi,
   type AuthUser,
   type LoginCredentials,
 } from '../services/authService'
+import { getPermissionCatalogApi } from '../services/permissionService'
 import { useRoles } from '../state/RoleContext'
 import { switchOutletApi } from '../services/outletService'
 import {
@@ -24,17 +28,34 @@ import {
   AUTH_USER_KEY,
   clearAuthStorage,
 } from './storage'
+import { isAdminUser } from './isAdmin'
+import {
+  OUTLET_GATE_PERMISSION,
+  resolveUrlName,
+} from './routePermissions'
 
 interface AuthContextValue {
   token: string | null
   refresh: string | null
   user: AuthUser | null
   permissions: string[]
+  /** False until the boot-time permission refresh has resolved (or failed). */
+  permissionsReady: boolean
   outletId: number | null
   encryptedOutletId: string | null
   isAuthenticated: boolean
+  /** Admin role/group only — used for admin-dashboard entry points. */
+  isAdmin: boolean
   hasPermission: (codename: string) => boolean
-  login: (credentials: LoginCredentials) => Promise<void>
+  /** URL name → qualified POS codename required by each gated screen. */
+  screens: Record<string, string>
+  /** Codename a pathname requires, or null when it is not gated. */
+  requiredPermission: (pathname: string) => string | null
+  /** Hybrid gate: outlet permission OR the screen's catalog codename. */
+  canAccess: (pathname: string) => boolean
+  /** First screen the user may open — admins land on /dashboard, billers on /table-view. */
+  homePath: () => string
+  login: (credentials: LoginCredentials) => Promise<string[]>
   logout: () => void
   updateProfile: (patch: Partial<AuthUser>) => void
   switchOutlet: (outletId: number) => Promise<void>
@@ -96,10 +117,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
   const [user, setUser] = useState<AuthUser | null>(readStoredUser)
   const [permissions, setPermissions] = useState<string[]>(readStoredPermissions)
+  const [permissionsReady, setPermissionsReady] = useState(false)
   const [outletId, setOutletId] = useState<number | null>(readStoredOutletId)
   const [encryptedOutletId, setEncryptedOutletId] = useState<string | null>(
     readStoredEncryptedOutletId,
   )
+  const [screens, setScreens] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!token) {
+      setScreens({})
+      return
+    }
+    let cancelled = false
+    getPermissionCatalogApi()
+      .then((catalog) => {
+        if (!cancelled) setScreens(catalog.screens ?? {})
+      })
+      .catch(() => {
+        // Catalog is best-effort: without it the route guard cannot restrict,
+        // but the backend still enforces every permission.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
+
+  // Refresh the permission snapshot from the server on each app start. The
+  // stored snapshot is only rewritten at login, so backend-side changes (e.g.
+  // group permission templates) would otherwise leave route guards denying
+  // screens until the user logs out and back in.
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    fetchPermissionsApi(token)
+      .then(({ permissions: freshPermissions }) => {
+        if (cancelled) return
+        localStorage.setItem(
+          AUTH_PERMISSIONS_KEY,
+          JSON.stringify(freshPermissions),
+        )
+        setPermissions(freshPermissions)
+      })
+      .catch(() => {
+        // Best-effort refresh: the stored snapshot still applies on failure.
+      })
+      .finally(() => {
+        if (!cancelled) setPermissionsReady(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   const login = useCallback(async (credentials: LoginCredentials) => {
     const result = await loginApi(credentials)
@@ -125,8 +194,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRefresh(result.refresh)
     setUser(result.user)
     setPermissions(result.permissions)
+    setPermissionsReady(true)
     setOutletId(result.outletId)
     setEncryptedOutletId(encryptedId)
+    return result.permissions
   }, [])
 
   const logout = useCallback(() => {
@@ -136,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRefresh(null)
     setUser(null)
     setPermissions([])
+    setPermissionsReady(false)
     setOutletId(null)
     setEncryptedOutletId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,6 +226,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (codename: string) => permissions.includes(codename),
     [permissions],
   )
+
+  const requiredPermission = useCallback(
+    (pathname: string): string | null => {
+      const urlName = resolveUrlName(pathname)
+      if (urlName) return screens[urlName] ?? null
+      // Fail closed: a screen is reachable for non-admin users only once it is
+      // mapped in PATH_URL_NAMES. `/profile` is the one always-open exception.
+      if (pathname === '/profile') return null
+      return OUTLET_GATE_PERMISSION
+    },
+    [screens],
+  )
+
+  const canAccess = useCallback(
+    (pathname: string): boolean => {
+      const codename = requiredPermission(pathname)
+      if (!codename) return true
+      return (
+        hasPermission(OUTLET_GATE_PERMISSION) || hasPermission(codename)
+      )
+    },
+    [requiredPermission, hasPermission],
+  )
+
+  const homePath = useCallback((): string => {
+    for (const pathname of ['/dashboard', '/table-view', '/billing', '/profile']) {
+      if (canAccess(pathname)) return pathname
+    }
+    return '/profile'
+  }, [canAccess])
 
   const switchOutlet = useCallback(
     async (targetOutletId: number) => {
@@ -194,16 +296,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [token],
   )
 
+  const isAdmin = isAdminUser(user)
+
   const value = useMemo<AuthContextValue>(
     () => ({
       token,
       refresh,
       user,
       permissions,
+      permissionsReady,
       outletId,
       encryptedOutletId,
       isAuthenticated: Boolean(token),
+      isAdmin,
       hasPermission,
+      screens,
+      requiredPermission,
+      canAccess,
+      homePath,
       login,
       logout,
       updateProfile,
@@ -214,9 +324,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       user,
       permissions,
+      permissionsReady,
       outletId,
       encryptedOutletId,
+      isAdmin,
       hasPermission,
+      screens,
+      requiredPermission,
+      canAccess,
+      homePath,
       login,
       logout,
       updateProfile,
@@ -235,11 +351,35 @@ export function useAuth(): AuthContextValue {
 
 /** Redirects unauthenticated visitors to /login, preserving origin. */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, permissionsReady, canAccess, requiredPermission, homePath } =
+    useAuth()
   const location = useLocation()
+  const notifiedRef = useRef<string | null>(null)
+
+  const codename = isAuthenticated ? requiredPermission(location.pathname) : null
+  const allowed = !codename || canAccess(location.pathname)
+
+  useEffect(() => {
+    if (!isAuthenticated || !codename || allowed) return
+    if (notifiedRef.current === location.pathname) return
+    notifiedRef.current = location.pathname
+    showToast(`Permission denied. Required permission: ${codename}.`)
+  }, [isAuthenticated, codename, allowed, location.pathname])
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />
+  }
+  if (!permissionsReady) {
+    // Wait for the boot-time permission refresh before ruling on access so a
+    // stale snapshot can never deny (or falsely allow) a gated screen.
+    return (
+      <div className="flex h-dvh items-center justify-center bg-page text-muted">
+        <span className="text-sm">Checking permissions…</span>
+      </div>
+    )
+  }
+  if (!allowed) {
+    return <Navigate to={homePath()} replace />
   }
   return children
 }

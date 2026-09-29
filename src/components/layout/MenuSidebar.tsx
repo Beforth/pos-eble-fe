@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   BadgePercent,
@@ -77,11 +77,7 @@ export function MenuSidebar({
   function handleNavigate(id: string) {
     onCloseMobile()
     const path = MENU_ROUTES[id]
-    if (path) {
-      navigate(path)
-      return
-    }
-    if (id !== activeItem) navigate('/menu')
+    if (!path && id !== activeItem) navigate('/menu')
   }
 
   const widthClass = collapsed ? 'lg:w-[76px]' : 'lg:w-[264px]'
@@ -153,8 +149,8 @@ export function MenuSidebar({
               const isBack = item.id === 'back-billing'
               return (
                 <li key={item.id}>
-                  <button
-                    type="button"
+                  <Link
+                    to={MENU_ROUTES[item.id]}
                     title={collapsed ? item.label : undefined}
                     aria-current={active ? 'page' : undefined}
                     onClick={() => handleNavigate(item.id)}
@@ -178,7 +174,7 @@ export function MenuSidebar({
                     {!collapsed && (
                       <span className="truncate text-left">{item.label}</span>
                     )}
-                  </button>
+                  </Link>
                 </li>
               )
             })}

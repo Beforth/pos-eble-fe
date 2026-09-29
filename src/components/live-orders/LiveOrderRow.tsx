@@ -1,15 +1,16 @@
 import type { ReactNode } from 'react'
 import { formatINR, formatNumber } from '../../utils/format'
-import type { LiveOrderChannelRow } from '../../mocks/liveOrdersData'
+import type { LiveOrderChannelRow } from '../../services/orderService'
 
 interface LiveOrderRowProps {
   row: LiveOrderChannelRow
   icon: ReactNode
+  onClick?: () => void
 }
 
-export function LiveOrderRow({ row, icon }: LiveOrderRowProps) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-3">
+export function LiveOrderRow({ row, icon, onClick }: LiveOrderRowProps) {
+  const content = (
+    <>
       <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-page text-muted">
         {icon}
       </span>
@@ -22,6 +23,24 @@ export function LiveOrderRow({ row, icon }: LiveOrderRowProps) {
       <p className="shrink-0 text-sm font-bold text-ink tabular-nums">
         {formatINR(row.amount, 2)}
       </p>
+    </>
+  )
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full items-center gap-3 rounded-xl border border-line bg-card px-3 py-3 text-left transition-colors hover:border-primary/40"
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-3">
+      {content}
     </div>
   )
 }

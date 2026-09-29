@@ -111,12 +111,14 @@ export default function CalculationSettings() {
   const [taxOnContainer, setTaxOnContainer] = useState(true)
   const [containerAmountRule, setContainerAmountRule] = useState('None')
   const [containerAmount, setContainerAmount] = useState('5')
+  const [containerTaxPercent, setContainerTaxPercent] = useState('0')
 
   const [showDeliveryCharge, setShowDeliveryCharge] = useState(true)
   const [defaultDeliveryCharge, setDefaultDeliveryCharge] = useState('0')
   const [taxOnDelivery, setTaxOnDelivery] = useState(false)
   const [deliveryAmountRule, setDeliveryAmountRule] = useState('None')
   const [deliveryAmount, setDeliveryAmount] = useState('0')
+  const [deliveryTaxPercent, setDeliveryTaxPercent] = useState('0')
 
   const [taxBeforeDiscount, setTaxBeforeDiscount] = useState(false)
   const [backwardTaxAfterDiscount, setBackwardTaxAfterDiscount] =
@@ -178,6 +180,8 @@ export default function CalculationSettings() {
       setContainerAmountRule(String(value.container_charge_threshold))
     if (value.container_charge_amount != null)
       setContainerAmount(String(value.container_charge_amount))
+    if (value.container_charge_tax_percent != null)
+      setContainerTaxPercent(String(value.container_charge_tax_percent))
     if (value.show_delivery_charge != null)
       setShowDeliveryCharge(Boolean(value.show_delivery_charge))
     if (value.default_delivery_charge != null)
@@ -188,6 +192,8 @@ export default function CalculationSettings() {
       setDeliveryAmountRule(String(value.delivery_charge_threshold))
     if (value.delivery_charge_amount != null)
       setDeliveryAmount(String(value.delivery_charge_amount))
+    if (value.delivery_charge_tax_percent != null)
+      setDeliveryTaxPercent(String(value.delivery_charge_tax_percent))
     if (value.tax_before_discount != null)
       setTaxBeforeDiscount(Boolean(value.tax_before_discount))
     if (value.backward_tax_after_discount != null)
@@ -266,11 +272,13 @@ export default function CalculationSettings() {
       tax_on_container_charge: taxOnContainer,
       container_charge_threshold: containerAmountRule,
       container_charge_amount: containerAmount,
+      container_charge_tax_percent: containerTaxPercent,
       show_delivery_charge: showDeliveryCharge,
       default_delivery_charge: defaultDeliveryCharge,
       tax_on_delivery_charge: taxOnDelivery,
       delivery_charge_threshold: deliveryAmountRule,
       delivery_charge_amount: deliveryAmount,
+      delivery_charge_tax_percent: deliveryTaxPercent,
       tax_before_discount: taxBeforeDiscount,
       backward_tax_after_discount: backwardTaxAfterDiscount,
       special_discount_on: specialDiscountOn,
@@ -458,6 +466,19 @@ export default function CalculationSettings() {
             onChange={setTaxOnContainer}
             label="Calculate tax on Container Charge"
           />
+          <ConfigFormRow label="Container Charge Tax (%)" align="center">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={containerTaxPercent}
+              onChange={(event) => setContainerTaxPercent(event.target.value)}
+              className={`${inputClass} max-w-xs`}
+            />
+            <MutedHelp>
+              Single rate applied to the container charge when the toggle above is
+              on. Leave 0 for no tax.
+            </MutedHelp>
+          </ConfigFormRow>
           <ConfigFormRow label="Set a specific amount to calculate" align="center">
             <RadioGroup
               name="container-amount-rule"
@@ -508,6 +529,19 @@ export default function CalculationSettings() {
             onChange={setTaxOnDelivery}
             label="Calculate tax on Delivery Charge."
           />
+          <ConfigFormRow label="Delivery Charge Tax (%)" align="center">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={deliveryTaxPercent}
+              onChange={(event) => setDeliveryTaxPercent(event.target.value)}
+              className={`${inputClass} max-w-xs`}
+            />
+            <MutedHelp>
+              Single rate applied to the delivery charge when the toggle above is
+              on. Leave 0 for no tax.
+            </MutedHelp>
+          </ConfigFormRow>
           <ConfigFormRow label="Set a specific amount to calculate" align="center">
             <RadioGroup
               name="delivery-amount-rule"

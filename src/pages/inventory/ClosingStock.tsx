@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import {
   Check,
   MessageCirclePlus,
@@ -113,6 +114,19 @@ export default function ClosingStock() {
 
   const noteRow = RAW_MATERIALS.find((row) => row.id === noteRowId)
 
+  function exportRows(rows: StockRow[], suffix: 'all') {
+    downloadCsv(
+      `closing-stock-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Raw Material', 'New Stock', 'Action'],
+      rows.map((row) => [
+        `${row.name} / ${row.unit}`,
+        stockValues[row.id] ?? '',
+        notes[row.id] ?? '',
+      ]),
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="closing-stock">
 
@@ -127,7 +141,7 @@ export default function ClosingStock() {
           />
           <HistoryMenu
             exportLabel="Closing stock PDF"
-            onExport={() => showToast('Closing stock PDF exported')}
+            onExport={() => exportRows(filteredRows, 'all')}
           />
           <OutlineButton
             variant="gray"

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { Loader2 } from 'lucide-react'
 
 type ButtonVariant =
@@ -17,6 +17,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean
   icon?: ReactNode
   fullWidth?: boolean
+  ref?: Ref<HTMLButtonElement>
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -44,10 +45,12 @@ export function Button({
   children,
   disabled,
   type = 'button',
+  ref,
   ...rest
 }: ButtonProps) {
   return (
     <button
+      ref={ref}
       type={type}
       disabled={disabled || loading}
       className={`inline-flex select-none items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? 'w-full' : ''} ${className}`}

@@ -1,53 +1,49 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronDown } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { menuTables } from '../mocks/menuSectionData'
-
-const AREA_TYPES = [
-  'Select Type',
-  'Dine In',
-  'Delivery',
-  'Takeaway',
-  'Online',
-] as const
+import { showToast } from '../utils/toast'
+import { useAuth } from '../auth/AuthContext'
+import { createDiningAreaApi } from '../services/menuService'
 
 export default function AddArea() {
   const navigate = useNavigate()
-  const tableOptions = useMemo(
-    () =>
-      [...menuTables]
-        .map((row) => row.tableNo)
-        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-    [],
-  )
-
-  const [areaType, setAreaType] = useState<(typeof AREA_TYPES)[number]>(
-    'Select Type',
-  )
+  const { encryptedOutletId } = useAuth()
   const [areaName, setAreaName] = useState('')
-  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set())
   const [active, setActive] = useState(true)
-
-  const allChecked =
-    tableOptions.length > 0 &&
-    tableOptions.every((table) => selectedTables.has(table))
+  const [discountPercent, setDiscountPercent] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   function goBack() {
     navigate('/menu/tables', { state: { tab: 'areas' } })
   }
 
-  function toggleAll() {
-    setSelectedTables(allChecked ? new Set() : new Set(tableOptions))
-  }
-
-  function toggleTable(tableNo: string) {
-    setSelectedTables((prev) => {
-      const next = new Set(prev)
-      if (next.has(tableNo)) next.delete(tableNo)
-      else next.add(tableNo)
-      return next
-    })
+  async function handleSave() {
+    if (!areaName.trim()) {
+      setError('Area name is required')
+      return
+    }
+    if (!encryptedOutletId) {
+      setError('Outlet not selected')
+      return
+    }
+    setError('')
+    setSaving(true)
+    try {
+      await createDiningAreaApi(encryptedOutletId, {
+        name: areaName.trim(),
+        is_active: active,
+        discount_percent: discountPercent === '' ? '0' : discountPercent,
+      })
+      showToast('Area created successfully')
+      window.setTimeout(() => goBack(), 800)
+    } catch (err) {
+      setSaving(false)
+      showToast(
+        err instanceof Error ? err.message : 'Failed to create area',
+      )
+    }
   }
 
   return (
@@ -86,33 +82,6 @@ export default function AddArea() {
         <div className="space-y-5 px-5 py-5 sm:px-6">
           <div className="max-w-xl">
             <label className="mb-1.5 block text-sm font-medium text-ink">
-              Area Type <span className="text-primary">*</span>
-            </label>
-            <div className="relative">
-              <select
-                value={areaType}
-                onChange={(event) =>
-                  setAreaType(
-                    event.target.value as (typeof AREA_TYPES)[number],
-                  )
-                }
-                className="h-9 w-full appearance-none rounded-md border border-line bg-card px-3 pr-8 text-sm outline-none focus:border-primary"
-              >
-                {AREA_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-              />
-            </div>
-          </div>
-
-          <div className="max-w-xl">
-            <label className="mb-1.5 block text-sm font-medium text-ink">
               Area Name <span className="text-primary">*</span>
             </label>
             <input
@@ -123,35 +92,18 @@ export default function AddArea() {
             />
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-ink">
-              Tables <span className="text-primary">*</span>
+          <div className="max-w-xl">
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              Discount (%)
             </label>
-            <label className="mb-3 inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={allChecked}
-                onChange={toggleAll}
-                className="size-4 cursor-pointer accent-primary"
-              />
-              Check All
-            </label>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {tableOptions.map((tableNo) => (
-                <label
-                  key={tableNo}
-                  className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedTables.has(tableNo)}
-                    onChange={() => toggleTable(tableNo)}
-                    className="size-4 cursor-pointer accent-primary"
-                  />
-                  {tableNo}
-                </label>
-              ))}
-            </div>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={discountPercent}
+              onChange={(event) => setDiscountPercent(event.target.value)}
+              placeholder="0"
+              className="h-9 w-full rounded-md border border-line px-3 text-sm outline-none focus:border-primary"
+            />
           </div>
 
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -163,6 +115,8 @@ export default function AddArea() {
             />
             Active
           </label>
+
+          {error ? <p className="text-sm text-primary">{error}</p> : null}
         </div>
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-line bg-page/70 px-5 py-4 sm:px-6">
@@ -175,10 +129,11 @@ export default function AddArea() {
           </button>
           <button
             type="button"
-            onClick={goBack}
-            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Save Changes
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>

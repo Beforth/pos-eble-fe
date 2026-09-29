@@ -27,6 +27,8 @@ interface KotViewProps {
   onBack: () => void
   onFoodReady: (id: string) => void
   onDismiss: (id: string) => void
+  /** Open the ticket's table/order in Order View. */
+  onOpenInBilling?: (ticket: KotTicket) => void
   onSettleSave: (payload: {
     tableId: string
     ticketIds: string[]
@@ -47,6 +49,7 @@ function KotCard({
   onFoodReady,
   onDismiss,
   onView,
+  onOpenInBilling,
   onSettle,
   onCancelOrder,
 }: {
@@ -55,6 +58,7 @@ function KotCard({
   onFoodReady: (id: string) => void
   onDismiss: (id: string) => void
   onView: (ticket: KotTicket) => void
+  onOpenInBilling?: (ticket: KotTicket) => void
   onSettle: (ticket: KotTicket) => void
   onCancelOrder: (ticket: KotTicket) => void
 }) {
@@ -69,7 +73,19 @@ function KotCard({
           <p className="text-sm font-bold leading-tight">
             {ticket.tableNo} {labelForOrderType(ticket.orderType)}
           </p>
-          <p className="mt-0.5 opacity-90">KOT {ticket.kotNo}</p>
+          {onOpenInBilling ? (
+            <button
+              type="button"
+              title="Open in order view"
+              aria-label={`Open KOT ${ticket.kotNo} in order view`}
+              onClick={() => onOpenInBilling(ticket)}
+              className="mt-0.5 rounded underline-offset-2 opacity-90 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              KOT {ticket.kotNo}
+            </button>
+          ) : (
+            <p className="mt-0.5 opacity-90">KOT {ticket.kotNo}</p>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <p className="tabular-nums">{formatElapsed(now - ticket.createdAt)}</p>
@@ -180,6 +196,7 @@ export function KotView({
   onBack,
   onFoodReady,
   onDismiss,
+  onOpenInBilling,
   onSettleSave,
 }: KotViewProps) {
   const [search, setSearch] = useState('')
@@ -240,6 +257,7 @@ export function KotView({
         open={Boolean(settleTicket)}
         label={settleTicket?.tableNo ?? '—'}
         billAmount={settleAmount}
+        customerName={settleTicket?.customerName}
         onClose={() => setSettleTicket(null)}
         onConfirm={(result) => {
           if (!settleTicket) return
@@ -335,6 +353,7 @@ export function KotView({
                 onFoodReady={onFoodReady}
                 onDismiss={onDismiss}
                 onView={setViewTicket}
+                onOpenInBilling={onOpenInBilling}
                 onSettle={setSettleTicket}
                 onCancelOrder={setCancelTicket}
               />

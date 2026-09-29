@@ -5,6 +5,7 @@ import {
   BookOpen,
   ChefHat,
   Grid2x2,
+  Home,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -12,9 +13,11 @@ import {
   Monitor,
   Phone,
   Plus,
+  ScrollText,
   Search,
   Settings,
   Store,
+  Sun,
   TrendingUp,
   User,
   UtensilsCrossed,
@@ -24,19 +27,22 @@ import { useAuth } from '../../auth/AuthContext'
 import { BrandLogo } from '../brand/BrandLogo'
 import { brand } from '../../theme/brand'
 import {
-  menuItems,
-  baseMenuCategories,
-} from '../../mocks/menuItemsData'
-import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
+  useBillingMenu,
+  type MenuItemRow,
+} from '../../utils/menuAdapter'
+import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
+import {
+  listDayEndClosuresApi,
+  toDayEndSummaryRow,
+} from '../../services/orderService'
 
 const CAPTAIN_SIDEBAR_LINKS = [
   { to: '/captain-orders',            label: 'Captain Orders', icon: ChefHat },
   { to: '/captain-orders/live-orders', label: 'Live Orders',    icon: Monitor },
   { to: '/captain-orders/all-orders',  label: 'All Orders',     icon: BookOpen },
   { to: '/captain-orders/kot',         label: 'KOT',            icon: UtensilsCrossed },
-  { to: '/captain-orders/day-end',     label: 'Day End',        icon: LayoutDashboard },
-  { to: '/dashboard',                  label: 'Dashboard',      icon: LayoutDashboard },
-  { to: '/menu',                       label: 'Menu',           icon: Store },
+  { to: '/captain-orders/day-end',     label: 'Day End',        icon: Sun },
+  { to: '/captain-orders/logs',        label: 'Logs',           icon: ScrollText },
 ] as const
 
 interface CaptainOrdersHeaderProps {
@@ -54,7 +60,7 @@ export function CaptainOrdersHeader({
 }: CaptainOrdersHeaderProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { logout, user } = useAuth()
+  const { logout, user, encryptedOutletId, isAdmin } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [menuViewOpen, setMenuViewOpen] = useState(false)
@@ -62,6 +68,22 @@ export function CaptainOrdersHeader({
   const [quickReportsOpen, setQuickReportsOpen] = useState(false)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
   const [menuSearch, setMenuSearch] = useState('')
+  const [recentDayEnd, setRecentDayEnd] = useState<DayEndSummaryRow[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    listDayEndClosuresApi(encryptedOutletId)
+      .then((dtos) => {
+        if (!cancelled) setRecentDayEnd(dtos.map(toDayEndSummaryRow).slice(0, 7))
+      })
+      .catch(() => {
+        if (!cancelled) setRecentDayEnd([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -87,6 +109,11 @@ export function CaptainOrdersHeader({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [profileOpen])
 
+  const {
+    items: menuItems,
+    categories: menuReferenceCategories,
+  } = useBillingMenu()
+
   const menuGrouped = useMemo(() => {
     const q = menuSearch.trim().toLowerCase()
     const filtered = q
@@ -97,23 +124,25 @@ export function CaptainOrdersHeader({
               item.shortCode.includes(q)),
         )
       : menuItems.filter((item) => item.available)
-    const groups: Record<string, typeof menuItems> = {}
+    const groups: Record<string, MenuItemRow[]> = {}
     for (const item of filtered) {
-      const cat = baseMenuCategories.find((c) => c.id === item.categoryId)
+      const cat = menuReferenceCategories.find(
+        (c) => c.id === item.categoryId,
+      )
       const catName = cat?.name ?? 'Other'
       if (!groups[catName]) groups[catName] = []
       groups[catName].push(item)
     }
     return groups
-  }, [menuSearch])
+  }, [menuSearch, menuItems, menuReferenceCategories])
 
   const recentSummary = useMemo(() => {
-    const rows = DAY_END_SUMMARY_ROWS.slice(0, 7)
+    const rows = recentDayEnd.slice(0, 7)
     const today = rows[0]
     const weekOrders = rows.reduce((s, r) => s + r.orders, 0)
     const weekTotal = rows.reduce((s, r) => s + r.total, 0)
     return { today, weekOrders, weekTotal, rows }
-  }, [])
+  }, [recentDayEnd])
 
   function handleLogout() {
     logout()
@@ -177,6 +206,20 @@ export function CaptainOrdersHeader({
               { icon: Grid2x2, label: 'View KOT', onClick: onViewKot },
               { icon: ChefHat, label: 'Kitchen', onClick: () => navigate('/screens') },
               { icon: LayoutDashboard, label: 'Reports', onClick: () => setQuickReportsOpen(true) },
+              ...(isAdmin
+                ? [
+                    {
+                      icon: UtensilsCrossed,
+                      label: 'Billing',
+                      onClick: () => navigate('/billing'),
+                    },
+                    {
+                      icon: Home,
+                      label: 'Admin Dashboard',
+                      onClick: () => navigate('/dashboard'),
+                    },
+                  ]
+                : []),
               { icon: Bell, label: 'Notifications', onClick: () => alert('Notifications — coming soon') },
               { icon: Settings, label: 'Settings', onClick: () => setBillingSettingsOpen(true) },
             ] as {
@@ -348,6 +391,32 @@ export function CaptainOrdersHeader({
                     </li>
                   )
                 })}
+
+                {isAdmin ? (
+                  <>
+                    <li className="my-2 border-t border-line" />
+                    <li>
+                      <Link
+                        to="/billing"
+                        onClick={closeDrawer}
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
+                      >
+                        <UtensilsCrossed size={18} className="text-muted" />
+                        Billing
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/dashboard"
+                        onClick={closeDrawer}
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
+                      >
+                        <Home size={18} className="text-muted" />
+                        Admin Dashboard
+                      </Link>
+                    </li>
+                  </>
+                ) : null}
 
                 <li className="my-2 border-t border-line" />
 
@@ -684,7 +753,9 @@ export function CaptainOrdersHeader({
                   <span className="font-bold text-ink">
                     ₹
                     {Math.round(
-                      recentSummary.weekTotal / recentSummary.rows.length,
+                      recentSummary.rows.length > 0
+                        ? recentSummary.weekTotal / recentSummary.rows.length
+                        : 0,
                     ).toLocaleString('en-IN')}
                   </span>
                 </p>

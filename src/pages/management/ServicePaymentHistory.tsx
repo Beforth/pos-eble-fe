@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { FileText, Mail, Search } from 'lucide-react'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
@@ -226,6 +227,43 @@ export default function ServicePaymentHistory() {
   }, [filtered])
 
 
+  function exportRows(rowsToExport: PgTransaction[], suffix: string) {
+    downloadCsv(
+      `service-payment-history-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        'Restaurant [GSTIN]',
+        'Proforma No.',
+        'Service Opted',
+        'Order ID',
+        'Proforma Date',
+        'Paid On',
+        'Basic Amount',
+        'CGST Tax',
+        'SGST Tax',
+        'IGST Tax',
+        'Gross Amount',
+        'Status',
+        'Invoice Generated (Yes/No)',
+      ],
+      rowsToExport.map((row) => [
+        `${row.restaurant} [${row.gstin}]`,
+        row.proformaNo,
+        row.serviceOpted,
+        row.orderId,
+        row.proformaDate,
+        row.paidOn,
+        row.basicAmount,
+        row.cgst,
+        row.sgst,
+        row.igst,
+        row.grossAmount,
+        row.status,
+        row.invoiceGenerated ? 'Yes' : 'No',
+      ]),
+    )
+    showToast(`Exported ${rowsToExport.length} rows`)
+  }
+
   function handleSearch() {
     setAppliedOrderId(orderId)
     setAppliedProformaNo(proformaNo)
@@ -251,8 +289,8 @@ export default function ServicePaymentHistory() {
       activeItem="acct-service-payment-history"
       actions={
         <ExportExcelMenu
-          onExportPage={() => showToast('Exporting current page…')}
-          onExportAll={() => showToast('Exporting all records…')}
+          onExportPage={() => exportRows(filtered, 'page')}
+          onExportAll={() => exportRows(filtered, 'all')}
         />
       }
     >

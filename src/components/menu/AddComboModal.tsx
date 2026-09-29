@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Plus, Trash2, X } from 'lucide-react'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { MenuItemRow } from '../../mocks/menuItemsData'
 import { menuItems } from '../../mocks/menuItemsData'
 
@@ -35,6 +36,7 @@ export function AddComboModal({ open, onClose, onSave }: AddComboModalProps) {
     emptyComboItem(),
   ])
   const [error, setError] = useState('')
+  const [pendingRemoveKey, setPendingRemoveKey] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -223,7 +225,7 @@ export function AddComboModal({ open, onClose, onSave }: AddComboModalProps) {
                         .filter((i) => i.key !== row.key && i.itemId)
                         .map((i) => i.itemId)}
                       onChange={(patch) => updateItem(row.key, patch)}
-                      onRemove={() => removeItem(row.key)}
+                      onRemove={() => setPendingRemoveKey(row.key)}
                       canRemove={comboItems.length > 1}
                     />
                   ))}
@@ -264,6 +266,20 @@ export function AddComboModal({ open, onClose, onSave }: AddComboModalProps) {
             Save Combo
           </button>
         </div>
+
+        <ConfirmDialog
+          open={Boolean(pendingRemoveKey)}
+          compact
+          title="Remove item from combo"
+          message="This item will be removed from the combo being built."
+          note="The combo is not saved yet — you can re-add the item before saving."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (pendingRemoveKey) removeItem(pendingRemoveKey)
+            setPendingRemoveKey(null)
+          }}
+          onClose={() => setPendingRemoveKey(null)}
+        />
       </div>
     </div>,
     document.body,

@@ -1,11 +1,14 @@
 import { useEffect, useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { showToast } from '../../utils/toast'
+import { useAuth } from '../../auth/AuthContext'
+import { createSpecialNoteApi } from '../../services/menuService'
 
 interface AddSpecialNoteModalProps {
   open: boolean
   onClose: () => void
-  onSave: (note: { name: string; available: boolean }) => void
+  onSave: () => void
 }
 
 export function AddSpecialNoteModal({
@@ -13,17 +16,23 @@ export function AddSpecialNoteModal({
   onClose,
   onSave,
 }: AddSpecialNoteModalProps) {
+  const { encryptedOutletId } = useAuth()
   const titleId = useId()
   const nameId = useId()
+  const noteTextId = useId()
   const [name, setName] = useState('')
+  const [noteText, setNoteText] = useState('')
   const [available, setAvailable] = useState(true)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setName('')
+    setNoteText('')
     setAvailable(true)
     setError('')
+    setSaving(false)
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
@@ -33,14 +42,33 @@ export function AddSpecialNoteModal({
 
   if (!open) return null
 
-  function handleSave() {
+  async function handleSave() {
     const trimmed = name.trim()
     if (!trimmed) {
       setError('Name is required')
       return
     }
-    onSave({ name: trimmed, available })
-    onClose()
+    if (!encryptedOutletId) {
+      showToast('No outlet selected')
+      return
+    }
+    setSaving(true)
+    try {
+      await createSpecialNoteApi(encryptedOutletId, {
+        title: trimmed,
+        note_text: noteText.trim() || undefined,
+        is_active: available,
+      })
+      showToast('Special note added successfully')
+      onSave()
+      onClose()
+    } catch (err: unknown) {
+      showToast(
+        err instanceof Error ? err.message : 'Failed to save note',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return createPortal(
@@ -100,6 +128,22 @@ export function AddSpecialNoteModal({
             ) : null}
           </div>
 
+          <div>
+            <label
+              htmlFor={noteTextId}
+              className="mb-1.5 block text-sm font-medium text-ink"
+            >
+              Note Text
+            </label>
+            <textarea
+              id={noteTextId}
+              value={noteText}
+              onChange={(event) => setNoteText(event.target.value)}
+              rows={3}
+              className="w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink outline-none focus:border-primary"
+            />
+          </div>
+
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
@@ -115,16 +159,18 @@ export function AddSpecialNoteModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
+            disabled={saving}
+            className="inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            disabled={saving}
+            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
           >
-            Save Changes
+            {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </div>

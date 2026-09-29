@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react'
-import { ArrowDown, Eye, Info, List, Pencil, PencilLine } from 'lucide-react'
+import {
+  ArrowDown,
+  Eye,
+  Info,
+  List,
+  Pencil,
+  PencilLine,
+  ShoppingCart,
+} from 'lucide-react'
 import type { KotRow, KotStatus } from '../../mocks/kotData'
 
 interface KotTableProps {
@@ -7,12 +15,14 @@ interface KotTableProps {
   onEdit?: (row: KotRow) => void
   onView?: (row: KotRow) => void
   onDetails?: (row: KotRow) => void
+  onOpenInBilling?: (row: KotRow) => void
 }
 
 const statusClass: Record<KotStatus, string> = {
   'Used In Bill': 'text-success',
   Pending: 'text-accent',
   Cancelled: 'text-danger',
+  Ready: 'text-primary',
 }
 
 function ActionButton({
@@ -37,10 +47,16 @@ function ActionButton({
   )
 }
 
-export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
+export function KotTable({
+  rows,
+  onEdit,
+  onView,
+  onDetails,
+  onOpenInBilling,
+}: KotTableProps) {
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-line bg-page/80 text-[11px] font-semibold uppercase tracking-wide text-muted">
             <th className="px-3 py-2.5">KOT ID</th>
@@ -129,6 +145,14 @@ export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
                   >
                     <List size={13} />
                   </ActionButton>
+                  {onOpenInBilling ? (
+                    <ActionButton
+                      label="Open in billing"
+                      onClick={() => onOpenInBilling(row)}
+                    >
+                      <ShoppingCart size={13} />
+                    </ActionButton>
+                  ) : null}
                   <ActionButton
                     label="Edit"
                     onClick={() => onEdit?.(row)}

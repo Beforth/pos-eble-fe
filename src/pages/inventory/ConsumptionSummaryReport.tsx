@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { ChevronDown, FileText } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
@@ -311,6 +312,25 @@ export default function ConsumptionSummaryReport() {
 
   const dayLabel = formatDayLabel(fromDate)
 
+  function exportRows(rows: ConsumptionRow[], suffix: 'page' | 'all') {
+    const date = new Date().toISOString().slice(0, 10)
+    downloadCsv(
+      `consumption-summary-${suffix}-${date}.csv`,
+      [
+        'Raw Material',
+        dayLabel,
+        'Total Consumption Qty',
+        'Total Consumption Cost (₹)',
+      ],
+      rows.map((row) => [
+        row.rawMaterial,
+        `${row.consumption} / ${row.avgPurchasePrice} / ${row.consumptionCost}`,
+        row.totalQty,
+        row.totalCost,
+      ]),
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
 
   function handleSearch() {
     setAppliedQuery(rawMaterial)
@@ -333,8 +353,8 @@ export default function ConsumptionSummaryReport() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Consumption Summary</h1>
         <ExportMenu
-          onExportPage={() => showToast('Exported current page')}
-          onExportAll={() => showToast('Exported all')}
+          onExportPage={() => exportRows(pageRows, 'page')}
+          onExportAll={() => exportRows(filteredRows, 'all')}
         />
       </div>
 
