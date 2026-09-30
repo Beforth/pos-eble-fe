@@ -2,9 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, ClipboardList, Pencil, Plus } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { ListSearch } from '../components/common/ListSearch'
-import { SortableTh } from '../components/common/SortableTh'
-import { useListQuery } from '../hooks/useListQuery'
 import {
   ActionDropdown,
   OutlineButton,
@@ -29,28 +26,6 @@ export default function TaxesManagement() {
   const [taxType] = useState<'item' | 'order'>(savedTaxType)
   const [changesName, setChangesName] = useState<string | null>(null)
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      taxes,
-      (row) => [
-        row.title,
-        row.onlineDisplayName,
-        row.taxType,
-        row.type,
-        row.amount,
-        row.status,
-        row.created,
-      ],
-      (row, key) => {
-        if (key === 'onlineDisplayName') return row.onlineDisplayName
-        if (key === 'taxType') return row.taxType
-        if (key === 'type') return row.type
-        if (key === 'amount') return row.amount
-        if (key === 'status') return row.status
-        if (key === 'created') return row.created
-        return row.title
-      },
-    )
 
   const { taxes: refTaxes, reload } = useMenuReference(['taxes'])
 
@@ -63,7 +38,7 @@ export default function TaxesManagement() {
   }, [refTaxes])
 
   const allSelected =
-    visible.length > 0 && visible.every((row) => selected.has(row.id))
+    taxes.length > 0 && taxes.every((row) => selected.has(row.id))
 
   function setSelectedStatus(status: 'Active' | 'Inactive') {
     if (selected.size === 0) {
@@ -127,13 +102,6 @@ export default function TaxesManagement() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-line bg-card">
-        <div className="border-b border-line p-3">
-          <ListSearch
-            value={search}
-            onChange={setSearch}
-            placeholder="Search taxes"
-          />
-        </div>
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-line bg-page text-sm font-semibold text-ink">
             <tr>
@@ -145,89 +113,23 @@ export default function TaxesManagement() {
                     setSelected(
                       allSelected
                         ? new Set()
-                        : new Set(visible.map((r) => r.id)),
+                        : new Set(taxes.map((r) => r.id)),
                     )
                   }
                   className="cursor-pointer accent-primary"
                 />
               </th>
-<<<<<<< HEAD
-              <SortableTh
-                columnKey="title"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Title
-              </SortableTh>
-              <SortableTh
-                columnKey="onlineDisplayName"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Online Display Name
-              </SortableTh>
-              <SortableTh
-                columnKey="taxType"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Tax Type
-              </SortableTh>
-              <SortableTh
-                columnKey="type"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Type
-              </SortableTh>
-              <SortableTh
-                columnKey="amount"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Amount
-              </SortableTh>
-              <SortableTh
-                columnKey="status"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Status
-              </SortableTh>
-              <SortableTh
-                columnKey="created"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Created
-              </SortableTh>
-=======
               <th className="px-3 py-3">Title</th>
               <th className="px-3 py-3">Online Display Name</th>
               <th className="px-3 py-3">Tax Type</th>
               <th className="px-3 py-3">Type</th>
               <th className="px-3 py-3">Amount</th>
               <th className="px-3 py-3">Status</th>
->>>>>>> origin/main
               <th className="px-3 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {visible.map((row) => (
+            {taxes.map((row) => (
               <tr
                 key={row.id}
                 className="border-b border-line last:border-b-0 hover:bg-page/80"

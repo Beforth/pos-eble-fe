@@ -10,8 +10,6 @@ import {
   Plus,
 } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { SortableTh } from '../components/common/SortableTh'
-import { useListQuery } from '../hooks/useListQuery'
 import {
   ActionDropdown,
   ImportExcelDropdown,
@@ -79,28 +77,8 @@ export default function AddonsManagement() {
     })
   }, [appliedDept, appliedItem, appliedSearchBy, groups])
 
-  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
-    rows,
-    (row) => [
-      row.departmentName,
-      row.onlineDisplayName,
-      row.rank,
-      row.status,
-      row.created,
-      row.modified,
-    ],
-    (row, key) => {
-      if (key === 'onlineDisplayName') return row.onlineDisplayName
-      if (key === 'rank') return row.rank
-      if (key === 'status') return row.status
-      if (key === 'created') return row.created
-      if (key === 'modified') return row.modified
-      return row.departmentName
-    },
-  )
-
   const allSelected =
-    visible.length > 0 && visible.every((row) => selected.has(row.id))
+    rows.length > 0 && rows.every((row) => selected.has(row.id))
 
   function setSelectedStatus(status: 'Active' | 'Inactive') {
     if (selected.size === 0) return
@@ -253,79 +231,22 @@ export default function AddonsManagement() {
                   checked={allSelected}
                   onChange={() =>
                     setSelected(
-                      allSelected ? new Set() : new Set(visible.map((r) => r.id)),
+                      allSelected ? new Set() : new Set(rows.map((r) => r.id)),
                     )
                   }
                   className="cursor-pointer accent-primary"
                 />
               </th>
-<<<<<<< HEAD
-              <SortableTh
-                columnKey="departmentName"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Department Name
-              </SortableTh>
-              <SortableTh
-                columnKey="onlineDisplayName"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Online Display Name
-              </SortableTh>
-              <SortableTh
-                columnKey="rank"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Rank
-              </SortableTh>
-              <SortableTh
-                columnKey="status"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Status
-              </SortableTh>
-              <SortableTh
-                columnKey="created"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Created
-              </SortableTh>
-              <SortableTh
-                columnKey="modified"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Modified
-              </SortableTh>
-=======
               <th className="px-3 py-3">Department Name</th>
               <th className="px-3 py-3">Online Display Name</th>
               <th className="px-3 py-3">Rank</th>
               <th className="px-3 py-3">Status</th>
               <th className="px-3 py-3">Addons</th>
->>>>>>> origin/main
               <th className="px-3 py-3">Action</th>
             </tr>
           </thead>
           <tbody>
-            {visible.map((row, index) => (
+            {rows.map((row, index) => (
               <tr
                 key={row.id}
                 className={`border-b border-line last:border-b-0 hover:bg-page/80 ${

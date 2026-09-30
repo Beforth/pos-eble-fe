@@ -3,9 +3,6 @@ import { useEffect, useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { Calendar, ChevronLeft, ChevronRight, Filter, RotateCcw, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
-import { ListSearch } from '../../components/common/ListSearch'
-import { SortableTh } from '../../components/common/SortableTh'
-import { useListQuery } from '../../hooks/useListQuery'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
@@ -46,35 +43,12 @@ export default function MenuTriggerLogs() {
   const [toDate, setToDate] = useState('')
   const [selectedUser, setSelectedUser] = useState('Select Thirdparty User')
   const [showMoreFilters, setShowMoreFilters] = useState(false)
-<<<<<<< HEAD
-  const [isSearched, setIsSearched] = useState(true)
-  const [logs, setLogs] = useState<MenuTriggerLogEntry[]>([])
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      logs,
-      (row) => [
-        row.dateTime,
-        row.thirdPartyUser,
-        row.triggerEvent,
-        row.status,
-        row.responseCode,
-      ],
-      (row, key) => {
-        if (key === 'thirdPartyUser') return row.thirdPartyUser
-        if (key === 'triggerEvent') return row.triggerEvent
-        if (key === 'status') return row.status
-        if (key === 'responseCode') return row.responseCode
-        return row.dateTime
-      },
-    )
-=======
   const [loading, setLoading] = useState(false)
   const [logs, setLogs] = useState<MenuTriggerLog[]>([])
   const [page, setPage] = useState(1)
   const [count, setCount] = useState(0)
   const [next, setNext] = useState<string | null>(null)
   const [previous, setPrevious] = useState<string | null>(null)
->>>>>>> origin/main
 
   useEffect(() => {
     let cancelled = false
@@ -234,54 +208,6 @@ export default function MenuTriggerLogs() {
               </p>
             </div>
           ) : (
-<<<<<<< HEAD
-            <div>
-              <div className="border-b border-line p-4">
-                <ListSearch
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Search trigger logs"
-                />
-              </div>
-              <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-ink">
-                <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
-                  <tr>
-                    <SortableTh columnKey="dateTime" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Date & Time</SortableTh>
-                    <SortableTh columnKey="thirdPartyUser" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Thirdparty User</SortableTh>
-                    <SortableTh columnKey="triggerEvent" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Trigger Event</SortableTh>
-                    <SortableTh columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Status</SortableTh>
-                    <SortableTh columnKey="responseCode" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-3">Response Code</SortableTh>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {visible.map((l) => (
-                    <tr
-                      key={l.id}
-                      className="transition-colors hover:bg-page/50"
-                    >
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-ink">
-                        {l.dateTime}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-ink">
-                        {l.thirdPartyUser}
-                      </td>
-                      <td className="px-4 py-3 text-muted">{l.triggerEvent}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">
-                          {l.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs font-bold text-ink">
-                        {l.responseCode}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            </div>
-=======
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-ink">
@@ -364,7 +290,6 @@ export default function MenuTriggerLogs() {
                 </div>
               </div>
             </>
->>>>>>> origin/main
           )}
         </div>
       </div>

@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-import { ManualStockCount } from './ManualStockCount'
-
-export default function ClosingStock() {
-  return <ManualStockCount kind="closing" />
-=======
 import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
@@ -377,5 +371,4 @@ export default function ClosingStock() {
       ) : null}
     </InventoryPageShell>
   )
->>>>>>> origin/main
 }

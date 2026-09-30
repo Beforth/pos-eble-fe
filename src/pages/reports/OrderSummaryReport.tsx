@@ -2,19 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
-<<<<<<< HEAD
-import { ListSearch } from '../../components/common/ListSearch'
-import { SortableTh } from '../../components/common/SortableTh'
-import { useListQuery } from '../../hooks/useListQuery'
-import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
-=======
 import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
 import {
   listDayEndClosuresApi,
   toDayEndSummaryRow,
 } from '../../services/orderService'
 import { useAuth } from '../../auth/AuthContext'
->>>>>>> origin/main
 
 const PAGE_SIZE = 10
 
@@ -40,28 +33,11 @@ export default function OrderSummaryReport() {
     }
   }, [encryptedOutletId])
 
-<<<<<<< HEAD
-  const rows = DAY_END_SUMMARY_ROWS
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      rows,
-      (row) => [row.createdDate, row.orders, row.total],
-      (row, key) => {
-        if (key === 'orders') return row.orders
-        if (key === 'revenue') return row.total
-        return row.createdDate
-      },
-    )
-  const totalOrders = visible.reduce((s, r) => s + r.orders, 0)
-  const totalRevenue = visible.reduce((s, r) => s + r.total, 0)
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-=======
   const totalOrders = rows.reduce((s, r) => s + r.orders, 0)
   const totalRevenue = rows.reduce((s, r) => s + r.total, 0)
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
->>>>>>> origin/main
   const safePage = Math.min(page, totalPages)
-  const pageRows = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   function handleExport() {
     const header = 'Date,Orders,Revenue'
@@ -92,7 +68,7 @@ export default function OrderSummaryReport() {
         <div className="mb-4 grid grid-cols-3 gap-3">
           <div className="rounded-lg border border-line bg-card p-3 text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Days</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{visible.length}</p>
+            <p className="mt-1 text-xl font-extrabold text-ink">{rows.length}</p>
           </div>
           <div className="rounded-lg border border-line bg-card p-3 text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Orders</p>
@@ -105,23 +81,13 @@ export default function OrderSummaryReport() {
         </div>
 
         <div className="rounded-xl border border-line bg-card">
-          <div className="border-b border-line p-3">
-            <ListSearch
-              value={search}
-              onChange={(value) => {
-                setSearch(value)
-                setPage(1)
-              }}
-              placeholder="Search summary"
-            />
-          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[400px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-                  <SortableTh columnKey="date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Date</SortableTh>
-                  <SortableTh columnKey="orders" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Orders</SortableTh>
-                  <SortableTh columnKey="revenue" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</SortableTh>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Date</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Orders</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

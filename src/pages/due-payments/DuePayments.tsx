@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useState } from 'react'
-=======
 import { useCallback, useEffect, useMemo, useState } from 'react'
->>>>>>> origin/main
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
@@ -10,21 +6,15 @@ import {
   Download,
   Eye,
   HandCoins,
-<<<<<<< HEAD
-  Trash2,
-=======
   Search,
->>>>>>> origin/main
   TrendingUp,
   Users,
   CheckCircle,
 } from 'lucide-react'
 import { Card } from '../../components/common/Card'
-import { ListSearch } from '../../components/common/ListSearch'
 import { Table, type Column } from '../../components/common/Table'
 import { FilterSelect } from '../../components/all-orders/FilterSelect'
 import { PageContainer } from '../../components/layout/PageContainer'
-import { useListQuery } from '../../hooks/useListQuery'
 import { formatINR } from '../../utils/format'
 import {
   MONTH_OPTIONS,
@@ -37,6 +27,13 @@ import {
 import { listDueClientsApi, toDueClient } from '../../services/customerService'
 import { useAuth } from '../../auth/AuthContext'
 import { DuePaymentsShell } from './DuePaymentsShell'
+
+const SORT_OPTIONS = [
+  { value: 'name-asc', label: 'Name A-Z' },
+  { value: 'name-desc', label: 'Name Z-A' },
+  { value: 'due-desc', label: 'Highest Due' },
+  { value: 'due-asc', label: 'Lowest Due' },
+]
 
 function downloadStatement(client: DueClient, month: number, year: number) {
   const due = clientDue(client)
@@ -61,31 +58,14 @@ export default function DuePayments() {
   const navigate = useNavigate()
   const { encryptedOutletId } = useAuth()
   const now = new Date()
-<<<<<<< HEAD
-  const [clients, setClients] = useState<DueClient[]>(() => getDueClients())
-=======
   const [clients, setClients] = useState<DueClient[]>([])
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('name-asc')
->>>>>>> origin/main
   const [month, setMonth] = useState(String(now.getMonth()))
   const [year, setYear] = useState(String(now.getFullYear()))
 
   const monthIndex = Number(month)
   const yearNumber = Number(year)
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      clients,
-      (client) => [client.name, client.phone, client.outlet],
-      (client, key) => {
-        if (key === 'phone') return client.phone
-        if (key === 'outlet') return client.outlet
-        if (key === 'taken') return monthlyTaken(client, monthIndex, yearNumber)
-        if (key === 'paid') return monthlyPaid(client, monthIndex, yearNumber)
-        if (key === 'due') return clientDue(client)
-        return client.name
-      },
-    )
 
   const loadClients = useCallback(async () => {
     if (!encryptedOutletId) {
@@ -106,13 +86,30 @@ export default function DuePayments() {
     loadClients()
   }, [loadClients])
 
-  const totalCredit = visible.reduce((sum, client) => sum + clientDue(client), 0)
-  const totalClients = visible.length
-  const totalTaken = visible.reduce(
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const filtered = clients.filter((client) => {
+      if (!q) return true
+      return (
+        client.name.toLowerCase().includes(q) || client.phone.includes(q)
+      )
+    })
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'name-desc') return b.name.localeCompare(a.name)
+      if (sortBy === 'due-desc') return clientDue(b) - clientDue(a)
+      if (sortBy === 'due-asc') return clientDue(a) - clientDue(b)
+      return a.name.localeCompare(b.name)
+    })
+  }, [clients, search, sortBy])
+
+  const totalCredit = rows.reduce((sum, client) => sum + clientDue(client), 0)
+  const totalClients = rows.length
+  const totalTaken = rows.reduce(
     (sum, client) => sum + monthlyTaken(client, monthIndex, yearNumber),
     0,
   )
-  const totalPaid = visible.reduce(
+  const totalPaid = rows.reduce(
     (sum, client) => sum + monthlyPaid(client, monthIndex, yearNumber),
     0,
   )
@@ -121,7 +118,6 @@ export default function DuePayments() {
     {
       key: 'name',
       header: 'Customer Name',
-      sortable: true,
       render: (row) => (
         <span className="font-semibold text-ink">{row.name}</span>
       ),
@@ -129,23 +125,12 @@ export default function DuePayments() {
     {
       key: 'phone',
       header: 'Phone',
-      sortable: true,
       render: (row) => <span className="text-ink">{row.phone}</span>,
     },
     {
-<<<<<<< HEAD
-      key: 'outlet',
-      header: 'Outlet',
-      sortable: true,
-      render: (row) => <span className="text-ink">{row.outlet}</span>,
-    },
-    {
-=======
->>>>>>> origin/main
       key: 'taken',
       header: 'Monthly Taken',
       align: 'right',
-      sortable: true,
       render: (row) => (
         <span className="font-semibold tabular-nums text-primary">
           {formatINR(monthlyTaken(row, monthIndex, yearNumber), 2)}
@@ -156,7 +141,6 @@ export default function DuePayments() {
       key: 'paid',
       header: 'Monthly Paid',
       align: 'right',
-      sortable: true,
       render: (row) => (
         <span className="font-semibold tabular-nums text-success">
           {formatINR(monthlyPaid(row, monthIndex, yearNumber), 2)}
@@ -167,7 +151,6 @@ export default function DuePayments() {
       key: 'due',
       header: 'Total Due',
       align: 'right',
-      sortable: true,
       render: (row) => (
         <span className="font-bold tabular-nums text-primary">
           {formatINR(clientDue(row), 2)}
@@ -264,15 +247,29 @@ export default function DuePayments() {
         </div>
 
         <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-          <div className="min-w-[200px] flex-1">
-            <p className="mb-1 text-xs text-muted">Search</p>
-            <ListSearch
-              value={search}
-              onChange={setSearch}
-              placeholder="Search by name or phone..."
-              className="sm:max-w-none"
-            />
-          </div>
+          <label className="min-w-[200px] flex-1 text-xs text-muted">
+            Search
+            <span className="relative mt-1 block">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"
+              />
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by name or phone..."
+                className="h-9 w-full rounded-lg border border-line bg-card pl-8 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+              />
+            </span>
+          </label>
+          <FilterSelect
+            label="Sort by"
+            value={sortBy}
+            onChange={setSortBy}
+            options={SORT_OPTIONS}
+            className="w-[160px]"
+          />
           <FilterSelect
             label="Month"
             value={month}
@@ -292,12 +289,9 @@ export default function DuePayments() {
         <Card bodyClassName="p-0">
           <Table
             columns={columns}
-            rows={visible}
+            rows={rows}
             rowKey={(row) => row.id}
             emptyMessage="No credit clients found."
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={toggleSort}
           />
         </Card>
       </PageContainer>

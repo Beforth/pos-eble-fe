@@ -15,11 +15,8 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",
-<<<<<<< HEAD
     "react-toastify": "^11.1.0",
     "read-excel-file": "^9.3.10",
-=======
->>>>>>> origin/main
     "recharts": "^3.10.1",
     "tailwindcss": "^4.3.3"
   },

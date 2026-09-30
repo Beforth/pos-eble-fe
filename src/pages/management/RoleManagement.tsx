@@ -4,17 +4,11 @@ import { showToast } from '../../utils/toast'
 import { Pencil, Plus, RefreshCcw, Search, Trash2, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
-<<<<<<< HEAD
-import { ListSearch } from '../../components/common/ListSearch'
-import { SortableTh } from '../../components/common/SortableTh'
-=======
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
->>>>>>> origin/main
 import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
-import { useListQuery } from '../../hooks/useListQuery'
 import { ApiError } from '../../services/apiClient'
 import { deleteRoleApi, type Role } from '../../services/roleService'
 import { useRoles } from '../../state/RoleContext'
@@ -23,21 +17,8 @@ export default function RoleManagement() {
   const navigate = useNavigate()
   const { roles, status, error, loadRoles, removeRole } = useRoles()
   const loading = status === 'loading'
-<<<<<<< HEAD
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      roles,
-      (role) => [role.name, role.code, role.description],
-      (role, key) => {
-        if (key === 'code') return role.code
-        if (key === 'description') return role.description
-        return role.name
-      },
-    )
-=======
   const [deleteTarget, setDeleteTarget] = useState<Role | null>(null)
   const [deleting, setDeleting] = useState(false)
->>>>>>> origin/main
 
 
   useEffect(() => {
@@ -115,58 +96,18 @@ export default function RoleManagement() {
             </p>
           </div>
         ) : (
-          <div>
-            <div className="border-b border-line p-4">
-              <ListSearch
-                value={search}
-                onChange={setSearch}
-                placeholder="Search roles"
-              />
-            </div>
-          {visible.length === 0 ? (
-            <div className="flex min-h-[240px] flex-col items-center justify-center px-6 py-16 text-center">
-              <p className="text-base font-bold text-ink">No Results Found.</p>
-              <p className="mt-1 text-sm text-muted">
-                We couldn&apos;t find a match for your search.
-              </p>
-            </div>
-          ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
                 <tr>
-                  <SortableTh
-                    columnKey="name"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Role
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="code"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Code
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="description"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Description
-                  </SortableTh>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Code</th>
+                  <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {visible.map((role) => (
+                {roles.map((role) => (
                   <tr
                     key={role.id}
                     className="border-b border-line last:border-0 hover:bg-page/50"
@@ -206,8 +147,6 @@ export default function RoleManagement() {
                 ))}
               </tbody>
             </table>
-          </div>
-          )}
           </div>
         )}
       </div>

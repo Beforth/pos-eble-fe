@@ -199,46 +199,19 @@ export function InventorySidebar({
   canCountStock = { available: true, closing: true },
 }: InventorySidebarProps) {
   const navigate = useNavigate()
-<<<<<<< HEAD
-
-  /** Drops Manage Stock leaves the user has no right for; hides the branch when both are gone. */
-  const stockCountBranch = (branch: NavBranch): NavBranch | null => {
-    const children = (branch.children ?? []).filter((child) =>
-      child.id === 'available-stock'
-        ? canCountStock.available
-        : child.id === 'closing-stock'
-          ? canCountStock.closing
-          : true,
-    )
-    if (!children.length) return null
-    return { ...branch, children }
-  }
-  const [consumptionMore, setConsumptionMore] = useState(() =>
-    CONSUMPTION_MORE.some((item) => item.id === activeItem),
-  )
-  const [mastersMore, setMastersMore] = useState(() =>
-    MASTERS_MORE.some((item) => item.id === activeItem),
-  )
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
-    const purchaseChildIds = [
-      'stock-purchase',
-      'purchase-order',
-      'purchase-return',
-    ]
-    const manageStockChildIds = ['available-stock', 'closing-stock']
-    return {
-      purchase: purchaseChildIds.includes(activeItem),
-      'manage-stock': manageStockChildIds.includes(activeItem),
-      production: PRODUCTION_IDS.includes(activeItem),
-      reports: REPORTS_IDS.includes(activeItem),
-      masters: MASTERS_IDS.includes(activeItem),
-    }
-  })
-=======
   const { expanded: expandedIds, toggleExpanded, mergeExpanded, navScroll, setNavScroll } =
     useChrome()
   const expandedList = expandedIds.inventory
->>>>>>> origin/main
+
+  function stockCountBranch(item: NavBranch): NavBranch | null {
+    const children = (item.children ?? []).filter((child) => {
+      if (child.id === 'available-stock') return canCountStock.available
+      if (child.id === 'closing-stock') return canCountStock.closing
+      return true
+    })
+    if (children.length === 0) return null
+    return { ...item, children }
+  }
 
   useEffect(() => {
     const purchaseChildIds = [

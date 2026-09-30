@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-<<<<<<< HEAD
-import { downloadCsv } from '../../utils/downloadFile'
-=======
 import { downloadCsv } from '../../utils/exportCsv'
->>>>>>> origin/main
 import { Calculator, ChevronDown, FileText } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -309,37 +305,8 @@ export default function RecipeCostingReport() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Recipe Costing Report</h1>
         <ExportMenu
-<<<<<<< HEAD
-          onExportPage={() => {
-            downloadCsv(
-              ['menu_name', 'recipe_costing', 'selling_price', 'margin'],
-              rows.map((row) => [
-                row.menuName,
-                row.recipeCosting,
-                row.sellingPrice,
-                row.margin,
-              ]),
-              'recipe-costing-page.csv',
-            )
-            showToast('Exported current page')
-          }}
-          onExportAll={() => {
-            downloadCsv(
-              ['menu_name', 'recipe_costing', 'selling_price', 'margin'],
-              ALL_ROWS.map((row) => [
-                row.menuName,
-                row.recipeCosting,
-                row.sellingPrice,
-                row.margin,
-              ]),
-              'recipe-costing-all.csv',
-            )
-            showToast('Exported all')
-          }}
-=======
           onExportPage={() => exportRows(rows, 'page')}
           onExportAll={() => exportRows(rows, 'all')}
->>>>>>> origin/main
         />
       </div>
 

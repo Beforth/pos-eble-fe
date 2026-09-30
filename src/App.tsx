@@ -11,13 +11,10 @@ import { TooltipHost } from './components/common/TooltipHost'
 import { ToastHost } from './components/common/ToastHost'
 import { AuthProvider, ProtectedRoute, useAuth } from './auth/AuthContext'
 import { RoleProvider } from './state/RoleContext'
-<<<<<<< HEAD
 import { InventoryMastersProvider } from './state/InventoryMastersContext'
-=======
 import { MenuChannelsProvider } from './state/MenuChannelsContext'
 import { MenuReferenceProvider } from './state/MenuReferenceContext'
 import { ChromeProvider } from './state/ChromeContext'
->>>>>>> origin/main
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
 import EditProfile from './pages/EditProfile'

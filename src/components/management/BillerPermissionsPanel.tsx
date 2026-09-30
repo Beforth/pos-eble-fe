@@ -1,17 +1,10 @@
-<<<<<<< HEAD
-import { useEffect, useMemo, useState } from 'react'
-import { Info, Loader2, Search, X } from 'lucide-react'
-=======
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Info, Loader2, Search } from 'lucide-react'
->>>>>>> origin/main
 import { SearchableSelect } from '../inventory/SearchableSelect'
 import {
   getPermissionCatalogApi,
-  getPermissionGroupsApi,
   type CatalogFeature,
   type PermissionCatalog,
-  type PermissionGroup,
 } from '../../services/permissionService'
 import {
   getGroupPermissionsApi,
@@ -65,13 +58,6 @@ export type PermissionDef = YesPermission | MultiPermission | ReportPermission
 
 export interface BillerPermissionsValue {
   group: string
-<<<<<<< HEAD
-  selectedGroup: string
-  selectedGroups: string[]
-  selectedCodenames: string[]
-  tables: string[]
-=======
->>>>>>> origin/main
 }
 
 export interface BillerPermissionsPanelProps {
@@ -79,11 +65,7 @@ export interface BillerPermissionsPanelProps {
   onChange?: (value: BillerPermissionsValue) => void
 }
 
-<<<<<<< HEAD
-const NO_GROUP = 'No Group Selected'
-=======
 const NO_GROUP_LABEL = 'No Group Selected'
->>>>>>> origin/main
 
 const REPORT_DAYS_OPTIONS = [
   'No Restriction',
@@ -196,69 +178,8 @@ function bareCodename(codename: string): string {
   return codename.split('.').pop() ?? codename
 }
 
-<<<<<<< HEAD
-function applyBareCodenames(
-  features: CatalogFeature[],
-  codes: Set<string>,
-): { yes: YesState; multi: MultiState; report: ReportState } {
-  const yes: YesState = {}
-  const multi: MultiState = {}
-  const report: ReportState = {}
-  for (const feature of features) {
-    const codenameFor = (label: string): string => {
-      const codename = feature.permissions.find(
-        (permission) => permission.label === label,
-      )?.codename
-      return codename ? bareCodename(codename) : ''
-    }
-    if (feature.mode === 'yes') {
-      yes[feature.key] = codes.has(
-        codenameFor(feature.permissions[0]?.label ?? ''),
-      )
-    } else if (feature.mode === 'multi') {
-      multi[feature.key] = feature.options.filter((option) => {
-        const codename = feature.permissions.find(
-          (permission) => permission.label === option,
-        )?.codename
-        return codename ? codes.has(bareCodename(codename)) : false
-      })
-    } else {
-      report[feature.key] = {
-        show: codes.has(codenameFor('View')),
-        displayValues: codes.has(codenameFor('Display Values')),
-        days: 'No Restriction',
-      }
-    }
-  }
-  return { yes, multi, report }
-}
-
-function unionPermissionState(
-  current: { yes: YesState; multi: MultiState; report: ReportState },
-  incoming: { yes: YesState; multi: MultiState; report: ReportState },
-): { yes: YesState; multi: MultiState; report: ReportState } {
-  const yes: YesState = { ...current.yes }
-  for (const [key, value] of Object.entries(incoming.yes)) {
-    yes[key] = Boolean(yes[key] || value)
-  }
-  const multi: MultiState = { ...current.multi }
-  for (const [key, options] of Object.entries(incoming.multi)) {
-    multi[key] = [...new Set([...(multi[key] ?? []), ...options])]
-  }
-  const report: ReportState = { ...current.report }
-  for (const [key, value] of Object.entries(incoming.report)) {
-    const prev = report[key]
-    report[key] = {
-      show: Boolean(prev?.show || value.show),
-      displayValues: Boolean(prev?.displayValues || value.displayValues),
-      days: prev?.days ?? value.days,
-    }
-  }
-  return { yes, multi, report }
-=======
 function canonical(codes: string[]): string {
   return codes.join('|')
->>>>>>> origin/main
 }
 
 function computeSelectedCodenames(
@@ -343,16 +264,11 @@ export function BillerPermissionsPanel({
   const [defs, setDefs] = useState<PermissionDef[]>([])
   const [features, setFeatures] = useState<CatalogFeature[]>([])
   const [categories, setCategories] = useState<PermissionCategory[]>([])
-<<<<<<< HEAD
-  const [groups, setGroups] = useState<PermissionGroup[]>([])
-  const [selectedGroups, setSelectedGroups] = useState<string[]>([])
-=======
   const [groups, setGroups] = useState<GroupSummary[]>([])
   const [groupError, setGroupError] = useState<string | null>(null)
   const [groupLoading, setGroupLoading] = useState(false)
   const [savingGroup, setSavingGroup] = useState(false)
   const [group, setGroup] = useState(NO_GROUP_LABEL)
->>>>>>> origin/main
   const [category, setCategory] = useState<PermissionCategoryId>('pos')
   const [search, setSearch] = useState('')
   const [yesState, setYesState] = useState<YesState>({})
@@ -364,14 +280,13 @@ export function BillerPermissionsPanel({
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getPermissionCatalogApi(), getPermissionGroupsApi()])
-      .then(([catalog, nextGroups]) => {
+    getPermissionCatalogApi()
+      .then((catalog) => {
         if (cancelled) return
         const next = catalogToDefs(catalog)
         setDefs(next)
         setFeatures(catalog.features)
         setCategories(buildCategories(catalog))
-        setGroups(nextGroups)
         setYesState(buildDefaultYes(next))
         setMultiState(buildDefaultMulti(next))
         setReportState(buildDefaultReport(next))
@@ -388,30 +303,6 @@ export function BillerPermissionsPanel({
   }, [])
 
   useEffect(() => {
-<<<<<<< HEAD
-    if (!initial || features.length === 0) return
-    const applied = applyBareCodenames(
-      features,
-      new Set(
-        (initial.selectedCodenames ?? []).map((codename) =>
-          bareCodename(codename),
-        ),
-      ),
-    )
-    setYesState(applied.yes)
-    setMultiState(applied.multi)
-    setReportState(applied.report)
-    const savedGroups =
-      initial.selectedGroups && initial.selectedGroups.length > 0
-        ? initial.selectedGroups
-        : [initial.selectedGroup, initial.group].filter(
-            (name): name is string =>
-              Boolean(name) && name !== NO_GROUP,
-          )
-    setSelectedGroups(savedGroups)
-    if (initial.tables) setSelectedTables(initial.tables)
-  }, [initial, features])
-=======
     let cancelled = false
     listGroupsApi()
       .then((rows) => {
@@ -520,34 +411,6 @@ export function BillerPermissionsPanel({
   useEffect(() => {
     onChange?.({ group })
   }, [onChange, group])
->>>>>>> origin/main
-
-  const groupOptions = useMemo(() => {
-    const names = groups.map((item) => item.name)
-    const extra = selectedGroups.filter((name) => !names.includes(name))
-    return [...names, ...extra].filter((name) => !selectedGroups.includes(name))
-  }, [groups, selectedGroups])
-
-  function addGroup(name: string) {
-    if (!name || selectedGroups.includes(name)) return
-    setSelectedGroups((prev) => [...prev, name])
-    const match = groups.find((item) => item.name === name)
-    if (!match) return
-    const merged = unionPermissionState(
-      { yes: yesState, multi: multiState, report: reportState },
-      applyBareCodenames(
-        features,
-        new Set(match.permissions.map((codename) => bareCodename(codename))),
-      ),
-    )
-    setYesState(merged.yes)
-    setMultiState(merged.multi)
-    setReportState(merged.report)
-  }
-
-  function removeGroup(name: string) {
-    setSelectedGroups((prev) => prev.filter((item) => item !== name))
-  }
 
   const TABLE_NUMBERS = ['1', '2']
 
@@ -572,25 +435,6 @@ export function BillerPermissionsPanel({
     )
   }
 
-<<<<<<< HEAD
-  const selectedCodenames = useMemo(
-    () => computeSelectedCodenames(features, yesState, multiState, reportState),
-    [features, yesState, multiState, reportState],
-  )
-
-  useEffect(() => {
-    const primary = selectedGroups[0] ?? ''
-    onChange?.({
-      group: primary,
-      selectedGroup: primary,
-      selectedGroups,
-      selectedCodenames,
-      tables: selectedTables,
-    })
-  }, [onChange, selectedGroups, selectedCodenames, selectedTables])
-
-=======
->>>>>>> origin/main
   const enabledCount = useMemo(
     () =>
       defs.filter((item) =>
@@ -667,7 +511,7 @@ export function BillerPermissionsPanel({
     return (
       <div className="flex h-[620px] flex-col items-center justify-center gap-3 rounded-xl border border-line bg-card px-6 text-center">
         <p className="text-sm font-semibold text-ink">
-          Could not load groups or the permission catalog.
+          Could not load the permission catalog.
         </p>
         <p className="text-xs text-muted">
           Sign in again or contact support if this keeps happening.
@@ -682,17 +526,9 @@ export function BillerPermissionsPanel({
         <div className="w-full min-w-[200px] sm:max-w-xs">
           <SearchableSelect
             label=""
-<<<<<<< HEAD
-            value=""
-            options={groupOptions}
-            placeholder="Select a group"
-            searchPlaceholder="Search groups"
-            onChange={addGroup}
-=======
             value={group}
             options={groupOptions}
             onChange={handleGroupChange}
->>>>>>> origin/main
           />
           {groupError ? (
             <p className="mt-1 text-xs text-danger">{groupError}</p>
@@ -718,27 +554,6 @@ export function BillerPermissionsPanel({
           />
         </label>
       </div>
-
-      {selectedGroups.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {selectedGroups.map((name) => (
-            <span
-              key={name}
-              className="inline-flex items-center gap-1 rounded-full border border-line bg-page px-2.5 py-1 text-xs font-medium text-ink"
-            >
-              {name}
-              <button
-                type="button"
-                aria-label={`Remove ${name}`}
-                onClick={() => removeGroup(name)}
-                className="rounded-full p-0.5 text-muted hover:bg-card hover:text-ink"
-              >
-                <X size={12} />
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : null}
 
       <p className="text-sm font-semibold text-ink">
         Permissions ({enabledCount} / {totalCount})

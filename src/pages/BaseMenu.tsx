@@ -17,8 +17,6 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { SortableTh } from '../components/common/SortableTh'
-import { useListQuery } from '../hooks/useListQuery'
 import {
   ActionDropdown,
   PrimaryButton,
@@ -185,9 +183,6 @@ export default function BaseMenu({
   const isSchedule = mode === 'schedule'
   const channel = MENU_CHANNELS[channelId]
   const navigate = useNavigate()
-<<<<<<< HEAD
-  const [categoryId, setCategoryId] = useState<string>(baseMenuCategories[0].id)
-=======
   const { encryptedOutletId } = useAuth()
   const { channels } = useMenuChannels()
 
@@ -211,7 +206,6 @@ export default function BaseMenu({
   const [categoriesApi, setCategoriesApi] = useState<Category[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [query, setQuery] = useState('')
->>>>>>> origin/main
   const [rankWise, setRankWise] = useState(false)
   const [hideEmpty, setHideEmpty] = useState(false)
   const [items, setItems] = useState<RowItem[]>([])
@@ -323,45 +317,33 @@ export default function BaseMenu({
     )
   }, [hideEmpty, categoriesApi, categoryHasItems])
 
-  const categoryItems = useMemo(() => {
-    const result = items.filter((item) => item.categoryId === categoryId)
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const result = items.filter((item) => {
+      if (item.categoryId !== categoryId) return false
+      if (!q) return true
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.onlineDisplayName.toLowerCase().includes(q) ||
+        item.shortCode.includes(q)
+      )
+    })
     if (rankWise) {
-      return [...result].sort((a, b) => {
+      result.sort((a, b) => {
         const ra = a.rank ?? Number.MAX_SAFE_INTEGER
         const rb = b.rank ?? Number.MAX_SAFE_INTEGER
         return ra - rb
       })
     }
     return result
-  }, [categoryId, items, rankWise])
+  }, [categoryId, items, query, rankWise])
 
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      categoryItems,
-      (item) => [
-        item.name,
-        item.onlineDisplayName,
-        item.shortCode,
-        item.price,
-        item.description,
-        item.rank,
-      ],
-      (item, key) => {
-        if (key === 'rank') return item.rank ?? Number.MAX_SAFE_INTEGER
-        if (key === 'shortCode') return item.shortCode
-        if (key === 'onlineDisplayName') return item.onlineDisplayName
-        if (key === 'price') return item.price
-        if (key === 'description') return item.description
-        return item.name
-      },
-    )
-
-  const totalRecords = visible.length
+  const totalRecords = filtered.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
 
   useEffect(() => {
     setPage(1)
-  }, [categoryId, search])
+  }, [categoryId, query])
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
@@ -369,14 +351,14 @@ export default function BaseMenu({
 
   const pageRows = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
-    return visible.slice(start, start + PAGE_SIZE)
-  }, [visible, page])
+    return filtered.slice(start, start + PAGE_SIZE)
+  }, [filtered, page])
 
   const allSelected =
     pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
 
   const categoryAvailable =
-    visible.length > 0 && visible.every((row) => row.available)
+    filtered.length > 0 && filtered.every((row) => row.available)
 
   function requireSelection(action: () => void) {
     if (selected.size === 0) {
@@ -409,12 +391,6 @@ export default function BaseMenu({
   async function toggleCategoryAvailable() {
     if (!encryptedOutletId) return
     const next = !categoryAvailable
-<<<<<<< HEAD
-    const ids = new Set(visible.map((row) => row.id))
-    setItems((prev) =>
-      prev.map((row) => (ids.has(row.id) ? { ...row, available: next } : row)),
-    )
-=======
     const ids = filtered.map((row) => row.id)
     try {
       await Promise.all(
@@ -632,7 +608,6 @@ export default function BaseMenu({
     } catch {
       showToast('Failed to delete item')
     }
->>>>>>> origin/main
   }
 
   return (
@@ -753,8 +728,8 @@ export default function BaseMenu({
           />
           <input
             type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
             placeholder="Search"
             className="h-9 w-full rounded-md border border-line bg-card pl-9 pr-3 text-sm outline-none focus:border-primary"
           />
@@ -940,62 +915,12 @@ export default function BaseMenu({
                       className="cursor-pointer accent-primary"
                     />
                   </th>
-                  {rankWise ? (
-                    <SortableTh
-                      columnKey="rank"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={toggleSort}
-                      className="w-16 px-3 py-3"
-                    >
-                      Rank *
-                    </SortableTh>
-                  ) : null}
-                  <SortableTh
-                    columnKey="name"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="min-w-[180px] px-3 py-3"
-                  >
-                    Name *
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="shortCode"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-3 py-3"
-                  >
-                    Short Code*
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="onlineDisplayName"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="min-w-[150px] px-3 py-3"
-                  >
-                    Online Display Name
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="price"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-3 py-3"
-                  >
-                    Price *
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="description"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="min-w-[200px] px-3 py-3"
-                  >
-                    Description
-                  </SortableTh>
+                  {rankWise ? <th className="w-16 px-3 py-3">Rank *</th> : null}
+                  <th className="min-w-[180px] px-3 py-3">Name *</th>
+                  <th className="px-3 py-3">Short Code*</th>
+                  <th className="min-w-[150px] px-3 py-3">Online Display Name</th>
+                  <th className="px-3 py-3">Price *</th>
+                  <th className="min-w-[200px] px-3 py-3">Description</th>
                   <th className="px-3 py-3">Image</th>
                   <th className="px-3 py-3">Actions</th>
                 </tr>

@@ -145,13 +145,6 @@ export default function AddBiller() {
         )
         setEditInitial({
           group: user.memberships?.[0]?.groups?.[0] ?? '',
-<<<<<<< HEAD
-          selectedGroup: user.memberships?.[0]?.groups?.[0] ?? '',
-          selectedGroups: user.memberships?.[0]?.groups ?? [],
-          selectedCodenames: user.permissions ?? [],
-          tables: [],
-=======
->>>>>>> origin/main
         })
       })
       .catch((err: unknown) => {
@@ -201,13 +194,8 @@ export default function AddBiller() {
       discount_value: discountValue.trim() !== '' ? discountValue.trim() : null,
       ...(panelValue
         ? {
-<<<<<<< HEAD
-            groups: panelValue.selectedGroups ?? [],
-            permissions: panelValue.selectedCodenames,
-=======
             group:
               panelValue.group === 'No Group Selected' ? '' : panelValue.group,
->>>>>>> origin/main
           }
         : {}),
     }

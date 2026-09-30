@@ -8,9 +8,7 @@ import { Button } from '../../components/common/Button'
 import { Card } from '../../components/common/Card'
 import { Badge } from '../../components/common/Badge'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
-import { ListSearch } from '../../components/common/ListSearch'
 import { Table, type Column } from '../../components/common/Table'
-import { useListQuery } from '../../hooks/useListQuery'
 import { formatINR } from '../../utils/format'
 import {
   PAYMENT_MODE_OPTIONS,
@@ -98,44 +96,7 @@ export default function DuePaymentClient() {
     [client],
   )
 
-<<<<<<< HEAD
-  const outstandingQuery = useListQuery(
-    outstandingBills,
-    (row) => [row.billNo, row.date, row.total, row.paid, billStatus(row), billPending(row)],
-    (row, key) => {
-      if (key === 'date') return row.date
-      if (key === 'total') return row.total
-      if (key === 'paid') return row.paid
-      if (key === 'status') return billStatus(row)
-      if (key === 'pending') return billPending(row)
-      return row.billNo
-    },
-  )
-  const salesQuery = useListQuery(
-    client?.sales ?? [],
-    (row) => [row.billNo, row.date, row.total, row.status, row.pending],
-    (row, key) => {
-      if (key === 'date') return row.date
-      if (key === 'total') return row.total
-      if (key === 'status') return row.status
-      if (key === 'pending') return row.pending
-      return row.billNo
-    },
-  )
-  const paymentsQuery = useListQuery(
-    client?.payments ?? [],
-    (row) => [row.date, row.method, row.amount],
-    (row, key) => {
-      if (key === 'method') return row.method
-      if (key === 'amount') return row.amount
-      return row.date
-    },
-  )
-
-  if (!clientId || !client) {
-=======
   if (!clientId || (!client && loaded)) {
->>>>>>> origin/main
     return <Navigate to="/due-payments" replace />
   }
   if (!client) {
@@ -177,20 +138,17 @@ export default function DuePaymentClient() {
     {
       key: 'billNo',
       header: 'Bill #',
-      sortable: true,
       render: (row) => <span className="font-medium text-ink">{row.billNo}</span>,
     },
     {
       key: 'date',
       header: 'Date',
-      sortable: true,
       render: (row) => <span className="text-ink">{row.date}</span>,
     },
     {
       key: 'total',
       header: 'Total',
       align: 'right',
-      sortable: true,
       render: (row) => (
         <span className="tabular-nums text-ink">{formatINR(row.total, 2)}</span>
       ),
@@ -199,7 +157,6 @@ export default function DuePaymentClient() {
       key: 'paid',
       header: 'Paid',
       align: 'right',
-      sortable: true,
       render: (row) => (
         <span className="font-semibold tabular-nums text-success">
           {formatINR(row.paid, 2)}
@@ -209,7 +166,6 @@ export default function DuePaymentClient() {
     {
       key: 'status',
       header: 'Status',
-      sortable: true,
       render: (row) => {
         const status = billStatus(row)
         const variant =
@@ -229,7 +185,6 @@ export default function DuePaymentClient() {
       key: 'pending',
       header: 'Pending',
       align: 'right',
-      sortable: true,
       render: (row) => {
         const pending = billPending(row)
         return (
@@ -247,20 +202,17 @@ export default function DuePaymentClient() {
     {
       key: 'billNo',
       header: 'Bill #',
-      sortable: true,
       render: (row) => <span className="font-medium text-ink">{row.billNo}</span>,
     },
     {
       key: 'date',
       header: 'Date',
-      sortable: true,
       render: (row) => <span className="text-ink">{row.date}</span>,
     },
     {
       key: 'total',
       header: 'Total',
       align: 'right',
-      sortable: true,
       render: (row) => (
         <span className="tabular-nums text-ink">{formatINR(row.total, 2)}</span>
       ),
@@ -268,7 +220,6 @@ export default function DuePaymentClient() {
     {
       key: 'status',
       header: 'Status',
-      sortable: true,
       render: (row) => (
         <Badge
           variant={row.status === 'Credit' ? 'accent' : 'success'}
@@ -283,7 +234,6 @@ export default function DuePaymentClient() {
       key: 'pending',
       header: 'Pending',
       align: 'right',
-      sortable: true,
       render: (row) => (
         <span
           className={`tabular-nums ${row.pending > 0 ? 'font-semibold text-primary' : 'text-ink'}`}
@@ -298,20 +248,17 @@ export default function DuePaymentClient() {
     {
       key: 'date',
       header: 'Payment Date',
-      sortable: true,
       render: (row) => <span className="text-ink">{row.date}</span>,
     },
     {
       key: 'method',
       header: 'Method',
-      sortable: true,
       render: (row) => <span className="text-ink">{row.method}</span>,
     },
     {
       key: 'amount',
       header: 'Amount',
       align: 'right',
-      sortable: true,
       render: (row) => (
         <span className="font-semibold tabular-nums text-success">
           {formatINR(row.amount, 2)}
@@ -429,63 +376,33 @@ export default function DuePaymentClient() {
 
         {tab === 'outstanding' ? (
           <Card bodyClassName="p-0">
-            <div className="border-b border-line p-3">
-              <ListSearch
-                value={outstandingQuery.search}
-                onChange={outstandingQuery.setSearch}
-                placeholder="Search outstanding bills"
-              />
-            </div>
             <Table
               columns={outstandingColumns}
-              rows={outstandingQuery.visible}
+              rows={outstandingBills}
               rowKey={(row) => row.id}
               emptyMessage="No outstanding bills."
-              sortKey={outstandingQuery.sortKey}
-              sortDir={outstandingQuery.sortDir}
-              onSort={outstandingQuery.toggleSort}
             />
           </Card>
         ) : null}
 
         {tab === 'sales' ? (
           <Card bodyClassName="p-0">
-            <div className="border-b border-line p-3">
-              <ListSearch
-                value={salesQuery.search}
-                onChange={salesQuery.setSearch}
-                placeholder="Search sales"
-              />
-            </div>
             <Table
               columns={salesColumns}
-              rows={salesQuery.visible}
+              rows={client.sales}
               rowKey={(row) => row.id}
               emptyMessage="No sales records."
-              sortKey={salesQuery.sortKey}
-              sortDir={salesQuery.sortDir}
-              onSort={salesQuery.toggleSort}
             />
           </Card>
         ) : null}
 
         {tab === 'payments' ? (
           <Card bodyClassName="p-0">
-            <div className="border-b border-line p-3">
-              <ListSearch
-                value={paymentsQuery.search}
-                onChange={paymentsQuery.setSearch}
-                placeholder="Search payments"
-              />
-            </div>
             <Table
               columns={paymentColumns}
-              rows={paymentsQuery.visible}
+              rows={client.payments}
               rowKey={(row) => row.id}
               emptyMessage="No payments recorded."
-              sortKey={paymentsQuery.sortKey}
-              sortDir={paymentsQuery.sortDir}
-              onSort={paymentsQuery.toggleSort}
             />
           </Card>
         ) : null}

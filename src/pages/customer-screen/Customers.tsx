@@ -2,18 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
-<<<<<<< HEAD
-import { ArrowLeft, Plus, Tv, Users } from 'lucide-react'
-import { BillingHeader } from '../../components/billing/BillingHeader'
-import { CustomerHistoryModal } from '../../components/billing/CustomerHistoryModal'
-import { ListSearch } from '../../components/common/ListSearch'
-import { SortableTh } from '../../components/common/SortableTh'
-import { useListQuery } from '../../hooks/useListQuery'
-import { AddCustomerModal } from './AddCustomerModal'
-=======
 import { ArrowLeft, Loader, Plus, Search, Tv, Users } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
->>>>>>> origin/main
 import {
   CustomerHistoryModal,
   type CustomerHistoryOrder,
@@ -59,6 +49,7 @@ export default function Customers() {
   const navigate = useNavigate()
   const { encryptedOutletId } = useAuth()
   const [billNo, setBillNo] = useState('')
+  const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<CustomerFilter>('all')
   const [customers, setCustomers] = useState<CustomerDto[]>([])
   const [dues, setDues] = useState<Record<string, string>>({})
@@ -80,40 +71,6 @@ export default function Customers() {
     }
   }, [encryptedOutletId])
 
-<<<<<<< HEAD
-  const filtered = useMemo(() => {
-    return customers.filter((customer) => {
-      if (filter === 'due' && customer.dueAmount <= 0) return false
-      if (filter === 'loyalty' && customer.loyaltyPoints <= 0) return false
-      return true
-    })
-  }, [customers, filter])
-
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      filtered,
-      (customer) => [
-        customer.name,
-        customer.phone,
-        customer.email,
-        customer.locality,
-        customer.address,
-        customer.dueAmount,
-        customer.loyaltyPoints,
-        customer.lastVisit,
-      ],
-      (customer, key) => {
-        if (key === 'phone') return customer.phone
-        if (key === 'email') return customer.email
-        if (key === 'address') return customer.address
-        if (key === 'locality') return customer.locality
-        if (key === 'due') return customer.dueAmount
-        if (key === 'loyalty') return customer.loyaltyPoints
-        if (key === 'lastVisit') return customer.lastVisit
-        return customer.name
-      },
-    )
-=======
   useEffect(() => {
     void loadDues()
   }, [loadDues])
@@ -160,7 +117,6 @@ export default function Customers() {
       )
     })
   }, [customers, dues, filter, search])
->>>>>>> origin/main
 
   const dueTotal = useMemo(
     () =>
@@ -280,14 +236,6 @@ export default function Customers() {
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-card px-4 py-3 sm:px-5">
         <div className="mb-3 flex flex-wrap items-center gap-3">
-<<<<<<< HEAD
-          <ListSearch
-            value={search}
-            onChange={setSearch}
-            placeholder="Search name, phone, locality"
-            className="max-w-sm"
-          />
-=======
           <div className="relative min-w-[200px] max-w-sm flex-1">
             <Search
               size={14}
@@ -301,7 +249,6 @@ export default function Customers() {
               className="h-9 w-full rounded-lg border border-line bg-card pl-8 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
             />
           </div>
->>>>>>> origin/main
           <div className="flex items-center gap-1">
             {FILTERS.map((tab) => (
               <button
@@ -328,82 +275,6 @@ export default function Customers() {
           <table className="w-full min-w-[980px] border-collapse text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-page text-left text-xs font-semibold text-ink">
-<<<<<<< HEAD
-                <SortableTh
-                  columnKey="name"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Name
-                </SortableTh>
-                <SortableTh
-                  columnKey="phone"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Phone
-                </SortableTh>
-                <SortableTh
-                  columnKey="email"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Email
-                </SortableTh>
-                <SortableTh
-                  columnKey="address"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Address
-                </SortableTh>
-                <SortableTh
-                  columnKey="locality"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Locality
-                </SortableTh>
-                <SortableTh
-                  columnKey="due"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Due (₹)
-                </SortableTh>
-                <SortableTh
-                  columnKey="loyalty"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Loyalty
-                </SortableTh>
-                <SortableTh
-                  columnKey="lastVisit"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Last Visit
-                </SortableTh>
-=======
                 <th className="border-b border-line px-3 py-2.5">Name</th>
                 <th className="border-b border-line px-3 py-2.5">Phone</th>
                 <th className="border-b border-line px-3 py-2.5">Email</th>
@@ -412,16 +283,11 @@ export default function Customers() {
                 <th className="border-b border-line px-3 py-2.5 text-right">
                   Due (₹)
                 </th>
->>>>>>> origin/main
                 <th className="border-b border-line px-3 py-2.5">Action</th>
               </tr>
             </thead>
             <tbody>
-<<<<<<< HEAD
-              {visible.length === 0 ? (
-=======
               {loading ? (
->>>>>>> origin/main
                 <tr>
                   <td
                     colSpan={7}
@@ -443,64 +309,6 @@ export default function Customers() {
                   </td>
                 </tr>
               ) : (
-<<<<<<< HEAD
-                visible.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-page/70">
-                    <td className="border-b border-line px-3 py-2 font-semibold text-ink">
-                      {customer.name}
-                    </td>
-                    <td className="border-b border-line px-3 py-2 text-ink">
-                      {customer.phone}
-                    </td>
-                    <td className="border-b border-line px-3 py-2 text-ink">
-                      {customer.email || '—'}
-                    </td>
-                    <td className="border-b border-line px-3 py-2 text-ink">
-                      {customer.address || '—'}
-                    </td>
-                    <td className="border-b border-line px-3 py-2 text-ink">
-                      {customer.locality || '—'}
-                    </td>
-                    <td
-                      className={`border-b border-line px-3 py-2 text-right tabular-nums ${
-                        customer.dueAmount > 0
-                          ? 'font-semibold text-primary'
-                          : 'text-ink'
-                      }`}
-                    >
-                      {money(customer.dueAmount)}
-                    </td>
-                    <td className="border-b border-line px-3 py-2 text-right tabular-nums text-ink">
-                      {customer.loyaltyPoints}
-                    </td>
-                    <td className="border-b border-line px-3 py-2 whitespace-nowrap text-ink">
-                      {customer.lastVisit}
-                    </td>
-                    <td className="border-b border-line px-3 py-2">
-                      <div className="flex flex-wrap items-center gap-x-1 text-sm">
-                        <button
-                          type="button"
-                          onClick={() => setHistoryCustomer(customer)}
-                          className="font-semibold text-primary underline decoration-primary/40 hover:text-primary-hover"
-                        >
-                          History
-                        </button>
-                        <span className="text-muted">|</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditing(customer)
-                            setFormOpen(true)
-                          }}
-                          className="font-semibold text-primary underline decoration-primary/40 hover:text-primary-hover"
-                        >
-                          Edit
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-=======
                 rows.map((customer) => {
                   const dueAmount = Number(dues[customer.id] ?? '0') || 0
                   return (
@@ -554,7 +362,6 @@ export default function Customers() {
                     </tr>
                   )
                 })
->>>>>>> origin/main
               )}
             </tbody>
           </table>

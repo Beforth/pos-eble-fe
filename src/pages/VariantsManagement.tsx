@@ -11,8 +11,6 @@ import {
   Search,
 } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { SortableTh } from '../components/common/SortableTh'
-import { useListQuery } from '../hooks/useListQuery'
 import {
   ActionDropdown,
   OutlineButton,
@@ -195,28 +193,8 @@ export default function VariantsManagement() {
     })
   }, [appliedName, appliedSearchBy, variations])
 
-  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
-    rows,
-    (row) => [
-      row.name,
-      row.onlineDisplayName,
-      row.departmentName,
-      row.status,
-      row.created,
-      row.modified,
-    ],
-    (row, key) => {
-      if (key === 'onlineDisplayName') return row.onlineDisplayName
-      if (key === 'departmentName') return row.departmentName
-      if (key === 'status') return row.status
-      if (key === 'created') return row.created
-      if (key === 'modified') return row.modified
-      return row.name
-    },
-  )
-
   const allSelected =
-    visible.length > 0 && visible.every((row) => selected.has(row.id))
+    rows.length > 0 && rows.every((row) => selected.has(row.id))
 
   async function setSelectedStatus(status: 'Active' | 'Inactive') {
     if (selected.size === 0 || !encryptedOutletId) return
@@ -345,78 +323,21 @@ export default function VariantsManagement() {
                   checked={allSelected}
                   onChange={() =>
                     setSelected(
-                      allSelected ? new Set() : new Set(visible.map((r) => r.id)),
+                      allSelected ? new Set() : new Set(rows.map((r) => r.id)),
                     )
                   }
                   className="cursor-pointer accent-primary"
                 />
               </th>
-<<<<<<< HEAD
-              <SortableTh
-                columnKey="name"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Name
-              </SortableTh>
-              <SortableTh
-                columnKey="onlineDisplayName"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Online Display Name
-              </SortableTh>
-              <SortableTh
-                columnKey="departmentName"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Department Name
-              </SortableTh>
-              <SortableTh
-                columnKey="status"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Status
-              </SortableTh>
-              <SortableTh
-                columnKey="created"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Created
-              </SortableTh>
-              <SortableTh
-                columnKey="modified"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={toggleSort}
-                className="px-3 py-3"
-              >
-                Modified
-              </SortableTh>
-=======
               <th className="px-3 py-3">Name</th>
               <th className="px-3 py-3">Online Display Name</th>
               <th className="px-3 py-3">Variations</th>
               <th className="px-3 py-3">Status</th>
->>>>>>> origin/main
               <th className="px-3 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {visible.map((row) => (
+            {rows.map((row) => (
               <tr
                 key={row.id}
                 className="border-b border-line last:border-b-0 hover:bg-page/80"

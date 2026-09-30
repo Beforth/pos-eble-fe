@@ -7,14 +7,12 @@ import {
   ArrowLeft,
   Bike,
   Grid2x2,
+  Search,
   ShoppingBag,
   UtensilsCrossed,
 } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { CurrentOrderDetailsModal } from '../../components/configuration/CurrentOrderDetailsModal'
-import { ListSearch } from '../../components/common/ListSearch'
-import { SortableTh } from '../../components/common/SortableTh'
-import { useListQuery } from '../../hooks/useListQuery'
 import {
   money,
   rowClassForStatus,
@@ -77,18 +75,12 @@ export default function CurrentOrders() {
   const [billNo, setBillNo] = useState('')
   const [mainTab, setMainTab] = useState<OrdersMainTab>('current')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
-<<<<<<< HEAD
-  const [orders, setOrders] = useState<CurrentOrderRow[]>(() => [
-    ...currentOrdersList,
-  ])
-=======
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState<CurrentOrderRow[]>([])
->>>>>>> origin/main
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null)
   const [cancelPassword, setCancelPassword] = useState('')
   const [cancelReason, setCancelReason] = useState('')
@@ -100,44 +92,6 @@ export default function CurrentOrders() {
     gateRef.current = { page, search, status: statusFilter }
   }, [page, search, statusFilter])
 
-<<<<<<< HEAD
-  const filtered = useMemo(() => {
-    return orders.filter((order) => {
-      if (typeFilter !== 'all' && order.orderType !== typeFilter) return false
-      return true
-    })
-  }, [orders, typeFilter])
-
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      filtered,
-      (order) => [
-        order.orderNo,
-        order.customerName,
-        order.customerPhone,
-        order.orderTypeLabel,
-        order.source,
-        order.paymentType,
-        order.myAmount,
-        order.tax,
-        order.discount,
-        order.grandTotal,
-        order.createdAt,
-      ],
-      (order, key) => {
-        if (key === 'orderType') return order.orderTypeLabel
-        if (key === 'customerPhone') return order.customerPhone
-        if (key === 'customerName') return order.customerName
-        if (key === 'paymentType') return order.paymentType
-        if (key === 'myAmount') return order.myAmount
-        if (key === 'tax') return order.tax
-        if (key === 'discount') return order.discount
-        if (key === 'grandTotal') return order.grandTotal
-        if (key === 'created') return order.createdAt
-        return order.orderNo
-      },
-    )
-=======
   useEffect(() => {
     if (!encryptedOutletId) return
     let cancelled = false
@@ -228,7 +182,6 @@ export default function CurrentOrders() {
   }, [orders, typeFilter])
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
->>>>>>> origin/main
 
   function openCancel(orderId: string) {
     setCancelOrderId(orderId)
@@ -362,14 +315,6 @@ export default function CurrentOrders() {
         </div>
 
         <div className="mb-3 flex flex-wrap items-center gap-3">
-<<<<<<< HEAD
-          <ListSearch
-            value={search}
-            onChange={setSearch}
-            placeholder="Search"
-            className="max-w-sm"
-          />
-=======
           <div className="relative min-w-[200px] max-w-sm flex-1">
             <Search
               size={14}
@@ -386,7 +331,6 @@ export default function CurrentOrders() {
               className="h-9 w-full rounded-lg border border-line bg-card pl-8 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
             />
           </div>
->>>>>>> origin/main
           <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
             {LEGEND.map((item) => (
               <div
@@ -427,100 +371,30 @@ export default function CurrentOrders() {
           <table className="w-full min-w-[1100px] border-collapse text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-page text-left text-xs font-semibold text-ink">
-                <SortableTh
-                  columnKey="orderNo"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Order No.
-                </SortableTh>
-                <SortableTh
-                  columnKey="orderType"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Order Type
-                </SortableTh>
-                <SortableTh
-                  columnKey="customerPhone"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
+                <th className="border-b border-line px-3 py-2.5">Order No.</th>
+                <th className="border-b border-line px-3 py-2.5">Order Type</th>
+                <th className="border-b border-line px-3 py-2.5">
                   Customer Phone
-                </SortableTh>
-                <SortableTh
-                  columnKey="customerName"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
+                </th>
+                <th className="border-b border-line px-3 py-2.5">
                   Customer Name
-                </SortableTh>
-                <SortableTh
-                  columnKey="paymentType"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
+                </th>
+                <th className="border-b border-line px-3 py-2.5">
                   Payment Type
-                </SortableTh>
-                <SortableTh
-                  columnKey="myAmount"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                  className="border-b border-line px-3 py-2.5"
-                >
+                </th>
+                <th className="border-b border-line px-3 py-2.5 text-right">
                   My Amount (₹)
-                </SortableTh>
-                <SortableTh
-                  columnKey="tax"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                  className="border-b border-line px-3 py-2.5"
-                >
+                </th>
+                <th className="border-b border-line px-3 py-2.5 text-right">
                   Tax (₹)
-                </SortableTh>
-                <SortableTh
-                  columnKey="discount"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                  className="border-b border-line px-3 py-2.5"
-                >
+                </th>
+                <th className="border-b border-line px-3 py-2.5 text-right">
                   Discount (₹)
-                </SortableTh>
-                <SortableTh
-                  columnKey="grandTotal"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                  className="border-b border-line px-3 py-2.5"
-                >
+                </th>
+                <th className="border-b border-line px-3 py-2.5 text-right">
                   Grand Total (₹)
-                </SortableTh>
-                <SortableTh
-                  columnKey="created"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={toggleSort}
-                  className="border-b border-line px-3 py-2.5"
-                >
-                  Created
-                </SortableTh>
+                </th>
+                <th className="border-b border-line px-3 py-2.5">Created</th>
                 <th className="border-b border-line px-3 py-2.5">Action</th>
               </tr>
             </thead>

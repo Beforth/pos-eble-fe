@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react'
-<<<<<<< HEAD
-import { Eye, Info, List, Pencil, PencilLine } from 'lucide-react'
-=======
 import {
-  ArrowDown,
   Eye,
   Info,
   List,
@@ -11,7 +7,6 @@ import {
   PencilLine,
   ShoppingCart,
 } from 'lucide-react'
->>>>>>> origin/main
 import type { KotRow, KotStatus } from '../../mocks/kotData'
 import { SortableTh } from '../common/SortableTh'
 import { useListQuery } from '../../hooks/useListQuery'
@@ -53,8 +48,13 @@ function ActionButton({
   )
 }
 
-<<<<<<< HEAD
-export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
+export function KotTable({
+  rows,
+  onEdit,
+  onView,
+  onDetails,
+  onOpenInBilling,
+}: KotTableProps) {
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
     rows,
     (row) => [
@@ -82,16 +82,6 @@ export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
       return row.kotId
     },
   )
-
-=======
-export function KotTable({
-  rows,
-  onEdit,
-  onView,
-  onDetails,
-  onOpenInBilling,
-}: KotTableProps) {
->>>>>>> origin/main
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
       <table className="w-full min-w-[1120px] border-collapse text-left text-sm">

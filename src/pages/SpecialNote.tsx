@@ -4,8 +4,6 @@ import { showToast } from '../utils/toast'
 import { Link } from 'react-router-dom'
 import { FileUp, Plus, Search } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { SortableTh } from '../components/common/SortableTh'
-import { useListQuery } from '../hooks/useListQuery'
 import { AddSpecialNoteModal } from '../components/menu/AddSpecialNoteModal'
 import { ImportSpecialNotesModal } from '../components/menu/ImportSpecialNotesModal'
 import {
@@ -56,15 +54,6 @@ export default function SpecialNote() {
     return notes.filter((note) => note.title.toLowerCase().includes(q))
   }, [notes, appliedQuery])
 
-  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
-    filteredNotes,
-    (note) => [note.name, note.available],
-    (note, key) => {
-      if (key === 'status') return note.available ? 1 : 0
-      return note.name
-    },
-  )
-
   function requireSelection() {
     if (selectedIds.size === 0) {
       setSelectAlertOpen(true)
@@ -93,11 +82,11 @@ export default function SpecialNote() {
   }
 
   function toggleSelectAll() {
-    if (selectedIds.size === visible.length) {
+    if (selectedIds.size === filteredNotes.length) {
       setSelectedIds(new Set())
       return
     }
-    setSelectedIds(new Set(visible.map((note) => note.id)))
+    setSelectedIds(new Set(filteredNotes.map((note) => note.id)))
   }
 
   function setAvailability(available: boolean) {
@@ -187,7 +176,7 @@ export default function SpecialNote() {
           </div>
         </div>
 
-        {visible.length === 0 ? (
+        {filteredNotes.length === 0 ? (
           <div className="flex min-h-[360px] flex-col items-center justify-center px-6 py-14 text-center">
             <span className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Search size={28} strokeWidth={1.75} />
@@ -206,36 +195,20 @@ export default function SpecialNote() {
                     <input
                       type="checkbox"
                       checked={
-                        visible.length > 0 &&
-                        selectedIds.size === visible.length
+                        filteredNotes.length > 0 &&
+                        selectedIds.size === filteredNotes.length
                       }
                       onChange={toggleSelectAll}
                       className="size-4 accent-primary"
                       aria-label="Select all"
                     />
                   </th>
-                  <SortableTh
-                    columnKey="name"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Name
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="status"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Status
-                  </SortableTh>
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {visible.map((note) => (
+                {filteredNotes.map((note) => (
                   <tr
                     key={note.id}
                     className="border-b border-line last:border-b-0 hover:bg-page/60"

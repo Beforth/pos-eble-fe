@@ -1,42 +1,7 @@
-<<<<<<< HEAD
-import { useState } from 'react'
-=======
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
->>>>>>> origin/main
 import { useNavigate } from 'react-router-dom'
-import { Download, Printer } from 'lucide-react'
+import { Download, Printer, Search } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
-<<<<<<< HEAD
-import { ListSearch } from '../components/common/ListSearch'
-import { SortableTh } from '../components/common/SortableTh'
-import { useListQuery } from '../hooks/useListQuery'
-
-interface LogRow {
-  id: string
-  timestamp: string
-  user: string
-  action: string
-  details: string
-}
-
-const LOG_ROWS: LogRow[] = [
-  { id: 'l1', timestamp: '25 Aug 2026, 09:12 AM', user: 'Utkarsh Gosavi', action: 'Order Created', details: 'Bill #56978 — Dine In, ₹300' },
-  { id: 'l2', timestamp: '25 Aug 2026, 09:15 AM', user: 'Utkarsh Gosavi', action: 'KOT Sent', details: 'KOT #1042 — 3 items to Kitchen' },
-  { id: 'l3', timestamp: '25 Aug 2026, 09:30 AM', user: 'System', action: 'Order Settled', details: 'Bill #56978 — Cash, ₹300' },
-  { id: 'l4', timestamp: '25 Aug 2026, 09:45 AM', user: 'Raju Shah', action: 'Item Modified', details: 'Bill #56979 — Added Extra Cheese (+₹30)' },
-  { id: 'l5', timestamp: '25 Aug 2026, 10:02 AM', user: 'Utkarsh Gosavi', action: 'Order Cancelled', details: 'Bill #56980 — Dine In, ₹180' },
-  { id: 'l6', timestamp: '25 Aug 2026, 10:15 AM', user: 'Raju Shah', action: 'Payment Changed', details: 'Bill #56981 — Cash → UPI' },
-  { id: 'l7', timestamp: '25 Aug 2026, 10:30 AM', user: 'Utkarsh Gosavi', action: 'Order Created', details: 'Bill #56982 — Parcel, ₹450' },
-  { id: 'l8', timestamp: '25 Aug 2026, 10:45 AM', user: 'System', action: 'KOT Printed', details: 'KOT #1045 — Auto-print triggered' },
-  { id: 'l9', timestamp: '25 Aug 2026, 11:00 AM', user: 'Raju Shah', action: 'Discount Applied', details: 'Bill #56982 — 10% flat discount (-₹45)' },
-  { id: 'l10', timestamp: '25 Aug 2026, 11:15 AM', user: 'Utkarsh Gosavi', action: 'Order Created', details: 'Bill #56983 — Dine In, ₹720' },
-  { id: 'l11', timestamp: '25 Aug 2026, 11:30 AM', user: 'System', action: 'Order Settled', details: 'Bill #56983 — Card, ₹720' },
-  { id: 'l12', timestamp: '25 Aug 2026, 11:45 AM', user: 'Raju Shah', action: 'Reprint Requested', details: 'Bill #56978 — Receipt reprinted' },
-  { id: 'l13', timestamp: '25 Aug 2026, 12:00 PM', user: 'Utkarsh Gosavi', action: 'Order Created', details: 'Bill #56984 — Dine In, ₹560' },
-  { id: 'l14', timestamp: '25 Aug 2026, 12:15 PM', user: 'System', action: 'Sync Completed', details: 'All data synced to server' },
-  { id: 'l15', timestamp: '25 Aug 2026, 12:30 PM', user: 'Raju Shah', action: 'Item Modified', details: 'Bill #56984 — Removed Item (-₹120)' },
-]
-=======
 import { useAuth } from '../auth/AuthContext'
 import { showToast } from '../utils/toast'
 import {
@@ -44,7 +9,6 @@ import {
   type ActivityLogDto,
   type ActivityLogSource,
 } from '../services/orderService'
->>>>>>> origin/main
 
 const ACTION_COLORS: Record<string, string> = {
   'Order Created': 'bg-success/10 text-success',
@@ -90,28 +54,6 @@ export function ActivityLogsView({
 }: ActivityLogsViewProps) {
   const { encryptedOutletId } = useAuth()
   const navigate = useNavigate()
-<<<<<<< HEAD
-  const [billNo, setBillNo] = useState('')
-  const [page, setPage] = useState(1)
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      LOG_ROWS,
-      (row) => [row.timestamp, row.user, row.action, row.details],
-      (row, key) => {
-        if (key === 'user') return row.user
-        if (key === 'action') return row.action
-        if (key === 'details') return row.details
-        return row.timestamp
-      },
-    )
-
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = visible.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE,
-  )
-=======
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -166,7 +108,6 @@ export function ActivityLogsView({
     setPage(1)
     setAppliedSearch(search.trim())
   }
->>>>>>> origin/main
 
   function handleExport() {
     const headerRow = 'Timestamp,User,Action,Details'
@@ -245,19 +186,6 @@ export function ActivityLogsView({
         </div>
 
         <div className="rounded-xl border border-line bg-card">
-<<<<<<< HEAD
-          <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-            <ListSearch
-              value={search}
-              onChange={(value) => {
-                setSearch(value)
-                setPage(1)
-              }}
-              placeholder="Search logs..."
-              className="sm:max-w-xs"
-            />
-            <span className="text-xs text-muted">{visible.length} events</span>
-=======
           <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
             <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
               <Search
@@ -285,51 +213,12 @@ export function ActivityLogsView({
             <span className="text-xs text-muted">
               {loading ? 'Loading…' : `${totalCount} events`}
             </span>
->>>>>>> origin/main
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="bg-page/60">
-<<<<<<< HEAD
-                  <SortableTh
-                    columnKey="timestamp"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
-                  >
-                    Timestamp
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="user"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
-                  >
-                    User
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="action"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
-                  >
-                    Action
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="details"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted"
-                  >
-                    Details
-                  </SortableTh>
-=======
                   <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">
                     Timestamp
                   </th>
@@ -342,7 +231,6 @@ export function ActivityLogsView({
                   <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">
                     Details
                   </th>
->>>>>>> origin/main
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">

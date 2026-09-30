@@ -12,9 +12,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react'
-import { SortableTh } from '../components/common/SortableTh'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { useListQuery } from '../hooks/useListQuery'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { NoRecordFound } from '../components/menu/NoRecordFound'
 import { ConfirmDeleteModal } from '../components/common/ConfirmDeleteModal'
@@ -270,55 +268,6 @@ export default function CategoryManagement() {
   const parentRows = parents
   const groupRows = groups
 
-  const {
-    sortKey: parentSortKey,
-    sortDir: parentSortDir,
-    toggleSort: toggleParentSort,
-    visible: parentVisible,
-  } = useListQuery(
-    parentRows,
-    (row) => [
-      row.name,
-      row.onlineDisplayName,
-      row.categories,
-      row.status,
-      row.created,
-    ],
-    (row, key) => {
-      if (key === 'onlineDisplayName') return row.onlineDisplayName
-      if (key === 'categories') return row.categories
-      if (key === 'status') return row.status
-      if (key === 'created') return row.created
-      return row.name
-    },
-  )
-
-  const {
-    sortKey: categorySortKey,
-    sortDir: categorySortDir,
-    toggleSort: toggleCategorySort,
-    visible: categoryVisible,
-  } = useListQuery(
-    categoryRows,
-    (row) => [
-      row.name,
-      row.onlineDisplayName,
-      row.parentCategory,
-      row.rank,
-      row.status,
-      row.created,
-      row.modified,
-    ],
-    (row, key) => {
-      if (key === 'onlineDisplayName') return row.onlineDisplayName
-      if (key === 'rank') return row.rank
-      if (key === 'status') return row.status
-      if (key === 'created') return row.created
-      if (key === 'modified') return row.modified
-      return row.name
-    },
-  )
-
   const showEmpty =
     (subTab === 'grouping' && groupRows.length === 0) ||
     subTab === 'menu-config' ||
@@ -326,17 +275,12 @@ export default function CategoryManagement() {
 
   const listForSelect =
     subTab === 'parent'
-      ? parentVisible
+      ? parentRows
       : subTab === 'category'
-<<<<<<< HEAD
-        ? categoryVisible
-        : []
-=======
         ? categoryRows
         : subTab === 'grouping'
           ? groupRows
           : []
->>>>>>> origin/main
 
   const allSelected =
     listForSelect.length > 0 &&
@@ -602,56 +546,16 @@ export default function CategoryManagement() {
                       className="cursor-pointer accent-primary"
                     />
                   </th>
-                  <SortableTh
-                    columnKey="name"
-                    sortKey={parentSortKey}
-                    sortDir={parentSortDir}
-                    onSort={toggleParentSort}
-                    className="px-3 py-3"
-                  >
-                    Name
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="onlineDisplayName"
-                    sortKey={parentSortKey}
-                    sortDir={parentSortDir}
-                    onSort={toggleParentSort}
-                    className="px-3 py-3"
-                  >
-                    Online Display Name
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="categories"
-                    sortKey={parentSortKey}
-                    sortDir={parentSortDir}
-                    onSort={toggleParentSort}
-                    className="px-3 py-3"
-                  >
-                    Category
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="status"
-                    sortKey={parentSortKey}
-                    sortDir={parentSortDir}
-                    onSort={toggleParentSort}
-                    className="px-3 py-3"
-                  >
-                    Status
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="created"
-                    sortKey={parentSortKey}
-                    sortDir={parentSortDir}
-                    onSort={toggleParentSort}
-                    className="px-3 py-3"
-                  >
-                    Created
-                  </SortableTh>
+                  <th className="px-3 py-3">Name</th>
+                  <th className="px-3 py-3">Online Display Name</th>
+                  <th className="px-3 py-3">Category</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Created</th>
                   <th className="px-3 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {parentVisible.map((row) => {
+                {parentRows.map((row) => {
                   const checked = selected.has(row.id)
                   const childNames =
                     (row.categories ?? [])
@@ -734,66 +638,18 @@ export default function CategoryManagement() {
                       className="cursor-pointer accent-primary"
                     />
                   </th>
-                  <SortableTh
-                    columnKey="name"
-                    sortKey={categorySortKey}
-                    sortDir={categorySortDir}
-                    onSort={toggleCategorySort}
-                    className="px-3 py-3"
-                  >
-                    Name
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="onlineDisplayName"
-                    sortKey={categorySortKey}
-                    sortDir={categorySortDir}
-                    onSort={toggleCategorySort}
-                    className="px-3 py-3"
-                  >
-                    Online Display Name
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="rank"
-                    sortKey={categorySortKey}
-                    sortDir={categorySortDir}
-                    onSort={toggleCategorySort}
-                    className="px-3 py-3"
-                  >
-                    Rank
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="status"
-                    sortKey={categorySortKey}
-                    sortDir={categorySortDir}
-                    onSort={toggleCategorySort}
-                    className="px-3 py-3"
-                  >
-                    Status
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="created"
-                    sortKey={categorySortKey}
-                    sortDir={categorySortDir}
-                    onSort={toggleCategorySort}
-                    className="px-3 py-3"
-                  >
-                    Created
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="modified"
-                    sortKey={categorySortKey}
-                    sortDir={categorySortDir}
-                    onSort={toggleCategorySort}
-                    className="px-3 py-3"
-                  >
-                    Modified
-                  </SortableTh>
+                  <th className="px-3 py-3">Name</th>
+                  <th className="px-3 py-3">Online Display Name</th>
+                  <th className="px-3 py-3">Rank</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Created</th>
+                  <th className="px-3 py-3">Modified</th>
                   <th className="px-3 py-3">Image</th>
                   <th className="px-3 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {categoryVisible.map((row) => {
+                {categoryRows.map((row) => {
                   const checked = selected.has(row.id)
                   return (
                     <tr
@@ -862,7 +718,7 @@ export default function CategoryManagement() {
             </table>
           </div>
           <p className="mt-3 text-sm text-muted">
-            Showing 1 to {categoryVisible.length} of {categoryVisible.length} records
+            Showing 1 to {categoryRows.length} of {categoryRows.length} records
           </p>
         </>
       ) : null}
