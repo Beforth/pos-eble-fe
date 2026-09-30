@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, Home } from 'lucide-react'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -131,6 +132,7 @@ export default function CancelOrderReport() {
     )
   }, [applied.fromDate, applied.toDate])
 
+<<<<<<< HEAD
   const qtyList = useListQuery(
     rows,
     (row) => [
@@ -155,6 +157,19 @@ export default function CancelOrderReport() {
     },
   )
 
+=======
+  function exportRows(exportData: CancelDayRow[], suffix: 'page' | 'all') {
+    downloadCsv(
+      `cancel-order-report-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', ...restaurantColumns],
+      exportData.map((row) => [
+        row.dateLabel,
+        ...restaurantColumns.map((name) => row.qtyByRestaurant[name] ?? 0),
+      ]),
+    )
+    showToast(`Exported ${exportData.length} rows`)
+  }
+>>>>>>> origin/main
 
   function handleSearch() {
     setApplied({ fromDate, toDate, restaurant })
@@ -209,13 +224,7 @@ export default function CancelOrderReport() {
             Back
           </button>
           <ExportMenu
-            onExport={(mode) =>
-              showToast(
-                mode === 'page'
-                  ? 'Exporting current page…'
-                  : 'Exporting all records…',
-              )
-            }
+            onExport={(mode) => exportRows(rows, mode)}
           />
         </div>
       }

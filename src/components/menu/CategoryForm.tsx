@@ -1,9 +1,15 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
+import { listParentCategoriesApi } from '../../services/menuService'
+import type { ParentCategory } from '../../types/menu'
+import { showToast } from '../../utils/toast'
 
 export interface CategoryFormValues {
   name: string
   onlineDisplayName: string
+  parentCategoryId: string | null
+  rank: number
   tag: string
   status: boolean
   logoName: string
@@ -74,10 +80,15 @@ export function CategoryForm({
   onSave,
   headerActions,
 }: CategoryFormProps) {
+  const { encryptedOutletId } = useAuth()
   const [name, setName] = useState(initial.name)
   const [onlineDisplayName, setOnlineDisplayName] = useState(
     initial.onlineDisplayName,
   )
+  const [parentCategoryId, setParentCategoryId] = useState<string | null>(
+    initial.parentCategoryId,
+  )
+  const [rank, setRank] = useState<number>(initial.rank)
   const [tag, setTag] = useState(initial.tag)
   const [status, setStatus] = useState(initial.status)
   const [logoName, setLogoName] = useState(initial.logoName)
@@ -85,11 +96,35 @@ export function CategoryForm({
   const [offlineImageName, setOfflineImageName] = useState(
     initial.offlineImageName,
   )
+  const [parentOptions, setParentOptions] = useState<ParentCategory[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    listParentCategoriesApi(encryptedOutletId)
+      .then((rows) => {
+        if (!cancelled) setParentOptions(rows)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load parent categories',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   function handleSave() {
     onSave({
       name: name.trim(),
       onlineDisplayName: onlineDisplayName.trim(),
+      parentCategoryId,
+      rank,
       tag,
       status,
       logoName,
@@ -136,6 +171,54 @@ export function CategoryForm({
               type="text"
               value={onlineDisplayName}
               onChange={(event) => setOnlineDisplayName(event.target.value)}
+              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div>
+            <label
+              htmlFor="category-parent"
+              className="mb-1.5 block text-sm font-medium text-ink"
+            >
+              Parent Category
+            </label>
+            <div className="relative">
+              <select
+                id="category-parent"
+                value={parentCategoryId ?? ''}
+                onChange={(event) =>
+                  setParentCategoryId(event.target.value || null)
+                }
+                className="h-10 w-full appearance-none rounded-md border border-line bg-card px-3 pr-9 text-sm text-ink outline-none focus:border-primary"
+              >
+                <option value="">No Parent Category</option>
+                {parentOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="category-rank"
+              className="mb-1.5 block text-sm font-medium text-ink"
+            >
+              Rank
+            </label>
+            <input
+              id="category-rank"
+              type="number"
+              value={rank}
+              onChange={(event) => setRank(Number(event.target.value))}
               className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
             />
           </div>

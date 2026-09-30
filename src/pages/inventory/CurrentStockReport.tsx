@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+<<<<<<< HEAD
 import { downloadCsv } from '../../utils/downloadFile'
+=======
+import { downloadCsv } from '../../utils/exportCsv'
+>>>>>>> origin/main
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -139,6 +143,7 @@ export default function CurrentStockReport() {
     categories,
   ])
 
+<<<<<<< HEAD
   useEffect(() => {
     void load()
   }, [load])
@@ -158,12 +163,33 @@ export default function CurrentStockReport() {
       return true
     })
   }, [rows, appliedStockLevel])
+=======
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `current-stock-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        'Raw Material',
+        'Unit',
+        'Category',
+        'Current Stock Qty',
+        'Stock Level',
+        'Status',
+      ],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+>>>>>>> origin/main
 
   return (
     <InventoryPageShell activeItem="current-stock">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Current Stock Report</h1>
         <ExportMenu
+<<<<<<< HEAD
           onExportPage={() => {
             downloadCsv(
               [
@@ -208,6 +234,10 @@ export default function CurrentStockReport() {
             )
             showToast('Exported all')
           }}
+=======
+          onExportPage={() => exportRows([], 'page')}
+          onExportAll={() => exportRows([], 'all')}
+>>>>>>> origin/main
         />
       </div>
 

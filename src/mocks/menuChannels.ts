@@ -12,3 +12,12 @@ export type MenuChannelId = keyof typeof MENU_CHANNELS
 export function isMenuChannelId(value: string): value is MenuChannelId {
   return value in MENU_CHANNELS
 }
+
+export const MENU_CHANNEL_SLUG: Record<MenuChannelId, string> = {
+  'base-menu': 'base',
+  'home-delivery': 'home-delivery',
+  parcel: 'parcel',
+  'dine-in': 'dine-in',
+  zomato: 'zomato',
+  swiggy: 'swiggy',
+}

@@ -1,19 +1,6 @@
-export interface MenuItemRow {
-  id: string
-  categoryId: string
-  name: string
-  shortCode: string
-  onlineDisplayName: string
-  price: number
-  description: string
-  available: boolean
-  availableOnPos?: boolean
-  availableOnSwiggy?: boolean
-  availableOnZomato?: boolean
-  tags: string[]
-  hasImage: boolean
-  rank?: number
-}
+import type { MenuItemRow } from '../utils/menuAdapter'
+
+export type { MenuItemRow }
 
 /** Full category sidebar list for Base Menu / Dine In / Parcel. */
 export const baseMenuCategories = [
@@ -427,26 +414,4 @@ export const menuItems: MenuItemRow[] = [
 
 export function getMenuItemById(id: string) {
   return menuItems.find((row) => row.id === id)
-}
-
-const ITEMS_STORAGE_KEY = 'menu_items_store'
-
-export function getStoredMenuItems(): MenuItemRow[] {
-  try {
-    const raw = localStorage.getItem(ITEMS_STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-export function addMenuItem(item: MenuItemRow) {
-  const items = getStoredMenuItems()
-  items.push(item)
-  localStorage.setItem(ITEMS_STORAGE_KEY, JSON.stringify(items))
-}
-
-export function deleteMenuItem(id: string) {
-  const items = getStoredMenuItems().filter((i) => i.id !== id)
-  localStorage.setItem(ITEMS_STORAGE_KEY, JSON.stringify(items))
 }

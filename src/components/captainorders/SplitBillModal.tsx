@@ -372,12 +372,12 @@ export function SplitBillModal({
             <div className="grid gap-4 md:grid-cols-2">
               {/* All Items */}
               <div className="overflow-hidden rounded border border-line">
-                <div className="flex items-center gap-2 bg-primary px-3 py-2.5 text-sm font-semibold text-white">
+                <div className="flex items-center gap-2 border-b border-line bg-page px-3 py-2.5 text-sm font-semibold text-ink">
                   <input
                     type="checkbox"
                     checked={allUnassignedSelected}
                     onChange={toggleSelectAll}
-                    className="size-4 accent-white"
+                    className="size-4 accent-primary"
                     aria-label="Select all items"
                   />
                   All Items
@@ -419,17 +419,17 @@ export function SplitBillModal({
                     key={partIndex}
                     className="overflow-hidden rounded border border-line"
                   >
-                    <div className="flex items-center gap-2 bg-primary px-3 py-2 text-sm font-semibold text-white">
+                    <div className="flex items-center gap-2 border-b border-line bg-page px-3 py-2 text-sm font-semibold text-ink">
                       <button
                         type="button"
                         onClick={() => addSelectedToPart(partIndex)}
-                        className="rounded bg-white px-2.5 py-0.5 text-xs font-semibold text-primary hover:bg-page"
+                        className="rounded border border-primary bg-white px-2.5 py-0.5 text-xs font-semibold text-primary hover:bg-primary/5"
                       >
                         Add
                       </button>
                       <span>Part {partIndex + 1}</span>
                       {itemSplitAmounts[partIndex] > 0 ? (
-                        <span className="ml-auto text-xs font-medium">
+                        <span className="ml-auto text-xs font-medium text-muted">
                           ₹{itemSplitAmounts[partIndex].toFixed(2)}
                         </span>
                       ) : null}

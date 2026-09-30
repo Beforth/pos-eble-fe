@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar'
 import { SupportAgentDrawer } from './SupportAgentDrawer'
 import { TopBar } from './TopBar'
 import { brand } from '../../theme/brand'
+import { useChrome } from '../../state/ChromeContext'
 
 interface ReportsPageShellProps {
   title: ReactNode
@@ -20,7 +21,7 @@ export function ReportsPageShell({
   actions,
   children,
 }: ReportsPageShellProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -37,7 +38,7 @@ export function ReportsPageShell({
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem={activeItem}
       />

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Eye, EyeOff, Lock, LogIn, Store, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
+import { homePathFor } from '../../auth/routePermissions'
 import {
   OutletSelectionRequiredError,
   type OutletMembership,
@@ -58,12 +59,12 @@ export function LoginForm() {
   }
 
   const completeLogin = async (outletId?: number) => {
-    await login({
+    const permissions = await login({
       identifier: identifier.trim(),
       password,
       outletId,
     })
-    navigate('/dashboard', { replace: true })
+    navigate(homePathFor(permissions), { replace: true })
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

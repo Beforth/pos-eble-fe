@@ -1,34 +1,84 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
+import { useAuth } from '../auth/AuthContext'
 import {
-  ASSIGNABLE_CATEGORIES,
-  getParentCategoryById,
-} from '../mocks/parentCategoriesData'
+  createParentCategoryApi,
+  getParentCategoryApi,
+  updateParentCategoryApi,
+} from '../services/menuService'
+import type { ParentCategory, ParentCategoryPayload } from '../types/menu'
+import { showToast } from '../utils/toast'
+import { useMenuReference } from '../state/MenuReferenceContext'
 
 export default function EditParentCategory() {
   const { id = '' } = useParams()
+  const isNew = !id
   const navigate = useNavigate()
-  const parent = useMemo(() => getParentCategoryById(id), [id])
+  const { encryptedOutletId } = useAuth()
 
-  const categoryOptions = useMemo(() => {
-    const set = new Set<string>([
-      ...ASSIGNABLE_CATEGORIES,
-      ...(parent?.categoryIds ?? []),
-    ])
-    return Array.from(set)
-  }, [parent])
+  const [parent, setParent] = useState<ParentCategory | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([])
 
-  const [name, setName] = useState(parent?.name ?? '')
-  const [onlineDisplayName, setOnlineDisplayName] = useState(
-    parent?.onlineDisplayName ?? '',
-  )
-  const [status, setStatus] = useState(parent?.status === 'Active')
+  const [name, setName] = useState('')
+  const [onlineDisplayName, setOnlineDisplayName] = useState('')
+  const [position, setPosition] = useState(0)
+  const [status, setStatus] = useState(true)
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
-    () => new Set(parent?.categoryIds ?? []),
+    new Set(),
   )
   const [logoName, setLogoName] = useState('')
   const [swiggyImageName, setSwiggyImageName] = useState('')
+
+  const { categories, reload } = useMenuReference(['categories'])
+
+  useEffect(() => {
+    if (encryptedOutletId) void reload('categories', { force: true })
+  }, [encryptedOutletId, reload])
+
+  useEffect(() => {
+    if (categoryOptions.length === 0) {
+      setCategoryOptions(categories.map((c) => c.name))
+      setSelectedCategories(
+        new Set(
+          categories.filter((c) => c.parent_id === id).map((c) => c.name),
+        ),
+      )
+    }
+  }, [categories, categoryOptions.length, id])
+
+  useEffect(() => {
+    if (isNew) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    if (!encryptedOutletId || !id) return
+    getParentCategoryApi(encryptedOutletId, id)
+      .then((row) => {
+        if (cancelled) return
+        setParent(row)
+        setName(row.name)
+        setOnlineDisplayName(row.online_display_name)
+        setPosition(row.position)
+        setStatus(row.is_active)
+        setLoading(false)
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        showToast(
+          error instanceof Error
+            ? error.message
+            : 'Failed to load parent category',
+        )
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, id, isNew])
 
   const allChecked =
     categoryOptions.length > 0 &&
@@ -55,29 +105,79 @@ export default function EditParentCategory() {
     setSelectedCategories(new Set(categoryOptions))
   }
 
-  if (!parent) {
-    return (
-      <MenuPageShell
-        backTo="/menu/categories?tab=parent"
-        title={
-          <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
-            <Link to="/menu" className="text-primary hover:underline">
-              Menu Management
-            </Link>
-            <span className="font-normal text-muted">&gt;</span>
-            <Link
-              to="/menu/categories?tab=parent"
-              className="text-primary hover:underline"
-            >
-              Category Management
-            </Link>
-            <span className="font-normal text-muted">&gt;</span>
-            <span className="font-semibold text-ink">Edit Parent Category</span>
-          </span>
-        }
+  async function handleSave() {
+    if (!encryptedOutletId || (!isNew && !id)) return
+    if (!name.trim()) {
+      showToast('Parent category name is required')
+      return
+    }
+    setSaving(true)
+    try {
+      const payload: ParentCategoryPayload = {
+        name: name.trim(),
+        online_display_name: onlineDisplayName.trim() || undefined,
+        is_active: status,
+        position,
+      }
+      if (isNew) {
+        await createParentCategoryApi(encryptedOutletId, payload)
+        showToast('Parent category created successfully')
+      } else {
+        await updateParentCategoryApi(encryptedOutletId, id, payload)
+        showToast('Parent category updated successfully')
+      }
+      goBack()
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : isNew
+            ? 'Failed to create parent category'
+            : 'Failed to update parent category',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const title = (
+    <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
+      <Link to="/menu" className="text-primary hover:underline">
+        Menu Management
+      </Link>
+      <span className="font-normal text-muted">&gt;</span>
+      <Link
+        to="/menu/categories?tab=parent"
+        className="text-primary hover:underline"
       >
+        Category Management
+      </Link>
+      <span className="font-normal text-muted">&gt;</span>
+      <span className="font-semibold text-ink">
+        {isNew ? 'Add Parent Category' : 'Edit Parent Category'}
+      </span>
+    </span>
+  )
+
+  if (loading) {
+    return (
+      <MenuPageShell backTo="/menu/categories?tab=parent" title={title}>
         <div className="rounded-lg border border-line bg-card p-8 text-center">
-          <p className="text-sm font-semibold text-ink">Parent category not found</p>
+          <p className="text-sm font-semibold text-ink">
+            Loading parent category…
+          </p>
+        </div>
+      </MenuPageShell>
+    )
+  }
+
+  if (!isNew && !parent) {
+    return (
+      <MenuPageShell backTo="/menu/categories?tab=parent" title={title}>
+        <div className="rounded-lg border border-line bg-card p-8 text-center">
+          <p className="text-sm font-semibold text-ink">
+            Parent category not found
+          </p>
           <button
             type="button"
             onClick={goBack}
@@ -91,27 +191,11 @@ export default function EditParentCategory() {
   }
 
   return (
-    <MenuPageShell
-      backTo="/menu/categories?tab=parent"
-      title={
-        <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
-          <Link to="/menu" className="text-primary hover:underline">
-            Menu Management
-          </Link>
-          <span className="font-normal text-muted">&gt;</span>
-          <Link
-            to="/menu/categories?tab=parent"
-            className="text-primary hover:underline"
-          >
-            Category Management
-          </Link>
-          <span className="font-normal text-muted">&gt;</span>
-          <span className="font-semibold text-ink">Edit Parent Category</span>
-        </span>
-      }
-    >
+    <MenuPageShell backTo="/menu/categories?tab=parent" title={title}>
       <div className="rounded-lg border border-line bg-card p-5 sm:p-6">
-        <h2 className="mb-5 text-base font-bold text-ink">Edit Parent Category</h2>
+        <h2 className="mb-5 text-base font-bold text-ink">
+          {isNew ? 'Add Parent Category' : 'Edit Parent Category'}
+        </h2>
 
         <div className="grid gap-5 md:grid-cols-2">
           <div>
@@ -143,6 +227,22 @@ export default function EditParentCategory() {
               type="text"
               value={onlineDisplayName}
               onChange={(event) => setOnlineDisplayName(event.target.value)}
+              className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="parent-position"
+              className="mb-1.5 block text-sm font-medium text-ink"
+            >
+              Position
+            </label>
+            <input
+              id="parent-position"
+              type="number"
+              value={position}
+              onChange={(event) => setPosition(Number(event.target.value))}
               className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
             />
           </div>
@@ -280,8 +380,9 @@ export default function EditParentCategory() {
           </button>
           <button
             type="button"
-            onClick={goBack}
-            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             Save Changes
           </button>

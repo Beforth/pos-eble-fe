@@ -1,8 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Check } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { menuAreas } from '../mocks/menuSectionData'
+import { SelectDropdown, type SelectDropdownOption } from '../components/common/SelectDropdown'
+import { createTaxApi } from '../services/menuService'
+import type { TaxPayload } from '../types/menu'
+import { useAuth } from '../auth/AuthContext'
+import { showToast } from '../utils/toast'
 
 type TaxKind = 'gst' | 'vat' | 'other'
 
@@ -28,43 +32,71 @@ const TAX_KINDS: {
   },
 ]
 
-const AREA_OPTIONS = menuAreas.map((area) => area.name)
-const ORDER_TYPES = ['Delivery', 'Pick Up', 'Dine In'] as const
+/** GST buckets the printed bill groups by (Tax.tax_category). */
+const GST_CATEGORIES = ['CGST', 'SGST', 'IGST', 'UTGST', 'CESS']
 
 export default function AddTax() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [kind, setKind] = useState<TaxKind | null>(null)
   const [direction, setDirection] = useState<'Forward' | 'Backward'>('Backward')
   const [title, setTitle] = useState('')
   const [onlineDisplayName, setOnlineDisplayName] = useState('')
-  const [areas, setAreas] = useState<Set<string>>(() => new Set(AREA_OPTIONS))
+  const [taxCategory, setTaxCategory] = useState('CGST')
   const [taxValue, setTaxValue] = useState<'Percentage' | 'Fixed'>('Percentage')
   const [amount, setAmount] = useState('')
-  const [orderTypes, setOrderTypes] = useState<Set<string>>(
-    () => new Set(['Delivery', 'Pick Up']),
-  )
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active')
+  const [saving, setSaving] = useState(false)
+
+  const categoryOptions = useMemo<SelectDropdownOption[]>(
+    () => [
+      ...GST_CATEGORIES.map((value) => ({ value, label: value })),
+      { value: '', label: 'No category' },
+    ],
+    [],
+  )
+
+  const statusOptions = useMemo<SelectDropdownOption[]>(
+    () => [
+      { value: 'Active', label: 'Active' },
+      { value: 'Inactive', label: 'Inactive' },
+    ],
+    [],
+  )
 
   function goBack() {
     navigate('/menu/taxes')
   }
 
-  function toggleArea(name: string) {
-    setAreas((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
-  }
-
-  function toggleOrderType(name: string) {
-    setOrderTypes((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
+  async function handleSave() {
+    if (!encryptedOutletId) return
+    if (!title.trim()) {
+      showToast('Tax title is required')
+      return
+    }
+    setSaving(true)
+    try {
+      const payload: TaxPayload = {
+        title,
+        online_display_name: onlineDisplayName,
+        tax_type: direction === 'Forward' ? 'Forward Tax' : 'Backward Tax',
+        // The boolean is authoritative: tax_type is only the human label, and
+        // the POS reads this to know whether the slab is added on top of the
+        // price or already inside it.
+        backward_printing: direction === 'Backward',
+        tax_category: kind === 'gst' ? taxCategory : '',
+        type: taxValue,
+        amount,
+        is_active: status === 'Active',
+      }
+      await createTaxApi(encryptedOutletId, payload)
+      showToast('Tax created successfully')
+      navigate('/menu/taxes')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to save tax')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -191,25 +223,23 @@ export default function AddTax() {
                   />
                 </div>
 
-                <div>
-                  <p className="mb-2 text-sm font-medium text-ink">Areas</p>
-                  <div className="flex flex-wrap gap-x-6 gap-y-2">
-                    {AREA_OPTIONS.map((name) => (
-                      <label
-                        key={name}
-                        className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={areas.has(name)}
-                          onChange={() => toggleArea(name)}
-                          className="size-4 cursor-pointer accent-primary"
-                        />
-                        {name}
-                      </label>
-                    ))}
+                {kind === 'gst' ? (
+                  <div className="max-w-xs">
+                    <label className="mb-1.5 block text-sm font-medium text-ink">
+                      GST Category
+                    </label>
+                    <SelectDropdown
+                      value={taxCategory}
+                      options={categoryOptions}
+                      onChange={setTaxCategory}
+                      caption="Select GST category"
+                    />
+                    <p className="mt-1.5 text-xs text-muted">
+                      Printed bills list one line per category, so CGST and SGST
+                      are set up as two taxes.
+                    </p>
                   </div>
-                </div>
+                ) : null}
 
                 <div>
                   <p className="mb-2 text-sm font-medium text-ink">Tax Value</p>
@@ -245,46 +275,21 @@ export default function AddTax() {
                   />
                 </div>
 
-                <div>
-                  <p className="mb-2 text-sm font-medium text-ink">Order Type</p>
-                  <div className="flex flex-wrap gap-x-6 gap-y-2">
-                    {ORDER_TYPES.map((name) => (
-                      <label
-                        key={name}
-                        className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={orderTypes.has(name)}
-                          onChange={() => toggleOrderType(name)}
-                          className="size-4 cursor-pointer accent-primary"
-                        />
-                        {name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="max-w-xs">
                   <label className="mb-1.5 block text-sm font-medium text-ink">
                     Status
                   </label>
-                  <div className="relative">
-                    <select
-                      value={status}
-                      onChange={(event) =>
-                        setStatus(event.target.value as 'Active' | 'Inactive')
-                      }
-                      className="h-9 w-full appearance-none rounded-md border border-line bg-card px-3 pr-8 text-sm outline-none focus:border-primary"
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-                    />
-                  </div>
+                  <SelectDropdown
+                    value={status}
+                    options={statusOptions}
+                    onChange={(value) =>
+                      setStatus(value as 'Active' | 'Inactive')
+                    }
+                    caption="Select status"
+                  />
+                  <p className="mt-1.5 text-xs text-muted">
+                    An inactive tax is configured but never priced on a bill.
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -302,8 +307,9 @@ export default function AddTax() {
           {kind ? (
             <button
               type="button"
-              onClick={goBack}
-              className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
               Save Changes
             </button>

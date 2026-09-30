@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FilePenLine, Search, Trash2, X } from 'lucide-react'
+import { showToast } from '../../utils/toast'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import {
-  deleteDraftBill,
+  deleteDraftBillApi,
+  listDraftBillsApi,
+} from '../../services/orderService'
+import {
   draftAmount,
   draftItemCount,
-  loadDraftBills,
+  toDraftBill,
   type DraftBill,
 } from '../../utils/draftBillStore'
 
 interface DraftBillsModalProps {
   open: boolean
+  outletId: string
   onClose: () => void
   onResume: (draft: DraftBill) => void
   onDraftsChange?: (count: number) => void
@@ -35,24 +41,38 @@ function draftTitle(draft: DraftBill): string {
 
 export function DraftBillsModal({
   open,
+  outletId,
   onClose,
   onResume,
   onDraftsChange,
 }: DraftBillsModalProps) {
   const [drafts, setDrafts] = useState<DraftBill[]>([])
+  const [pendingDelete, setPendingDelete] = useState<DraftBill | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [search, setSearch] = useState('')
 
-  function reloadDrafts() {
-    const next = loadDraftBills()
-    setDrafts(next)
-    onDraftsChange?.(next.length)
-  }
+  const reloadDrafts = useCallback(async () => {
+    if (!outletId) {
+      setDrafts([])
+      onDraftsChange?.(0)
+      return
+    }
+    try {
+      const rows = await listDraftBillsApi(outletId)
+      const next = rows.map(toDraftBill)
+      setDrafts(next)
+      onDraftsChange?.(next.length)
+    } catch {
+      setDrafts([])
+      onDraftsChange?.(0)
+    }
+  }, [outletId, onDraftsChange])
 
   useEffect(() => {
     if (!open) return
-    reloadDrafts()
+    void reloadDrafts()
     setSearch('')
-  }, [open])
+  }, [open, reloadDrafts])
 
   useEffect(() => {
     if (!open) return
@@ -71,6 +91,28 @@ export function DraftBillsModal({
       document.body.style.overflow = previous
     }
   }, [open])
+
+  async function handleDelete(id: string) {
+    if (!outletId) return
+    try {
+      setDeleting(true)
+      await deleteDraftBillApi(outletId, id)
+      await reloadDrafts()
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to delete the draft',
+      )
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function confirmDeleteDraft() {
+    if (!pendingDelete) return
+    const draft = pendingDelete
+    setPendingDelete(null)
+    await handleDelete(draft.id)
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -183,10 +225,7 @@ export function DraftBillsModal({
                       type="button"
                       title="Delete draft"
                       aria-label="Delete draft"
-                      onClick={() => {
-                        deleteDraftBill(draft.id)
-                        reloadDrafts()
-                      }}
+                      onClick={() => setPendingDelete(draft)}
                       className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line text-muted hover:border-primary hover:text-primary"
                     >
                       <Trash2 size={14} />
@@ -205,6 +244,27 @@ export function DraftBillsModal({
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Delete draft bill"
+        target={pendingDelete ? draftTitle(pendingDelete) : undefined}
+        message={
+          pendingDelete
+            ? `${draftItemCount(pendingDelete)} item(s) worth ₹${draftAmount(
+                pendingDelete,
+              ).toLocaleString('en-IN', { maximumFractionDigits: 2 })} will be discarded. This draft was never billed, so nothing is settled.`
+            : undefined
+        }
+        consequences={[
+          'You will not be able to resume or reprint this bill.',
+          'Any table, customer and note saved with it is discarded.',
+        ]}
+        note="This draft was never billed, so it holds no sales or stock record — archiving it changes no stock count and no revenue."
+        confirmLabel="Delete draft"
+        loading={deleting}
+        onConfirm={() => void confirmDeleteDraft()}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

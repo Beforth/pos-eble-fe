@@ -1,42 +1,8 @@
-export interface BillingTable {
-  id: string
-  tableNo: string
-  persons: number
-  areaName: string
-}
-
 export type TableFloorStatus =
   | 'blank'
   | 'printed'
   | 'paid'
   | 'running-kot'
-
-export const billingTables: BillingTable[] = [
-  ...Array.from({ length: 10 }, (_, i) => ({
-    id: `gf-${i + 1}`,
-    tableNo: String(i + 1),
-    persons: i % 3 === 0 ? 6 : i % 2 === 0 ? 4 : 2,
-    areaName: 'Ground Floor',
-  })),
-  ...Array.from({ length: 10 }, (_, i) => ({
-    id: `bs-${i + 11}`,
-    tableNo: String(i + 11),
-    persons: i % 2 === 0 ? 4 : 2,
-    areaName: 'BASEMENT',
-  })),
-  {
-    id: 'ph-1',
-    tableNo: 'Hall 1',
-    persons: 20,
-    areaName: 'Party Hall',
-  },
-  {
-    id: 'ph-2',
-    tableNo: 'Hall 2',
-    persons: 20,
-    areaName: 'Party Hall',
-  },
-]
 
 export const TABLE_STATUS_LEGEND: {
   id: TableFloorStatus

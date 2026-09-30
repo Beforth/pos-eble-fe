@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { AuditTrailSidebar } from './AuditTrailSidebar'
 import { UniversalSearchBar } from './UniversalSearchBar'
 import { brand } from '../../theme/brand'
+import { useChrome } from '../../state/ChromeContext'
 
 interface AuditTrailPageShellProps {
   activeItem?: string
@@ -12,7 +13,7 @@ export function AuditTrailPageShell({
   activeItem = 'overview',
   children,
 }: AuditTrailPageShellProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
@@ -20,7 +21,7 @@ export function AuditTrailPageShell({
       <AuditTrailSidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem={activeItem}
       />

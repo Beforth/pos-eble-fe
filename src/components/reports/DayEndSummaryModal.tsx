@@ -1,18 +1,54 @@
-import { useEffect } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Printer, X } from 'lucide-react'
 import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
+import {
+  getDayEndClosureApi,
+  type DayEndClosureDetailDto,
+  type DayEndSnapshot,
+} from '../../services/orderService'
 import { formatNumber } from '../../utils/format'
+import {
+  DayEndPrintTemplate,
+  type BreakoutRow,
+} from './DayEndPrintTemplate'
 
 interface DayEndSummaryModalProps {
   open: boolean
   row: DayEndSummaryRow | null
+  outletId: string
   onClose: () => void
 }
 
-interface BreakoutRow {
-  label: string
-  count: number
-  amount: number
+/** Snapshot `payment_types`/`order_types` → breakout rows. */
+function snapshotBreakout(
+  types: DayEndSnapshot['payment_types'] | undefined,
+  row: DayEndSummaryRow,
+): BreakoutRow[] {
+  if (!types || Object.keys(types).length === 0) {
+    return buildBreakout(row).payment
+  }
+  const entries = Object.entries(types)
+  return entries.map(([label, value], index) => ({
+    label,
+    count: index === entries.length - 1 ? 0 : value.count,
+    amount: Number(value.total ?? 0),
+  }))
+}
+
+/** Snapshot `order_types` → breakout rows. */
+function snapshotOrderTypeBreakout(
+  types: DayEndSnapshot['order_types'] | undefined,
+  row: DayEndSummaryRow,
+): BreakoutRow[] {
+  if (!types || Object.keys(types).length === 0) {
+    return buildBreakout(row).orderType
+  }
+  const entries = Object.entries(types)
+  return entries.map(([label, value], index) => ({
+    label,
+    count: index === entries.length - 1 ? 0 : value.count,
+    amount: Number(value.total ?? 0),
+  }))
 }
 
 /** Deterministic mock split of a day-end total (stable per row, latest under total). */
@@ -118,8 +154,28 @@ function BreakoutTable({
 export function DayEndSummaryModal({
   open,
   row,
+  outletId,
   onClose,
 }: DayEndSummaryModalProps) {
+  const [detail, setDetail] = useState<DayEndClosureDetailDto | null>(null)
+  const [printOpen, setPrintOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open || !row || !outletId) return
+    let cancelled = false
+    setDetail(null)
+    getDayEndClosureApi(outletId, row.id)
+      .then((result) => {
+        if (!cancelled) setDetail(result)
+      })
+      .catch(() => {
+        if (!cancelled) setDetail(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, row, outletId])
+
   useEffect(() => {
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -140,7 +196,13 @@ export function DayEndSummaryModal({
 
   if (!open || !row) return null
 
-  const breakout = buildBreakout(row)
+  const summary = detail?.summary ?? null
+  const breakout = summary
+    ? {
+        payment: snapshotBreakout(summary.payment_types, row),
+        orderType: snapshotOrderTypeBreakout(summary.order_types, row),
+      }
+    : buildBreakout(row)
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -172,24 +234,28 @@ export function DayEndSummaryModal({
         </header>
 
         <div className="flex-1 space-y-4 overflow-auto p-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-line bg-page/60 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                No. Of Orders
-              </p>
-              <p className="mt-1 text-xl font-bold tabular-nums text-ink">
-                {formatNumber(row.orders)}
-              </p>
+          {summary ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard label="No. Of Orders" value={formatNumber(summary.orders)} accent={false} />
+              <StatCard label="Total" value={`₹${formatNumber(row.total)}`} accent />
+              <StatCard label="Settled" value={`₹${formatNumber(Number(summary.settled_total ?? 0))}`} accent={false} />
+              <StatCard label="Due" value={`₹${formatNumber(Number(summary.due.total ?? 0))} (${summary.due.count})`} accent={false} />
             </div>
-            <div className="rounded-lg border border-line bg-page/60 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                Total
-              </p>
-              <p className="mt-1 text-xl font-bold tabular-nums text-accent">
-                ₹{formatNumber(row.total)}
-              </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="No. Of Orders" value={formatNumber(row.orders)} accent={false} />
+              <StatCard label="Total" value={`₹${formatNumber(row.total)}`} accent />
             </div>
-          </div>
+          )}
+
+          {summary ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard label="My Amount" value={`₹${formatNumber(Number(summary.my_amount ?? 0))}`} accent={false} />
+              <StatCard label="Tax" value={`₹${formatNumber(Number(summary.tax ?? 0))}`} accent={false} />
+              <StatCard label="Discount" value={`₹${formatNumber(Number(summary.discount ?? 0))}`} accent={false} />
+              <StatCard label="KOTs" value={`${summary.kots.count} (${summary.kots.cancelled} cancelled)`} accent={false} />
+            </div>
+          ) : null}
 
           <BreakoutTable
             title="Payment Mode"
@@ -203,7 +269,21 @@ export function DayEndSummaryModal({
           />
         </div>
 
-        <footer className="flex shrink-0 justify-end border-t border-line px-5 py-3">
+        <footer className="flex shrink-0 justify-end gap-2 border-t border-line px-5 py-3">
+          <button
+            type="button"
+            onClick={() => setPrintOpen(true)}
+            disabled={!detail?.summary}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-4 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
+            title={
+              detail?.summary
+                ? 'Print 80mm receipt'
+                : 'Detail not loaded yet'
+            }
+          >
+            <Printer size={14} className="text-muted" />
+            Print
+          </button>
           <button
             type="button"
             onClick={onClose}
@@ -213,6 +293,41 @@ export function DayEndSummaryModal({
           </button>
         </footer>
       </div>
+
+      {printOpen && detail ? (
+        <DayEndPrintTemplate
+          detail={detail}
+          row={row}
+          payment={breakout.payment}
+          orderType={breakout.orderType}
+          onClose={() => setPrintOpen(false)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string
+  value: string
+  accent?: boolean
+}) {
+  return (
+    <div className="rounded-lg border border-line bg-page/60 px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+        {label}
+      </p>
+      <p
+        className={`mt-1 text-lg font-bold tabular-nums ${
+          accent ? 'text-accent' : 'text-ink'
+        }`}
+      >
+        {value}
+      </p>
     </div>
   )
 }

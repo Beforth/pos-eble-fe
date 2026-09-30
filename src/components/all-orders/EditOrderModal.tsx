@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Pencil, Trash2, X } from 'lucide-react'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { AllOrderRow } from '../../mocks/allOrdersData'
 
 interface EditLineItem {
@@ -68,6 +69,7 @@ export function EditOrderModal({
 }: EditOrderModalProps) {
   const [items, setItems] = useState<EditLineItem[]>([])
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [pendingRemove, setPendingRemove] = useState<EditLineItem | null>(null)
 
   useEffect(() => {
     if (open && order) {
@@ -222,7 +224,7 @@ export function EditOrderModal({
                         <button
                           type="button"
                           aria-label={`Remove ${item.name}`}
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => setPendingRemove(item)}
                           className="flex size-7 items-center justify-center rounded border border-line text-danger hover:bg-page"
                         >
                           <Trash2 size={13} />
@@ -358,6 +360,21 @@ export function EditOrderModal({
             Save Changes
           </button>
         </footer>
+
+        <ConfirmDialog
+          open={Boolean(pendingRemove)}
+          compact
+          title="Remove item from order"
+          target={pendingRemove?.name}
+          message="This item will be removed from the order being edited."
+          note="The order is still in edit — nothing is charged until you save."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (pendingRemove) removeItem(pendingRemove.id)
+            setPendingRemove(null)
+          }}
+          onClose={() => setPendingRemove(null)}
+        />
       </div>
     </div>
   )

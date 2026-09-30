@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { brand } from '../../theme/brand'
 import { BrandLogo } from '../brand/BrandLogo'
+import { useChrome } from '../../state/ChromeContext'
 
 type IconType = typeof Home
 
@@ -77,9 +78,8 @@ export function AuditTrailSidebar({
 }: AuditTrailSidebarProps) {
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState(activeItem)
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    new Set(['management', 'report']),
-  )
+  const { expanded, toggleExpanded: toggleExpandedInStore } = useChrome()
+  const expandedIds = useMemo(() => new Set(expanded.audit), [expanded.audit])
 
   useEffect(() => {
     setActiveCategory(activeItem)
@@ -95,12 +95,7 @@ export function AuditTrailSidebar({
   }, [mobileOpen, onCloseMobile])
 
   function toggleExpand(id: string) {
-    setExpandedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    toggleExpandedInStore('audit', id)
   }
 
   function go(id: string) {

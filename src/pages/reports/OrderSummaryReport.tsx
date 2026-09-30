@@ -1,19 +1,46 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
+<<<<<<< HEAD
 import { ListSearch } from '../../components/common/ListSearch'
 import { SortableTh } from '../../components/common/SortableTh'
 import { useListQuery } from '../../hooks/useListQuery'
 import { DAY_END_SUMMARY_ROWS } from '../../mocks/dayEndSummaryData'
+=======
+import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
+import {
+  listDayEndClosuresApi,
+  toDayEndSummaryRow,
+} from '../../services/orderService'
+import { useAuth } from '../../auth/AuthContext'
+>>>>>>> origin/main
 
 const PAGE_SIZE = 10
 
 export default function OrderSummaryReport() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [page, setPage] = useState(1)
+  const [rows, setRows] = useState<DayEndSummaryRow[]>([])
 
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    listDayEndClosuresApi(encryptedOutletId)
+      .then((dtos) => {
+        if (!cancelled) setRows(dtos.map(toDayEndSummaryRow))
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
+<<<<<<< HEAD
   const rows = DAY_END_SUMMARY_ROWS
   const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
     useListQuery(
@@ -28,6 +55,11 @@ export default function OrderSummaryReport() {
   const totalOrders = visible.reduce((s, r) => s + r.orders, 0)
   const totalRevenue = visible.reduce((s, r) => s + r.total, 0)
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+=======
+  const totalOrders = rows.reduce((s, r) => s + r.orders, 0)
+  const totalRevenue = rows.reduce((s, r) => s + r.total, 0)
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+>>>>>>> origin/main
   const safePage = Math.min(page, totalPages)
   const pageRows = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 

@@ -25,6 +25,15 @@ export interface ScreenTicketItem extends KotViewItem {
   categoryId: string | null
 }
 
+/** Live (or mock) menu row used to resolve KOT lines → category/diet/item. */
+export interface ScreenMenuRow {
+  id: string
+  name: string
+  categoryId: string
+  tags: string[]
+  onlineDisplayName?: string
+}
+
 /** Diet-type pseudo-categories selectable alongside menu categories. */
 export const DIET_CATEGORIES = [
   { id: 'veg', name: 'Veg' },
@@ -43,8 +52,32 @@ const CATEGORY_INDEX = new Map<string, string>([
   ...DIET_CATEGORIES.map((category) => [category.id, category.name] as const),
 ])
 
+/** Merge live category id→name pairs (encrypted ids) into the label index. */
+export function registerCategoryNames(
+  entries: ReadonlyArray<readonly [string, string]>,
+): void {
+  for (const [id, name] of entries) {
+    if (id) CATEGORY_INDEX.set(id, name)
+  }
+}
+
 export function categoryName(id: string): string {
   return CATEGORY_INDEX.get(id) ?? id
+}
+
+let liveMenu: ScreenMenuRow[] | null = null
+const liveById = new Map<string, ScreenMenuRow>()
+
+/** Install the outlet's live menu for KOT filtering / item labels. */
+export function setScreenMenuLookup(rows: ScreenMenuRow[] | null): void {
+  liveMenu = rows
+  liveById.clear()
+  if (!rows) return
+  for (const row of rows) liveById.set(row.id, row)
+}
+
+export function getScreenItemName(id: string): string | null {
+  return liveById.get(id)?.name ?? getMenuItemById(id)?.name ?? null
 }
 
 /** Every menu category plus the diet pseudo-categories (Veg/Non-Veg/Egg first). */
@@ -77,40 +110,65 @@ export function autoScreenName(categoryNames: string[]): string {
   return `${joined} Screen`
 }
 
+function mockAsScreenRow(item: {
+  id: string
+  name: string
+  categoryId: string
+  tags: string[]
+  onlineDisplayName?: string
+}): ScreenMenuRow {
+  return {
+    id: item.id,
+    name: item.name,
+    categoryId: item.categoryId,
+    tags: item.tags,
+    onlineDisplayName: item.onlineDisplayName,
+  }
+}
+
 /** Find the menu item backing a KOT line (itemId → line-id prefix → fuzzy name). */
-function findMenuItemForKotItem(item: KotViewItem) {
+function findMenuItemForKotItem(item: KotViewItem): ScreenMenuRow | null {
   if (item.itemId) {
-    const menuItem = getMenuItemById(item.itemId)
-    if (menuItem) return menuItem
+    const live = liveById.get(item.itemId)
+    if (live) return live
+    const mock = getMenuItemById(item.itemId)
+    if (mock) return mockAsScreenRow(mock)
   }
 
   if (item.id) {
     const stripped = item.id.startsWith('line-') ? item.id.slice(5) : item.id
     const baseId = stripped.split('-')[0]
-    const menuItem = getMenuItemById(baseId) || getMenuItemById(stripped)
-    if (menuItem) return menuItem
+    for (const candidate of [baseId, stripped]) {
+      const live = liveById.get(candidate)
+      if (live) return live
+      const mock = getMenuItemById(candidate)
+      if (mock) return mockAsScreenRow(mock)
+    }
   }
 
   const normalized = normalizeFoodText(item.name)
   if (!normalized) return null
 
+  const pool: ScreenMenuRow[] =
+    liveMenu ?? menuItems.map((row) => mockAsScreenRow(row))
+
   const exact =
-    menuItems.find(
-      (row) => normalizeFoodText(row.name) === normalized,
-    ) ??
-    menuItems.find(
-      (row) => normalizeFoodText(row.onlineDisplayName) === normalized,
+    pool.find((row) => normalizeFoodText(row.name) === normalized) ??
+    pool.find(
+      (row) =>
+        normalizeFoodText(row.onlineDisplayName ?? '') === normalized,
     )
   if (exact) return exact
 
   const nameWords = normalized.split(' ')
   const words = (value: string) =>
     normalizeFoodText(value).split(' ').filter(Boolean)
-  const candidates = menuItems
+  const candidates = pool
     .map((row) => ({ row, rowWords: words(row.name) }))
-    .filter(({ rowWords }) =>
-      rowWords.every((word) => nameWords.includes(word)) ||
-      nameWords.every((word) => rowWords.includes(word)),
+    .filter(
+      ({ rowWords }) =>
+        rowWords.every((word) => nameWords.includes(word)) ||
+        nameWords.every((word) => rowWords.includes(word)),
     )
     .sort((a, b) => b.rowWords.length - a.rowWords.length)
   return candidates[0]?.row ?? null
@@ -119,7 +177,7 @@ function findMenuItemForKotItem(item: KotViewItem) {
 /** Map a KOT item back to a menu category (itemId → menu → category → fallback keywords). */
 export function resolveItemCategoryId(item: KotViewItem): string | null {
   const found = findMenuItemForKotItem(item)
-  if (found) return found.categoryId
+  if (found?.categoryId) return found.categoryId
 
   const lower = item.name.toLowerCase()
   if (lower.includes('chaat') || lower.includes('puri') || lower.includes('bhel') || lower.includes('kachori')) return 'c1'
@@ -190,7 +248,9 @@ export function filterTicketForScreen(
   for (const item of ticket.items) {
     const categoryId = resolveItemCategoryId(item)
     const menuItem = findMenuItemForKotItem(item)
-    const matchesItem = menuItem !== null && itemSet.has(menuItem.id)
+    const matchesItem =
+      (item.itemId != null && itemSet.has(item.itemId)) ||
+      (menuItem !== null && itemSet.has(menuItem.id))
     const matchesCategory =
       categoryId !== null &&
       !isDietCategoryId(categoryId) &&

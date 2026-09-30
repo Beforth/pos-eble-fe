@@ -1,66 +1,124 @@
-import { useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Info } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Info } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { getTaxById, menuAreas } from '../mocks/menuSectionData'
+import {
+  SelectDropdown,
+  type SelectDropdownOption,
+} from '../components/common/SelectDropdown'
+import { getTaxApi, updateTaxApi } from '../services/menuService'
+import type { TaxPayload } from '../types/menu'
+import { useAuth } from '../auth/AuthContext'
+import { showToast } from '../utils/toast'
 
-const AREA_OPTIONS = menuAreas.map((area) => area.name)
-const ORDER_TYPES = ['Delivery', 'Pick Up', 'Dine In'] as const
+/** GST buckets the printed bill groups by (Tax.tax_category). */
+const GST_CATEGORIES = ['CGST', 'SGST', 'IGST', 'UTGST', 'CESS']
 
 export default function EditTax() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
-  const tax = useMemo(() => getTaxById(id), [id])
+  const { encryptedOutletId } = useAuth()
 
-  const [direction, setDirection] = useState<'Forward' | 'Backward'>(
-    tax?.taxType.toLowerCase().includes('forward') ? 'Forward' : 'Backward',
-  )
-  const [title, setTitle] = useState(tax?.title ?? '')
-  const [onlineDisplayName, setOnlineDisplayName] = useState(
-    tax?.onlineDisplayName === tax?.title ? '' : (tax?.onlineDisplayName ?? ''),
-  )
-  const [areas, setAreas] = useState<Set<string>>(
-    () => new Set(AREA_OPTIONS),
-  )
-  const [taxValue, setTaxValue] = useState<'Percentage' | 'Fixed'>(
-    tax?.type === 'Fixed' ? 'Fixed' : 'Percentage',
-  )
-  const [amount, setAmount] = useState(tax?.amount ?? '')
-  const [orderTypes, setOrderTypes] = useState<Set<string>>(
-    () => new Set(['Delivery', 'Pick Up']),
-  )
-  const [status, setStatus] = useState(tax?.status ?? 'Active')
-  const [coreAmount, setCoreAmount] = useState(false)
-  const [sapCode, setSapCode] = useState('')
-  const [description, setDescription] = useState('')
+  const [direction, setDirection] = useState<'Forward' | 'Backward'>('Backward')
+  const [title, setTitle] = useState('')
+  const [onlineDisplayName, setOnlineDisplayName] = useState('')
+  const [taxCategory, setTaxCategory] = useState('')
+  const [taxValue, setTaxValue] = useState<'Percentage' | 'Fixed'>('Percentage')
+  const [amount, setAmount] = useState('')
+  const [status, setStatus] = useState<'Active' | 'Inactive'>('Active')
+  const [saving, setSaving] = useState(false)
 
-  if (!tax) {
-    return <Navigate to="/menu/taxes" replace />
-  }
+  const categoryOptions = useMemo<SelectDropdownOption[]>(
+    () => [
+      ...GST_CATEGORIES.map((value) => ({ value, label: value })),
+      { value: '', label: 'No category' },
+    ],
+    [],
+  )
+
+  const statusOptions = useMemo<SelectDropdownOption[]>(
+    () => [
+      { value: 'Active', label: 'Active' },
+      { value: 'Inactive', label: 'Inactive' },
+    ],
+    [],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId || !id) return
+    getTaxApi(encryptedOutletId, id)
+      .then((row) => {
+        if (cancelled) return
+        setTitle(row.title)
+        setOnlineDisplayName(row.online_display_name)
+        setTaxCategory(row.tax_category ?? '')
+        // backward_printing is the authoritative flag; tax_type is only a
+        // human label, so it is the fallback for rows predating the boolean.
+        setDirection(
+          row.backward_printing === true
+            ? 'Backward'
+            : row.backward_printing === false
+              ? 'Forward'
+              : row.tax_type.toLowerCase().includes('backward')
+                ? 'Backward'
+                : 'Forward',
+        )
+        setTaxValue(row.type === 'Fixed' ? 'Fixed' : 'Percentage')
+        setAmount(String(row.amount))
+        setStatus(row.is_active ? 'Active' : 'Inactive')
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load tax',
+          )
+          navigate('/menu/taxes', { replace: true })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, id, navigate])
 
   function goBack() {
     navigate('/menu/taxes')
   }
 
-  function toggleArea(name: string) {
-    setAreas((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
+  async function handleSave() {
+    if (!encryptedOutletId || !id) return
+    if (!title.trim()) {
+      showToast('Tax title is required')
+      return
+    }
+    setSaving(true)
+    try {
+      const payload: TaxPayload = {
+        title,
+        online_display_name: onlineDisplayName,
+        tax_type: direction === 'Forward' ? 'Forward Tax' : 'Backward Tax',
+        // Kept in sync with the label because the POS prices off the boolean.
+        backward_printing: direction === 'Backward',
+        tax_category: taxCategory,
+        type: taxValue,
+        amount,
+        is_active: status === 'Active',
+      }
+      await updateTaxApi(encryptedOutletId, id, payload)
+      showToast('Tax updated successfully')
+      navigate('/menu/taxes')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to save tax')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  function toggleOrderType(name: string) {
-    setOrderTypes((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
-  }
-
-  const copyNote = `Tax configuration automatically be copied to SGST ${amount || '2.5'} % (${direction.toLowerCase()}).`
+  const copyNote = `This tax is applied to every item it is assigned to. ${
+    direction === 'Backward'
+      ? 'Backward (tax-inclusive) tax is already inside the item price, so it is reported on the bill but not added again.'
+      : 'Forward tax is added on top of the item price when the bill is totalled.'
+  }`
 
   return (
     <MenuPageShell
@@ -146,24 +204,20 @@ export default function EditTax() {
             />
           </div>
 
-          <div>
-            <p className="mb-2 text-sm font-medium text-ink">Areas</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {AREA_OPTIONS.map((name) => (
-                <label
-                  key={name}
-                  className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                >
-                  <input
-                    type="checkbox"
-                    checked={areas.has(name)}
-                    onChange={() => toggleArea(name)}
-                    className="size-4 cursor-pointer accent-primary"
-                  />
-                  {name}
-                </label>
-              ))}
-            </div>
+          <div className="max-w-xs">
+            <label className="mb-1.5 block text-sm font-medium text-ink">
+              GST Category
+            </label>
+            <SelectDropdown
+              value={taxCategory}
+              options={categoryOptions}
+              onChange={setTaxCategory}
+              caption="Select GST category"
+            />
+            <p className="mt-1.5 text-xs text-muted">
+              Printed bills list one line per category, so CGST and SGST are
+              set up as two taxes.
+            </p>
           </div>
 
           <div>
@@ -200,119 +254,33 @@ export default function EditTax() {
             />
           </div>
 
-          <div>
-            <p className="mb-2 text-sm font-medium text-ink">Order Type</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              {ORDER_TYPES.map((name) => (
-                <label
-                  key={name}
-                  className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-                >
-                  <input
-                    type="checkbox"
-                    checked={orderTypes.has(name)}
-                    onChange={() => toggleOrderType(name)}
-                    className="size-4 cursor-pointer accent-primary"
-                  />
-                  {name}
-                </label>
-              ))}
-            </div>
-          </div>
-
           <div className="max-w-xs">
             <label className="mb-1.5 block text-sm font-medium text-ink">
               Status
             </label>
-            <div className="relative">
-              <select
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value as 'Active' | 'Inactive')
-                }
-                className="h-9 w-full appearance-none rounded-md border border-line bg-card px-3 pr-8 text-sm outline-none focus:border-primary"
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-              <ChevronDown
-                size={14}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={coreAmount}
-                onChange={(event) => setCoreAmount(event.target.checked)}
-                className="size-4 cursor-pointer accent-primary"
-              />
-              Consider this in core amount calculation
-            </label>
-            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-primary">
-              Check this box only if you are taking taxes on certain applied
-              taxes. Eg: If you want to take 18% service charge on items
-              purchase and want to calculate GST on item + service charge than
-              mark this box.
+            <SelectDropdown
+              value={status}
+              options={statusOptions}
+              onChange={(value) => setStatus(value as 'Active' | 'Inactive')}
+              caption="Select status"
+            />
+            <p className="mt-1.5 text-xs text-muted">
+              An inactive tax is configured but never priced on a bill.
             </p>
           </div>
-
-          <div className="max-w-xl">
-            <label className="mb-1.5 block text-sm font-medium text-ink">
-              SAP Code
-            </label>
-            <input
-              type="text"
-              value={sapCode}
-              onChange={(event) => setSapCode(event.target.value)}
-              className="h-9 w-full rounded-md border border-line px-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-
-          <div className="max-w-xl">
-            <label className="mb-1.5 block text-sm font-medium text-ink">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={4}
-              className="w-full resize-y rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-          </div>
-
-          <div className="rounded-md border border-line bg-page/60 p-4 opacity-70">
-            <label className="inline-flex cursor-not-allowed items-center gap-2 text-sm text-muted">
-              <input
-                type="checkbox"
-                disabled
-                className="size-4 accent-primary"
-              />
-              Do not print e-Commerce operators. GST levied on the bills printed.
-            </label>
-            <p className="mt-2 text-sm leading-relaxed text-muted">
-              Note: If enabled, the GST amount deducted by e-commerce operators
-              will not be included in the invoices generated.
-            </p>
-          </div>
-
-          <p className="text-sm font-medium text-primary">
-            Note: This configuration has been migrated to the marketplace and is
-            now available on individual third-party platform.
-          </p>
         </div>
 
         <div className="flex items-start gap-2 border-t border-line bg-primary/5 px-5 py-3 text-sm text-ink sm:px-6">
           <Info size={16} className="mt-0.5 shrink-0 text-primary" />
           <span>
-            Tax configuration automatically be copied to{' '}
+            This tax prints on the bill as{' '}
             <span className="font-semibold">
-              SGST {amount || '2.5'} % ({direction.toLowerCase()})
+              {taxCategory || title} {amount || '0'}
+              {taxValue === 'Percentage' ? ' %' : ''} ({direction.toLowerCase()}
+              )
             </span>
-            .
+            . Add a second tax for the matching GST bucket (e.g. SGST alongside
+            CGST) — each is priced and printed on its own line.
           </span>
         </div>
 
@@ -326,8 +294,9 @@ export default function EditTax() {
           </button>
           <button
             type="button"
-            onClick={goBack}
-            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             Save Changes
           </button>

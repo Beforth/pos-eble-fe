@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, Home, Printer } from 'lucide-react'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -168,6 +169,17 @@ export default function OrderSubOrderWiseReport() {
     showToast('Report updated')
   }
 
+  function exportRows(rowsToExport: OrderSubOrderWiseRow[], suffix: string) {
+    downloadCsv(
+      `order-sub-order-wise-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      columns.map((column) => column.label),
+      rowsToExport.map((row) =>
+        columns.map((column) => cellValue(row, column.key)),
+      ),
+    )
+    showToast(`Exported ${rowsToExport.length} rows`)
+  }
+
   function toggleColumn(key: OrderSubOrderColumnKey) {
     if (key === 'restaurant') return
     setVisible((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -264,7 +276,7 @@ export default function OrderSubOrderWiseReport() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => showToast('Exporting Excel…')}
+            onClick={() => exportRows(rows, 'all')}
             className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
           >
             Excel

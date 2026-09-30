@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../utils/toast'
 import { Link, useNavigate } from 'react-router-dom'
-import { FileUp, Pencil, Plus } from 'lucide-react'
+import { Pencil, Plus } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { SortableTh } from '../components/common/SortableTh'
 import { useListQuery } from '../hooks/useListQuery'
@@ -14,20 +14,40 @@ import {
 import { UpdateItemCommissionModal } from '../components/menu/UpdateItemCommissionModal'
 import { CategoryMultiSelect } from '../components/menu/CategoryMultiSelect'
 import { CommissionTypeSelect } from '../components/menu/CommissionTypeSelect'
+import { useAuth } from '../auth/AuthContext'
 import {
-  addonCommissionRows,
-  itemCommissionRows,
-  type CommissionType,
-  type ItemCommissionRow,
-} from '../mocks/itemCommissionData'
-import { baseMenuCategories } from '../mocks/menuItemsData'
+  listAddonCommissionsApi,
+  listItemCommissionsApi,
+} from '../services/menuService'
+import type {
+  AddonCommission,
+  ItemCommission,
+} from '../types/menu'
 
 type TabId = 'item' | 'addon'
 
 const PAGE_SIZE = 50
 
+async function fetchAllItemCommissions(
+  outletId: string,
+): Promise<ItemCommission[]> {
+  const all: ItemCommission[] = []
+  let currentPage = 1
+  for (;;) {
+    const result = await listItemCommissionsApi(outletId, {
+      page: currentPage,
+      page_size: 100,
+    })
+    all.push(...result.results)
+    if (!result.next) break
+    currentPage += 1
+  }
+  return all
+}
+
 export default function SetItemCommission() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [tab, setTab] = useState<TabId>('item')
   const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [itemQuery, setItemQuery] = useState('')
@@ -39,26 +59,60 @@ export default function SetItemCommission() {
   })
   const [page, setPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [rows, setRows] = useState<ItemCommissionRow[]>(itemCommissionRows)
-  const [importOpen, setImportOpen] = useState(false)
+  const [rows, setRows] = useState<ItemCommission[]>([])
+  const [addonRows, setAddonRows] = useState<AddonCommission[]>([])
+  const [editing, setEditing] = useState<{
+    kind: 'item' | 'addon'
+    row: ItemCommission | AddonCommission
+  } | null>(null)
 
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    Promise.all([
+      fetchAllItemCommissions(encryptedOutletId),
+      listAddonCommissionsApi(encryptedOutletId),
+    ])
+      .then(([items, addons]) => {
+        if (cancelled) return
+        setRows(items)
+        setAddonRows(addons)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load commissions',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
+  const categoryOptions = useMemo(() => {
+    const names = Array.from(
+      new Set(rows.map((row) => row.category_name).filter(Boolean)),
+    )
+    return names.map((name) => ({ id: name, name }))
+  }, [rows])
 
   const filtered = useMemo(() => {
     if (tab === 'addon') return []
     return rows.filter((row) => {
       if (
         applied.categoryIds.length > 0 &&
-        !applied.categoryIds.includes(row.categoryId)
+        !applied.categoryIds.includes(row.category_name)
       ) {
         return false
       }
       if (applied.itemQuery.trim()) {
         const q = applied.itemQuery.trim().toLowerCase()
-        if (!row.itemName.toLowerCase().includes(q)) return false
+        if (!row.item_name.toLowerCase().includes(q)) return false
       }
       if (
         applied.commissionType !== 'all' &&
-        row.commissionType !== applied.commissionType
+        row.commission_type !== applied.commissionType
       ) {
         return false
       }
@@ -68,20 +122,20 @@ export default function SetItemCommission() {
 
   const addonFiltered = useMemo(() => {
     if (tab !== 'addon') return []
-    return addonCommissionRows.filter((row) => {
+    return addonRows.filter((row) => {
       if (applied.itemQuery.trim()) {
         const q = applied.itemQuery.trim().toLowerCase()
-        if (!row.addonName.toLowerCase().includes(q)) return false
+        if (!row.addon_name.toLowerCase().includes(q)) return false
       }
       if (
         applied.commissionType !== 'all' &&
-        row.commissionType !== applied.commissionType
+        row.commission_type !== applied.commissionType
       ) {
         return false
       }
       return true
     })
-  }, [applied, tab])
+  }, [addonRows, applied, tab])
 
   const itemList = useListQuery(
     filtered,
@@ -192,8 +246,17 @@ export default function SetItemCommission() {
     })
   }
 
-  function formatType(type: CommissionType) {
-    return type
+  function handleSaved(updated: ItemCommission | AddonCommission) {
+    if (editing?.kind === 'addon') {
+      setAddonRows((prev) =>
+        prev.map((row) => (row.id === updated.id ? (updated as AddonCommission) : row)),
+      )
+    } else {
+      setRows((prev) =>
+        prev.map((row) => (row.id === updated.id ? (updated as ItemCommission) : row)),
+      )
+    }
+    setEditing(null)
   }
 
   return (
@@ -215,10 +278,6 @@ export default function SetItemCommission() {
           <Plus size={15} />
           Add Menu Commission
         </PrimaryButton>
-        <OutlineButton variant="gray" onClick={() => setImportOpen(true)}>
-          <FileUp size={15} />
-          Import
-        </OutlineButton>
       </div>
 
       {/* Tabs */}
@@ -260,7 +319,7 @@ export default function SetItemCommission() {
               Category
             </label>
             <CategoryMultiSelect
-              options={baseMenuCategories}
+              options={categoryOptions}
               selectedIds={categoryIds}
               onChange={setCategoryIds}
             />
@@ -330,6 +389,7 @@ export default function SetItemCommission() {
                   className="px-4 py-3"
                 >
                   {tab === 'item' ? 'Category' : 'Group'}
+<<<<<<< HEAD
                 </SortableTh>
                 <SortableTh
                   columnKey="price"
@@ -358,6 +418,11 @@ export default function SetItemCommission() {
                 >
                   Commission Value
                 </SortableTh>
+=======
+                </th>
+                <th className="px-4 py-3">Commission Type</th>
+                <th className="px-4 py-3">Commission Value</th>
+>>>>>>> origin/main
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -365,7 +430,7 @@ export default function SetItemCommission() {
               {pageRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-4 py-16 text-center text-sm text-muted"
                   >
                     No Record Found
@@ -385,37 +450,26 @@ export default function SetItemCommission() {
                           checked={selectedIds.has(row.id)}
                           onChange={() => toggleSelect(row.id)}
                           className="size-4 accent-primary"
-                          aria-label={`Select ${row.itemName}`}
+                          aria-label={`Select ${row.item_name}`}
                         />
                       </td>
                       <td className="px-4 py-3 font-medium text-ink">
-                        {row.itemName}
+                        {row.item_name}
                       </td>
-                      <td className="px-4 py-3 text-muted">{row.categoryName}</td>
-                      <td className="px-4 py-3 text-ink">{row.itemPrice}</td>
-                      <td className="px-4 py-3 text-ink">
-                        {formatType(row.commissionType)}
+                      <td className="px-4 py-3 text-muted">
+                        {row.category_name}
                       </td>
                       <td className="px-4 py-3 text-ink">
-                        {row.commissionValue ?? '—'}
+                        {row.commission_type}
+                      </td>
+                      <td className="px-4 py-3 text-ink">
+                        {row.commission_value ?? '—'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">
                           <RowActionButton
                             label="Edit"
-                            onClick={() => {
-                              setRows((prev) =>
-                                prev.map((r) =>
-                                  r.id === row.id
-                                    ? {
-                                        ...r,
-                                        commissionType: 'Percentage',
-                                        commissionValue: r.commissionValue ?? 44,
-                                      }
-                                    : r,
-                                ),
-                              )
-                            }}
+                            onClick={() => setEditing({ kind: 'item', row })}
                           >
                             <Pencil size={15} />
                           </RowActionButton>
@@ -437,23 +491,25 @@ export default function SetItemCommission() {
                           checked={selectedIds.has(row.id)}
                           onChange={() => toggleSelect(row.id)}
                           className="size-4 accent-primary"
-                          aria-label={`Select ${row.addonName}`}
+                          aria-label={`Select ${row.addon_name}`}
                         />
                       </td>
                       <td className="px-4 py-3 font-medium text-ink">
-                        {row.addonName}
+                        {row.addon_name}
                       </td>
-                      <td className="px-4 py-3 text-muted">{row.groupName}</td>
-                      <td className="px-4 py-3 text-ink">{row.price}</td>
+                      <td className="px-4 py-3 text-muted">{row.group_name}</td>
                       <td className="px-4 py-3 text-ink">
-                        {formatType(row.commissionType)}
+                        {row.commission_type}
                       </td>
                       <td className="px-4 py-3 text-ink">
-                        {row.commissionValue ?? '—'}
+                        {row.commission_value ?? '—'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end">
-                          <RowActionButton label="Edit">
+                          <RowActionButton
+                            label="Edit"
+                            onClick={() => setEditing({ kind: 'addon', row })}
+                          >
                             <Pencil size={15} />
                           </RowActionButton>
                         </div>
@@ -507,11 +563,11 @@ export default function SetItemCommission() {
       </div>
 
       <UpdateItemCommissionModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onUpload={(file) => {
-          showToast(`Uploaded ${file.name}`)
-        }}
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        row={editing?.row ?? null}
+        kind={editing?.kind ?? 'item'}
+        onSaved={handleSaved}
       />
     </MenuPageShell>
   )

@@ -3,12 +3,11 @@ import { CheckCheck, ListPlus, Loader2, MonitorSmartphone, Search, X } from 'luc
 import { Input } from '../common/Input'
 import {
   categoryName,
+  getScreenItemName,
   type KotScreen,
   type ScreenCategory,
 } from '../../mocks/screensData'
-import { getMenuItemById } from '../../mocks/menuItemsData'
-import { fetchCategories } from '../../services/screenService'
-import { upsertScreen } from '../../utils/screenStore'
+import { fetchCategories, updateScreen } from '../../services/screenService'
 import { AddSingleItemModal } from './AddSingleItemModal'
 
 interface EditScreenModalProps {
@@ -84,14 +83,13 @@ export function EditScreenModal({
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!screen) return
     setSaving(true)
     setError(null)
 
     try {
-      const updated = upsertScreen({
-        id: screen.id,
+      const updated = await updateScreen(screen.id, {
         name: screenName.trim() || screen.name,
         categoryIds: selectedIds,
         itemIds: selectedItemIds,
@@ -270,17 +268,14 @@ export function EditScreenModal({
                       {categoryName(id)}
                     </span>
                   ))}
-                  {selectedItemIds.map((id) => {
-                    const item = getMenuItemById(id)
-                    return (
-                      <span
-                        key={id}
-                        className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary"
-                      >
-                        {item?.name ?? id}
-                      </span>
-                    )
-                  })}
+                  {selectedItemIds.map((id) => (
+                    <span
+                      key={id}
+                      className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary"
+                    >
+                      {getScreenItemName(id) ?? id}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>

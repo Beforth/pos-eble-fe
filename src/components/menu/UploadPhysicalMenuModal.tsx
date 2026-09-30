@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { FolderOpen, Upload, X } from 'lucide-react'
+import { uploadPhysicalMenuApi } from '../../services/menuService'
+import { showToast } from '../../utils/toast'
 
 const MAX_BYTES = 15 * 1024 * 1024
 const ACCEPTED_EXT = ['.jpg', '.jpeg', '.png', '.pdf']
@@ -13,8 +15,9 @@ const ACCEPTED_MIME = [
 
 interface UploadPhysicalMenuModalProps {
   open: boolean
+  encryptedOutletId: string
   onClose: () => void
-  onUpload: (files: File[]) => void
+  onUploaded: () => void
 }
 
 function isAccepted(file: File) {
@@ -26,19 +29,22 @@ function isAccepted(file: File) {
 
 export function UploadPhysicalMenuModal({
   open,
+  encryptedOutletId,
   onClose,
-  onUpload,
+  onUploaded,
 }: UploadPhysicalMenuModalProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [files, setFiles] = useState<File[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setFiles([])
     setError('')
     setDragOver(false)
+    setUploading(false)
     if (inputRef.current) inputRef.current.value = ''
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -73,13 +79,27 @@ export function UploadPhysicalMenuModal({
     takeFiles(event.dataTransfer.files)
   }
 
-  function handleUpload() {
+  async function handleUpload() {
     if (files.length === 0) {
       setError('Please choose a file to upload')
       return
     }
-    onUpload(files)
-    onClose()
+    setUploading(true)
+    setError('')
+    try {
+      await uploadPhysicalMenuApi(encryptedOutletId, files[0])
+      showToast('Physical menu uploaded successfully')
+      onUploaded()
+      onClose()
+    } catch (error: unknown) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : 'Failed to upload physical menu',
+      )
+    } finally {
+      setUploading(false)
+    }
   }
 
   return createPortal(
@@ -182,9 +202,10 @@ export function UploadPhysicalMenuModal({
           <button
             type="button"
             onClick={handleUpload}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            disabled={uploading}
+            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Upload
+            {uploading ? 'Uploading...' : 'Upload'}
           </button>
         </div>
       </div>

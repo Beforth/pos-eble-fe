@@ -1,17 +1,78 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
+import { useOutletSettings } from '../services/useOutletSettings'
+import { useAuth } from '../auth/AuthContext'
+import { showToast } from '../utils/toast'
 
 type PriceDisplay = 'without' | 'including'
 
 export default function BackwardTaxPrintingSettings() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [priceDisplay, setPriceDisplay] = useState<PriceDisplay>('without')
   const [showOnBill, setShowOnBill] = useState(false)
 
+  const { loading, data, save } = useOutletSettings('print')
+
+  const loadedRef = { current: false }
+  useEffect(() => {
+    if (!data || loadedRef.current) return
+    loadedRef.current = true
+    if (data.backward_tax_in_item_price != null) {
+      setPriceDisplay(
+        data.backward_tax_in_item_price ? 'including' : 'without',
+      )
+    }
+    if (data.print_backward_tax != null) {
+      setShowOnBill(Boolean(data.print_backward_tax))
+    }
+  }, [data])
+
   function goBack() {
     navigate('/menu/taxes')
+  }
+
+  async function handleSave() {
+    if (!encryptedOutletId) return
+    try {
+      await save({
+        backward_tax_in_item_price: priceDisplay === 'including',
+        print_backward_tax: showOnBill,
+      })
+      showToast('Backward tax printing settings saved')
+      goBack()
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to save settings',
+      )
+    }
+  }
+
+  if (loading && !data) {
+    return (
+      <MenuPageShell
+        backTo="/menu/taxes"
+        title={
+          <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
+            <Link to="/menu" className="text-primary hover-underline">
+              Menu Management
+            </Link>
+            <span className="font-normal text-muted">&gt;</span>
+            <Link to="/menu/taxes" className="text-primary hover:underline">
+              Tax Configuration
+            </Link>
+            <span className="font-normal text-muted">&gt;</span>
+            <span className="font-semibold text-ink">
+              Backward Tax Printing Settings
+            </span>
+          </span>
+        }
+      >
+        <div className="py-10 text-center text-sm text-muted">Loading…</div>
+      </MenuPageShell>
+    )
   }
 
   return (
@@ -102,7 +163,7 @@ export default function BackwardTaxPrintingSettings() {
           </button>
           <button
             type="button"
-            onClick={goBack}
+            onClick={() => void handleSave()}
             className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
           >
             Save Changes

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { ChevronDown, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
@@ -139,6 +140,15 @@ export default function ExpenseWithdrawal() {
   const toRecord = Math.min(currentPage * PAGE_SIZE, visible.length)
 
 
+  function exportRows(rowsToExport: ExpenseRow[], suffix: string) {
+    downloadCsv(
+      `expense-withdrawal-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Title', `Total Expense Reported (${brand.currency})`],
+      rowsToExport.map((row) => [row.title, row.total]),
+    )
+    showToast(`Exported ${rowsToExport.length} rows`)
+  }
+
   function handleSearch() {
     setAppliedTitle(titleQuery)
     setPage(1)
@@ -204,8 +214,8 @@ export default function ExpenseWithdrawal() {
               Add Expense
             </PrimaryButton>
             <ExportExcelMenu
-              onExportPage={() => showToast('Exporting current page…')}
-              onExportAll={() => showToast('Exporting all records…')}
+              onExportPage={() => exportRows(pageRows, 'page')}
+              onExportAll={() => exportRows(filtered, 'all')}
             />
           </div>
         ) : null

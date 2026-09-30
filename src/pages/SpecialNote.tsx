@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../utils/toast'
 import { Link } from 'react-router-dom'
@@ -14,27 +14,46 @@ import {
   PrimaryButton,
 } from '../components/menu/MenuActionButtons'
 import { SelectRecordAlert } from '../components/menu/SelectRecordAlert'
-
-interface SpecialNoteRow {
-  id: string
-  name: string
-  available: boolean
-}
+import { useAuth } from '../auth/AuthContext'
+import { listSpecialNotesApi } from '../services/menuService'
+import type { SpecialNote } from '../types/menu'
 
 export default function SpecialNote() {
+  const { encryptedOutletId } = useAuth()
   const [nameQuery, setNameQuery] = useState('')
   const [appliedQuery, setAppliedQuery] = useState('')
-  const [notes, setNotes] = useState<SpecialNoteRow[]>([])
+  const [notes, setNotes] = useState<SpecialNote[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
 
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    listSpecialNotesApi(encryptedOutletId)
+      .then((rows: SpecialNote[]) => {
+        if (cancelled) return
+        setNotes(rows)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load special notes',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   const filteredNotes = useMemo(() => {
     const q = appliedQuery.trim().toLowerCase()
     if (!q) return notes
-    return notes.filter((note) => note.name.toLowerCase().includes(q))
+    return notes.filter((note) => note.title.toLowerCase().includes(q))
   }, [notes, appliedQuery])
 
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
@@ -85,7 +104,7 @@ export default function SpecialNote() {
     if (!requireSelection()) return
     setNotes((prev) =>
       prev.map((note) =>
-        selectedIds.has(note.id) ? { ...note, available } : note,
+        selectedIds.has(note.id) ? { ...note, is_active: available } : note,
       ),
     )
     setSelectedIds(new Set())
@@ -95,6 +114,19 @@ export default function SpecialNote() {
     if (!requireSelection()) return
     setNotes((prev) => prev.filter((note) => !selectedIds.has(note.id)))
     setSelectedIds(new Set())
+  }
+
+  function refreshNotes() {
+    if (!encryptedOutletId) return
+    listSpecialNotesApi(encryptedOutletId)
+      .then((rows) => setNotes(rows))
+      .catch((error: unknown) => {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : 'Failed to load special notes',
+        )
+      })
   }
 
   return (
@@ -214,21 +246,21 @@ export default function SpecialNote() {
                         checked={selectedIds.has(note.id)}
                         onChange={() => toggleSelect(note.id)}
                         className="size-4 accent-primary"
-                        aria-label={`Select ${note.name}`}
+                        aria-label={`Select ${note.title}`}
                       />
                     </td>
                     <td className="px-4 py-3 font-medium text-ink">
-                      {note.name}
+                      {note.title}
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ${
-                          note.available
+                          note.is_active
                             ? 'bg-success/10 text-success'
                             : 'bg-muted/15 text-muted'
                         }`}
                       >
-                        {note.available ? 'Available' : 'Inactive'}
+                        {note.is_active ? 'Available' : 'Inactive'}
                       </span>
                     </td>
                   </tr>
@@ -242,47 +274,13 @@ export default function SpecialNote() {
       <AddSpecialNoteModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onSave={({ name, available }) => {
-          setNotes((prev) => [
-            {
-              id: `sn-${Date.now()}`,
-              name,
-              available,
-            },
-            ...prev,
-          ])
-        }}
+        onSave={refreshNotes}
       />
 
       <ImportSpecialNotesModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onUpload={(file) => {
-          void file.text().then((text) => {
-            const lines = text
-              .split(/\r?\n/)
-              .map((line) => line.trim())
-              .filter(Boolean)
-            const rows = lines.slice(1)
-            const imported: SpecialNoteRow[] = []
-            for (const row of rows) {
-              const [rawName, rawAvailable] = row.split(',')
-              const name = rawName?.replace(/^"|"$/g, '').trim()
-              if (!name || name.toLowerCase() === 'name') continue
-              const available = !/^(no|false|0|inactive)$/i.test(
-                (rawAvailable ?? 'yes').trim(),
-              )
-              imported.push({
-                id: `sn-${Date.now()}-${imported.length}`,
-                name,
-                available,
-              })
-            }
-            if (imported.length) {
-              setNotes((prev) => [...imported, ...prev])
-            }
-          })
-        }}
+        onSuccess={refreshNotes}
       />
 
       <SelectRecordAlert

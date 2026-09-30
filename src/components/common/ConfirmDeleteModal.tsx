@@ -1,83 +1,53 @@
-import { useEffect, useId } from 'react'
-import { createPortal } from 'react-dom'
-import { OutlineButton, PrimaryButton } from '../menu/MenuActionButtons'
+import type { ReactNode } from 'react'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface ConfirmDeleteModalProps {
   open: boolean
   title?: string
   message: string
   confirmLabel?: string
+  target?: string
+  consequences?: string[]
+  note?: ReactNode
   onConfirm: () => void
   onClose: () => void
 }
 
+/**
+ * Backwards-compatible shim over `ConfirmDialog`, kept so the existing call
+ * sites (parent category, group, table, screens, menu item, physical menu) keep
+ * working unchanged while they are migrated to the richer API.
+ *
+ * Deletes here are soft (see STANDARDS.md §17), so the default note corrects the
+ * old "this action cannot be undone" wording. Prefer `ConfirmDialog` directly for
+ * new call sites — it does not auto-close, which lets you drive a `loading`
+ * state around the API call.
+ */
 export function ConfirmDeleteModal({
   open,
   title = 'Confirm Delete',
   message,
   confirmLabel = 'Delete',
+  target,
+  consequences,
+  note = 'This record is archived, not erased. It will stop appearing in lists and reports.',
   onConfirm,
   onClose,
 }: ConfirmDeleteModalProps) {
-  const titleId = useId()
-  const messageId = useId()
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = previous
-    }
-  }, [open, onClose])
-
-  if (!open) return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        aria-label="Close"
-        className="absolute inset-0 cursor-pointer bg-ink/40"
-        onClick={onClose}
-      />
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={messageId}
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-lg border border-line bg-card shadow-xl [background-color:var(--color-card)]"
-      >
-        <div className="border-b border-line px-5 py-3.5">
-          <h2 id={titleId} className="text-base font-semibold text-ink">
-            {title}
-          </h2>
-        </div>
-        <div className="px-5 py-5">
-          <p id={messageId} className="text-sm leading-relaxed text-ink">
-            {message}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3.5">
-          <OutlineButton variant="gray" onClick={onClose}>
-            Cancel
-          </OutlineButton>
-          <PrimaryButton
-            onClick={() => {
-              onConfirm()
-              onClose()
-            }}
-          >
-            {confirmLabel}
-          </PrimaryButton>
-        </div>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <ConfirmDialog
+      open={open}
+      title={title}
+      target={target}
+      message={message}
+      consequences={consequences}
+      note={note}
+      confirmLabel={confirmLabel}
+      onConfirm={() => {
+        onConfirm()
+        onClose()
+      }}
+      onClose={onClose}
+    />
   )
 }

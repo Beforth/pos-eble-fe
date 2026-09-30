@@ -6,7 +6,6 @@ import { Eye, Plus, RefreshCw } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
 import {
   TABLE_STATUS_LEGEND,
-  billingTables,
   tableCardClass,
   type TableFloorStatus,
 } from '../mocks/billingTables'
@@ -17,14 +16,20 @@ import {
   loadTableStatuses,
   type TableSession,
 } from '../utils/tableStatusStore'
+import { useAuth } from '../auth/AuthContext'
+import { listDiningAreasApi } from '../services/menuService'
+import { subscribeToRail } from '../services/liveRailClient'
+import type { DiningArea } from '../types/menu'
 
 const AREA_ORDER = ['Ground Floor', 'BASEMENT', 'Party Hall'] as const
 
 export default function TableView() {
   const navigate = useNavigate()
+  const { encryptedOutletId, token } = useAuth()
   const [searchParams] = useSearchParams()
   const [billNo, setBillNo] = useState('')
   const [moveKot, setMoveKot] = useState(false)
+  const [apiAreas, setApiAreas] = useState<DiningArea[]>([])
   const [statuses, setStatuses] = useState<Record<string, TableFloorStatus>>(
     () => loadTableStatuses(),
   )
@@ -38,26 +43,63 @@ export default function TableView() {
     return () => window.clearInterval(id)
   }, [])
 
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    listDiningAreasApi(encryptedOutletId)
+      .then((data) => {
+        if (!cancelled) setApiAreas(data)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          showToast(
+            err instanceof Error ? err.message : 'Failed to load tables',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event) => {
+        if (
+          event === 'kot.prep' ||
+          event === 'kot.modified' ||
+          event === 'kot.cancelled' ||
+          event === 'kot.used_in_bill' ||
+          event === 'kot.deleted' ||
+          event === 'order.settle'
+        ) {
+          reloadFloor()
+        }
+      },
+    })
+  }, [encryptedOutletId, token])
+
   const areas = useMemo(() => {
-    const map = new Map<string, typeof billingTables>()
-    for (const table of billingTables) {
-      const list = map.get(table.areaName) ?? []
-      list.push(table)
-      map.set(table.areaName, list)
-    }
-    const ordered: { name: string; tables: typeof billingTables }[] = AREA_ORDER.filter(
-      (name) => map.has(name),
-    ).map((name) => ({
-      name,
-      tables: map.get(name) ?? [],
+    const nameOrder = new Map<string, number>()
+    AREA_ORDER.forEach((name, i) => nameOrder.set(name, i))
+    const sorted = [...apiAreas].sort((a, b) => {
+      const ai = nameOrder.get(a.name) ?? a.position
+      const bi = nameOrder.get(b.name) ?? b.position
+      return ai - bi
+    })
+    return sorted.map((area) => ({
+      name: area.name,
+      tables: area.tables.map((t) => ({
+        id: t.id,
+        tableNo: t.table_no,
+        persons: t.persons,
+      })),
     }))
-    for (const [name, tables] of map) {
-      if (!AREA_ORDER.includes(name as (typeof AREA_ORDER)[number])) {
-        ordered.push({ name, tables })
-      }
-    }
-    return ordered
-  }, [])
+  }, [apiAreas])
 
 
   function reloadFloor() {

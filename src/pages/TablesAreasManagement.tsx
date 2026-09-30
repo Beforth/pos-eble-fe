@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../utils/toast'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -26,13 +26,24 @@ import { SelectRecordAlert } from '../components/menu/SelectRecordAlert'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
 import { AddTableDiscountModal } from '../components/menu/AddTableDiscountModal'
 import { EditTableModal } from '../components/menu/EditTableModal'
-import { menuAreas, menuTables, type MenuTable } from '../mocks/menuSectionData'
+import { ConfirmDeleteModal } from '../components/common/ConfirmDeleteModal'
+import { ConfirmDialog } from '../components/common/ConfirmDialog'
+import { useAuth } from '../auth/AuthContext'
+import {
+  listDiningAreasApi,
+  deleteDiningAreaApi,
+  deleteDiningTableApi,
+  updateDiningAreaApi,
+  updateDiningTableApi,
+} from '../services/menuService'
+import type { DiningArea, DiningTable } from '../types/menu'
 
 type TablesSubTab = 'tables' | 'areas'
 
 export default function TablesAreasManagement() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { encryptedOutletId } = useAuth()
   const initialTab =
     (location.state as { tab?: TablesSubTab } | null)?.tab === 'areas'
       ? 'areas'
@@ -42,8 +53,9 @@ export default function TablesAreasManagement() {
   const [area, setArea] = useState('all')
   const [appliedTableNo, setAppliedTableNo] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [rows, setRows] = useState(menuTables)
-  const [areas, setAreas] = useState(menuAreas)
+  const [tables, setTables] = useState<DiningTable[]>([])
+  const [areas, setAreas] = useState<DiningArea[]>([])
+  const [loading, setLoading] = useState(true)
   const [areaNameQuery, setAreaNameQuery] = useState('')
   const [appliedAreaName, setAppliedAreaName] = useState('')
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
@@ -51,18 +63,51 @@ export default function TablesAreasManagement() {
   const [discountTargetIds, setDiscountTargetIds] = useState<string[]>([])
   const [discountLabel, setDiscountLabel] = useState<string | null>(null)
   const [discountInitial, setDiscountInitial] = useState<number | string>('')
-  const [editingTable, setEditingTable] = useState<MenuTable | null>(null)
+  const [editingTable, setEditingTable] = useState<DiningTable | null>(null)
+  const [pendingDeleteTable, setPendingDeleteTable] = useState<DiningTable | null>(null)
+  const [pendingDeleteArea, setPendingDeleteArea] = useState<DiningArea | null>(null)
+  const [pendingBulkDelete, setPendingBulkDelete] = useState(false)
 
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    setLoading(true)
+    listDiningAreasApi(encryptedOutletId)
+      .then((data) => {
+        if (cancelled) return
+        setAreas(data)
+        const flat: DiningTable[] = []
+        for (const a of data) {
+          for (const t of a.tables) {
+            flat.push(t)
+          }
+        }
+        setTables(flat)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          showToast(
+            err instanceof Error ? err.message : 'Failed to load dining areas',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   const filtered = useMemo(() => {
     const q = appliedTableNo.trim().toLowerCase()
-    return rows.filter((row) => {
-      const matchNo = !q || row.tableNo.toLowerCase().includes(q)
+    return tables.filter((row) => {
+      const matchNo = !q || row.table_no.toLowerCase().includes(q)
       const matchArea =
-        area === 'all' || row.areaName.toLowerCase() === area.toLowerCase()
+        area === 'all' || row.area_name.toLowerCase() === area.toLowerCase()
       return matchNo && matchArea
     })
-  }, [appliedTableNo, area, rows])
+  }, [appliedTableNo, area, tables])
 
   const filteredAreas = useMemo(() => {
     const q = appliedAreaName.trim().toLowerCase()
@@ -124,30 +169,65 @@ export default function TablesAreasManagement() {
   }
 
   function setSelectedActive(statusOn: boolean) {
-    requireSelection(() => {
-      setRows((prev) =>
+    requireSelection(async () => {
+      if (!encryptedOutletId) return
+      for (const id of selected) {
+        try {
+          await updateDiningTableApi(encryptedOutletId, id, { is_on: statusOn })
+        } catch {
+          showToast('Failed to update table status')
+        }
+      }
+      setTables((prev) =>
         prev.map((row) =>
-          selected.has(row.id) ? { ...row, statusOn } : row,
+          selected.has(row.id) ? { ...row, is_on: statusOn } : row,
         ),
       )
-    })
-  }
-
-  function removeSelectedTables() {
-    requireSelection(() => {
-      setRows((prev) => prev.filter((row) => !selected.has(row.id)))
       setSelected(new Set())
     })
   }
 
+  function onRemoveSelectedTables() {
+    requireSelection(() => setPendingBulkDelete(true))
+  }
+
+  async function removeSelectedTables() {
+    if (!encryptedOutletId) return
+    setPendingBulkDelete(false)
+    const ids = Array.from(selected)
+    const failed = new Set<string>()
+    let deleted = 0
+    for (const id of ids) {
+      try {
+        await deleteDiningTableApi(encryptedOutletId, id)
+        deleted += 1
+      } catch {
+        failed.add(id)
+      }
+    }
+    setTables((prev) => prev.filter((row) => !failed.has(row.id)))
+    setSelected(failed)
+    if (deleted > 0) {
+      showToast(deleted === 1 ? '1 table deleted' : `${deleted} tables deleted`)
+    }
+    if (failed.size > 0) {
+      showToast(
+        failed.size === 1
+          ? 'Failed to delete 1 table'
+          : `Failed to delete ${failed.size} tables`,
+      )
+    }
+  }
+
   function handleExportImportTables() {
-    const header = 'Table No,No. Of Persons,Extra Information,Area Name,Status,Discount (%)\n'
-    const body = rows
+    const header =
+      'Table No,No. Of Persons,Extra Information,Area Name,Status,Discount (%)\n'
+    const body = tables
       .map(
         (row) =>
-          `${row.tableNo},${row.persons},"${row.extraInfo}",${row.areaName},${
-            row.statusOn ? 'Active' : 'Inactive'
-          },${row.discountPercent}`,
+          `${row.table_no},${row.persons},"${row.extra_info}",${row.area_name},${
+            row.is_on ? 'Active' : 'Inactive'
+          },${row.discount_percent}`,
       )
       .join('\n')
     const blob = new Blob([header + body], {
@@ -167,34 +247,100 @@ export default function TablesAreasManagement() {
       return
     }
     const ids = Array.from(selected)
-    const selectedRows = rows.filter((row) => selected.has(row.id))
+    const selectedRows = tables.filter((row) => selected.has(row.id))
     const label =
       selectedRows.length === 1
-        ? selectedRows[0].tableNo
+        ? selectedRows[0].table_no
         : `${selectedRows.length} Tables`
     setDiscountTargetIds(ids)
     setDiscountLabel(label)
     setDiscountInitial(
-      selectedRows.length === 1 ? selectedRows[0].discountPercent : '',
+      selectedRows.length === 1 ? selectedRows[0].discount_percent : '',
     )
   }
 
-  function openRowDiscount(rowId: string, tableNo: string, percent: number) {
+  function openRowDiscount(
+    rowId: string,
+    tableNo: string,
+    percent: number | string,
+  ) {
     setDiscountTargetIds([rowId])
     setDiscountLabel(tableNo)
     setDiscountInitial(percent)
   }
 
-  function saveDiscount(percent: number) {
-    setRows((prev) =>
+  async function saveDiscount(percent: number) {
+    if (!encryptedOutletId) return
+    for (const id of discountTargetIds) {
+      try {
+        await updateDiningTableApi(encryptedOutletId, id, {
+          discount_percent: percent,
+        })
+      } catch {
+        showToast('Failed to update discount')
+      }
+    }
+    setTables((prev) =>
       prev.map((row) =>
         discountTargetIds.includes(row.id)
-          ? { ...row, discountPercent: percent }
+          ? { ...row, discount_percent: percent }
           : row,
       ),
     )
     setDiscountTargetIds([])
     setDiscountLabel(null)
+  }
+
+  async function toggleAreaStatus(row: DiningArea) {
+    if (!encryptedOutletId) return
+    const next = !row.is_active
+    try {
+      await updateDiningAreaApi(encryptedOutletId, row.id, { is_active: next })
+      setAreas((prev) =>
+        prev.map((item) =>
+          item.id === row.id ? { ...item, is_active: next } : item,
+        ),
+      )
+    } catch {
+      showToast('Failed to update area status')
+    }
+  }
+
+  async function deleteArea(row: DiningArea) {
+    if (!encryptedOutletId) return
+    try {
+      await deleteDiningAreaApi(encryptedOutletId, row.id)
+      setAreas((prev) => prev.filter((item) => item.id !== row.id))
+      setTables((prev) => prev.filter((t) => t.area_id !== row.id))
+      showToast('Area deleted')
+    } catch {
+      showToast('Failed to delete area')
+    }
+  }
+
+  async function confirmDeleteArea() {
+    if (!pendingDeleteArea) return
+    const row = pendingDeleteArea
+    setPendingDeleteArea(null)
+    await deleteArea(row)
+  }
+
+  async function confirmDeleteTable() {
+    if (!encryptedOutletId || !pendingDeleteTable) return
+    const row = pendingDeleteTable
+    setPendingDeleteTable(null)
+    try {
+      await deleteDiningTableApi(encryptedOutletId, row.id)
+      setTables((prev) => prev.filter((t) => t.id !== row.id))
+      setSelected((prev) => {
+        const next = new Set(prev)
+        next.delete(row.id)
+        return next
+      })
+      showToast(`Table ${row.table_no} deleted`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete table')
+    }
   }
 
   return (
@@ -235,7 +381,7 @@ export default function TablesAreasManagement() {
                 },
                 {
                   label: 'Remove',
-                  onClick: removeSelectedTables,
+                  onClick: onRemoveSelectedTables,
                 },
               ]}
             />
@@ -314,7 +460,11 @@ export default function TablesAreasManagement() {
                   className="h-9 w-full appearance-none rounded-md border border-line bg-card px-3 pr-8 text-sm outline-none focus:border-primary"
                 >
                   <option value="all">All</option>
-                  <option value="Ground Floor">Ground Floor</option>
+                  {areas.map((a) => (
+                    <option key={a.id} value={a.name}>
+                      {a.name}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown
                   size={14}
@@ -370,7 +520,11 @@ export default function TablesAreasManagement() {
         )}
       </div>
 
-      {subTab === 'tables' ? (
+      {loading ? (
+        <div className="flex min-h-[200px] items-center justify-center text-sm text-muted">
+          Loading…
+        </div>
+      ) : subTab === 'tables' ? (
         <>
           <div className="overflow-x-auto rounded-lg border border-line bg-card">
             <table className="min-w-full text-left text-sm">
@@ -469,48 +623,61 @@ export default function TablesAreasManagement() {
                       />
                     </td>
                     <td className="px-3 py-3.5 font-medium text-ink">
-                      {row.tableNo}
+                      {row.table_no}
                     </td>
                     <td className="px-3 py-3.5 tabular-nums text-ink">
                       {row.persons}
                     </td>
                     <td className="px-3 py-3.5 text-muted">
-                      {row.extraInfo || '—'}
+                      {row.extra_info || '—'}
                     </td>
-                    <td className="px-3 py-3.5 text-ink">{row.areaName}</td>
+                    <td className="px-3 py-3.5 text-ink">{row.area_name}</td>
                     <td className="px-3 py-3.5">
                       <button
                         type="button"
                         role="switch"
-                        aria-checked={row.statusOn}
-                        onClick={() =>
-                          setRows((prev) =>
-                            prev.map((item) =>
-                              item.id === row.id
-                                ? { ...item, statusOn: !item.statusOn }
-                                : item,
-                            ),
-                          )
-                        }
+                        aria-checked={row.is_on}
+                        onClick={async () => {
+                          if (!encryptedOutletId) return
+                          const next = !row.is_on
+                          try {
+                            await updateDiningTableApi(
+                              encryptedOutletId,
+                              row.id,
+                              { is_on: next },
+                            )
+                            setTables((prev) =>
+                              prev.map((item) =>
+                                item.id === row.id
+                                  ? { ...item, is_on: next }
+                                  : item,
+                              ),
+                            )
+                          } catch {
+                            showToast('Failed to update status')
+                          }
+                        }}
                         className={`relative inline-flex h-6 w-11 cursor-pointer items-center rounded-full transition-colors ${
-                          row.statusOn ? 'bg-primary' : 'bg-line'
+                          row.is_on ? 'bg-primary' : 'bg-line'
                         }`}
                       >
                         <span
                           className={`inline-block size-4 rounded-full bg-card transition-transform ${
-                            row.statusOn ? 'translate-x-6' : 'translate-x-1'
+                            row.is_on ? 'translate-x-6' : 'translate-x-1'
                           }`}
                         />
                       </button>
                     </td>
                     <td className="px-3 py-3.5 tabular-nums text-ink">
-                      {row.discountPercent}
+                      {row.discount_percent}
                     </td>
                     <td className="px-3 py-3.5">
                       <div className="flex items-center gap-1">
                         <RowActionButton
                           label="Show Changes"
-                          onClick={() => setChangesName(`Table ${row.tableNo}`)}
+                          onClick={() =>
+                            setChangesName(`Table ${row.table_no}`)
+                          }
                         >
                           <ClipboardList size={16} />
                         </RowActionButton>
@@ -525,12 +692,18 @@ export default function TablesAreasManagement() {
                           onClick={() =>
                             openRowDiscount(
                               row.id,
-                              row.tableNo,
-                              row.discountPercent,
+                              row.table_no,
+                              row.discount_percent,
                             )
                           }
                         >
                           <TicketPercent size={16} />
+                        </RowActionButton>
+                        <RowActionButton
+                          label="Delete"
+                          onClick={() => setPendingDeleteTable(row)}
+                        >
+                          <Trash2 size={16} />
                         </RowActionButton>
                       </div>
                     </td>
@@ -549,6 +722,7 @@ export default function TablesAreasManagement() {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-line bg-page text-sm font-semibold text-ink">
                 <tr>
+<<<<<<< HEAD
                   <SortableTh
                     columnKey="name"
                     sortKey={areaSortKey}
@@ -594,6 +768,12 @@ export default function TablesAreasManagement() {
                   >
                     Discount (%)
                   </SortableTh>
+=======
+                  <th className="px-3 py-3">Area Name</th>
+                  <th className="px-3 py-3">Tables</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Discount (%)</th>
+>>>>>>> origin/main
                   <th className="px-3 py-3">Actions</th>
                 </tr>
               </thead>
@@ -607,38 +787,25 @@ export default function TablesAreasManagement() {
                       {row.name}
                     </td>
                     <td className="px-3 py-3.5 text-muted">
-                      {row.tables || ''}
+                      {row.tables.length > 0
+                        ? `${row.tables.length} table${row.tables.length === 1 ? '' : 's'}`
+                        : '—'}
                     </td>
                     <td className="px-3 py-3.5">
                       <button
                         type="button"
-                        onClick={() =>
-                          setAreas((prev) =>
-                            prev.map((item) =>
-                              item.id === row.id
-                                ? {
-                                    ...item,
-                                    status:
-                                      item.status === 'Active'
-                                        ? 'Inactive'
-                                        : 'Active',
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
+                        onClick={() => toggleAreaStatus(row)}
                         className={`cursor-pointer text-sm font-medium ${
-                          row.status === 'Active'
+                          row.is_active
                             ? 'text-success hover:underline'
                             : 'text-muted hover:underline'
                         }`}
                       >
-                        {row.status}
+                        {row.is_active ? 'Active' : 'Inactive'}
                       </button>
                     </td>
-                    <td className="px-3 py-3.5 text-muted">{row.created}</td>
                     <td className="px-3 py-3.5 text-muted">
-                      {row.discountPercent}
+                      {row.discount_percent}
                     </td>
                     <td className="px-3 py-3.5">
                       <div className="flex items-center gap-1">
@@ -659,11 +826,7 @@ export default function TablesAreasManagement() {
                         ) : (
                           <RowActionButton
                             label="Delete"
-                            onClick={() =>
-                              setAreas((prev) =>
-                                prev.filter((item) => item.id !== row.id),
-                              )
-                            }
+                            onClick={() => setPendingDeleteArea(row)}
                           >
                             <Trash2 size={16} />
                           </RowActionButton>
@@ -699,9 +862,10 @@ export default function TablesAreasManagement() {
       <EditTableModal
         open={Boolean(editingTable)}
         table={editingTable}
+        outletId={encryptedOutletId ?? ''}
         onClose={() => setEditingTable(null)}
         onUpdate={(updated) => {
-          setRows((prev) =>
+          setTables((prev) =>
             prev.map((row) => (row.id === updated.id ? updated : row)),
           )
           setEditingTable(null)
@@ -711,6 +875,48 @@ export default function TablesAreasManagement() {
         open={Boolean(changesName)}
         name={changesName}
         onClose={() => setChangesName(null)}
+      />
+      <ConfirmDeleteModal
+        open={Boolean(pendingDeleteTable)}
+        title="Delete Table"
+        target={pendingDeleteTable?.table_no}
+        message="This table will be removed from the floor plan."
+        consequences={[
+          'It can no longer be assigned to a new order.',
+          'Existing bills keep the table name on their records.',
+        ]}
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteTable}
+        onClose={() => setPendingDeleteTable(null)}
+      />
+      <ConfirmDeleteModal
+        open={pendingBulkDelete}
+        title="Delete Tables"
+        target={`${selected.size} selected`}
+        message={`${selected.size} table${selected.size === 1 ? '' : 's'} will be removed from the floor plan at once.`}
+        consequences={[
+          'None of them can be assigned to a new order.',
+          'Existing bills keep their table names on the records.',
+        ]}
+        confirmLabel="Delete"
+        onConfirm={removeSelectedTables}
+        onClose={() => setPendingBulkDelete(false)}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingDeleteArea)}
+        title="Delete dining area"
+        target={pendingDeleteArea?.name}
+        message={`${pendingDeleteArea?.name ?? 'This area'} will be removed from the floor plan.`}
+        consequences={[
+          pendingDeleteArea
+            ? `${tables.filter((t) => t.area_id === pendingDeleteArea.id).length} table(s) in this area are removed from the floor map with it.`
+            : 'Tables in this area are removed from the floor map with it.',
+          'Running orders on these tables are not cancelled.',
+        ]}
+        note="The area is archived, not erased. Its tables stop appearing on the floor plan."
+        confirmLabel="Delete area"
+        onConfirm={() => void confirmDeleteArea()}
+        onClose={() => setPendingDeleteArea(null)}
       />
     </MenuPageShell>
   )

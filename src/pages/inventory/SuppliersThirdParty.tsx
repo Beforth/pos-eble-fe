@@ -471,6 +471,7 @@ export default function SuppliersThirdParty() {
       </div>
 
       <ConfirmDeleteModal
+<<<<<<< HEAD
         open={Boolean(pendingDelete) || pendingBulkDelete}
         title="Confirm Delete"
         message={
@@ -478,6 +479,15 @@ export default function SuppliersThirdParty() {
             ? `Are you sure you want to delete "${pendingDelete.name}"? This action cannot be undone.`
             : `Are you sure you want to delete ${selectedIds.size} selected supplier${selectedIds.size === 1 ? '' : 's'}? This action cannot be undone.`
         }
+=======
+        open={pendingDelete}
+        title="Delete suppliers"
+        target={`${selectedIds.size} selected`}
+        message={`${selectedIds.size} selected supplier${selectedIds.size === 1 ? '' : 's'} will be removed.`}
+        consequences={[
+          'They stop appearing when you raise purchases for raw materials.',
+        ]}
+>>>>>>> origin/main
         confirmLabel="Delete"
         onConfirm={() => void confirmDelete()}
         onClose={() => {

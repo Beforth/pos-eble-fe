@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BadgePercent,
   BarChart3,
   BookOpen,
   Calculator,
+  ChefHat,
   ChevronsLeft,
   ChevronsRight,
   Clock3,
@@ -22,12 +23,15 @@ import {
   SlidersHorizontal,
   Truck,
   Upload,
+  UtensilsCrossed,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
+import { Avatar } from '../common/Avatar'
 import { brand } from '../../theme/brand'
 import { BrandLogo } from '../brand/BrandLogo'
 import { SidebarNavItem, type NavItemDef } from './SidebarNavItem'
+import { useChrome } from '../../state/ChromeContext'
 
 interface NavGroupDef {
   title: string
@@ -38,6 +42,33 @@ type NavEntry =
   | { kind: 'link'; item: NavItemDef }
   | { kind: 'group'; group: NavGroupDef }
   | { kind: 'divider' }
+
+/** Keep a nav entry only when the user can access at least one of its routes. */
+function filterNavEntry(
+  entry: NavEntry,
+  canAccess: (pathname: string) => boolean,
+): NavEntry | null {
+  if (entry.kind === 'divider') return entry
+  if (entry.kind === 'group') {
+    const items = entry.group.items.filter((item) =>
+      canAccess(ROUTES[item.id] ?? ''),
+    )
+    return items.length > 0 ? { ...entry, group: { ...entry.group, items } } : null
+  }
+  const path = ROUTES[entry.item.id]
+  if (!path) return entry
+  if (entry.item.children) {
+    const children = entry.item.children
+      .map((child) => ({ child, path: ROUTES[child.id] }))
+      .filter(({ child: _child, path: childPath }) =>
+        childPath ? canAccess(childPath) : true,
+      )
+      .map(({ child }) => child)
+    if (children.length === 0) return null
+    return { ...entry, item: { ...entry.item, children } }
+  }
+  return canAccess(path) ? entry : null
+}
 
 const NAV: NavEntry[] = [
   {
@@ -50,6 +81,8 @@ const NAV: NavEntry[] = [
     group: {
       title: 'Daily Operations',
       items: [
+        { id: 'billing', label: 'Billing', icon: UtensilsCrossed },
+        { id: 'captain-orders', label: 'Captain Orders', icon: ChefHat },
         { id: 'live-orders', label: 'Live Orders', icon: Clock3 },
         { id: 'all-orders', label: 'All Orders', icon: ShoppingBag },
         { id: 'online-orders', label: 'Online Orders', icon: Globe },
@@ -301,6 +334,8 @@ const NAV: NavEntry[] = [
 
 const ROUTES: Record<string, string> = {
   dashboard: '/dashboard',
+  billing: '/billing',
+  'captain-orders': '/captain-orders',
   'live-orders': '/live-orders',
   'all-orders': '/all-orders',
   'online-orders': '/online-orders',
@@ -419,23 +454,30 @@ export function Sidebar({
   onNavigate,
 }: SidebarProps) {
   const navigate = useNavigate()
-  const { logout } = useAuth()
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    const parents = AUTO_EXPAND_PARENTS[activeItem]
-    return parents ? new Set(parents) : new Set()
-  })
+  const { logout, canAccess, user } = useAuth()
+  const {
+    expanded,
+    toggleExpanded: toggleExpandedInStore,
+    mergeExpanded,
+    navScroll,
+    setNavScroll,
+  } = useChrome()
+  const visibleNav = NAV.filter((entry) => filterNavEntry(entry, canAccess) !== null)
+  const expandedIds = useMemo(() => new Set(expanded.main), [expanded.main])
 
   useEffect(() => {
     const parents = AUTO_EXPAND_PARENTS[activeItem]
-    if (!parents?.length) return
-    setExpandedIds((prev) => {
-      const missing = parents.filter((id) => !prev.has(id))
-      if (missing.length === 0) return prev
-      const next = new Set(prev)
-      missing.forEach((id) => next.add(id))
-      return next
-    })
-  }, [activeItem])
+    if (parents?.length) mergeExpanded('main', parents)
+  }, [activeItem, mergeExpanded])
+
+  const navRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    const el = navRef.current
+    if (el && el.scrollTop !== navScroll.main) {
+      el.scrollTop = navScroll.main
+    }
+  }, [navScroll.main])
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -447,12 +489,7 @@ export function Sidebar({
   }, [mobileOpen, onCloseMobile])
 
   function toggleExpanded(id: string) {
-    setExpandedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    toggleExpandedInStore('main', id)
   }
 
   function handleNavigate(id: string) {
@@ -528,9 +565,13 @@ export function Sidebar({
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-2">
+        <nav
+          ref={navRef}
+          onScroll={(e) => setNavScroll('main', e.currentTarget.scrollTop)}
+          className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-2"
+        >
           <ul className="space-y-0.5">
-            {NAV.map((entry, index) => {
+            {visibleNav.map((entry, index) => {
               if (entry.kind === 'divider') {
                 return (
                   <li
@@ -604,21 +645,43 @@ export function Sidebar({
         </nav>
 
         <div className="border-t border-line px-2.5 py-2">
-          <button
-            type="button"
-            onClick={() => handleNavigate('logout')}
-            title={collapsed ? 'Logout' : undefined}
-            className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-muted transition-colors hover:bg-page hover:text-ink ${
-              collapsed ? 'justify-center px-0' : ''
-            }`}
-          >
-            <LogOut size={18} strokeWidth={1.75} className="shrink-0" />
-            {!collapsed && <span>Logout</span>}
-          </button>
-          {!collapsed && (
-            <p className="mt-1 px-1 pb-1 text-center text-[10px] text-muted">
-              {brand.shopName}
-            </p>
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-2">
+                <Avatar src={user?.photoUrl} name={user?.name ?? brand.shopName} size="sm" />
+              <button
+                type="button"
+                onClick={() => handleNavigate('logout')}
+                title="Logout"
+                aria-label="Logout"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-page hover:text-ink"
+              >
+                <LogOut size={18} strokeWidth={1.75} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex w-full items-center gap-2.5 px-3 py-2.5">
+              <Avatar src={user?.photoUrl} name={user?.name ?? brand.shopName} size="sm" />
+                <span
+                  className="min-w-0 flex-1 truncate text-sm font-medium text-ink"
+                  title={user?.name}
+                >
+                  {user?.name ?? brand.shopName}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate('logout')}
+                  title="Logout"
+                  aria-label="Logout"
+                  className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-page hover:text-ink"
+                >
+                  <LogOut size={18} strokeWidth={1.75} />
+                </button>
+              </div>
+              <p className="mt-1 px-1 pb-1 text-center text-[10px] text-muted">
+                {brand.shopName}
+              </p>
+            </>
           )}
         </div>
       </aside>

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import {
   Bell,
   Check,
+  ChefHat,
   ChevronDown,
   FileText,
-  Headset,
   Loader2,
   LogOut,
   Menu,
@@ -36,7 +36,6 @@ interface TopBarProps {
 
 export function TopBar({
   onMenuClick,
-  onSupportClick,
   onNotificationsClick,
   outletName,
 }: TopBarProps) {
@@ -258,11 +257,12 @@ export function TopBar({
 
         <button
           type="button"
-          onClick={onSupportClick}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-sm font-medium text-ink transition-colors hover:border-muted"
+          onClick={() => navigate('/captain-orders')}
+          title="Captain Orders"
+          className="inline-flex h-9 max-lg:shrink-0 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-medium text-ink transition-colors hover:border-muted"
         >
-          <Headset size={16} className="text-primary" />
-          <span className="hidden md:inline">Support Agent</span>
+          <ChefHat size={16} className="text-primary" />
+          <span className="hidden sm:inline">Captain Orders</span>
         </button>
 
         <IconButton label="Display">

@@ -1,5 +1,11 @@
 import { useState } from 'react'
 
+<<<<<<< HEAD
+=======
+import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
+import { ChevronDown, FileText, Search } from 'lucide-react'
+>>>>>>> origin/main
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
@@ -42,13 +48,32 @@ export default function ExpiryBatchwiseInsightReport() {
     setMoreFiltersOpen(false)
   }
 
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `expiry-batchwise-insight-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Raw Material', 'Batch No', 'Expiry Date', 'Stock Qty', 'Unit'],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="other-reports">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Expiry & Batchwise Insight
         </h1>
+<<<<<<< HEAD
         <DisabledExportButton />
+=======
+        <ExportMenu
+          onExportPage={() => exportRows([], 'page')}
+          onExportAll={() => exportRows([], 'all')}
+        />
+>>>>>>> origin/main
       </div>
 
       <ReportUnavailableNotice />

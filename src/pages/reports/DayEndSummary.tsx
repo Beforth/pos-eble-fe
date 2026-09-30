@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { Download, FileText } from 'lucide-react'
@@ -7,11 +7,13 @@ import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { useListQuery } from '../../hooks/useListQuery'
 import { DayEndSummaryModal } from '../../components/reports/DayEndSummaryModal'
-import {
-  DAY_END_SUMMARY_ROWS,
-  type DayEndSummaryRow,
-} from '../../mocks/dayEndSummaryData'
+import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
 import { formatNumber } from '../../utils/format'
+import {
+  listDayEndClosuresApi,
+  toDayEndSummaryRow,
+} from '../../services/orderService'
+import { useAuth } from '../../auth/AuthContext'
 
 const PAGE_SIZE = 15
 
@@ -32,21 +34,39 @@ function downloadCsv(rows: DayEndSummaryRow[], filename: string) {
 }
 
 export default function DayEndSummary() {
-  const [startDate, setStartDate] = useState('2026-07-13')
-  const [endDate, setEndDate] = useState('2026-08-12')
-  const [appliedStart, setAppliedStart] = useState('2026-07-13')
-  const [appliedEnd, setAppliedEnd] = useState('2026-08-12')
+  const { encryptedOutletId } = useAuth()
+  const [rows, setRows] = useState<DayEndSummaryRow[]>([])
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [appliedStart, setAppliedStart] = useState('')
+  const [appliedEnd, setAppliedEnd] = useState('')
   const [ignoreDates, setIgnoreDates] = useState(false)
   const [page, setPage] = useState(1)
   const [viewRow, setViewRow] = useState<DayEndSummaryRow | null>(null)
 
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    listDayEndClosuresApi(encryptedOutletId)
+      .then((dtos) => {
+        if (!cancelled) setRows(dtos.map(toDayEndSummaryRow))
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   const filtered = useMemo(() => {
-    if (ignoreDates) return DAY_END_SUMMARY_ROWS
-    return DAY_END_SUMMARY_ROWS.filter(
-      (row) => row.dateKey >= appliedStart && row.dateKey <= appliedEnd,
+    if (ignoreDates) return rows
+    return rows.filter(
+      (row) =>
+        (!appliedStart || row.dateKey >= appliedStart) &&
+        (!appliedEnd || row.dateKey <= appliedEnd),
     )
-  }, [appliedEnd, appliedStart, ignoreDates])
+  }, [appliedEnd, appliedStart, ignoreDates, rows])
 
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
     filtered,
@@ -76,10 +96,10 @@ export default function DayEndSummary() {
   }
 
   function handleShowAll() {
-    setStartDate('2026-07-13')
-    setEndDate('2026-08-12')
-    setAppliedStart('2026-07-13')
-    setAppliedEnd('2026-08-12')
+    setStartDate('')
+    setEndDate('')
+    setAppliedStart('')
+    setAppliedEnd('')
     setIgnoreDates(true)
     setPage(1)
     showToast('Filters cleared')
@@ -99,6 +119,7 @@ export default function DayEndSummary() {
       <DayEndSummaryModal
         open={Boolean(viewRow)}
         row={viewRow}
+        outletId={encryptedOutletId ?? ''}
         onClose={() => setViewRow(null)}
       />
 

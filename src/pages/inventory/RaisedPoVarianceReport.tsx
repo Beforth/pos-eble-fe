@@ -1,5 +1,11 @@
 import { useState } from 'react'
 
+<<<<<<< HEAD
+=======
+import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
+import { ChevronDown, FileText, Search } from 'lucide-react'
+>>>>>>> origin/main
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
@@ -31,13 +37,38 @@ export default function RaisedPoVarianceReport() {
     setTo('All')
   }
 
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `raised-po-variance-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        'PO Number',
+        'Date',
+        'Supplier',
+        'Raw Material',
+        'Ordered Qty',
+        'Received Qty',
+        'Variance Qty',
+        'Variance Amount (₹)',
+      ],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="other-reports">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Purchase Order Variance Report
         </h1>
+<<<<<<< HEAD
         <DisabledExportButton />
+=======
+        <ExportMenu onExportAll={() => exportRows([], 'all')} />
+>>>>>>> origin/main
       </div>
 
       <ReportUnavailableNotice />

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ExportExcelMenu } from '../../components/all-orders/ExportExcelMenu'
@@ -42,6 +43,15 @@ export default function UtilityBills() {
     },
   )
 
+
+  function exportRows(rowsToExport: UtilityOperatorRow[], suffix: string) {
+    downloadCsv(
+      `utility-bills-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Operator', 'Type', 'Status'],
+      rowsToExport.map((row) => [row.operator, row.type, row.status]),
+    )
+    showToast(`Exported ${rowsToExport.length} rows`)
+  }
 
   function handleSearch() {
     setAppliedQuery(operatorQuery.trim())
@@ -85,8 +95,8 @@ export default function UtilityBills() {
             ]}
           />
           <ExportExcelMenu
-            onExportPage={() => showToast('Exporting current page…')}
-            onExportAll={() => showToast('Exporting all records…')}
+            onExportPage={() => exportRows(filtered, 'page')}
+            onExportAll={() => exportRows(filtered, 'all')}
           />
         </div>
       }

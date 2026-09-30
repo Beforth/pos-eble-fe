@@ -1,15 +1,24 @@
 import type { ReactNode } from 'react'
 import { formatINR, formatNumber } from '../../utils/format'
-import type { LiveOrdersSummary } from '../../mocks/liveOrdersData'
+import type {
+  LiveOrderChannelRow,
+  LiveOrdersSummary,
+} from '../../services/orderService'
 import { LiveOrderRow } from './LiveOrderRow'
 
 interface LiveOrdersBoardProps {
   title: string
   data: LiveOrdersSummary
   icons: Record<string, ReactNode>
+  onRowClick?: (row: LiveOrderChannelRow) => void
 }
 
-export function LiveOrdersBoard({ title, data, icons }: LiveOrdersBoardProps) {
+export function LiveOrdersBoard({
+  title,
+  data,
+  icons,
+  onRowClick,
+}: LiveOrdersBoardProps) {
   return (
     <section className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
       <div className="mb-4 flex items-center gap-2">
@@ -35,13 +44,30 @@ export function LiveOrdersBoard({ title, data, icons }: LiveOrdersBoardProps) {
         </div>
       </div>
 
-      <ul className="space-y-2.5">
-        {data.rows.map((row) => (
-          <li key={row.id}>
-            <LiveOrderRow row={row} icon={icons[row.icon]} />
-          </li>
-        ))}
-      </ul>
+      {data.totalOrders === 0 ? (
+        <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-line px-4 py-8 text-center">
+          <p className="text-sm font-medium text-muted">
+            No {title.toLowerCase()} right now
+          </p>
+          <p className="mt-1 text-xs text-muted/70">
+            New orders will appear here automatically.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2.5">
+          {data.rows
+            .filter((row) => row.orders > 0)
+            .map((row) => (
+              <li key={row.id}>
+                <LiveOrderRow
+                  row={row}
+                  icon={icons[row.icon]}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                />
+              </li>
+            ))}
+        </ul>
+      )}
     </section>
   )
 }

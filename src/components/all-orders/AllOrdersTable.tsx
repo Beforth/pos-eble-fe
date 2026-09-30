@@ -1,5 +1,5 @@
 import type { ReactNode, SVGProps } from 'react'
-import { Eye, Pencil, ReceiptText, Search } from 'lucide-react'
+import { Banknote, Eye, Pencil, ReceiptText, Search } from 'lucide-react'
 import type { AllOrderRow } from '../../mocks/allOrdersData'
 import { formatINR } from '../../utils/format'
 import { Badge } from '../common/Badge'
@@ -36,6 +36,7 @@ interface AllOrdersTableProps {
   onViewKot?: (row: AllOrderRow) => void
   onEdit?: (row: AllOrderRow) => void
   onChangePayment?: (row: AllOrderRow) => void
+  onSettleDue?: (row: AllOrderRow) => void
 }
 
 function ActionButton({
@@ -69,6 +70,7 @@ export function AllOrdersTable({
   onViewKot,
   onEdit,
   onChangePayment,
+  onSettleDue,
 }: AllOrdersTableProps) {
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
     rows,
@@ -253,6 +255,11 @@ export function AllOrdersTable({
           >
             <ChangePaymentIcon width={13} height={13} />
           </ActionButton>
+          {(row.balanceDue ?? 0) > 0 && (
+            <ActionButton label="Settle Due" onClick={() => onSettleDue?.(row)}>
+              <Banknote size={13} />
+            </ActionButton>
+          )}
         </div>
       ),
     },

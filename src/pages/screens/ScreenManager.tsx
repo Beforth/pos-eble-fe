@@ -3,17 +3,23 @@ import { useCallback, useEffect, useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, MonitorSmartphone, Plus } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
 import { BrandLogo } from '../../components/brand/BrandLogo'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import { CreateScreenModal } from '../../components/screens/CreateScreenModal'
 import { EditScreenModal } from '../../components/screens/EditScreenModal'
 import { ScreenCard } from '../../components/screens/ScreenCard'
 import type { KotScreen } from '../../mocks/screensData'
-import { fetchScreens, removeScreen } from '../../services/screenService'
+import {
+  fetchScreens,
+  removeScreen,
+  warmScreenLookups,
+} from '../../services/screenService'
 import { brand } from '../../theme/brand'
 
 export default function ScreenManager() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [screens, setScreens] = useState<KotScreen[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
@@ -21,16 +27,24 @@ export default function ScreenManager() {
   const [pendingDelete, setPendingDelete] = useState<KotScreen | null>(null)
 
   const refresh = useCallback(() => {
-    fetchScreens()
-      .then(setScreens)
+    if (!encryptedOutletId) {
+      setScreens([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    Promise.all([
+      fetchScreens(encryptedOutletId),
+      warmScreenLookups(encryptedOutletId),
+    ])
+      .then(([list]) => setScreens(list))
       .catch(() => setScreens([]))
       .finally(() => setLoading(false))
-  }, [])
+  }, [encryptedOutletId])
 
   useEffect(() => {
     refresh()
   }, [refresh])
-
 
   function handleCreated(screen: KotScreen) {
     setCreateOpen(false)
@@ -47,11 +61,16 @@ export default function ScreenManager() {
   }
 
   async function handleDelete() {
-    if (!pendingDelete) return
-    await removeScreen(pendingDelete.id)
-    setScreens((prev) => prev.filter((row) => row.id !== pendingDelete.id))
-    showToast(`"${pendingDelete.name}" deleted`)
-    setPendingDelete(null)
+    if (!pendingDelete || !encryptedOutletId) return
+    try {
+      await removeScreen(pendingDelete.id, encryptedOutletId)
+      setScreens((prev) => prev.filter((row) => row.id !== pendingDelete.id))
+      showToast(`"${pendingDelete.name}" deleted`)
+    } catch {
+      showToast('Could not delete the screen. Try again.')
+    } finally {
+      setPendingDelete(null)
+    }
   }
 
   return (
@@ -73,7 +92,8 @@ export default function ScreenManager() {
       <ConfirmDeleteModal
         open={Boolean(pendingDelete)}
         title="Delete Screen"
-        message={`Delete "${pendingDelete?.name}"? This screen will stop showing KOTs.`}
+        target={pendingDelete?.name}
+        message="This screen will stop showing KOTs."
         confirmLabel="Delete"
         onConfirm={handleDelete}
         onClose={() => setPendingDelete(null)}

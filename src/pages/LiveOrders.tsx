@@ -1,14 +1,18 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { useChrome } from '../state/ChromeContext'
 import {
   ChefHat,
   Clock3,
   HandPlatter,
+  Loader2,
   RefreshCw,
   ShoppingBag,
   Truck,
   UtensilsCrossed,
 } from 'lucide-react'
+import { useAuth } from '../auth/AuthContext'
 import { LiveOrdersBoard } from '../components/live-orders/LiveOrdersBoard'
+import { LiveOrdersDetailModal } from '../components/live-orders/LiveOrdersDetailModal'
 import { RunningTablesView } from '../components/live-orders/RunningTablesView'
 import { ActionCenterDrawer } from '../components/layout/ActionCenterDrawer'
 import { NotificationsDrawer } from '../components/layout/NotificationsDrawer'
@@ -16,13 +20,20 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
 import {
-  pendingOrders,
-  runningOrders,
-  runningTables,
-} from '../mocks/liveOrdersData'
+  liveOrdersApi,
+  toLiveOrdersBoard,
+  type LiveOrderChannelRow,
+  type LiveOrdersSummary,
+  type RunningTablesSummary,
+} from '../services/orderService'
 import { brand } from '../theme/brand'
 
 type LiveTab = 'orders' | 'tables'
+
+interface LiveDetail {
+  board: 'running' | 'pending'
+  row: LiveOrderChannelRow
+}
 
 const channelIcons: Record<string, ReactNode> = {
   dineIn: <UtensilsCrossed size={18} />,
@@ -34,19 +45,55 @@ const channelIcons: Record<string, ReactNode> = {
 }
 
 export default function LiveOrders() {
-  const [collapsed, setCollapsed] = useState(false)
+  const { encryptedOutletId } = useAuth()
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
   const [tab, setTab] = useState<LiveTab>('orders')
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [running, setRunning] = useState<LiveOrdersSummary | null>(null)
+  const [pending, setPending] = useState<LiveOrdersSummary | null>(null)
+  const [tables, setTables] = useState<RunningTablesSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [reload, setReload] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [detail, setDetail] = useState<LiveDetail | null>(null)
+
+  useEffect(() => {
+    if (!encryptedOutletId) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    liveOrdersApi(encryptedOutletId)
+      .then((dto) => {
+        if (cancelled) return
+        setRunning(toLiveOrdersBoard(dto.running))
+        setPending(toLiveOrdersBoard(dto.pending))
+        setTables({
+          activeTables: dto.tables.activeTables,
+          revenueEstimated: Number(dto.tables.revenueEstimated),
+        })
+        setError(false)
+      })
+      .catch(() => {
+        if (!cancelled) setError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, reload])
 
   function handleRefresh() {
     if (refreshing) return
     setRefreshing(true)
-    setRefreshKey((key) => key + 1)
+    setReload((key) => key + 1)
     window.setTimeout(() => setRefreshing(false), 800)
   }
 
@@ -61,7 +108,7 @@ export default function LiveOrders() {
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem="live-orders"
       />
@@ -154,25 +201,83 @@ export default function LiveOrders() {
             </button>
           </div>
 
-          <div key={refreshKey}>
-            {tab === 'orders' ? (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <LiveOrdersBoard
-                  title="Running Orders"
-                  data={runningOrders}
-                  icons={channelIcons}
-                />
-                <LiveOrdersBoard
-                  title="Pending Orders"
-                  data={pendingOrders}
-                  icons={channelIcons}
-                />
+          {tab === 'orders' ? (
+            loading ? (
+              <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-line bg-card">
+                <Loader2 size={22} className="animate-spin text-primary" />
               </div>
-            ) : (
-              <RunningTablesView data={runningTables} />
-            )}
-          </div>
+) : error || !running || !pending ? (
+            <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+              <p className="text-base font-semibold text-ink">
+                Couldn't load live orders
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Check your connection and retry.
+              </p>
+              <button
+                type="button"
+                onClick={() => setReload((key) => key + 1)}
+                className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink transition-colors hover:border-muted"
+              >
+                <RefreshCw size={15} className="text-muted" />
+                Retry
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <LiveOrdersBoard
+                title="Running Orders"
+                data={running}
+                icons={channelIcons}
+                onRowClick={(row) => setDetail({ board: 'running', row })}
+              />
+              <LiveOrdersBoard
+                title="Pending Orders"
+                data={pending}
+                icons={channelIcons}
+                onRowClick={(row) => setDetail({ board: 'pending', row })}
+              />
+            </div>
+          )
+          ) : loading ? (
+            <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-line bg-card">
+              <Loader2 size={22} className="animate-spin text-primary" />
+            </div>
+          ) : error || !tables ? (
+            <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+              <p className="text-base font-semibold text-ink">
+                Couldn't load live orders
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Check your connection and retry.
+              </p>
+              <button
+                type="button"
+                onClick={() => setReload((key) => key + 1)}
+                className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink transition-colors hover:border-muted"
+              >
+                <RefreshCw size={15} className="text-muted" />
+                Retry
+              </button>
+            </div>
+          ) : (
+            <RunningTablesView data={tables} />
+          )}
         </main>
+
+        {detail && encryptedOutletId && (
+          <LiveOrdersDetailModal
+            open
+            outletId={encryptedOutletId}
+            board={detail.board}
+            rowId={detail.row.id}
+            title={`${detail.row.label} · ${
+              detail.board === 'running' ? 'Running' : 'Pending'
+            } Orders`}
+            icon={channelIcons[detail.row.icon]}
+            onClose={() => setDetail(null)}
+          />
+        )}
       </div>
     </div>
   )

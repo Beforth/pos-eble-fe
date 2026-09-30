@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Trash2, X } from 'lucide-react'
-import { baseMenuCategories } from '../../mocks/menuItemsData'
+import { ConfirmDialog } from '../common/ConfirmDialog'
+import { useMenuReference } from '../../state/MenuReferenceContext'
 
 export type DiscountMode = 'percentage' | 'fixed'
 
@@ -127,10 +128,8 @@ function ScopeDropdown({
                         onChange(option)
                         setOpen(false)
                       }}
-                      className={`flex w-full px-3 py-2 text-left text-sm ${
-                        active
-                          ? 'bg-primary text-white'
-                          : 'text-ink hover:bg-primary hover:text-white'
+                      className={`flex w-full px-3 py-2 text-left text-sm hover:bg-page ${
+                        active ? 'font-medium text-primary' : 'text-ink'
                       }`}
                     >
                       {option}
@@ -154,18 +153,22 @@ export function AppliedDiscountModal({
   onSave,
 }: AppliedDiscountModalProps) {
   const [rows, setRows] = useState<CustomDiscountRow[]>([newRow()])
+  const [pendingRow, setPendingRow] = useState<CustomDiscountRow | null>(null)
   const [couponCode, setCouponCode] = useState('')
   const [couponMessage, setCouponMessage] = useState<string | null>(null)
 
+  const menus = useMenuReference(['categories'])
+
   const scopeOptions = useMemo(() => {
+    const active = menus.categories.filter((cat) => cat.is_active)
     const fromMenu = FEATURED_CATEGORY_NAMES.filter((name) =>
-      baseMenuCategories.some((cat) => cat.name === name),
+      active.some((cat) => cat.name === name),
     )
-    // Fallback: first 4 original categories if featured names are missing
-    const fallback = baseMenuCategories.slice(0, 4).map((cat) => cat.name)
+    // Fallback: first 4 categories if featured names are missing
+    const fallback = active.slice(0, 4).map((cat) => cat.name)
     const categories = fromMenu.length > 0 ? fromMenu : fallback
     return [...EXTRA_SCOPE_OPTIONS, ...categories]
-  }, [])
+  }, [menus.categories])
 
   useEffect(() => {
     if (!open) return
@@ -323,7 +326,7 @@ export function AppliedDiscountModal({
                       title="Remove discount"
                       aria-label="Remove discount"
                       onClick={() =>
-                        setRows((prev) => prev.filter((r) => r.id !== row.id))
+                        rows.length > 1 && setPendingRow(row)
                       }
                       className="rounded p-1 text-muted hover:bg-primary/10 hover:text-primary"
                     >
@@ -451,6 +454,24 @@ export function AppliedDiscountModal({
             Save
           </button>
         </footer>
+
+        <ConfirmDialog
+          open={Boolean(pendingRow)}
+          compact
+          title="Remove discount"
+          target={pendingRow?.reason?.trim() || undefined}
+          message="This discount row will be removed from the applied discounts."
+          note="The bill total and GST update immediately — nothing is settled until you save."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (pendingRow)
+              setRows((prev) =>
+                prev.filter((r) => r.id !== pendingRow.id),
+              )
+            setPendingRow(null)
+          }}
+          onClose={() => setPendingRow(null)}
+        />
       </div>
     </div>
   )

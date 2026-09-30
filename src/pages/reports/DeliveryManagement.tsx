@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/exportCsv'
 import { Search } from 'lucide-react'
 import {
   Cell,
@@ -71,6 +72,18 @@ export default function DeliveryManagement() {
   )
 
 
+  function exportRows(
+    rowsToExport: (string | number | null | undefined)[][],
+    suffix: string,
+  ) {
+    downloadCsv(
+      `delivery-management-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Order ID', 'Provider', 'Status'],
+      rowsToExport,
+    )
+    showToast(`Exported ${rowsToExport.length} rows`)
+  }
+
   function handleSearch() {
     showToast('Search applied')
   }
@@ -99,8 +112,8 @@ export default function DeliveryManagement() {
             </p>
           </div>
           <ExportExcelMenu
-            onExportPage={() => showToast('Exporting current page…')}
-            onExportAll={() => showToast('Exporting all records…')}
+            onExportPage={() => exportRows([], 'page')}
+            onExportAll={() => exportRows([], 'all')}
           />
         </div>
       }

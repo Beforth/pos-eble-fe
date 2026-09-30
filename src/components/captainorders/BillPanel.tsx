@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import {
@@ -19,8 +19,16 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { billingTables } from '../../mocks/billingTables'
+import type { BillingTableRow } from '../../utils/diningTables'
 import { roundSettlementAmount } from '../../utils/settlementRound'
+import {
+  computeTax,
+  DEFAULT_TAX_SETTINGS,
+  type TaxableItem,
+  type TaxBreakdownLine,
+  type TaxSettings,
+} from '../../utils/taxEngine'
+import type { TaxSummary } from '../../types/menu'
 import {
   AppliedDiscountModal,
   type AppliedDiscount,
@@ -31,6 +39,7 @@ import {
 } from './CustomerHistoryModal'
 import { CustomerGstModal } from './CustomerGstModal'
 import { DeleteReasonModal } from './DeleteReasonModal'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { OTHER_PAYMENT_TYPES } from './OtherPaymentModal'
 import { PrimaryButton } from '../menu/MenuActionButtons'
 
@@ -54,6 +63,24 @@ const SEED_CUSTOMER_HISTORY: Record<string, CustomerHistoryOrder[]> = {
 }
 
 export type OrderType = 'dine-in' | 'delivery' | 'pick-up' | 'other'
+
+/** Snapshot of bill extras passed with Save / Save & Print actions. */
+export interface BillChargesSnapshot {
+  deliveryCharge: number
+  containerCharge: number
+  customerPaid: number
+  tip: number
+  discount: number
+  /** Total tax across the cart (forward + backward). */
+  tax: number
+  /** The slice added on top of the line sum — the backend's `grand_total` input. */
+  taxAddedToTotal: number
+  /** Per-tax amounts for the printed-bill CGST/SGST bifurcation. */
+  taxBreakdown: TaxBreakdownLine[]
+  /** Settlement rounding only (not tax / discount residuals). */
+  roundOff: number
+  settlementTotal: number
+}
 export type PaymentMethod = 'cash' | 'card' | 'due' | 'other' | 'part'
 
 export interface CartLine {
@@ -81,11 +108,32 @@ interface BillPanelProps {
     kotNo: number
     amount: number
     createdAt?: number
-    items: { id: string; name: string; qty: number; price: number; note?: string }[]
+    items: {
+      id: string
+      /** Menu item id, so KOT lines are priced by the same tax engine. */
+      itemId?: string
+      name: string
+      qty: number
+      price: number
+      note?: string
+    }[]
   }[]
+  /** Menu rows keyed by item id — supply the tax slabs for each line. */
+  taxSource?: Map<string, TaxableItem>
+  /** Outlet tax switches from the `calculations` settings group. */
+  taxSettings?: Partial<TaxSettings>
+  /**
+   * Slabs applied to the delivery/container charges themselves, built by the
+   * caller from the outlet's charge-tax percent settings. Empty/omitted = the
+   * charges are untaxed.
+   */
+  chargeTaxes?: TaxSummary[]
+  /** When set (e.g. opened from Kot View), expand that KOT in the sent list. */
+  focusKotNo?: number | null
   orderType: OrderType
   payment: PaymentMethod
   tableId: string
+  tables: BillingTableRow[]
   guests: number
   complimentary: boolean
   itsPaid: boolean
@@ -111,8 +159,8 @@ interface BillPanelProps {
     reason: string
   }) => void
   onClearItems?: () => void
-  onAction: (action: string) => void
-  onSettleSave?: (amount: number) => void
+  onAction: (action: string, charges?: BillChargesSnapshot) => void
+  onSettleSave?: (amount: number, due?: number) => void
   onCustomerChange: (customer: CustomerDetails) => void
   onCustomerFormOpenChange: (open: boolean) => void
   onNotesClick?: () => void
@@ -150,9 +198,14 @@ function fieldClass(error?: boolean) {
 export function BillPanel({
   lines,
   tableKots = [],
+  focusKotNo = null,
+  taxSource,
+  taxSettings,
+  chargeTaxes,
   orderType,
   payment,
   tableId,
+  tables,
   guests,
   complimentary,
   itsPaid,
@@ -191,21 +244,26 @@ export function BillPanel({
     itemId: string
     itemName: string
   } | null>(null)
-  const selectedTable = billingTables.find((t) => t.id === tableId)
+  const [pendingLineDelete, setPendingLineDelete] = useState<CartLine | null>(null)
+  const [clearAllOpen, setClearAllOpen] = useState(false)
+  const [clearCustomerOpen, setClearCustomerOpen] = useState(false)
+  const selectedTable = tables.find((t) => t.id === tableId)
 
   useEffect(() => {
-    setExpandedKotNo(null)
-  }, [tableId])
+    setExpandedKotNo(focusKotNo ?? null)
+  }, [tableId, focusKotNo])
   const currentTotal = lines.reduce((sum, line) => sum + line.price * line.qty, 0)
   const kotTotal = tableKots.reduce((sum, kot) => sum + kot.amount, 0)
   const total = currentTotal + kotTotal
   const hasSentKots = tableKots.length > 0
   const hasAnyItems = lines.length > 0 || hasSentKots
-  const noteLine = lines.find((line) => line.id === noteLineId) ?? null
   const [settlementInput, setSettlementInput] = useState('')
   const [settlementError, setSettlementError] = useState<string | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
+  // Derive after the state above — reading noteLineId before its declaration is
+  // a temporal-dead-zone ReferenceError whenever the cart has a line.
+  const noteLine = lines.find((line) => line.id === noteLineId) ?? null
   const [noteDraft, setNoteDraft] = useState('')
   const [discount, setDiscount] = useState(0)
   const [discountDetails, setDiscountDetails] = useState<AppliedDiscount | null>(
@@ -231,7 +289,54 @@ export function BillPanel({
   const containerValue = Number(containerCharge) || 0
   const tipValue = Number(tip) || 0
   const paidValue = Number(customerPaid) || 0
-  const taxableBase = Math.max(0, total - discount + deliveryValue + containerValue)
+
+  // Tax is priced over the live cart *and* the KOT lines already sent to the
+  // table — a table bill is mostly KOT lines, so pricing only `lines` would
+  // leave the common case untaxed.
+  const taxLines = useMemo(
+    () => [
+      ...lines.map((line) => ({ itemId: line.itemId, price: line.price, qty: line.qty })),
+      ...tableKots.flatMap((kot) =>
+        kot.items
+          .filter((item) => Boolean(item.itemId))
+          .map((item) => ({
+            itemId: item.itemId as string,
+            price: item.price,
+            qty: item.qty,
+          })),
+      ),
+    ],
+    [lines, tableKots],
+  )
+
+  const tax = useMemo(
+    () =>
+      computeTax(taxLines, taxSource ?? new Map(), {
+        discount,
+        deliveryCharge: orderType === 'delivery' ? deliveryValue : 0,
+        containerCharge: orderType === 'delivery' ? containerValue : 0,
+        chargeTaxes,
+        settings: { ...DEFAULT_TAX_SETTINGS, ...taxSettings },
+      }),
+    [
+      taxLines,
+      taxSource,
+      discount,
+      deliveryValue,
+      containerValue,
+      orderType,
+      taxSettings,
+      chargeTaxes,
+    ],
+  )
+
+  // `taxableBase` = the pre-rounding amount the customer owes. Backward tax is
+  // already inside the line prices, so only the forward slice is added here —
+  // adding the total would double-charge a tax-inclusive cart.
+  const taxableBase = Math.max(
+    0,
+    total - discount + tax.addedToTotal + deliveryValue + containerValue,
+  )
   const roundedTotal = roundSettlementAmount(taxableBase)
   const roundOff = Math.round((roundedTotal - taxableBase) * 100) / 100
   const settlementValue =
@@ -260,6 +365,30 @@ export function BillPanel({
     setSettlementInput(String(roundSettlementAmount(taxableBase)))
     setSettlementError(null)
   }, [taxableBase, hasAnyItems])
+
+  useEffect(() => {
+    if (orderType !== 'delivery') {
+      setDeliveryCharge('0')
+      setContainerCharge('0')
+      setCustomerPaid('0')
+      setTip('0')
+    }
+  }, [orderType])
+
+  function chargesSnapshot(): BillChargesSnapshot {
+    return {
+      deliveryCharge: orderType === 'delivery' ? deliveryValue : 0,
+      containerCharge: orderType === 'delivery' ? containerValue : 0,
+      customerPaid: orderType === 'delivery' ? paidValue : 0,
+      tip: orderType === 'delivery' ? tipValue : 0,
+      discount,
+      tax: tax.total,
+      taxAddedToTotal: tax.addedToTotal,
+      taxBreakdown: tax.breakdown,
+      roundOff,
+      settlementTotal: settlementValue,
+    }
+  }
 
   function updateCustomer<K extends keyof CustomerDetails>(
     key: K,
@@ -291,8 +420,16 @@ export function BillPanel({
     }
     const rounded = roundSettlementAmount(raw)
     setSettlementInput(String(rounded))
+    const due = Math.max(0, Math.round((roundedTotal - rounded) * 100) / 100)
+    // A short settlement books a due balance, which is tracked per customer —
+    // so the customer name is mandatory before it can be saved.
+    if (due > 0 && !customer.name.trim()) {
+      setSettlementError('Customer name is required when a due balance remains')
+      onCustomerFormOpenChange(true)
+      return
+    }
     setSettlementError(null)
-    onSettleSave?.(rounded)
+    onSettleSave?.(rounded, due)
   }
 
   function money(n: number) {
@@ -323,7 +460,7 @@ export function BillPanel({
       gstNo: '',
     })
     setHistoryOpen(false)
-    showToast('Customer history deleted')
+    showToast('Customer removed from bill')
   }
 
   return (
@@ -416,6 +553,63 @@ export function BillPanel({
           })
           setDeleteTarget(null)
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingLineDelete)}
+        compact
+        title="Remove item from bill"
+        target={pendingLineDelete?.name}
+        message={
+          pendingLineDelete
+            ? pendingLineDelete.qty > 1
+              ? `${pendingLineDelete.qty} × ${pendingLineDelete.name} will be removed from this bill.`
+              : `${pendingLineDelete.name} will be removed from this bill.`
+            : undefined
+        }
+        note="The bill updates as if this item was never added — nothing is settled until you save or settle."
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (pendingLineDelete) onRemoveLine(pendingLineDelete.id)
+          setPendingLineDelete(null)
+        }}
+        onClose={() => setPendingLineDelete(null)}
+      />
+      <ConfirmDialog
+        open={clearAllOpen}
+        title="Remove all items"
+        target={`${lines.length} item${lines.length === 1 ? '' : 's'}`}
+        message={`The bill (${money(total)}) will be emptied in one go.`}
+        consequences={[
+          'Table, customer, payment, discount and note details stay.',
+          'You can re-add items afterwards before settling.',
+        ]}
+        note="Nothing is settled or recorded — clearing only empties the current bill."
+        confirmLabel="Remove all"
+        onConfirm={() => {
+          onClearItems?.()
+          setClearAllOpen(false)
+        }}
+        onClose={() => setClearAllOpen(false)}
+      />
+      <ConfirmDialog
+        open={clearCustomerOpen}
+        title="Remove customer from bill"
+        target={
+          customer.name.trim() || customer.mobile.trim() || undefined
+        }
+        message="The customer details will be cleared from this bill."
+        consequences={[
+          'The saved bill will carry no customer name or mobile.',
+          'The history panel for this number stops showing while billing.',
+        ]}
+        note="This only clears the current bill and the on-screen history view — no customer record is deleted."
+        confirmLabel="Remove customer"
+        onConfirm={() => {
+          clearCustomerHistory()
+          setClearCustomerOpen(false)
+        }}
+        onClose={() => setClearCustomerOpen(false)}
       />
 
       {/* Order type */}
@@ -539,7 +733,7 @@ export function BillPanel({
           title="Delete all items"
           aria-label="Delete all items"
           disabled={lines.length === 0}
-          onClick={onClearItems}
+          onClick={onClearItems ? () => setClearAllOpen(true) : undefined}
           className="ml-auto inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-ink hover:border-primary hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Trash2 size={14} />
@@ -597,7 +791,7 @@ export function BillPanel({
                   <span>No table selected</span>
                 </button>
               </li>
-              {billingTables.map((table) => (
+              {tables.map((table) => (
                 <li key={table.id}>
                   <button
                     type="button"
@@ -666,7 +860,7 @@ export function BillPanel({
                 <button
                   type="button"
                   title="Delete customer history"
-                  onClick={clearCustomerHistory}
+                  onClick={() => setClearCustomerOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-primary"
                 >
                   <Trash2 size={14} />
@@ -971,7 +1165,7 @@ export function BillPanel({
                             <button
                               type="button"
                               aria-label={`Remove ${line.name}`}
-                              onClick={() => onRemoveLine(line.id)}
+                              onClick={() => setPendingLineDelete(line)}
                               className="inline-flex size-7 items-center justify-center rounded text-muted hover:bg-primary/10 hover:text-primary"
                             >
                               <Trash2 size={14} />
@@ -1072,8 +1266,21 @@ export function BillPanel({
                   More
                 </button>
               </span>
-              <span className="font-semibold">{money(0)}</span>
+              <span className="font-semibold">{money(tax.total)}</span>
             </div>
+            {tax.breakdown.map((row) => (
+              <div
+                key={`${row.mode}:${row.label}`}
+                className="flex items-center justify-between gap-2 pl-4 text-xs text-muted"
+              >
+                <span>
+                  {row.label}
+                  {row.rate > 0 ? ` @ ${row.rate}%` : ''}
+                  {row.mode === 'backward' ? ' (incl.)' : ''}
+                </span>
+                <span>{money(row.amount)}</span>
+              </div>
+            ))}
             <div className="flex items-center justify-between text-sm text-ink">
               <span>Round Off</span>
               <span className="font-semibold">
@@ -1292,7 +1499,7 @@ export function BillPanel({
                     ? 'Save current order as draft'
                     : action.label
                 }
-                onClick={() => onAction(action.id)}
+                onClick={() => onAction(action.id, chargesSnapshot())}
                 className={`inline-flex h-10 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[11px] font-semibold leading-tight sm:text-xs ${
                   action.id === 'Draft'
                     ? 'border border-primary bg-card text-primary hover:bg-primary/5'

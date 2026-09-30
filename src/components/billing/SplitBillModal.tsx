@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { List, Percent, SplitSquareHorizontal, Trash2, X } from 'lucide-react'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { CartLine } from './BillPanel'
 
 type SplitTab = 'portion' | 'percentage' | 'item'
@@ -57,6 +58,7 @@ export function SplitBillModal({
   const [percentFields, setPercentFields] = useState<string[]>(['', ''])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [parts, setParts] = useState<string[][]>([[], []])
+  const [pendingPartIndex, setPendingPartIndex] = useState<number | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -379,12 +381,12 @@ export function SplitBillModal({
             <div className="grid gap-4 md:grid-cols-2">
               {/* All Items */}
               <div className="overflow-hidden rounded border border-line">
-                <div className="flex items-center gap-2 bg-primary px-3 py-2.5 text-sm font-semibold text-white">
+                <div className="flex items-center gap-2 border-b border-line bg-page px-3 py-2.5 text-sm font-semibold text-ink">
                   <input
                     type="checkbox"
                     checked={allUnassignedSelected}
                     onChange={toggleSelectAll}
-                    className="size-4 accent-white"
+                    className="size-4 accent-primary"
                     aria-label="Select all items"
                   />
                   All Items
@@ -426,18 +428,18 @@ export function SplitBillModal({
                     key={partIndex}
                     className="overflow-hidden rounded border border-line"
                   >
-                    <div className="flex items-center gap-2 bg-primary px-3 py-2 text-sm font-semibold text-white">
+                    <div className="flex items-center gap-2 border-b border-line bg-page px-3 py-2 text-sm font-semibold text-ink">
                       <button
                         type="button"
                         onClick={() => addSelectedToPart(partIndex)}
-                        className="rounded bg-white px-2.5 py-0.5 text-xs font-semibold text-primary hover:bg-page"
+                        className="rounded border border-primary bg-white px-2.5 py-0.5 text-xs font-semibold text-primary hover:bg-primary/5"
                       >
                         Add
                       </button>
                       <span>Part {partIndex + 1}</span>
                       <span className="ml-auto flex items-center gap-2">
                         {itemSplitAmounts[partIndex] > 0 ? (
-                          <span className="text-xs font-medium">
+                          <span className="text-xs font-medium text-muted">
                             ₹{itemSplitAmounts[partIndex].toFixed(2)}
                           </span>
                         ) : null}
@@ -445,8 +447,10 @@ export function SplitBillModal({
                           <button
                             type="button"
                             aria-label={`Delete Part ${partIndex + 1}`}
-                            onClick={() => removePart(partIndex)}
-                            className="rounded p-0.5 text-white/90 hover:bg-white/20 hover:text-white"
+                            onClick={() =>
+                          parts.length > 2 && setPendingPartIndex(partIndex)
+                        }
+                            className="rounded p-0.5 text-muted hover:bg-white hover:text-primary"
                           >
                             <Trash2 size={15} strokeWidth={2.25} />
                           </button>
@@ -516,6 +520,23 @@ export function SplitBillModal({
             Save
           </button>
         </footer>
+
+        <ConfirmDialog
+          open={pendingPartIndex !== null}
+          compact
+          title="Remove split part"
+          target={
+            pendingPartIndex !== null ? `Part ${pendingPartIndex + 1}` : undefined
+          }
+          message="This payment part will be removed from the bill split."
+          note="The split is still being set up — the amount simply goes back to the other parts."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (pendingPartIndex !== null) removePart(pendingPartIndex)
+            setPendingPartIndex(null)
+          }}
+          onClose={() => setPendingPartIndex(null)}
+        />
       </div>
     </div>
   )

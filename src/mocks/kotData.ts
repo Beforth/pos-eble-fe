@@ -1,5 +1,5 @@
 export type KotOrderType = 'DINE IN' | 'PARCEL' | 'DELIVERY' | 'PICK UP' | 'OTHER'
-export type KotStatus = 'Used In Bill' | 'Pending' | 'Cancelled'
+export type KotStatus = 'Used In Bill' | 'Pending' | 'Cancelled' | 'Ready'
 export type KotRowSource = 'billing' | 'captain'
 
 export interface KotRow {
@@ -7,6 +7,10 @@ export interface KotRow {
   kotId: number
   orderType: KotOrderType
   source?: KotRowSource
+  /** Encrypted dining-table id when the KOT is table-scoped. */
+  tableId?: string
+  tableNo?: string
+  guests?: number
   customerName: string
   customerPhone: string
   itemCount: number

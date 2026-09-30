@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, Trash2, X } from 'lucide-react'
-import type { MenuItemRow } from '../../mocks/menuItemsData'
+import { ConfirmDialog } from '../common/ConfirmDialog'
+import { useAuth } from '../../auth/AuthContext'
+import { createItemApi } from '../../services/menuService'
+import { SearchableSelect } from '../inventory/SearchableSelect'
+import type { Category, ItemPayload } from '../../types/menu'
+import { showToast } from '../../utils/toast'
 
 interface DraftRow {
   key: string
@@ -14,9 +19,10 @@ interface DraftRow {
 
 interface AddItemsGridModalProps {
   open: boolean
-  categoryId: string
+  categories: Category[]
+  initialCategoryId: string
   onClose: () => void
-  onSave: (items: MenuItemRow[]) => void
+  onSaved: () => void
 }
 
 function emptyDraft(): DraftRow {
@@ -32,16 +38,34 @@ function emptyDraft(): DraftRow {
 
 export function AddItemsGridModal({
   open,
-  categoryId,
+  categories,
+  initialCategoryId,
   onClose,
-  onSave,
+  onSaved,
 }: AddItemsGridModalProps) {
+  const { encryptedOutletId } = useAuth()
   const [rows, setRows] = useState<DraftRow[]>([emptyDraft(), emptyDraft()])
+  const [selectedCategoryId, setSelectedCategoryId] =
+    useState(initialCategoryId)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [pendingRemove, setPendingRemove] = useState<DraftRow | null>(null)
+
+  const categoryNames = useMemo(
+    () => categories.map((category) => category.name),
+    [categories],
+  )
+  const categoryLabel = useMemo(
+    () =>
+      categories.find((category) => category.id === selectedCategoryId)?.name ??
+      '',
+    [categories, selectedCategoryId],
+  )
 
   useEffect(() => {
     if (!open) return
     setRows([emptyDraft(), emptyDraft()])
+    setSelectedCategoryId(initialCategoryId)
     setError('')
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -53,7 +77,7 @@ export function AddItemsGridModal({
       window.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previous
     }
-  }, [open, onClose])
+  }, [open, onClose, initialCategoryId])
 
   if (!open) return null
 
@@ -63,7 +87,11 @@ export function AddItemsGridModal({
     )
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (!selectedCategoryId) {
+      setError('Select a category')
+      return
+    }
     const filled = rows.filter((row) => row.name.trim())
     if (filled.length === 0) {
       setError('Enter at least one item name')
@@ -76,20 +104,32 @@ export function AddItemsGridModal({
       setError('Each item needs a short code and a valid price')
       return
     }
-    const items: MenuItemRow[] = filled.map((row, index) => ({
-      id: `new-${Date.now()}-${index}`,
-      categoryId,
-      name: row.name.trim(),
-      shortCode: row.shortCode.trim(),
-      onlineDisplayName: row.onlineDisplayName.trim() || row.name.trim(),
-      price: Number(row.price) || 0,
-      description: row.description.trim(),
-      available: false,
-      tags: ['V+'],
-      hasImage: false,
-    }))
-    onSave(items)
-    onClose()
+    if (!encryptedOutletId) return
+    setSaving(true)
+    try {
+      await Promise.all(
+        filled.map((row) => {
+          const payload: ItemPayload = {
+            category_id: selectedCategoryId,
+            name: row.name.trim(),
+            short_code: row.shortCode.trim(),
+            online_display_name:
+              row.onlineDisplayName.trim() || row.name.trim(),
+            base_price: Number(row.price) || 0,
+            description: row.description.trim(),
+            is_active: true,
+          }
+          return createItemApi(encryptedOutletId!, payload)
+        }),
+      )
+      showToast('Items created')
+      onSaved()
+      onClose()
+    } catch {
+      showToast('Failed to create some items')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return createPortal(
@@ -124,6 +164,23 @@ export function AddItemsGridModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-4">
+          <div className="mb-4 max-w-sm">
+            <SearchableSelect
+              label="Category"
+              required
+              value={categoryLabel}
+              options={categoryNames}
+              placeholder="Select a category"
+              searchPlaceholder="Search categories..."
+              dropdownPlacement="below"
+              onChange={(nameValue) => {
+                const category = categories.find(
+                  (item) => item.name === nameValue,
+                )
+                setSelectedCategoryId(category?.id ?? '')
+              }}
+            />
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
@@ -200,9 +257,7 @@ export function AddItemsGridModal({
                         aria-label="Remove row"
                         disabled={rows.length <= 1}
                         onClick={() =>
-                          setRows((prev) =>
-                            prev.filter((r) => r.key !== row.key),
-                          )
+                          rows.length > 1 && setPendingRemove(row)
                         }
                         className="rounded p-1.5 text-muted hover:bg-primary/10 hover:text-primary disabled:opacity-30"
                       >
@@ -231,18 +286,38 @@ export function AddItemsGridModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page"
+            disabled={saving}
+            className="inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSave}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            disabled={saving}
+            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
           >
-            Save Items
+            {saving ? 'Saving...' : 'Save Items'}
           </button>
         </div>
+
+        <ConfirmDialog
+          open={Boolean(pendingRemove)}
+          compact
+          title="Remove item"
+          target={pendingRemove?.name?.trim() || undefined}
+          message="This item row will be removed from the list being added."
+          note="Nothing is saved until you confirm — the row can be re-added."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (pendingRemove)
+              setRows((prev) =>
+                prev.filter((r) => r.key !== pendingRemove.key),
+              )
+            setPendingRemove(null)
+          }}
+          onClose={() => setPendingRemove(null)}
+        />
       </div>
     </div>,
     document.body,

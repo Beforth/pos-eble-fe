@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useChrome } from '../state/ChromeContext'
 
 import { showToast } from '../utils/toast'
 import {
@@ -90,7 +91,7 @@ function matchesRecordType(row: OnlineOrderRow, recordType: string): boolean {
   return true
 }
 
-export default function OnlineOrders() {  const [collapsed, setCollapsed] = useState(false)
+export default function OnlineOrders() {  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -173,7 +174,7 @@ export default function OnlineOrders() {  const [collapsed, setCollapsed] = useS
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem="online-orders"
       />

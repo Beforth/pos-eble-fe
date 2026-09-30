@@ -343,8 +343,9 @@ export default function Units() {
       />
       <ConfirmDeleteModal
         open={Boolean(pendingDelete)}
-        title="Confirm Delete"
-        message={`Are you sure you want to delete "${pendingDelete?.name ?? 'this unit'}"? This action cannot be undone.`}
+        title="Delete unit"
+        target={pendingDelete?.name}
+        message="This unit stops appearing when you enter quantities."
         confirmLabel="Delete"
         onConfirm={() => void confirmDelete()}
         onClose={() => setPendingDelete(null)}

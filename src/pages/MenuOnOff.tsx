@@ -1,15 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../utils/toast'
 import { Search } from 'lucide-react'
 import { Badge } from '../components/common/Badge'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import {
-  baseMenuCategories,
-  getStoredMenuItems,
-  menuItems,
-  type MenuItemRow,
-} from '../mocks/menuItemsData'
+import { useAuth } from '../auth/AuthContext'
+import { useMenuChannels } from '../state/MenuChannelsContext'
+import { listCategoriesApi, updateItemApi } from '../services/menuService'
+import { fetchCategoryItemsCached, invalidateMenuItems } from '../state/menuItemsCache'
+import type { Category, Item, ItemAvailability } from '../types/menu'
 
 type Platform = 'pos' | 'swiggy' | 'zomato'
 
@@ -25,10 +24,27 @@ const PLATFORM_LABEL: Record<Platform, string> = {
   zomato: 'Zomato',
 }
 
+const PLATFORM_SLUG: Record<Platform, string> = {
+  pos: 'base',
+  swiggy: 'swiggy',
+  zomato: 'zomato',
+}
+
+interface MenuItemRow {
+  id: string
+  name: string
+  shortCode: string
+  price: number
+  prices: Record<Platform, number>
+  availableOnPos: boolean
+  availableOnSwiggy: boolean
+  availableOnZomato: boolean
+}
+
 function getAvailable(item: MenuItemRow, platform: Platform): boolean {
-  if (platform === 'pos') return item.availableOnPos ?? item.available
-  if (platform === 'swiggy') return item.availableOnSwiggy ?? item.available
-  return item.availableOnZomato ?? item.available
+  if (platform === 'pos') return item.availableOnPos
+  if (platform === 'swiggy') return item.availableOnSwiggy
+  return item.availableOnZomato
 }
 
 function Toggle({
@@ -54,26 +70,109 @@ function Toggle({
   )
 }
 
+function toRow(item: Item): MenuItemRow {
+  const availability = item.availability ?? []
+  const avail = (slug: string): boolean => {
+    const entry = availability.find((a) => a.channel_slug === slug)
+    return entry != null ? entry.is_available : true
+  }
+  const priceFor = (slug: string): number => {
+    const entry = item.area_prices?.find((a) => a.channel_slug === slug)
+    if (entry) {
+      const n = Number(entry.price)
+      if (Number.isFinite(n)) return n
+    }
+    const base = Number(item.base_price)
+    return Number.isFinite(base) ? base : 0
+  }
+  return {
+    id: item.id,
+    name: item.name,
+    shortCode: item.short_code,
+    price: priceFor('base'),
+    prices: {
+      pos: priceFor('base'),
+      swiggy: priceFor('swiggy'),
+      zomato: priceFor('zomato'),
+    },
+    availableOnPos: avail('base'),
+    availableOnSwiggy: avail('swiggy'),
+    availableOnZomato: avail('zomato'),
+  }
+}
+
 export default function MenuOnOff() {
-  const [items, setItems] = useState<MenuItemRow[]>(() => [
-    ...menuItems,
-    ...getStoredMenuItems(),
-  ])
-  const [categoryId, setCategoryId] = useState('c1')
+  const { encryptedOutletId } = useAuth()
+  const { channels } = useMenuChannels()
+
+  const [categories, setCategories] = useState<Category[]>([])
+  const [categoryId, setCategoryId] = useState('')
+  const [items, setItems] = useState<MenuItemRow[]>([])
+  const [rawItems, setRawItems] = useState<Map<string, Item>>(new Map())
   const [search, setSearch] = useState('')
   const [activePlatforms, setActivePlatforms] = useState<Platform[]>([
     'pos',
     'swiggy',
     'zomato',
   ])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    listCategoriesApi(encryptedOutletId)
+      .then((cats) => {
+        if (cancelled) return
+        setCategories(cats)
+        const stillExists = cats.some((cat) => cat.id === categoryId)
+        if (cats.length > 0 && !stillExists) {
+          setCategoryId(cats[0].id)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [encryptedOutletId])
+
+  const fetchAllItems = useCallback(
+    async (catId: string) => {
+      if (!encryptedOutletId || !catId) return
+      setLoading(true)
+      try {
+        const cachedItems = await fetchCategoryItemsCached(
+          encryptedOutletId,
+          catId,
+        )
+        const allRows = cachedItems.map(toRow)
+        const allRaw = new Map<string, Item>(
+          cachedItems.map((item) => [item.id, item]),
+        )
+        setItems(allRows)
+        setRawItems(allRaw)
+      } catch {
+        setItems([])
+        setRawItems(new Map())
+      } finally {
+        setLoading(false)
+      }
+    },
+    [encryptedOutletId],
+  )
+
+  useEffect(() => {
+    if (!categoryId) return
+    let cancelled = false
+    void fetchAllItems(categoryId).then(() => {
+      if (cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [categoryId, fetchAllItems])
 
   const activeCategory =
-    baseMenuCategories.find((cat) => cat.id === categoryId) ??
-    baseMenuCategories[0]
-
+    categories.find((cat) => cat.id === categoryId) ?? categories[0]
 
   const filtered = useMemo(() => {
-    let rows = items.filter((row) => row.categoryId === categoryId)
+    let rows = items
     if (search.trim()) {
       const q = search.toLowerCase()
       rows = rows.filter(
@@ -83,7 +182,7 @@ export default function MenuOnOff() {
       )
     }
     return rows
-  }, [items, categoryId, search])
+  }, [items, search])
 
   function togglePlatform(platform: Platform) {
     setActivePlatforms((prev) => {
@@ -95,35 +194,137 @@ export default function MenuOnOff() {
     })
   }
 
-  function toggleItem(item: MenuItemRow, platform: Platform) {
+  async function toggleItem(item: MenuItemRow, platform: Platform) {
+    const slug = PLATFORM_SLUG[platform]
+    const channel = channels.find((c) => c.channel_slug === slug)
+    if (!channel) {
+      showToast(`Channel "${PLATFORM_LABEL[platform]}" not configured`)
+      return
+    }
+
+    const raw = rawItems.get(item.id)
+    const existingAvailability = raw?.availability ?? []
+    const newVal = !getAvailable(item, platform)
+
+    const platformAvailability: ItemAvailability = {
+      outlet_channel_id: channel.id,
+      is_available: newVal,
+      channel_slug: slug,
+    }
+
+    const merged: ItemAvailability[] = [
+      ...existingAvailability
+        .filter((a) => a.channel_slug !== slug)
+        .map((a) => ({
+          outlet_channel_id: a.outlet_channel_id,
+          is_available: a.is_available,
+          channel_slug: a.channel_slug,
+        })),
+      platformAvailability,
+    ]
+
+    // optimistic local flip
+    const key =
+      platform === 'pos'
+        ? 'availableOnPos'
+        : platform === 'swiggy'
+          ? 'availableOnSwiggy'
+          : 'availableOnZomato'
     setItems((prev) =>
-      prev.map((row) => {
-        if (row.id !== item.id) return row
-        const key =
-          platform === 'pos'
-            ? 'availableOnPos'
-            : platform === 'swiggy'
-              ? 'availableOnSwiggy'
-              : 'availableOnZomato'
-        return { ...row, [key]: !getAvailable(row, platform) }
-      }),
+      prev.map((r) => (r.id === item.id ? { ...r, [key]: newVal } : r)),
     )
+
+    try {
+      await updateItemApi(encryptedOutletId!, item.id, { availability: merged })
+      invalidateMenuItems(encryptedOutletId ?? '', categoryId)
+      // update the raw cache
+      setRawItems((prev) => {
+        const next = new Map(prev)
+        const cached = next.get(item.id)
+        if (cached) {
+          next.set(item.id, { ...cached, availability: merged })
+        }
+        return next
+      })
+    } catch {
+      showToast('Failed to update item availability')
+      // revert
+      setItems((prev) =>
+        prev.map((r) => (r.id === item.id ? { ...r, [key]: !newVal } : r)),
+      )
+    }
   }
 
-  function toggleAllForCategory(platform: Platform, value: boolean) {
-    const ids = new Set(filtered.map((row) => row.id))
+  async function toggleAllForCategory(platform: Platform, value: boolean) {
+    const slug = PLATFORM_SLUG[platform]
+    const channel = channels.find((c) => c.channel_slug === slug)
+    if (!channel) {
+      showToast(`Channel "${PLATFORM_LABEL[platform]}" not configured`)
+      return
+    }
+
+    const affected = [...filtered]
+    if (affected.length === 0) {
+      showToast(
+        `All items ${value ? 'ON' : 'OFF'} on ${PLATFORM_LABEL[platform]}`,
+      )
+      return
+    }
+
+    const key =
+      platform === 'pos'
+        ? 'availableOnPos'
+        : platform === 'swiggy'
+          ? 'availableOnSwiggy'
+          : 'availableOnZomato'
+
+    // optimistic flip all
+    const ids = new Set(affected.map((r) => r.id))
     setItems((prev) =>
-      prev.map((row) => {
-        if (!ids.has(row.id)) return row
-        const key =
-          platform === 'pos'
-            ? 'availableOnPos'
-            : platform === 'swiggy'
-              ? 'availableOnSwiggy'
-              : 'availableOnZomato'
-        return { ...row, [key]: value }
+      prev.map((r) => (ids.has(r.id) ? { ...r, [key]: value } : r)),
+    )
+
+    const results = await Promise.allSettled(
+      affected.map((row) => {
+        const raw = rawItems.get(row.id)
+        const existing = raw?.availability ?? []
+        const merged: ItemAvailability[] = [
+          ...existing
+            .filter((a) => a.channel_slug !== slug)
+            .map((a) => ({
+              outlet_channel_id: a.outlet_channel_id,
+              is_available: a.is_available,
+              channel_slug: a.channel_slug,
+            })),
+          {
+            outlet_channel_id: channel.id,
+            is_available: value,
+            channel_slug: slug,
+          },
+        ]
+        return updateItemApi(encryptedOutletId!, row.id, { availability: merged }).then(
+          () => {
+            setRawItems((prev) => {
+              const next = new Map(prev)
+              const cached = next.get(row.id)
+              if (cached) {
+                next.set(row.id, { ...cached, availability: merged })
+              }
+              return next
+            })
+          },
+        )
       }),
     )
+
+    invalidateMenuItems(encryptedOutletId ?? '', categoryId)
+
+    const failed = results.filter((r) => r.status === 'rejected').length
+    if (failed > 0) {
+      showToast(
+        `${failed} item${failed === 1 ? '' : 's'} failed to update`,
+      )
+    }
     showToast(
       `All items ${value ? 'ON' : 'OFF'} on ${PLATFORM_LABEL[platform]}`,
     )
@@ -154,7 +355,7 @@ export default function MenuOnOff() {
         <aside className="menu-on-off-categories hidden md:flex">
           <p className="menu-on-off-categories-header">Categories</p>
           <ul className="menu-on-off-categories-list space-y-0.5">
-            {baseMenuCategories.map((cat) => {
+            {categories.map((cat) => {
               const active = cat.id === categoryId
               return (
                 <li key={cat.id}>
@@ -178,7 +379,7 @@ export default function MenuOnOff() {
               Categories
             </p>
             <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {baseMenuCategories.map((cat) => {
+              {categories.map((cat) => {
                 const active = cat.id === categoryId
                 return (
                   <button
@@ -201,9 +402,11 @@ export default function MenuOnOff() {
           {/* Toolbar */}
           <div className="menu-on-off-main-header flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">{activeCategory.name}</p>
+              <p className="text-sm font-semibold text-ink">{activeCategory?.name ?? ''}</p>
               <p className="text-xs text-muted">
-                {filtered.length} item{filtered.length === 1 ? '' : 's'} in category
+                {loading
+                  ? 'Loading...'
+                  : `${filtered.length} item${filtered.length === 1 ? '' : 's'} in category`}
               </p>
             </div>
             <div className="relative min-w-[200px] flex-1 sm:max-w-xs sm:flex-none">
@@ -304,12 +507,18 @@ export default function MenuOnOff() {
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
                 <Badge variant="neutral" size="md">
-                  {search ? 'No matches' : 'Empty category'}
+                  {loading
+                    ? 'Loading...'
+                    : search
+                      ? 'No matches'
+                      : 'Empty category'}
                 </Badge>
                 <p className="text-sm text-muted">
-                  {search
-                    ? 'No items match your search.'
-                    : 'No items in this category.'}
+                  {loading
+                    ? 'Fetching items...'
+                    : search
+                      ? 'No items match your search.'
+                      : 'No items in this category.'}
                 </p>
               </div>
             ) : (
@@ -324,36 +533,26 @@ export default function MenuOnOff() {
                       {item.name}
                     </p>
                     <p className="mt-0.5 text-xs text-muted">
-                      {item.shortCode} · ₹{item.price.toFixed(1)}
+                      {item.shortCode}
                     </p>
                   </div>
-                  {activePlatforms.includes('pos') && (
-                    <div className="flex justify-center">
+                  {PLATFORM_TABS.filter((tab) =>
+                    activePlatforms.includes(tab.id),
+                  ).map((tab) => (
+                    <div
+                      key={tab.id}
+                      className="flex flex-col items-center gap-1"
+                    >
                       <Toggle
-                        checked={getAvailable(item, 'pos')}
-                        onToggle={() => toggleItem(item, 'pos')}
-                        label={`Toggle ${item.name} on POS`}
+                        checked={getAvailable(item, tab.id)}
+                        onToggle={() => toggleItem(item, tab.id)}
+                        label={`Toggle ${item.name} on ${tab.label}`}
                       />
+                      <span className="text-[11px] text-muted">
+                        ₹{item.prices[tab.id].toFixed(1)}
+                      </span>
                     </div>
-                  )}
-                  {activePlatforms.includes('swiggy') && (
-                    <div className="flex justify-center">
-                      <Toggle
-                        checked={getAvailable(item, 'swiggy')}
-                        onToggle={() => toggleItem(item, 'swiggy')}
-                        label={`Toggle ${item.name} on Swiggy`}
-                      />
-                    </div>
-                  )}
-                  {activePlatforms.includes('zomato') && (
-                    <div className="flex justify-center">
-                      <Toggle
-                        checked={getAvailable(item, 'zomato')}
-                        onToggle={() => toggleItem(item, 'zomato')}
-                        label={`Toggle ${item.name} on Zomato`}
-                      />
-                    </div>
-                  )}
+                  ))}
                 </div>
               ))
             )}

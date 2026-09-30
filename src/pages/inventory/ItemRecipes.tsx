@@ -665,12 +665,20 @@ export default function ItemRecipes() {
       />
       <ConfirmDeleteModal
         open={Boolean(pendingDelete)}
-        title="Confirm Delete"
+        title="Delete recipe"
+        target={
+          pendingDelete?.type === 'multiple' && pendingDelete.name
+            ? `${selectedIds.size} selected`
+            : pendingDelete?.name
+        }
         message={
           pendingDelete?.type === 'multiple'
-            ? `Are you sure you want to delete ${selectedIds.size} selected recipe${selectedIds.size === 1 ? '' : 's'}? This action cannot be undone.`
-            : `Are you sure you want to delete "${pendingDelete?.name ?? 'this recipe'}"? This action cannot be undone.`
+            ? `${selectedIds.size} selected recipe${selectedIds.size === 1 ? '' : 's'} will be removed.`
+            : 'This recipe will be removed from the item.'
         }
+        consequences={[
+          'The item no longer produces this recipe for a kitchen order.',
+        ]}
         confirmLabel="Delete"
         onConfirm={() => void confirmDelete()}
         onClose={() => setPendingDelete(null)}

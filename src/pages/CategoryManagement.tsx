@@ -6,8 +6,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ChevronDown,
   ClipboardList,
+  FileSpreadsheet,
   Pencil,
   Plus,
+  Trash2,
   Upload,
 } from 'lucide-react'
 import { SortableTh } from '../components/common/SortableTh'
@@ -15,9 +17,13 @@ import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { useListQuery } from '../hooks/useListQuery'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { NoRecordFound } from '../components/menu/NoRecordFound'
+import { ConfirmDeleteModal } from '../components/common/ConfirmDeleteModal'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
-import { menuCategories } from '../mocks/menuCategoriesData'
-import { parentCategories } from '../mocks/parentCategoriesData'
+import { AddTagDrawer } from '../components/menu/AddTagDrawer'
+import { useAuth } from '../auth/AuthContext'
+import { listParentCategoriesApi, deleteParentCategoryApi, listMenuGroupsApi, deleteMenuGroupApi } from '../services/menuService'
+import type { Category, MenuGroup, ParentCategory } from '../types/menu'
+import { useMenuReference } from '../state/MenuReferenceContext'
 
 type CategorySubTab =
   | 'parent'
@@ -40,6 +46,35 @@ const SEARCH_LABEL: Record<CategorySubTab, string> = {
   grouping: 'Department name',
   'menu-config': 'Menu Type name',
   tags: 'Tag Name',
+}
+
+function SolidButton({
+  children,
+  onClick,
+}: {
+  children: ReactNode
+  onClick?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:brightness-95"
+    >
+      {children}
+    </button>
+  )
+}
+
+function formatCreated(value?: string) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 function OutlineButton({
@@ -70,10 +105,12 @@ function RowActionButton({
   label,
   onClick,
   children,
+  boxed = false,
 }: {
   label: string
   onClick?: () => void
   children: ReactNode
+  boxed?: boolean
 }) {
   const btnRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -105,7 +142,11 @@ function RowActionButton({
         onMouseLeave={() => setOpen(false)}
         onFocus={handleEnter}
         onBlur={() => setOpen(false)}
-        className="inline-flex cursor-pointer rounded p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
+        className={`inline-flex cursor-pointer text-muted transition-colors hover:bg-page hover:text-ink ${
+          boxed
+            ? 'rounded border border-line p-1.5'
+            : 'rounded p-1.5'
+        }`}
       >
         {children}
       </button>
@@ -136,7 +177,71 @@ export default function CategoryManagement() {
   const [appliedQuery, setAppliedQuery] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [changesName, setChangesName] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ParentCategory | null>(null)
+  const [groupDeleteTarget, setGroupDeleteTarget] = useState<MenuGroup | null>(null)
+  const [addTagOpen, setAddTagOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [actionMenu, setActionMenu] = useState<'export' | 'action' | null>(null)
+  const { encryptedOutletId } = useAuth()
+  const [categories, setCategories] = useState<Category[]>([])
+  const [parents, setParents] = useState<ParentCategory[]>([])
+  const [groups, setGroups] = useState<MenuGroup[]>([])
 
+  const { categories: refCategories, reload } = useMenuReference(['categories'])
+
+  useEffect(() => {
+    if (encryptedOutletId) void reload('categories', { force: true })
+  }, [encryptedOutletId, reload])
+
+  useEffect(() => {
+    setCategories(refCategories)
+  }, [refCategories])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    if (subTab !== 'parent') return
+    listParentCategoriesApi(encryptedOutletId, {
+      search: appliedQuery || undefined,
+    })
+      .then((rows) => {
+        if (!cancelled) setParents(rows)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load parent categories',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, subTab, appliedQuery])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    if (subTab !== 'grouping') return
+    listMenuGroupsApi(encryptedOutletId, {
+      search: appliedQuery || undefined,
+    })
+      .then((rows) => {
+        if (!cancelled) setGroups(rows)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load groups',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, subTab, appliedQuery])
 
   useEffect(() => {
     const tab = searchParams.get('tab') as CategorySubTab | null
@@ -153,25 +258,17 @@ export default function CategoryManagement() {
 
   const categoryRows = useMemo(() => {
     const q = appliedQuery.trim().toLowerCase()
-    if (!q) return menuCategories
-    return menuCategories.filter(
+    if (!q) return categories
+    return categories.filter(
       (row) =>
         row.name.toLowerCase().includes(q) ||
-        row.onlineDisplayName.toLowerCase().includes(q) ||
-        (row.parentCategory?.toLowerCase().includes(q) ?? false),
+        row.online_display_name.toLowerCase().includes(q) ||
+        (row.parent_name?.toLowerCase().includes(q) ?? false),
     )
-  }, [appliedQuery])
+  }, [categories, appliedQuery])
 
-  const parentRows = useMemo(() => {
-    const q = appliedQuery.trim().toLowerCase()
-    if (!q) return parentCategories
-    return parentCategories.filter(
-      (row) =>
-        row.name.toLowerCase().includes(q) ||
-        row.onlineDisplayName.toLowerCase().includes(q) ||
-        row.categories.toLowerCase().includes(q),
-    )
-  }, [appliedQuery])
+  const parentRows = parents
+  const groupRows = groups
 
   const {
     sortKey: parentSortKey,
@@ -223,14 +320,23 @@ export default function CategoryManagement() {
   )
 
   const showEmpty =
-    subTab === 'grouping' || subTab === 'menu-config' || subTab === 'tags'
+    (subTab === 'grouping' && groupRows.length === 0) ||
+    subTab === 'menu-config' ||
+    subTab === 'tags'
 
   const listForSelect =
     subTab === 'parent'
       ? parentVisible
       : subTab === 'category'
+<<<<<<< HEAD
         ? categoryVisible
         : []
+=======
+        ? categoryRows
+        : subTab === 'grouping'
+          ? groupRows
+          : []
+>>>>>>> origin/main
 
   const allSelected =
     listForSelect.length > 0 &&
@@ -264,6 +370,70 @@ export default function CategoryManagement() {
   }
 
   function renderHeaderActions() {
+    if (subTab === 'parent') {
+      return (
+        <>
+          <SolidButton onClick={() => showToast('Copy parent category to another outlet is not available yet.')}>
+            Copy Parent Category To Outlet
+          </SolidButton>
+          <SolidButton onClick={() => navigate('/menu/categories/parent/new')}>
+            Add Parent Category
+          </SolidButton>
+          <div className="relative">
+            <OutlineButton
+              variant="gray"
+              onClick={() =>
+                setActionMenu((current) => (current === 'export' ? null : 'export'))
+              }
+            >
+              <FileSpreadsheet size={15} className="text-success" />
+              Export Excel
+              <ChevronDown size={14} className="text-muted" />
+            </OutlineButton>
+            {actionMenu === 'export' ? (
+              <div className="absolute right-0 z-20 mt-1 min-w-40 rounded-md border border-line bg-card py-1 shadow-md">
+                <button
+                  type="button"
+                  className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-ink hover:bg-page"
+                  onClick={() => {
+                    setActionMenu(null)
+                    showToast('Excel export is not available yet.')
+                  }}
+                >
+                  Export Excel
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className="relative">
+            <OutlineButton
+              variant="gray"
+              onClick={() =>
+                setActionMenu((current) => (current === 'action' ? null : 'action'))
+              }
+            >
+              Action
+              <ChevronDown size={14} className="text-muted" />
+            </OutlineButton>
+            {actionMenu === 'action' ? (
+              <div className="absolute right-0 z-20 mt-1 min-w-44 rounded-md border border-line bg-card py-1 shadow-md">
+                <button
+                  type="button"
+                  className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-ink hover:bg-page"
+                  onClick={() => {
+                    setActionMenu(null)
+                    showToast('Bulk actions are not available yet.')
+                  }}
+                >
+                  Bulk action
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </>
+      )
+    }
+
     if (subTab === 'category') {
       return (
         <>
@@ -291,6 +461,7 @@ export default function CategoryManagement() {
       return (
         <button
           type="button"
+          onClick={() => navigate('/menu/categories/group/new')}
           className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:brightness-95"
         >
           <Plus size={15} />
@@ -304,6 +475,7 @@ export default function CategoryManagement() {
         <>
           <button
             type="button"
+            onClick={() => setAddTagOpen(true)}
             className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:brightness-95"
           >
             <Plus size={15} />
@@ -399,7 +571,7 @@ export default function CategoryManagement() {
           />
           <OutlineButton onClick={handleSearch}>Search</OutlineButton>
           <OutlineButton onClick={handleShowAll} variant="gray">
-            Clear Filter
+            {subTab === 'parent' ? 'Show All' : 'Clear Filter'}
           </OutlineButton>
           {subTab === 'category' ? (
             <OutlineButton>Update Rank</OutlineButton>
@@ -481,10 +653,18 @@ export default function CategoryManagement() {
               <tbody>
                 {parentVisible.map((row) => {
                   const checked = selected.has(row.id)
+                  const childNames =
+                    (row.categories ?? [])
+                      .map((category) => category.name)
+                      .join(', ') ||
+                    categories
+                      .filter((category) => category.parent_id === row.id)
+                      .map((category) => category.name)
+                      .join(', ')
                   return (
                     <tr
                       key={row.id}
-                      className="cursor-grab border-b border-line last:border-b-0 hover:bg-page/80"
+                      className="border-b border-line last:border-b-0 hover:bg-page/80"
                     >
                       <td className="px-3 py-3.5">
                         <input
@@ -499,21 +679,22 @@ export default function CategoryManagement() {
                         {row.name}
                       </td>
                       <td className="px-3 py-3.5 text-ink">
-                        {row.onlineDisplayName}
+                        {row.online_display_name || row.name}
                       </td>
                       <td className="max-w-md px-3 py-3.5 text-ink">
-                        {row.categories}
+                        {childNames || '—'}
                       </td>
-                      <td className="px-3 py-3.5">
-                        <span className="inline-flex rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success">
-                          {row.status}
-                        </span>
+                      <td className="px-3 py-3.5 font-medium text-success">
+                        {row.is_active ? 'Active' : 'Inactive'}
                       </td>
-                      <td className="px-3 py-3.5 text-muted">{row.created}</td>
+                      <td className="px-3 py-3.5 text-muted">
+                        {formatCreated(row.created_at)}
+                      </td>
                       <td className="px-3 py-3.5">
                         <div className="flex items-center gap-1">
                           <RowActionButton
                             label="Edit"
+                            boxed
                             onClick={() =>
                               navigate(`/menu/categories/parent/${row.id}/edit`)
                             }
@@ -521,10 +702,11 @@ export default function CategoryManagement() {
                             <Pencil size={16} />
                           </RowActionButton>
                           <RowActionButton
-                            label="Show Changes"
-                            onClick={() => setChangesName(row.name)}
+                            label="Delete"
+                            boxed
+                            onClick={() => setDeleteTarget(row)}
                           >
-                            <ClipboardList size={16} />
+                            <Trash2 size={16} />
                           </RowActionButton>
                         </div>
                       </td>
@@ -534,11 +716,6 @@ export default function CategoryManagement() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm text-muted">
-            Note :{' '}
-            <span className="font-medium text-primary">Drag row</span> to
-            change order/rank.
-          </p>
         </>
       ) : null}
 
@@ -634,23 +811,23 @@ export default function CategoryManagement() {
                       </td>
                       <td className="px-3 py-3.5">
                         <p className="font-semibold text-ink">{row.name}</p>
-                        {row.parentCategory ? (
+                        {row.parent_name ? (
                           <p className="mt-0.5 text-xs text-primary">
-                            [Parent Category : {row.parentCategory}]
+                            [Parent Category : {row.parent_name}]
                           </p>
                         ) : null}
                       </td>
                       <td className="px-3 py-3.5 text-ink">
-                        {row.onlineDisplayName}
+                        {row.online_display_name}
                       </td>
                       <td className="px-3 py-3.5 tabular-nums text-ink">
                         {row.rank}
                       </td>
                       <td className="px-3 py-3.5 font-medium text-success">
-                        {row.status}
+                        {row.is_active ? 'Active' : 'Inactive'}
                       </td>
-                      <td className="px-3 py-3.5 text-muted">{row.created}</td>
-                      <td className="px-3 py-3.5 text-muted">{row.modified}</td>
+                      <td className="px-3 py-3.5 text-muted">—</td>
+                      <td className="px-3 py-3.5 text-muted">—</td>
                       <td className="px-3 py-3.5">
                         <button
                           type="button"
@@ -690,10 +867,166 @@ export default function CategoryManagement() {
         </>
       ) : null}
 
+      {subTab === 'grouping' && groupRows.length > 0 ? (
+        <>
+          <div className="overflow-x-auto rounded-lg border border-line bg-card">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-line bg-page text-sm font-semibold text-ink">
+                <tr>
+                  <th className="w-10 px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      aria-label="Select all groups"
+                      className="cursor-pointer accent-primary"
+                    />
+                  </th>
+                  <th className="px-3 py-3">Name</th>
+                  <th className="px-3 py-3">SAC Code</th>
+                  <th className="px-3 py-3">Parent Category</th>
+                  <th className="px-3 py-3">Category</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Created</th>
+                  <th className="px-3 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupRows.map((row) => {
+                  const checked = selected.has(row.id)
+                  const childNames =
+                    (row.categories ?? []).map((c) => c.name).join(', ') || '—'
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-b border-line last:border-b-0 hover:bg-page/80"
+                    >
+                      <td className="px-3 py-3.5">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleOne(row.id)}
+                          aria-label={`Select ${row.name}`}
+                          className="cursor-pointer accent-primary"
+                        />
+                      </td>
+                      <td className="px-3 py-3.5 font-medium text-ink">
+                        {row.name}
+                      </td>
+                      <td className="px-3 py-3.5 text-ink">
+                        {row.sac_code || '—'}
+                      </td>
+                      <td className="px-3 py-3.5 text-ink">
+                        {row.parent_name || '—'}
+                      </td>
+                      <td className="max-w-md px-3 py-3.5 text-ink">
+                        {childNames}
+                      </td>
+                      <td className="px-3 py-3.5 font-medium text-success">
+                        {row.is_active ? 'Active' : 'Inactive'}
+                      </td>
+                      <td className="px-3 py-3.5 text-muted">
+                        {formatCreated(row.created_at)}
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <div className="flex items-center gap-1">
+                          <RowActionButton
+                            label="Delete"
+                            boxed
+                            onClick={() => setGroupDeleteTarget(row)}
+                          >
+                            <Trash2 size={16} />
+                          </RowActionButton>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-sm text-muted">
+            Showing 1 to {groupRows.length} of {groupRows.length} records
+          </p>
+        </>
+      ) : null}
+
       <ShowChangesModal
         open={Boolean(changesName)}
         name={changesName}
         onClose={() => setChangesName(null)}
+      />
+      <ConfirmDeleteModal
+        open={Boolean(deleteTarget)}
+        title="Delete parent category"
+        target={deleteTarget?.name}
+        message="Categories under it will be unlinked."
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={() => {
+          if (!deleteTarget || !encryptedOutletId || deleting) return
+          const target = deleteTarget
+          setDeleting(true)
+          deleteParentCategoryApi(encryptedOutletId, target.id)
+            .then(() => {
+              setParents((prev) => prev.filter((row) => row.id !== target.id))
+              setSelected((prev) => {
+                const next = new Set(prev)
+                next.delete(target.id)
+                return next
+              })
+              showToast('Parent category deleted')
+              setDeleteTarget(null)
+            })
+            .catch((error: unknown) => {
+              showToast(
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to delete parent category',
+              )
+            })
+            .finally(() => setDeleting(false))
+        }}
+      />
+      <ConfirmDeleteModal
+        open={Boolean(groupDeleteTarget)}
+        title="Delete group"
+        target={groupDeleteTarget?.name}
+        message="The group stops appearing in grouping."
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        onClose={() => {
+          if (!deleting) setGroupDeleteTarget(null)
+        }}
+        onConfirm={() => {
+          if (!groupDeleteTarget || !encryptedOutletId || deleting) return
+          const target = groupDeleteTarget
+          setDeleting(true)
+          deleteMenuGroupApi(encryptedOutletId, target.id)
+            .then(() => {
+              setGroups((prev) => prev.filter((row) => row.id !== target.id))
+              setSelected((prev) => {
+                const next = new Set(prev)
+                next.delete(target.id)
+                return next
+              })
+              showToast('Group deleted')
+              setGroupDeleteTarget(null)
+            })
+            .catch((error: unknown) => {
+              showToast(
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to delete group',
+              )
+            })
+            .finally(() => setDeleting(false))
+        }}
+      />
+      <AddTagDrawer
+        open={addTagOpen}
+        onClose={() => setAddTagOpen(false)}
       />
     </MenuPageShell>
   )

@@ -6,10 +6,10 @@ import { useNavigate } from 'react-router-dom'
 import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { PrimaryButton } from '../components/menu/MenuActionButtons'
-import { addComboItem } from '../mocks/comboStore'
-import { menuItems, type MenuItemRow } from '../mocks/menuItemsData'
-
-const COMBO_CATEGORY_ID = 'c21'
+import { menuItems } from '../mocks/menuItemsData'
+import { createComboApi } from '../services/menuService'
+import { useAuth } from '../auth/AuthContext'
+import type { ComboPayload } from '../types/menu'
 
 interface ComboItemDraft {
   key: string
@@ -27,7 +27,9 @@ function emptyComboItem(): ComboItemDraft {
 
 export default function AddCombo() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const [name, setName] = useState('')
   const [shortCode, setShortCode] = useState('')
@@ -48,7 +50,7 @@ export default function AddCombo() {
     setComboItems((prev) => prev.filter((item) => item.key !== key))
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!name.trim()) {
       setError('Combo name is required')
       return
@@ -66,23 +68,35 @@ export default function AddCombo() {
       setError('Add at least one item to the combo')
       return
     }
-
-    const combo: MenuItemRow = {
-      id: `combo-${Date.now()}`,
-      categoryId: COMBO_CATEGORY_ID,
-      name: name.trim(),
-      shortCode: shortCode.trim(),
-      onlineDisplayName: name.trim(),
-      price: Number(price) || 0,
-      description: description.trim(),
-      available: false,
-      tags: ['set-as-combo'],
-      hasImage: false,
+    if (!encryptedOutletId) {
+      setError('No active outlet selected')
+      return
     }
-    addComboItem(combo)
     setError('')
-    showToast('Combo created successfully')
-    window.setTimeout(() => navigate('/menu/base-menu'), 800)
+    setSaving(true)
+    try {
+      const payload: ComboPayload = {
+        name: name.trim(),
+        online_display_name: name.trim(),
+        price: Number(price) || 0,
+        is_active: true,
+        items: filled.map((item) => ({
+          item_id: item.itemId,
+          quantity: item.quantity,
+        })),
+      }
+      await createComboApi(encryptedOutletId, payload)
+      showToast('Combo created successfully')
+      window.setTimeout(() => navigate('/menu/base-menu'), 800)
+    } catch (saveError) {
+      showToast(
+        saveError instanceof Error
+          ? saveError.message
+          : 'Failed to create combo',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -234,7 +248,9 @@ export default function AddCombo() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Save Combo</PrimaryButton>
+        <PrimaryButton onClick={handleSave} disabled={saving}>
+          Save Combo
+        </PrimaryButton>
       </div>
     </MenuPageShell>
   )

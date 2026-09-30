@@ -1,24 +1,13 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ImageIcon, X } from 'lucide-react'
-import {
-  baseMenuCategories,
-  type MenuItemRow,
-} from '../../mocks/menuItemsData'
+import { X } from 'lucide-react'
+import type { Item } from '../../types/menu'
 
 interface MenuItemDetailsModalProps {
   open: boolean
-  item: MenuItemRow | null
+  item: Item | null
   onClose: () => void
 }
-
-const AREA_PRICES = [
-  { area: 'Home Delivery', price: 40, status: 'Active' },
-  { area: 'Zomato', price: 56, status: 'Active' },
-  { area: 'Swiggy', price: 56, status: 'Active' },
-  { area: 'Parcel', price: 40, status: 'Active' },
-  { area: 'Home Website', price: 50, status: 'Active' },
-] as const
 
 function DetailCell({
   label,
@@ -43,22 +32,28 @@ function DetailCell({
   )
 }
 
-function ImageCell({
-  label,
-  showImage,
-}: {
-  label: string
-  showImage?: boolean
-}) {
+function ImagesCell({ images }: { images: Item['images'] }) {
   return (
-    <div className="flex items-center gap-3 border-b border-line px-4 py-2.5 text-sm">
-      <span className="w-[42%] shrink-0 font-medium text-ink sm:w-44">
-        {label}
+    <div className="flex flex-col gap-2 border-b border-line px-4 py-2.5 text-sm sm:col-span-2">
+      <span className="shrink-0 font-medium text-ink">
+        Images ({images.length})
       </span>
-      {showImage ? (
-        <span className="inline-flex size-14 items-center justify-center overflow-hidden rounded border border-line bg-page text-muted">
-          <ImageIcon size={22} />
-        </span>
+      {images.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {images.map((image) => (
+            <span
+              key={image.id}
+              title={image.channel_slug ?? undefined}
+              className="inline-flex size-14 items-center justify-center overflow-hidden rounded border border-line bg-page"
+            >
+              <img
+                src={image.image}
+                alt={image.channel_slug ?? 'item image'}
+                className="size-full object-cover"
+              />
+            </span>
+          ))}
+        </div>
       ) : (
         <span className="text-muted">—</span>
       )}
@@ -86,19 +81,6 @@ export function MenuItemDetailsModal({
   }, [open, onClose])
 
   if (!open || !item) return null
-
-  const categoryName =
-    baseMenuCategories.find((category) => category.id === item.categoryId)
-      ?.name ?? ''
-
-  const areaPrices = AREA_PRICES.map((row) =>
-    row.area === 'Home Delivery' || row.area === 'Parcel'
-      ? { ...row, price: item.price }
-      : {
-          ...row,
-          price: Math.round(item.price * 1.4),
-        },
-  )
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -134,62 +116,67 @@ export function MenuItemDetailsModal({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="grid sm:grid-cols-2">
             <DetailCell label="Name" value={item.name} />
-            <DetailCell label="Short Code" value={item.shortCode} />
-            <DetailCell label="Short Code 2" value="" />
+            <DetailCell label="Category" value={item.category_name} />
+            <DetailCell label="Item Price" value={item.base_price} />
             <DetailCell
               label="Online Display Name"
-              value={item.onlineDisplayName}
+              value={item.online_display_name}
             />
-            <DetailCell
-              label="Expose This Items In"
-              value="Online Orders, Captain App"
-            />
-            <DetailCell
-              label="Order Type"
-              value="PARCEL, DINE IN, Dine In"
-            />
+            <DetailCell label="Short Code" value={item.short_code} />
+            <DetailCell label="Short Code 2" value={item.short_code_2} />
+            <DetailCell label="Item Unit" value={item.item_unit} />
+            <DetailCell label="Stock Status" value={item.stock_status} />
+            <DetailCell label="Rank" value={item.rank} />
+            <DetailCell label="Is Active" value={item.is_active ? 'Yes' : 'No'} />
+            <DetailCell label="Choice" value={item.choice} />
+            <DetailCell label="Tags" value={item.tags.join(', ')} />
+            <DetailCell label="Order Types" value={item.order_types.join(', ')} />
+            <DetailCell label="Days" value={item.days.join(', ')} />
             <DetailCell
               label="Item Description"
               value={item.description}
               fullWidth
             />
-            <DetailCell label="Category" value={categoryName} />
-            <DetailCell label="Item Price" value={item.price} />
-            <DetailCell label="Item Unit" value="" />
-            <DetailCell label="Create Self Item Recipe" value="No" />
-
-            <ImageCell label="Zomato Image" showImage={item.hasImage} />
-            <ImageCell label="Swiggy Image" showImage={item.hasImage} />
-            <ImageCell label="Home Website Image" showImage={item.hasImage} />
-            <div className="border-b border-line" />
-            <ImageCell label="Dunzo Image" />
-            <ImageCell
-              label="Offline Orders Image"
-              showImage={item.hasImage}
-            />
-            <ImageCell label="Paytm Image" />
-            <ImageCell label="GooglePay Image" />
-            <ImageCell label="Uengage Image" />
-            <div className="border-b border-line" />
-
-            <DetailCell label="Ignore Tax" value="No" />
-            <DetailCell label="Ignore Discount" value="No" />
-            <DetailCell label="HSN Code" value="" />
-            <DetailCell label="Set As Favorite" value="Yes" />
-            <DetailCell label="Set As Open Item" value="No" />
-            <DetailCell label="Open Quantity Popup" value="No" />
-            <DetailCell label="Stock Status" value="Do Not Track" />
-            <DetailCell label="Sap Code" value="" />
-            <DetailCell label="Days" value="All Days" />
-            <DetailCell label="Profit Margin (%)" value="" />
-            <DetailCell label="Weight(In grams/ml)" value="" fullWidth />
             <DetailCell
-              label="Choice"
-              value={item.tags.includes('V+') ? 'veg' : 'veg'}
+              label="Long Description"
+              value={item.long_description}
               fullWidth
             />
-            <DetailCell label="Long Description" value="" fullWidth />
-            <DetailCell label="FSN Code" value="" fullWidth />
+          </div>
+
+          <div className="grid border-t border-line sm:grid-cols-2">
+            <DetailCell label="Ignore Tax" value={item.flags.ignore_tax ? 'Yes' : 'No'} />
+            <DetailCell
+              label="Ignore Discount"
+              value={item.flags.ignore_discount ? 'Yes' : 'No'}
+            />
+            <DetailCell
+              label="Set As Favorite"
+              value={item.flags.set_as_favorite ? 'Yes' : 'No'}
+            />
+            <DetailCell label="Open Item" value={item.flags.open_item ? 'Yes' : 'No'} />
+            <DetailCell
+              label="Open Quantity Popup"
+              value={item.flags.open_quantity_popup ? 'Yes' : 'No'}
+            />
+            <DetailCell
+              label="Create Self Item Recipe"
+              value={item.flags.create_self_recipe ? 'Yes' : 'No'}
+            />
+            <DetailCell label="Sap Code" value={item.sap_code} />
+            <DetailCell label="HSN Code" value={item.hsn_code} />
+            <DetailCell label="FSN Code" value={item.fsn_code} />
+            <DetailCell
+              label="Profit Margin (%)"
+              value={item.profit_margin}
+              fullWidth
+            />
+            <DetailCell
+              label="Weight (In grams/ml)"
+              value={item.weight}
+              fullWidth
+            />
+            <ImagesCell images={item.images} />
           </div>
 
           <div className="border-t border-line px-4 py-3">
@@ -206,28 +193,127 @@ export function MenuItemDetailsModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {areaPrices.map((row, index) => (
-                    <tr
-                      key={row.area}
-                      className={`border-t border-line ${
-                        index % 2 === 1 ? 'bg-page/60' : 'bg-card'
-                      }`}
-                    >
-                      <td className="px-3 py-2 text-ink">{row.area}</td>
-                      <td className="px-3 py-2 tabular-nums text-ink">
-                        {row.price}
-                      </td>
-                      <td className="px-3 py-2 font-medium text-success">
-                        {row.status}
+                  {item.area_prices.length > 0 ? (
+                    item.area_prices.map((row, index) => (
+                      <tr
+                        key={row.outlet_channel_id}
+                        className={`border-t border-line ${
+                          index % 2 === 1 ? 'bg-page/60' : 'bg-card'
+                        }`}
+                      >
+                        <td className="px-3 py-2 text-ink">
+                          {row.channel_label}
+                        </td>
+                        <td className="px-3 py-2 tabular-nums text-ink">
+                          {row.price}
+                        </td>
+                        <td
+                          className={`px-3 py-2 font-medium ${
+                            row.is_active ? 'text-success' : 'text-muted'
+                          }`}
+                        >
+                          {row.is_active ? 'Active' : 'Inactive'}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-3 py-4 text-center text-sm text-muted"
+                      >
+                        No area prices configured
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
-            <div className="mt-3 flex gap-3 text-sm">
-              <span className="font-medium text-ink">Container Charges</span>
-              <span className="text-ink">0</span>
+          </div>
+
+          <div className="border-t border-line px-4 py-3">
+            <h3 className="mb-3 text-sm font-semibold text-ink">Availability</h3>
+            <div className="overflow-hidden rounded-md border border-line">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-primary/5 text-ink">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Channel</th>
+                    <th className="px-3 py-2 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {item.availability.length > 0 ? (
+                    item.availability.map((row, index) => (
+                      <tr
+                        key={row.outlet_channel_id}
+                        className={`border-t border-line ${
+                          index % 2 === 1 ? 'bg-page/60' : 'bg-card'
+                        }`}
+                      >
+                        <td className="px-3 py-2 text-ink">{row.channel_slug}</td>
+                        <td
+                          className={`px-3 py-2 font-medium ${
+                            row.is_available ? 'text-success' : 'text-muted'
+                          }`}
+                        >
+                          {row.is_available ? 'Available' : 'Unavailable'}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={2}
+                        className="px-3 py-4 text-center text-sm text-muted"
+                      >
+                        No availability configured
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="border-t border-line px-4 py-3">
+            <h3 className="mb-3 text-sm font-semibold text-ink">Taxes</h3>
+            <div className="overflow-hidden rounded-md border border-line">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-primary/5 text-ink">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Title</th>
+                    <th className="px-3 py-2 font-semibold">Type</th>
+                    <th className="px-3 py-2 font-semibold">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {item.taxes.length > 0 ? (
+                    item.taxes.map((tax, index) => (
+                      <tr
+                        key={tax.id}
+                        className={`border-t border-line ${
+                          index % 2 === 1 ? 'bg-page/60' : 'bg-card'
+                        }`}
+                      >
+                        <td className="px-3 py-2 text-ink">{tax.title}</td>
+                        <td className="px-3 py-2 text-ink">{tax.tax_type}</td>
+                        <td className="px-3 py-2 tabular-nums text-ink">
+                          {tax.amount}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-3 py-4 text-center text-sm text-muted"
+                      >
+                        No taxes configured
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

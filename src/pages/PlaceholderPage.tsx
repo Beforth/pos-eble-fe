@@ -2,12 +2,14 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { BrandLogo } from '../components/brand/BrandLogo'
 import { brand } from '../theme/brand'
+import { useAuth } from '../auth/AuthContext'
 
 const TITLES: Record<string, string> = {}
 
 export default function PlaceholderPage() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  const { homePath } = useAuth()
   const title = TITLES[pathname] ?? 'Page'
 
   return (
@@ -17,7 +19,7 @@ export default function PlaceholderPage() {
         <span className="text-sm font-bold text-ink">{brand.shortName}</span>
         <button
           type="button"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(homePath())}
           className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page"
         >
           <ArrowLeft size={14} />

@@ -9,13 +9,13 @@ import {
   MonitorSmartphone,
   Plus,
   Settings,
-  Sparkles,
   Users,
 } from 'lucide-react'
 import {
   categoryName,
   debugScreenMatch,
   filterTicketForScreen,
+  getScreenItemName,
   type FilteredScreenTicket,
   type KotScreen,
 } from '../../mocks/screensData'
@@ -25,17 +25,22 @@ import {
   sortKotTicketsForDisplay,
   type KotTicket,
 } from '../../mocks/kotViewData'
-import { fetchScreen } from '../../services/screenService'
-import { getMenuItemById } from '../../mocks/menuItemsData'
-import { KOT_STORE_EVENT, loadAllKotTickets, updateKotTicketStatus } from '../../utils/tableStatusStore'
+import {
+  fetchScreen,
+  updateScreen,
+  warmScreenLookups,
+} from '../../services/screenService'
+import { KOT_STORE_EVENT, loadAllKotTickets, updateKotTicketStatus, removeKotTicket, upsertKotTicketFromServer } from '../../utils/tableStatusStore'
 import {
   isKotFullyReady,
   loadReadyProgress,
   markKotItemsReady,
   pruneReadyProgress,
 } from '../../utils/kotPrepStore'
-import { upsertScreen } from '../../utils/screenStore'
 import { EditScreenModal } from '../../components/screens/EditScreenModal'
+import { subscribeToRail } from '../../services/liveRailClient'
+import { kotEventToTicket, type KotEventData } from '../../services/orderService'
+import { useAuth } from '../../auth/AuthContext'
 
 const POLL_INTERVAL_MS = 1500
 const TICK_INTERVAL_MS = 1000
@@ -57,6 +62,7 @@ function formatTime(timestamp: number): string {
 
 export default function ScreenDisplay() {
   const { id } = useParams<{ id: string }>()
+  const { encryptedOutletId, token } = useAuth()
   const [screen, setScreen] = useState<KotScreen | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [tickets, setTickets] = useState<KotTicket[]>([])
@@ -66,8 +72,9 @@ export default function ScreenDisplay() {
 
 
   const loadScreenData = useCallback(() => {
-    if (!id) return
-    fetchScreen(id)
+    if (!id || !encryptedOutletId) return
+    void warmScreenLookups(encryptedOutletId)
+    fetchScreen(id, encryptedOutletId)
       .then((entry) => {
         if (entry) {
           setScreen(entry)
@@ -77,7 +84,7 @@ export default function ScreenDisplay() {
         }
       })
       .catch(() => setNotFound(true))
-  }, [id])
+  }, [id, encryptedOutletId])
 
   useEffect(() => {
     loadScreenData()
@@ -137,6 +144,39 @@ export default function ScreenDisplay() {
   }, [refreshTickets, loadScreenData])
 
   useEffect(() => {
+    if (!encryptedOutletId || !token) return
+
+    const handleKotRemoved = (id: string) => {
+      const before = loadAllKotTickets()
+      removeKotTicket(id)
+      if (before.some((ticket) => ticket.id === id)) refreshTickets()
+    }
+
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event, data) => {
+        if (event === 'kot.prep' || event === 'kot.modified') {
+          upsertKotTicketFromServer(kotEventToTicket(data as KotEventData))
+          refreshTickets()
+          return
+        }
+        if (event === 'kot.deleted') {
+          handleKotRemoved((data as { id: string }).id)
+          return
+        }
+        if (event === 'kot.cancelled') {
+          handleKotRemoved((data as KotEventData).id)
+          return
+        }
+        if (event === 'kot.used_in_bill') {
+          handleKotRemoved((data as KotEventData).id)
+        }
+      },
+    })
+  }, [encryptedOutletId, token, refreshTickets])
+
+  useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), TICK_INTERVAL_MS)
     return () => window.clearInterval(interval)
   }, [])
@@ -177,16 +217,20 @@ export default function ScreenDisplay() {
     )
   }
 
-  function handleEnableAllCategories() {
-    if (!screen) return
-    const updated = upsertScreen({
-      id: screen.id,
-      name: screen.name,
-      categoryIds: [],
-      itemIds: [],
-    })
-    setScreen(updated)
-    showToast('Screen updated: Showing all categories')
+  async function handleEnableAllCategories() {
+    if (!screen || !encryptedOutletId) return
+    try {
+      const updated = await updateScreen(screen.id, {
+        name: screen.name,
+        categoryIds: [],
+        itemIds: [],
+        outletId: encryptedOutletId,
+      })
+      setScreen(updated)
+      showToast('Screen updated: Showing all categories')
+    } catch {
+      showToast('Could not update the screen. Try again.')
+    }
   }
 
   if (notFound) {
@@ -195,7 +239,7 @@ export default function ScreenDisplay() {
         <MonitorSmartphone size={40} className="mb-4 text-muted" />
         <p className="text-base font-semibold text-ink">Screen not found</p>
         <p className="mt-1 max-w-sm text-sm text-muted">
-          Screen &ldquo;{id}&rdquo; was not found in storage.
+          This screen is missing or was deleted. Create a new one from the Screens list.
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
           <Link
@@ -205,25 +249,6 @@ export default function ScreenDisplay() {
             <ArrowLeft size={16} />
             Back to Screens
           </Link>
-          <button
-            type="button"
-            onClick={() => {
-              if (id) {
-                const created = upsertScreen({
-                  id,
-                  name: 'Kitchen Display Screen',
-                  categoryIds: [],
-                  itemIds: [],
-                })
-                setScreen(created)
-                setNotFound(false)
-              }
-            }}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-ink hover:bg-page"
-          >
-            <Sparkles size={16} className="text-primary" />
-            Initialize this Screen
-          </button>
         </div>
       </div>
     )
@@ -298,14 +323,14 @@ export default function ScreenDisplay() {
                     </span>
                   ))}
                   {(screen.itemIds ?? []).map((itemId) => {
-                    const item = getMenuItemById(itemId)
-                    if (!item) return null
+                    const name = getScreenItemName(itemId)
+                    if (!name) return null
                     return (
                       <span
                         key={itemId}
                         className="rounded border border-primary/40 bg-primary/5 px-1.5 py-px text-[11px] text-ink"
                       >
-                        {item.name}
+                        {name}
                       </span>
                     )
                   })}

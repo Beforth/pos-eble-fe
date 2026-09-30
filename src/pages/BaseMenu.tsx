@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft,
@@ -15,6 +15,7 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react'
+import { useAuth } from '../auth/AuthContext'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { SortableTh } from '../components/common/SortableTh'
 import { useListQuery } from '../hooks/useListQuery'
@@ -23,25 +24,44 @@ import {
   PrimaryButton,
   RowActionButton,
 } from '../components/menu/MenuActionButtons'
+import { formatDateTimeDisplay } from '../components/common/DateTimeField'
+import { ConfirmDeleteModal } from '../components/common/ConfirmDeleteModal'
+import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { AddNewItemsModal } from '../components/menu/AddNewItemsModal'
 import { AddItemsGridModal } from '../components/menu/AddItemsGridModal'
 import { MenuItemDetailsModal } from '../components/menu/MenuItemDetailsModal'
+import { PublishDateModal } from '../components/menu/PublishDateModal'
 import { UpdateAreaWisePriceModal } from '../components/menu/UpdateAreaWisePriceModal'
 import { UpdateNutritionModal } from '../components/menu/UpdateNutritionModal'
 import { SelectRecordAlert } from '../components/menu/SelectRecordAlert'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
 import {
-  baseMenuCategories,
-  getStoredMenuItems,
-  menuItems,
-  type MenuItemRow,
-} from '../mocks/menuItemsData'
-import { getComboItems } from '../mocks/comboStore'
-import {
   MENU_CHANNELS,
+  MENU_CHANNEL_SLUG,
   type MenuChannelId,
 } from '../mocks/menuChannels'
+import { useMenuChannels } from '../state/MenuChannelsContext'
+import {
+  listCategoriesApi,
+  updateItemApi,
+  deleteItemApi,
+  listScheduledPublishesApi,
+  createScheduledPublishApi,
+  cancelScheduledPublishApi,
+} from '../services/menuService'
+import {
+  fetchCategoryItemsCached,
+  invalidateMenuItems,
+} from '../state/menuItemsCache'
+import type {
+  Category,
+  Item,
+  ItemPayload,
+  ScheduledPublish,
+  ScheduledPublishLineInput,
+} from '../types/menu'
+import { showToast } from '../utils/toast'
 
 const PAGE_SIZE = 11
 
@@ -112,12 +132,47 @@ function ClipboardEyeIcon({ size = 15 }: { size?: number }) {
   )
 }
 
-function updateItem(
-  items: MenuItemRow[],
-  id: string,
-  patch: Partial<MenuItemRow>,
-) {
-  return items.map((row) => (row.id === id ? { ...row, ...patch } : row))
+interface RowItem {
+  id: string
+  categoryId: string
+  name: string
+  shortCode: string
+  onlineDisplayName: string
+  price: number
+  description: string
+  available: boolean
+  tags: string[]
+  hasImage: boolean
+  rank?: number
+}
+
+function adaptItem(item: Item, currentChannelId: string): RowItem {
+  const area = item.area_prices?.find(
+    (price) => price.outlet_channel_id === currentChannelId,
+  )
+  const channelPrice =
+    currentChannelId && area ? (Number(area.price) || 0) : null
+  return {
+    id: item.id,
+    categoryId: item.category_id ?? '',
+    name: item.name,
+    shortCode: item.short_code,
+    onlineDisplayName: item.online_display_name,
+    price:
+      channelPrice ??
+      (typeof item.base_price === 'string'
+        ? Number(item.base_price) || 0
+        : item.base_price),
+    description: item.description,
+    available: item.is_active,
+    tags: item.tags ?? [],
+    hasImage: item.has_image,
+    rank: item.rank,
+  }
+}
+
+function updateRow(rows: RowItem[], id: string, patch: Partial<RowItem>) {
+  return rows.map((row) => (row.id === id ? { ...row, ...patch } : row))
 }
 
 export default function BaseMenu({
@@ -130,39 +185,143 @@ export default function BaseMenu({
   const isSchedule = mode === 'schedule'
   const channel = MENU_CHANNELS[channelId]
   const navigate = useNavigate()
+<<<<<<< HEAD
   const [categoryId, setCategoryId] = useState<string>(baseMenuCategories[0].id)
+=======
+  const { encryptedOutletId } = useAuth()
+  const { channels } = useMenuChannels()
+
+  const currentChannelId =
+    channels.find(
+      (c) => c.channel_slug === MENU_CHANNEL_SLUG[channelId],
+    )?.id ?? ''
+
+  function resolveChannelPrice(item: Item): number {
+    const area = item.area_prices?.find(
+      (price) => price.outlet_channel_id === currentChannelId,
+    )
+    if (currentChannelId && area) return Number(area.price) || 0
+    const base =
+      typeof item.base_price === 'string'
+        ? Number(item.base_price) || 0
+        : item.base_price
+    return base
+  }
+
+  const [categoriesApi, setCategoriesApi] = useState<Category[]>([])
+  const [categoryId, setCategoryId] = useState('')
+  const [query, setQuery] = useState('')
+>>>>>>> origin/main
   const [rankWise, setRankWise] = useState(false)
   const [hideEmpty, setHideEmpty] = useState(false)
-  const [items, setItems] = useState(menuItems)
+  const [items, setItems] = useState<RowItem[]>([])
+  const [rawItemsMap, setRawItemsMap] = useState<Map<string, Item>>(
+    new Map(),
+  )
+  const [categoryHasItems, setCategoryHasItems] = useState<Set<string>>(
+    new Set(),
+  )
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
   const [addItemsOpen, setAddItemsOpen] = useState(false)
   const [addGridOpen, setAddGridOpen] = useState(false)
-  const [detailsItem, setDetailsItem] = useState<MenuItemRow | null>(null)
-  const [areaPriceItem, setAreaPriceItem] = useState<MenuItemRow | null>(null)
-  const [nutritionItem, setNutritionItem] = useState<MenuItemRow | null>(null)
+  const [detailsItem, setDetailsItem] = useState<Item | null>(null)
+  const [areaPriceItem, setAreaPriceItem] = useState<Item | null>(null)
+  const [nutritionItem, setNutritionItem] = useState<Item | null>(null)
   const [changesName, setChangesName] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<RowItem | null>(null)
+  const [bulkDeleteTargets, setBulkDeleteTargets] = useState<RowItem[]>([])
+  const [pendingCancelPublish, setPendingCancelPublish] =
+    useState<ScheduledPublish | null>(null)
+  const [busy, setBusy] = useState(false)
   const [page, setPage] = useState(1)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [publishModalOpen, setPublishModalOpen] = useState(false)
+  const [publishes, setPublishes] = useState<ScheduledPublish[]>([])
+
+  const loadPublishes = useCallback(() => {
+    if (!encryptedOutletId) return
+    listScheduledPublishesApi(encryptedOutletId)
+      .then(setPublishes)
+      .catch(() => {
+        showToast('Failed to load scheduled publishes')
+      })
+  }, [encryptedOutletId])
 
   useEffect(() => {
-    const stored = getStoredMenuItems()
-    const combos = getComboItems()
-    const allNew = [...stored, ...combos]
-    if (allNew.length > 0) {
-      setItems((prev) => {
-        const baseIds = new Set(menuItems.map((i) => i.id))
-        const newItems = allNew.filter((i) => !baseIds.has(i.id))
-        return newItems.length > 0 ? [...newItems, ...prev] : prev
+    if (isSchedule) loadPublishes()
+  }, [isSchedule, loadPublishes])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    listCategoriesApi(encryptedOutletId)
+      .then((cats) => {
+        if (!cancelled) setCategoriesApi(cats)
       })
+      .catch(() => {
+        if (!cancelled) showToast('Failed to load categories')
+      })
+    return () => {
+      cancelled = true
     }
-  }, [])
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (
+      categoriesApi.length > 0 &&
+      (categoryId === '' ||
+        !categoriesApi.some((c) => c.id === categoryId))
+    ) {
+      setCategoryId(categoriesApi[0].id)
+    }
+  }, [categoriesApi, categoryId])
+
+  useEffect(() => {
+    if (!encryptedOutletId || !categoryId) return
+    let cancelled = false
+    const outletId = encryptedOutletId
+
+    async function loadItems() {
+      try {
+        const allItems = await fetchCategoryItemsCached(
+          outletId,
+          categoryId,
+          { force: refreshKey > 0 },
+        )
+        if (cancelled) return
+        setItems(allItems.map((item) => adaptItem(item, currentChannelId)))
+        setRawItemsMap(
+          new Map(allItems.map((item) => [item.id, item])),
+        )
+        setCategoryHasItems((prev) => {
+          const next = new Set(prev)
+          if (allItems.length > 0) next.add(categoryId)
+          else next.delete(categoryId)
+          return next
+        })
+      } catch {
+        if (!cancelled) showToast('Failed to load items')
+      }
+    }
+
+    loadItems()
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, categoryId, refreshKey, currentChannelId])
+
+  const invalidateAndRefresh = useCallback(() => {
+    invalidateMenuItems(encryptedOutletId ?? '', categoryId)
+    setRefreshKey((k) => k + 1)
+  }, [encryptedOutletId, categoryId])
 
   const categories = useMemo(() => {
-    if (!hideEmpty) return baseMenuCategories
-    return baseMenuCategories.filter((category) =>
-      items.some((item) => item.categoryId === category.id),
+    if (!hideEmpty) return categoriesApi
+    return categoriesApi.filter((category) =>
+      categoryHasItems.has(category.id),
     )
-  }, [hideEmpty, items])
+  }, [hideEmpty, categoriesApi, categoryHasItems])
 
   const categoryItems = useMemo(() => {
     const result = items.filter((item) => item.categoryId === categoryId)
@@ -228,21 +387,252 @@ export default function BaseMenu({
   }
 
   function setSelectedAvailable(available: boolean) {
-    requireSelection(() => {
-      setItems((prev) =>
-        prev.map((row) =>
-          selected.has(row.id) ? { ...row, available } : row,
-        ),
-      )
+    requireSelection(async () => {
+      if (!encryptedOutletId) return
+      try {
+        await Promise.all(
+          [...selected].map((id) =>
+            updateItemApi(encryptedOutletId!, id, {
+              is_active: available,
+            }),
+          ),
+        )
+        showToast(available ? 'Marked in stock' : 'Marked out of stock')
+        setSelected(new Set())
+        invalidateAndRefresh()
+      } catch {
+        showToast('Failed to update items')
+      }
     })
   }
 
-  function toggleCategoryAvailable() {
+  async function toggleCategoryAvailable() {
+    if (!encryptedOutletId) return
     const next = !categoryAvailable
+<<<<<<< HEAD
     const ids = new Set(visible.map((row) => row.id))
     setItems((prev) =>
       prev.map((row) => (ids.has(row.id) ? { ...row, available: next } : row)),
     )
+=======
+    const ids = filtered.map((row) => row.id)
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          updateItemApi(encryptedOutletId!, id, { is_active: next }),
+        ),
+      )
+      showToast(
+        next ? 'Category marked available' : 'Category marked unavailable',
+      )
+      invalidateAndRefresh()
+    } catch {
+      showToast('Failed to update category availability')
+    }
+  }
+
+  async function handleSave() {
+    if (!encryptedOutletId) return
+    if (!currentChannelId) {
+      showToast('Channels are still loading, try again')
+      return
+    }
+    const changed = items.filter((row) => {
+      const raw = rawItemsMap.get(row.id)
+      if (!raw) return false
+      const rawPrice = resolveChannelPrice(raw)
+      return (
+        raw.short_code !== row.shortCode ||
+        raw.online_display_name !== row.onlineDisplayName ||
+        rawPrice !== row.price ||
+        raw.description !== row.description ||
+        raw.rank !== row.rank ||
+        raw.is_active !== row.available
+      )
+    })
+    if (changed.length === 0) {
+      showToast('No changes to save')
+      return
+    }
+    try {
+      await Promise.all(
+        changed.map((row) => {
+          const raw = rawItemsMap.get(row.id)!
+          const area_prices = raw.area_prices?.map((area) => ({
+            outlet_channel_id: area.outlet_channel_id,
+            price: Number(area.price) || 0,
+            is_active: area.is_active,
+          })) ?? []
+          const existing = area_prices.findIndex(
+            (area) => area.outlet_channel_id === currentChannelId,
+          )
+          if (existing >= 0) {
+            area_prices[existing] = {
+              ...area_prices[existing],
+              price: row.price,
+            }
+          } else {
+            area_prices.push({
+              outlet_channel_id: currentChannelId,
+              price: row.price,
+              is_active: true,
+            })
+          }
+          const patch: Partial<ItemPayload> = {
+            short_code: row.shortCode,
+            online_display_name: row.onlineDisplayName,
+            description: row.description,
+            rank: row.rank,
+            is_active: row.available,
+            area_prices,
+          }
+          return updateItemApi(encryptedOutletId!, row.id, patch)
+        }),
+      )
+      showToast('Saved')
+      invalidateAndRefresh()
+    } catch {
+      showToast('Failed to save some items')
+    }
+  }
+
+  function buildPublishLines(): ScheduledPublishLineInput[] {
+    if (!currentChannelId) return []
+    const lines: ScheduledPublishLineInput[] = []
+    for (const row of items) {
+      const raw = rawItemsMap.get(row.id)
+      if (!raw) continue
+      const rawPrice = resolveChannelPrice(raw)
+      const priceChanged = rawPrice !== row.price
+      const availabilityChanged = raw.is_active !== row.available
+      if (!priceChanged && !availabilityChanged) continue
+      lines.push({
+        item_id: row.id,
+        outlet_channel_id: currentChannelId,
+        change_type: 'Amount',
+        change_direction: row.price > rawPrice ? 'Increase' : 'Decrease',
+        change_value: Math.abs(row.price - rawPrice),
+        availability: availabilityChanged ? row.available : null,
+      })
+    }
+    return lines
+  }
+
+  async function doSchedule(startsAt: Date, endsAt: Date) {
+    if (!encryptedOutletId) return
+    if (!currentChannelId) {
+      showToast('Channels are still loading, try again')
+      return
+    }
+    const lines = buildPublishLines()
+    if (lines.length === 0) {
+      showToast('No price or availability changes to schedule')
+      return
+    }
+    try {
+      await createScheduledPublishApi(encryptedOutletId, {
+        name: `Publish ${formatDateTimeDisplay(startsAt)}`,
+        starts_at: startsAt.toISOString(),
+        ends_at: endsAt.toISOString(),
+        is_draft: false,
+        lines,
+      })
+      showToast(`Scheduled to publish on ${formatDateTimeDisplay(startsAt)}`)
+      setPublishModalOpen(false)
+      loadPublishes()
+    } catch {
+      showToast('Failed to schedule publish')
+    }
+  }
+
+  async function doSaveLater() {
+    if (!encryptedOutletId) return
+    if (!currentChannelId) {
+      showToast('Channels are still loading, try again')
+      return
+    }
+    const lines = buildPublishLines()
+    if (lines.length === 0) {
+      showToast('No price or availability changes to save')
+      return
+    }
+    try {
+      await createScheduledPublishApi(encryptedOutletId, {
+        name: 'Draft',
+        is_draft: true,
+        lines,
+      })
+      showToast('Draft saved')
+      loadPublishes()
+    } catch {
+      showToast('Failed to save draft')
+    }
+  }
+
+  async function handleCancelPublish(publish: ScheduledPublish) {
+    if (!encryptedOutletId) return
+    try {
+      await cancelScheduledPublishApi(encryptedOutletId, publish.id)
+      showToast('Publish cancelled')
+      loadPublishes()
+    } catch {
+      showToast('Failed to cancel publish')
+    }
+  }
+
+  async function confirmBulkDeleteItems() {
+    if (!encryptedOutletId || bulkDeleteTargets.length === 0) return
+    const targets = bulkDeleteTargets
+    setBulkDeleteTargets([])
+    try {
+      setBusy(true)
+      const results = await Promise.allSettled(
+        targets.map((row) => deleteItemApi(encryptedOutletId!, row.id)),
+      )
+      const failed = results
+        .map((result, index) => (result.status === 'rejected' ? targets[index] : null))
+        .filter((row): row is RowItem => row !== null)
+      if (failed.length === 0) {
+        showToast(`${targets.length} item(s) removed`)
+        setSelected(new Set())
+        invalidateAndRefresh()
+        return
+      }
+      // Partial failure: say exactly which ones survived, so the count in the
+      // confirmation can be reconciled.
+      setSelected(new Set(failed.map((row) => row.id)))
+      showToast(
+        `Removed ${targets.length - failed.length} of ${targets.length}. ` +
+          `Failed: ${failed.map((row) => row.name).join(', ')}`,
+      )
+      invalidateAndRefresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmCancelPublish() {
+    if (!pendingCancelPublish) return
+    const publish = pendingCancelPublish
+    setPendingCancelPublish(null)
+    await handleCancelPublish(publish)
+  }
+
+  async function deleteRowItem(target: RowItem) {
+    if (!encryptedOutletId) return
+    try {
+      await deleteItemApi(encryptedOutletId, target.id)
+      showToast('Item deleted')
+      setSelected((prev) => {
+        const next = new Set(prev)
+        next.delete(target.id)
+        return next
+      })
+      invalidateAndRefresh()
+    } catch {
+      showToast('Failed to delete item')
+    }
+>>>>>>> origin/main
   }
 
   return (
@@ -293,6 +683,68 @@ export default function BaseMenu({
         </div>
       ) : null}
 
+      {isSchedule && publishes.length > 0 ? (
+        <div className="mb-3 flex shrink-0 flex-col gap-2 rounded-lg border border-line bg-card px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            Scheduled publishes
+          </p>
+          <ul className="flex flex-col gap-2">
+            {publishes.map((publish) => {
+              const cancelable =
+                publish.is_draft || publish.status === 'pending'
+              return (
+                <li
+                  key={publish.id}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-line bg-page/60 px-3 py-2 text-sm"
+                >
+                  <span className="font-medium text-ink">{publish.name}</span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                      publish.is_draft
+                        ? 'bg-muted/15 text-muted'
+                        : publish.status === 'applied'
+                          ? 'bg-success/15 text-success'
+                          : publish.status === 'reverted'
+                            ? 'bg-primary/10 text-primary'
+                            : publish.status === 'cancelled'
+                              ? 'bg-danger/10 text-danger'
+                              : 'bg-secondary/40 text-deep'
+                    }`}
+                  >
+                    {publish.is_draft
+                      ? 'Draft'
+                      : publish.status === 'applied'
+                        ? 'Applied'
+                        : publish.status === 'reverted'
+                          ? 'Reverted'
+                          : publish.status === 'cancelled'
+                            ? 'Cancelled'
+                            : 'Scheduled'}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {publish.starts_at && publish.ends_at
+                      ? `${new Date(publish.starts_at).toLocaleString()} → ${new Date(publish.ends_at).toLocaleString()}`
+                      : `${publish.lines.length} change(s)`}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {publish.lines.length} item(s)
+                  </span>
+                  {cancelable ? (
+                    <button
+                      type="button"
+                      onClick={() => setPendingCancelPublish(publish)}
+                      className="ml-auto inline-flex h-7 cursor-pointer items-center rounded-md border border-line bg-card px-2.5 text-xs font-medium text-danger hover:bg-danger/10"
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
         <label className="relative min-w-[180px] flex-1">
           <Search
@@ -324,10 +776,7 @@ export default function BaseMenu({
               }
               if (label === 'Remove Items') {
                 requireSelection(() => {
-                  setItems((prev) =>
-                    prev.filter((row) => !selected.has(row.id)),
-                  )
-                  setSelected(new Set())
+                  setBulkDeleteTargets(items.filter((i) => selected.has(i.id)))
                 })
                 return
               }
@@ -347,11 +796,12 @@ export default function BaseMenu({
           <>
             <button
               type="button"
+              onClick={() => setPublishModalOpen(true)}
               className="inline-flex h-9 items-center rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
             >
               Publish Date
             </button>
-            <PrimaryButton>Save Later</PrimaryButton>
+            <PrimaryButton onClick={doSaveLater}>Save Later</PrimaryButton>
             <div className="inline-flex h-9 items-center gap-3 rounded-md border border-line bg-card px-3 text-sm text-ink">
               <label className="inline-flex cursor-pointer items-center gap-1.5">
                 <input
@@ -377,7 +827,7 @@ export default function BaseMenu({
           </>
         ) : (
           <>
-            <PrimaryButton>Save</PrimaryButton>
+            <PrimaryButton onClick={handleSave}>Save</PrimaryButton>
             <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-line bg-card px-3 text-sm text-ink">
               <input
                 type="checkbox"
@@ -597,7 +1047,7 @@ export default function BaseMenu({
                             onChange={(event) => {
                               const val = event.target.value.replace(/\D/g, '')
                               setItems((prev) =>
-                                updateItem(prev, row.id, {
+                                updateRow(prev, row.id, {
                                   rank: val ? Number(val) : undefined,
                                 }),
                               )
@@ -637,7 +1087,7 @@ export default function BaseMenu({
                           value={row.shortCode}
                           onChange={(event) =>
                             setItems((prev) =>
-                              updateItem(prev, row.id, {
+                              updateRow(prev, row.id, {
                                 shortCode: event.target.value,
                               }),
                             )
@@ -651,7 +1101,7 @@ export default function BaseMenu({
                           value={row.onlineDisplayName}
                           onChange={(event) =>
                             setItems((prev) =>
-                              updateItem(prev, row.id, {
+                              updateRow(prev, row.id, {
                                 onlineDisplayName: event.target.value,
                               }),
                             )
@@ -666,7 +1116,7 @@ export default function BaseMenu({
                           value={row.price}
                           onChange={(event) =>
                             setItems((prev) =>
-                              updateItem(prev, row.id, {
+                              updateRow(prev, row.id, {
                                 price: Number(event.target.value) || 0,
                               }),
                             )
@@ -680,7 +1130,7 @@ export default function BaseMenu({
                           value={row.description}
                           onChange={(event) =>
                             setItems((prev) =>
-                              updateItem(prev, row.id, {
+                              updateRow(prev, row.id, {
                                 description: event.target.value,
                               }),
                             )
@@ -708,7 +1158,7 @@ export default function BaseMenu({
                                   setItems((prev) => {
                                     const source = prev.find((i) => i.id === row.id)
                                     if (!source) return prev
-                                    const copy: MenuItemRow = {
+                                    const copy: RowItem = {
                                       ...source,
                                       id: `${source.id}-copy-${Date.now()}`,
                                       name: `${source.name} (Copy)`,
@@ -749,13 +1199,17 @@ export default function BaseMenu({
                             <>
                               <RowActionButton
                                 label="Item details"
-                                onClick={() => setDetailsItem(row)}
+                                onClick={() =>
+                                  setDetailsItem(rawItemsMap.get(row.id) ?? null)
+                                }
                               >
                                 <ClipboardEyeIcon />
                               </RowActionButton>
                               <RowActionButton
                                 label="Update area wise price & status"
-                                onClick={() => setAreaPriceItem(row)}
+                                onClick={() =>
+                                  setAreaPriceItem(rawItemsMap.get(row.id) ?? null)
+                                }
                               >
                                 <ReceiptText size={15} />
                               </RowActionButton>
@@ -771,9 +1225,17 @@ export default function BaseMenu({
                               </RowActionButton>
                               <RowActionButton
                                 label="Update item nutrition and info detail"
-                                onClick={() => setNutritionItem(row)}
+                                onClick={() =>
+                                  setNutritionItem(rawItemsMap.get(row.id) ?? null)
+                                }
                               >
                                 <FileOutput size={15} />
+                              </RowActionButton>
+                              <RowActionButton
+                                label="Delete item"
+                                onClick={() => setDeleteTarget(row)}
+                              >
+                                <Trash2 size={15} />
                               </RowActionButton>
                               <RowActionButton
                                 label="Show changes"
@@ -870,11 +1332,12 @@ export default function BaseMenu({
       />
       <AddItemsGridModal
         open={addGridOpen}
-        categoryId={categoryId}
+        categories={categoriesApi}
+        initialCategoryId={categoryId}
         onClose={() => setAddGridOpen(false)}
-        onSave={(newItems) => {
-          setItems((prev) => [...newItems, ...prev])
+        onSaved={() => {
           setPage(1)
+          invalidateAndRefresh()
         }}
       />
       <MenuItemDetailsModal
@@ -886,26 +1349,85 @@ export default function BaseMenu({
         open={Boolean(areaPriceItem)}
         item={areaPriceItem}
         onClose={() => setAreaPriceItem(null)}
-        onSave={(itemId, price, active) => {
-          setItems((prev) =>
-            prev.map((row) =>
-              row.id === itemId
-                ? { ...row, price, available: active }
-                : row,
-            ),
-          )
+        onSaved={() => {
           setAreaPriceItem(null)
+          invalidateAndRefresh()
         }}
       />
       <UpdateNutritionModal
         open={Boolean(nutritionItem)}
         item={nutritionItem}
-        onClose={() => setNutritionItem(null)}
+        onClose={() => {
+          setNutritionItem(null)
+          invalidateAndRefresh()
+        }}
+        onSaved={() => {
+          setNutritionItem(null)
+          invalidateAndRefresh()
+        }}
       />
       <ShowChangesModal
         open={Boolean(changesName)}
         name={changesName}
         onClose={() => setChangesName(null)}
+      />
+      <ConfirmDeleteModal
+        open={Boolean(deleteTarget)}
+        title="Delete Item"
+        target={deleteTarget?.name}
+        message="This item will be removed from every menu channel."
+        consequences={[
+          'It stops selling at the counter, online and on marketplaces.',
+          'Existing orders keep their recorded lines and prices.',
+        ]}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (deleteTarget) deleteRowItem(deleteTarget)
+        }}
+        onClose={() => setDeleteTarget(null)}
+      />
+      <ConfirmDialog
+        open={bulkDeleteTargets.length > 0}
+        title={`Remove ${bulkDeleteTargets.length} item${bulkDeleteTargets.length === 1 ? '' : 's'}`}
+        target={
+          bulkDeleteTargets.length > 3
+            ? `${bulkDeleteTargets.slice(0, 3).map((row) => row.name).join(', ')} and ${bulkDeleteTargets.length - 3} more`
+            : bulkDeleteTargets.map((row) => row.name).join(', ')
+        }
+        message={`${bulkDeleteTargets.length} selected item${bulkDeleteTargets.length === 1 ? '' : 's'} will be removed from every menu channel.`}
+        consequences={[
+          'They stop appearing on your POS, online menus and marketplaces.',
+          'Existing orders keep their recorded lines and prices.',
+        ]}
+        note="Items are archived, not erased, so they stop selling but the order history stays intact."
+        confirmLabel={`Remove ${bulkDeleteTargets.length} item${bulkDeleteTargets.length === 1 ? '' : 's'}`}
+        loading={busy}
+        onConfirm={() => void confirmBulkDeleteItems()}
+        onClose={() => setBulkDeleteTargets([])}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingCancelPublish)}
+        title="Cancel scheduled publish"
+        target={
+          pendingCancelPublish?.name ||
+          (pendingCancelPublish
+            ? `${pendingCancelPublish.lines.length} change(s)`
+            : undefined)
+        }
+        message="The pending menu changes will not be applied at the scheduled time."
+        consequences={[
+          'The menu stays as it is now until you schedule a new publish.',
+          'Any changes already applied by an earlier publish are not rolled back.',
+        ]}
+        note="Only the pending schedule is cancelled. You can schedule the same changes again at any time."
+        confirmLabel="Cancel publish"
+        onConfirm={() => void confirmCancelPublish()}
+        onClose={() => setPendingCancelPublish(null)}
+      />
+      <PublishDateModal
+        open={publishModalOpen}
+        onClose={() => setPublishModalOpen(false)}
+        onSchedule={doSchedule}
       />
     </MenuPageShell>
   )

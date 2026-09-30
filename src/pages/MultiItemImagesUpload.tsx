@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 
 import { showToast } from '../utils/toast'
 import {
@@ -17,7 +17,11 @@ import {
   X,
 } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
-import { menuItems } from '../mocks/menuItemsData'
+import { addItemImageApi } from '../services/menuService'
+import { fetchAllItemsCached, invalidateMenuItems } from '../state/menuItemsCache'
+import { useMenuChannels } from '../state/MenuChannelsContext'
+import { useAuth } from '../auth/AuthContext'
+import type { Item } from '../types/menu'
 
 type ModuleType = 'item' | 'category' | 'addons'
 type Step = 1 | 2
@@ -27,10 +31,11 @@ const MODULES: {
   label: string
   hint: string
   icon: typeof Package
+  disabled?: boolean
 }[] = [
   { id: 'item', label: 'Item', hint: 'Menu items', icon: Package },
-  { id: 'category', label: 'Category', hint: 'Category images', icon: FolderTree },
-  { id: 'addons', label: 'Addons', hint: 'Addon groups', icon: Puzzle },
+  { id: 'category', label: 'Category', hint: 'Coming soon', icon: FolderTree, disabled: true },
+  { id: 'addons', label: 'Addons', hint: 'Coming soon', icon: Puzzle, disabled: true },
 ]
 
 const PLATFORMS = [
@@ -50,6 +55,7 @@ interface UploadedImage {
   file: File
   previewUrl: string
   matchedItemName: string | null
+  item: Item | null
 }
 
 function normalizeName(value: string) {
@@ -61,10 +67,9 @@ function normalizeName(value: string) {
     .trim()
 }
 
-function matchItemName(fileName: string) {
+function matchItemName(fileName: string, items: Item[]): Item | null {
   const key = normalizeName(fileName)
-  const found = menuItems.find((item) => normalizeName(item.name) === key)
-  return found?.name ?? null
+  return items.find((item) => normalizeName(item.name) === key) ?? null
 }
 
 function Stepper({ step }: { step: Step }) {
@@ -110,12 +115,33 @@ function Stepper({ step }: { step: Step }) {
 }
 
 export default function MultiItemImagesUpload() {
+  const { encryptedOutletId } = useAuth()
+  const { channels } = useMenuChannels()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const allItemsRef = useRef<Item[]>([])
+  const [itemsLoaded, setItemsLoaded] = useState(false)
   const [step, setStep] = useState<Step>(1)
   const [moduleType, setModuleType] = useState<ModuleType | null>(null)
   const [platforms, setPlatforms] = useState<string[]>([])
   const [images, setImages] = useState<UploadedImage[]>([])
   const [dragOver, setDragOver] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+
+    async function loadAllItems() {
+      const allItems = await fetchAllItemsCached(encryptedOutletId!)
+      if (!cancelled) {
+        allItemsRef.current = allItems
+        setItemsLoaded(true)
+      }
+    }
+
+    void loadAllItems()
+    return () => { cancelled = true }
+  }, [encryptedOutletId])
 
   const showPlatformSection = moduleType === 'item'
   const showUpload =
@@ -137,6 +163,8 @@ export default function MultiItemImagesUpload() {
 
 
   function selectModule(id: ModuleType) {
+    const mod = MODULES.find((m) => m.id === id)
+    if (mod?.disabled) return
     setModuleType(id)
     setPlatforms([])
     setImages((prev) => {
@@ -188,11 +216,13 @@ export default function MultiItemImagesUpload() {
                 resolve()
                 return
               }
+              const matchedItem = matchItemName(file.name, allItemsRef.current)
               accepted.push({
                 id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
                 file,
                 previewUrl: url,
-                matchedItemName: matchItemName(file.name),
+                matchedItemName: matchedItem?.name ?? null,
+                item: matchedItem,
               })
               resolve()
             }
@@ -231,10 +261,10 @@ export default function MultiItemImagesUpload() {
 
   function downloadItemList() {
     const header = 'Item Name,Short Code,Price\n'
-    const rows = menuItems
+    const rows = allItemsRef.current
       .map(
         (item) =>
-          `"${item.name.replace(/"/g, '""')}",${item.shortCode},${item.price}`,
+          `"${item.name.replace(/"/g, '""')}",${item.short_code},${item.base_price}`,
       )
       .join('\n')
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8' })
@@ -254,10 +284,74 @@ export default function MultiItemImagesUpload() {
     })
   }
 
-  function handleConfirmUpload() {
-    showToast(
-      `${images.length} image${images.length > 1 ? 's' : ''} queued for upload.`,
+  async function handleConfirmUpload() {
+    if (moduleType === 'category' || moduleType === 'addons') {
+      showToast('Category/Addon image upload is not available yet.')
+      resetForm()
+      return
+    }
+
+    const matchedImages = images.filter((img) => img.item)
+    const unmatchedCount = images.length - matchedImages.length
+
+    if (matchedImages.length === 0) {
+      showToast('No matched images to upload.')
+      return
+    }
+
+    setUploading(true)
+
+    const tasks = matchedImages.flatMap((img) =>
+      platforms.map((platformId) => {
+        const channelId =
+          channels.find((c) => c.channel_slug === platformId)?.id ?? ''
+        return addItemImageApi(encryptedOutletId!, img.item!.id, {
+          image: img.file,
+          outlet_channel_id: channelId,
+        }).then(
+          () => ({ ok: true as const }),
+          (err: unknown) => ({
+            ok: false as const,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        )
+      }),
     )
+
+    const results = await Promise.allSettled(tasks)
+
+    let successCount = 0
+    let failureCount = 0
+    let firstErrMsg: string | null = null
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        failureCount += 1
+        if (firstErrMsg === null) {
+          firstErrMsg =
+            r.reason instanceof Error ? r.reason.message : String(r.reason)
+        }
+      } else if (!r.value.ok) {
+        failureCount += 1
+        if (firstErrMsg === null) firstErrMsg = r.value.error
+      } else {
+        successCount += 1
+      }
+    }
+
+    setUploading(false)
+
+    invalidateMenuItems(encryptedOutletId!)
+
+    if (failureCount === 0) {
+      showToast(
+        `${successCount} image${successCount > 1 ? 's' : ''} uploaded${unmatchedCount ? ` (${unmatchedCount} unmatched skipped)` : ''}.`,
+      )
+    } else {
+      showToast(
+        `${failureCount} upload${failureCount > 1 ? 's' : ''} failed: ${firstErrMsg ?? 'Unknown error'}`,
+      )
+    }
+
     resetForm()
   }
 
@@ -353,22 +447,28 @@ export default function MultiItemImagesUpload() {
                   {MODULES.map((mod) => {
                     const Icon = mod.icon
                     const selected = moduleType === mod.id
+                    const disabled = Boolean(mod.disabled)
                     return (
                       <button
                         key={mod.id}
                         type="button"
+                        disabled={disabled}
                         onClick={() => selectModule(mod.id)}
                         className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${
-                          selected
-                            ? 'border-primary bg-primary/5 shadow-[0_0_0_1px_rgba(255,9,23,0.25)]'
-                            : 'border-line bg-card hover:border-primary/30 hover:bg-page'
+                          disabled
+                            ? 'cursor-not-allowed border-line bg-page/50 opacity-50'
+                            : selected
+                              ? 'border-primary bg-primary/5 shadow-[0_0_0_1px_rgba(255,9,23,0.25)]'
+                              : 'border-line bg-card hover:border-primary/30 hover:bg-page'
                         }`}
                       >
                         <span
                           className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
-                            selected
-                              ? 'bg-primary text-white'
-                              : 'bg-page text-muted'
+                            disabled
+                              ? 'bg-page text-muted/50'
+                              : selected
+                                ? 'bg-primary text-white'
+                                : 'bg-page text-muted'
                           }`}
                         >
                           <Icon size={18} />
@@ -377,18 +477,20 @@ export default function MultiItemImagesUpload() {
                           <span className="block text-sm font-semibold text-ink">
                             {mod.label}
                           </span>
-                          <span className="block text-xs text-muted">
+                          <span className={`block text-xs ${disabled ? 'text-accent' : 'text-muted'}`}>
                             {mod.hint}
                           </span>
                         </span>
                         <span
                           className={`ml-auto flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                            selected
-                              ? 'border-primary bg-primary'
-                              : 'border-line bg-card'
+                            disabled
+                              ? 'border-line bg-page'
+                              : selected
+                                ? 'border-primary bg-primary'
+                                : 'border-line bg-card'
                           }`}
                         >
-                          {selected ? (
+                          {!disabled && selected ? (
                             <Check size={10} className="text-white" strokeWidth={3} />
                           ) : null}
                         </span>
@@ -439,7 +541,8 @@ export default function MultiItemImagesUpload() {
                       <button
                         type="button"
                         onClick={downloadItemList}
-                        className="h-9 shrink-0 rounded-lg border border-primary px-3 text-sm font-semibold text-primary hover:bg-primary/5"
+                        disabled={!itemsLoaded}
+                        className="h-9 shrink-0 rounded-lg border border-primary px-3 text-sm font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         Download Item List
                       </button>
@@ -712,10 +815,11 @@ export default function MultiItemImagesUpload() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleConfirmUpload}
-                  className="h-9 rounded-lg bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover"
+                  onClick={() => void handleConfirmUpload()}
+                  disabled={uploading}
+                  className="h-9 rounded-lg bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  Confirm Upload
+                  {uploading ? 'Uploading…' : 'Confirm Upload'}
                 </button>
               </div>
             </>

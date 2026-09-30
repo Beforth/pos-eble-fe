@@ -1,7 +1,9 @@
 import { MonitorSmartphone, Settings, Trash2 } from 'lucide-react'
-import type { KotScreen } from '../../mocks/screensData'
-import { categoryName } from '../../mocks/screensData'
-import { getMenuItemById } from '../../mocks/menuItemsData'
+import {
+  categoryName,
+  getScreenItemName,
+  type KotScreen,
+} from '../../mocks/screensData'
 
 interface ScreenCardProps {
   screen: KotScreen
@@ -65,14 +67,14 @@ export function ScreenCard({ screen, onOpen, onEdit, onDelete }: ScreenCardProps
             </span>
           ))}
           {(screen.itemIds ?? []).map((id) => {
-            const item = getMenuItemById(id)
-            if (!item) return null
+            const name = getScreenItemName(id)
+            if (!name) return null
             return (
               <span
                 key={id}
                 className="rounded-md border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs text-ink"
               >
-                {item.name}
+                {name}
               </span>
             )
           })}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../utils/toast'
 import { useNavigate } from 'react-router-dom'
@@ -8,8 +8,16 @@ import { PrimaryButton } from '../components/menu/MenuActionButtons'
 import { CategoryMultiSelect } from '../components/menu/CategoryMultiSelect'
 import { CommissionTypeSelect } from '../components/menu/CommissionTypeSelect'
 import { SearchableSelect } from '../components/inventory/SearchableSelect'
-import { baseMenuCategories, menuItems } from '../mocks/menuItemsData'
-import { addCommissionRow, type CommissionType } from '../mocks/itemCommissionData'
+import { useAuth } from '../auth/AuthContext'
+import {
+  listCategoryCommissionsApi,
+  listItemCommissionsApi,
+  updateItemCommissionApi,
+} from '../services/menuService'
+import type {
+  CategoryCommission,
+  ItemCommission,
+} from '../types/menu'
 
 function FieldLabel({
   children,
@@ -53,58 +61,136 @@ function SectionCard({
 const inputClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
 
+async function fetchAllItemCommissions(
+  outletId: string,
+): Promise<ItemCommission[]> {
+  const all: ItemCommission[] = []
+  let currentPage = 1
+  for (;;) {
+    const result = await listItemCommissionsApi(outletId, {
+      page: currentPage,
+      page_size: 100,
+    })
+    all.push(...result.results)
+    if (!result.next) break
+    currentPage += 1
+  }
+  return all
+}
+
 export default function AddCommission() {
   const navigate = useNavigate()
+  const { encryptedOutletId } = useAuth()
   const [error, setError] = useState('')
 
+  const [categoryRows, setCategoryRows] = useState<CategoryCommission[]>([])
+  const [itemRows, setItemRows] = useState<ItemCommission[]>([])
   const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [selectedItemName, setSelectedItemName] = useState('')
   const [commissionType, setCommissionType] = useState<string>('Percentage')
   const [commissionValue, setCommissionValue] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!encryptedOutletId) return
+    Promise.all([
+      listCategoryCommissionsApi(encryptedOutletId),
+      fetchAllItemCommissions(encryptedOutletId),
+    ])
+      .then(([categories, items]) => {
+        if (cancelled) return
+        setCategoryRows(categories)
+        setItemRows(items)
+      })
+      .catch((loadError: unknown) => {
+        if (!cancelled) {
+          showToast(
+            loadError instanceof Error
+              ? loadError.message
+              : 'Failed to load items',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
+  const categoryOptions = useMemo(() => {
+    return categoryRows.map((category) => ({
+      id: category.category_id,
+      name: category.category_name,
+    }))
+  }, [categoryRows])
+
+  const selectedCategoryNames = useMemo(() => {
+    const idSet = new Set(categoryIds)
+    return new Set(
+      categoryRows
+        .filter((category) => idSet.has(category.category_id))
+        .map((category) => category.category_name),
+    )
+  }, [categoryRows, categoryIds])
 
   const availableItemNames = useMemo(() => {
-    return menuItems
-      .filter((item) => {
-        if (categoryIds.length > 0 && !categoryIds.includes(item.categoryId))
-          return false
-        return true
-      })
-      .map((item) => item.name)
-  }, [categoryIds])
+    return Array.from(
+      new Set(
+        itemRows
+          .filter((item) => {
+            if (selectedCategoryNames.size === 0) return true
+            return selectedCategoryNames.has(item.category_name)
+          })
+          .map((item) => item.item_name),
+      ),
+    )
+  }, [itemRows, selectedCategoryNames])
 
-
-  function handleSave() {
+  async function handleSave() {
     if (!commissionValue || Number(commissionValue) <= 0) {
       setError('Enter a valid commission value')
       return
     }
+    if (!encryptedOutletId) return
 
-    const type = commissionType as CommissionType
+    const type =
+      commissionType === 'Fixed' ? ('Fixed' as const) : ('Percentage' as const)
     const value = Number(commissionValue)
 
     const targetItems = selectedItemName
-      ? menuItems.filter((i) => i.name === selectedItemName)
+      ? itemRows.filter((item) => item.item_name === selectedItemName)
       : availableItemNames.length > 0
-        ? menuItems.filter((i) => availableItemNames.includes(i.name))
+        ? itemRows.filter((item) =>
+            selectedCategoryNames.size === 0 ||
+            selectedCategoryNames.has(item.category_name),
+          )
         : []
 
-    targetItems.forEach((item) => {
-      addCommissionRow({
-        id: `ic-new-${Date.now()}-${item.id}`,
-        itemName: item.name,
-        categoryId: item.categoryId,
-        categoryName:
-          baseMenuCategories.find((c) => c.id === item.categoryId)?.name ??
-          'Other',
-        itemPrice: item.price,
-        commissionType: type,
-        commissionValue: value,
-      })
-    })
+    if (targetItems.length === 0) {
+      setError('No matching items found')
+      return
+    }
 
+    setSaving(true)
     setError('')
-    showToast('Commission applied successfully')
-    window.setTimeout(() => navigate('/menu/item-commission'), 800)
+    try {
+      await Promise.all(
+        targetItems.map((item) =>
+          updateItemCommissionApi(encryptedOutletId, item.id, {
+            commission_type: type,
+            commission_value: value,
+          }),
+        ),
+      )
+      showToast('Commission applied successfully')
+      window.setTimeout(() => navigate('/menu/item-commission'), 800)
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : 'Failed to save',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -147,7 +233,7 @@ export default function AddCommission() {
           <div>
             <FieldLabel>Category</FieldLabel>
             <CategoryMultiSelect
-              options={baseMenuCategories}
+              options={categoryOptions}
               selectedIds={categoryIds}
               onChange={setCategoryIds}
             />
@@ -223,7 +309,9 @@ export default function AddCommission() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Apply Commission</PrimaryButton>
+        <PrimaryButton onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Apply Commission'}
+        </PrimaryButton>
       </div>
     </MenuPageShell>
   )

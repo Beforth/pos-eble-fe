@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useChrome } from '../state/ChromeContext'
 import { Armchair, Bike, Package } from 'lucide-react'
 import type { OrderTypeKey } from '../types'
 import { ExpensesPanel } from '../components/dashboard/ExpensesPanel'
@@ -81,7 +82,7 @@ const orderTypeIcons: Record<
 }
 
 export default function Dashboard() {
-  const [collapsed, setCollapsed] = useState(false)
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -104,7 +105,7 @@ export default function Dashboard() {
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem="dashboard"
       />

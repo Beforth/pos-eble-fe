@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { FinanceSidebar } from './FinanceSidebar'
 import { UniversalSearchBar } from './UniversalSearchBar'
 import { brand } from '../../theme/brand'
+import { useChrome } from '../../state/ChromeContext'
 
 interface FinancePageShellProps {
   activeItem?: string
@@ -14,7 +15,7 @@ export function FinancePageShell({
   activeItem = 'dashboard',
   children,
 }: FinancePageShellProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
@@ -22,7 +23,7 @@ export function FinancePageShell({
       <FinanceSidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem={activeItem}
       />

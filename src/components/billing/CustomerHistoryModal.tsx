@@ -14,6 +14,15 @@ export interface CustomerHistoryOrder {
   billNo: string
   amount: number
   items: string[]
+  paid?: number
+  remaining?: number
+}
+
+export interface CustomerHistoryPayment {
+  id: string
+  date: string
+  method: string
+  amount: number
 }
 
 interface CustomerHistoryModalProps {
@@ -21,6 +30,8 @@ interface CustomerHistoryModalProps {
   customerName: string
   customerMobile: string
   orders?: CustomerHistoryOrder[]
+  payments?: CustomerHistoryPayment[]
+  loading?: boolean
   onClose: () => void
 }
 
@@ -29,6 +40,8 @@ export function CustomerHistoryModal({
   customerName,
   customerMobile,
   orders = [],
+  payments = [],
+  loading = false,
   onClose,
 }: CustomerHistoryModalProps) {
   useEffect(() => {
@@ -153,6 +166,17 @@ export function CustomerHistoryModal({
             </p>
           </div>
 
+          {loading ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-center">
+              <div className="flex size-16 items-center justify-center rounded-full bg-page text-muted">
+                <Utensils size={28} strokeWidth={1.5} />
+              </div>
+              <p className="text-sm text-muted">Loading history…</p>
+            </div>
+          ) : (
+            <></>
+          )}
+
           {orders.length === 0 ? (
             <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-center">
               <div className="flex size-16 items-center justify-center rounded-full bg-page text-muted">
@@ -170,9 +194,16 @@ export function CustomerHistoryModal({
                   <div>
                     <p className="font-semibold text-ink">Bill #{order.billNo}</p>
                     <p className="text-xs text-muted">{order.date}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {order.items.join(', ')}
-                    </p>
+                    {order.items.length > 0 ? (
+                      <p className="mt-1 text-xs text-muted">
+                        {order.items.join(', ')}
+                      </p>
+                    ) : order.remaining != null ? (
+                      <p className="mt-1 text-xs text-muted">
+                        Total ₹{order.amount} · Paid ₹{order.paid ?? 0} ·
+                        Remaining ₹{order.remaining}
+                      </p>
+                    ) : null}
                   </div>
                   <p className="font-semibold text-accent">
                     ₹
@@ -185,6 +216,34 @@ export function CustomerHistoryModal({
               ))}
             </ul>
           )}
+
+          {payments.length > 0 ? (
+            <div className="mt-5">
+              <p className="text-sm font-medium text-ink">Payments</p>
+              <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
+                {payments.slice(0, 25).map((payment) => (
+                  <li
+                    key={payment.id}
+                    className="flex items-center justify-between gap-2 px-3 py-2.5 text-sm"
+                  >
+                    <div>
+                      <p className="font-semibold text-ink">
+                        {payment.method || 'Cash'}
+                      </p>
+                      <p className="text-xs text-muted">{payment.date}</p>
+                    </div>
+                    <p className="font-semibold text-primary">
+                      ₹
+                      {payment.amount.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

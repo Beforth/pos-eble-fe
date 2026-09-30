@@ -18,6 +18,8 @@ export interface TableSession {
   persons: number
   startedAt: number
   amount: number
+  /** Server order id the table's KOTs belong to (KOT→order flow, M4). */
+  orderId?: string
 }
 
 export function loadTableStatuses(): Record<string, TableFloorStatus> {
@@ -92,6 +94,7 @@ export function upsertTableSession(
     persons: patch.persons ?? prev?.persons ?? 0,
     startedAt: prev?.startedAt ?? patch.startedAt ?? Date.now(),
     amount: patch.amount ?? prev?.amount ?? 0,
+    orderId: patch.orderId ?? prev?.orderId,
   }
   saveTableSessions(sessions)
 }
@@ -150,7 +153,12 @@ export function removeKotTicket(ticketId: string): KotTicket[] {
 }
 
 export function appendKotTicket(ticket: KotTicket): KotTicket[] {
-  const next = [...loadAllKotTickets(), ticket]
+  const current = loadAllKotTickets()
+  const index = current.findIndex((existing) => existing.id === ticket.id)
+  const next =
+    index === -1
+      ? [...current, ticket]
+      : current.map((existing, i) => (i === index ? ticket : existing))
   saveAllKotTickets(next)
   if (ticket.tableId && ticket.tableId !== 'no-table') {
     const tableTickets = next.filter((t) => t.tableId === ticket.tableId)
@@ -163,6 +171,40 @@ export function appendKotTicket(ticket: KotTicket): KotTicket[] {
     })
     setTableStatus(ticket.tableId, 'running-kot')
   }
+  return next
+}
+
+/**
+ * Merge a ticket received from the live rail into the store. Ties are broken
+ * by ticket ``id``: an existing local ticket keeps its display context
+ * (table, token, prices, ready state) while the server payload refreshes the
+ * mutable fields (kotNo, items, customer). New ids are appended.
+ */
+export function upsertKotTicketFromServer(ticket: KotTicket): KotTicket[] {
+  const current = loadAllKotTickets()
+  const index = current.findIndex((existing) => existing.id === ticket.id)
+  if (index === -1) {
+    return appendKotTicket(ticket)
+  }
+  const existing = current[index]
+  const merged: KotTicket = {
+    ...existing,
+    kotNo: ticket.kotNo ?? existing.kotNo,
+    source: ticket.source ?? existing.source,
+    orderType: ticket.orderType ?? existing.orderType,
+    customerName: ticket.customerName ?? existing.customerName,
+    status: ticket.status === 'ready' ? 'ready' : existing.status,
+    items:
+      ticket.items.length > 0
+        ? ticket.items.map((item, i) => ({
+            ...existing.items[i],
+            ...item,
+          }))
+        : existing.items,
+  }
+  const next = [...current]
+  next[index] = merged
+  saveAllKotTickets(next)
   return next
 }
 
@@ -184,6 +226,7 @@ export function replaceKotTickets(tickets: KotTicket[]): void {
       persons: Math.max(0, ...list.map((t) => t.persons), 0),
       startedAt: Math.min(...list.map((t) => t.createdAt)),
       amount: list.reduce((sum, t) => sum + kotTicketAmount(t), 0),
+      orderId: sessions[tableId]?.orderId,
     }
   }
   // Drop sessions that no longer have tickets (unless printed — keep until settled)

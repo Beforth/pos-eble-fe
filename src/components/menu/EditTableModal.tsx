@@ -1,31 +1,36 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Pencil, X } from 'lucide-react'
-import type { MenuTable } from '../../mocks/menuSectionData'
+import { showToast } from '../../utils/toast'
+import { updateDiningTableApi } from '../../services/menuService'
+import type { DiningTable } from '../../types/menu'
 
 interface EditTableModalProps {
   open: boolean
-  table: MenuTable | null
+  table: DiningTable | null
+  outletId: string
   onClose: () => void
-  onUpdate: (table: MenuTable) => void
+  onUpdate: (table: DiningTable) => void
 }
 
 export function EditTableModal({
   open,
   table,
+  outletId,
   onClose,
   onUpdate,
 }: EditTableModalProps) {
   const [tableNo, setTableNo] = useState('')
   const [editingTableNo, setEditingTableNo] = useState(false)
   const [persons, setPersons] = useState('')
-  const [availableForReservation, setAvailableForReservation] = useState(true)
+  const [isOn, setIsOn] = useState(true)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open || !table) return
-    setTableNo(table.tableNo)
+    setTableNo(table.table_no)
     setPersons(table.persons ? String(table.persons) : '')
-    setAvailableForReservation(true)
+    setIsOn(table.is_on)
     setEditingTableNo(false)
   }, [open, table])
 
@@ -45,12 +50,23 @@ export function EditTableModal({
 
   if (!open || !table) return null
 
-  function handleUpdate() {
-    onUpdate({
-      ...table!,
-      tableNo: tableNo.trim() || table!.tableNo,
-      persons: Number(persons) || 0,
-    })
+  async function handleUpdate() {
+    if (!outletId) return
+    setSaving(true)
+    try {
+      const updated = await updateDiningTableApi(outletId, table!.id, {
+        table_no: tableNo.trim() || table!.table_no,
+        persons: Number(persons) || 0,
+        is_on: isOn,
+      })
+      onUpdate(updated)
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : 'Failed to update table',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return createPortal(
@@ -72,7 +88,7 @@ export function EditTableModal({
             id="edit-table-title"
             className="text-base font-semibold text-ink"
           >
-            Table No - {table.tableNo}
+            Table No - {table.table_no}
           </h2>
           <button
             type="button"
@@ -133,10 +149,8 @@ export function EditTableModal({
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
-              checked={availableForReservation}
-              onChange={(event) =>
-                setAvailableForReservation(event.target.checked)
-              }
+              checked={isOn}
+              onChange={(event) => setIsOn(event.target.checked)}
               className="size-4 cursor-pointer accent-primary"
             />
             Available for reservation
@@ -154,9 +168,10 @@ export function EditTableModal({
           <button
             type="button"
             onClick={handleUpdate}
-            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            disabled={saving}
+            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Update
+            {saving ? 'Saving…' : 'Update'}
           </button>
         </div>
       </div>

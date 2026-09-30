@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useChrome } from '../state/ChromeContext'
 
 import { showToast } from '../utils/toast'
 import { Eye, EyeOff, ImagePlus } from 'lucide-react'
@@ -50,11 +51,15 @@ function firstFieldError(errors: unknown, key: string): string | undefined {
 
 export default function EditProfile() {
   const navigate = useNavigate()
+<<<<<<< HEAD
   const { user, updateProfile, hasPermission } = useAuth()
   const canEdit = hasPermission(EDIT_OWN_PROFILE_PERMISSION)
   const canChangePassword = hasPermission(CHANGE_OWN_PASSWORD_PERMISSION)
+=======
+  const { user, updateProfile, homePath } = useAuth()
+>>>>>>> origin/main
 
-  const [collapsed, setCollapsed] = useState(false)
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -280,7 +285,7 @@ export default function EditProfile() {
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem="dashboard"
       />
@@ -314,7 +319,7 @@ export default function EditProfile() {
           title="Edit profile"
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              <Button variant="outline" onClick={() => navigate(homePath())}>
                 Cancel
               </Button>
               {canEdit ? (

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
-import { BarChart3, Download, Search } from 'lucide-react'
+import { BarChart3, Download, Loader2, Search } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { AllOrdersChart } from '../../components/all-orders/AllOrdersChart'
 import { AllOrdersTable } from '../../components/all-orders/AllOrdersTable'
@@ -10,20 +11,19 @@ import { OrderDetailsDrawer } from '../../components/all-orders/OrderDetailsDraw
 import { KotDetailsModal } from '../../components/all-orders/KotDetailsModal'
 import { EditOrderModal } from '../../components/all-orders/EditOrderModal'
 import { ChangePaymentModal } from '../../components/all-orders/ChangePaymentModal'
-import {
-  allOrdersChartSeries,
-  allOrdersGrandTotal,
-  allOrdersList,
-  type AllOrderRow,
-} from '../../mocks/allOrdersData'
+import { SettleDueModal } from '../../components/all-orders/SettleDueModal'
+import { useAllOrdersData } from '../../services/useAllOrdersData'
+import { type AllOrderRow } from '../../mocks/allOrdersData'
 import { formatINR } from '../../utils/format'
 
 const PAGE_SIZE = 10
 
 export default function BillingAllOrders() {
   const navigate = useNavigate()
+  const { encryptedOutletId, token } = useAuth()
+  const { orders, chartSeries, grandTotal, loading, saveChangePayment, saveDueCollect } =
+    useAllOrdersData(encryptedOutletId, token)
   const [billNo, setBillNo] = useState('')
-  const [orders, setOrders] = useState<AllOrderRow[]>(allOrdersList)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [chartOpen, setChartOpen] = useState(false)
@@ -37,6 +37,7 @@ export default function BillingAllOrders() {
   const [viewKotOrder, setViewKotOrder] = useState<AllOrderRow | null>(null)
   const [editOrder, setEditOrder] = useState<AllOrderRow | null>(null)
   const [changePaymentOrder, setChangePaymentOrder] = useState<AllOrderRow | null>(null)
+  const [dueOrder, setDueOrder] = useState<AllOrderRow | null>(null)
 
 
   const filtered = useMemo(() => {
@@ -136,27 +137,18 @@ export default function BillingAllOrders() {
         open={Boolean(editOrder)}
         order={editOrder}
         onClose={() => setEditOrder(null)}
-        onSave={(updated) => {
-          setOrders((prev) =>
-            prev.map((o) => (o.id === updated.id ? updated : o)),
-          )
-          setEditOrder(null)
-          showToast('Order updated')
-        }}
       />
       <ChangePaymentModal
         open={Boolean(changePaymentOrder)}
         order={changePaymentOrder}
         onClose={() => setChangePaymentOrder(null)}
-        onSave={(orderId, payment) => {
-          setOrders((prev) =>
-            prev.map((o) =>
-              o.id === orderId ? { ...o, payment } : o,
-            ),
-          )
-          setChangePaymentOrder(null)
-          showToast('Payment updated')
-        }}
+        onSave={saveChangePayment}
+      />
+      <SettleDueModal
+        open={Boolean(dueOrder)}
+        order={dueOrder}
+        onClose={() => setDueOrder(null)}
+        onSave={saveDueCollect}
       />
 
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
@@ -164,7 +156,7 @@ export default function BillingAllOrders() {
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold text-ink">All Orders</h1>
             <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">
-              {formatINR(allOrdersGrandTotal)}
+              {loading ? '—' : formatINR(grandTotal)}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -193,7 +185,7 @@ export default function BillingAllOrders() {
 
         {chartOpen ? (
           <div className="mb-4 rounded-xl border border-line bg-card p-4">
-            <AllOrdersChart series={allOrdersChartSeries} />
+            <AllOrdersChart series={chartSeries} />
           </div>
         ) : null}
 
@@ -241,6 +233,12 @@ export default function BillingAllOrders() {
           </div>
         </div>
 
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-12 text-sm text-muted">
+            <Loader2 size={16} className="animate-spin" />
+            Loading orders…
+          </div>
+        ) : (
         <div className="rounded-xl border border-line bg-card">
           <div className="overflow-x-auto">
             <AllOrdersTable
@@ -252,6 +250,7 @@ export default function BillingAllOrders() {
               onViewKot={setViewKotOrder}
               onEdit={setEditOrder}
               onChangePayment={setChangePaymentOrder}
+              onSettleDue={setDueOrder}
             />
           </div>
 
@@ -302,6 +301,7 @@ export default function BillingAllOrders() {
             </div>
           </div>
         </div>
+        )}
       </main>
     </div>
   )

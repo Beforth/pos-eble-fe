@@ -146,7 +146,7 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
 
   return (
     <>
-      <div className="relative z-20 mb-4 flex h-[90px] items-center gap-1">
+      <div className="relative z-20 mb-3 flex items-center gap-1">
         <button
           type="button"
           aria-label="Scroll tabs left"
@@ -161,7 +161,7 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
           ref={scrollerRef}
           role="tablist"
           aria-label="Menu sections"
-          className="category-tab-scroller flex min-w-0 flex-1 items-stretch gap-[90px] overflow-x-auto overflow-y-hidden"
+          className="category-tab-scroller flex min-w-0 flex-1 items-center gap-14 overflow-x-auto overflow-y-hidden py-0.5"
         >
           {TABS.map((tab) => {
             const active = activeTab === tab.id

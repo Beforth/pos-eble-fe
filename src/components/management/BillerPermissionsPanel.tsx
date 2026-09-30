@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from 'react'
 import { Info, Loader2, Search, X } from 'lucide-react'
+=======
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Info, Loader2, Search } from 'lucide-react'
+>>>>>>> origin/main
 import { SearchableSelect } from '../inventory/SearchableSelect'
 import {
   getPermissionCatalogApi,
@@ -8,6 +13,14 @@ import {
   type PermissionCatalog,
   type PermissionGroup,
 } from '../../services/permissionService'
+import {
+  getGroupPermissionsApi,
+  listGroupsApi,
+  updateGroupPermissionsApi,
+  type GroupSummary,
+} from '../../services/groupService'
+import { ApiError } from '../../services/apiClient'
+import { showToast } from '../../utils/toast'
 
 export type PermissionCategoryId = string
 
@@ -52,10 +65,13 @@ export type PermissionDef = YesPermission | MultiPermission | ReportPermission
 
 export interface BillerPermissionsValue {
   group: string
+<<<<<<< HEAD
   selectedGroup: string
   selectedGroups: string[]
   selectedCodenames: string[]
   tables: string[]
+=======
+>>>>>>> origin/main
 }
 
 export interface BillerPermissionsPanelProps {
@@ -63,7 +79,11 @@ export interface BillerPermissionsPanelProps {
   onChange?: (value: BillerPermissionsValue) => void
 }
 
+<<<<<<< HEAD
 const NO_GROUP = 'No Group Selected'
+=======
+const NO_GROUP_LABEL = 'No Group Selected'
+>>>>>>> origin/main
 
 const REPORT_DAYS_OPTIONS = [
   'No Restriction',
@@ -176,6 +196,7 @@ function bareCodename(codename: string): string {
   return codename.split('.').pop() ?? codename
 }
 
+<<<<<<< HEAD
 function applyBareCodenames(
   features: CatalogFeature[],
   codes: Set<string>,
@@ -234,6 +255,10 @@ function unionPermissionState(
     }
   }
   return { yes, multi, report }
+=======
+function canonical(codes: string[]): string {
+  return codes.join('|')
+>>>>>>> origin/main
 }
 
 function computeSelectedCodenames(
@@ -274,6 +299,41 @@ function computeSelectedCodenames(
   return selected
 }
 
+function seedStatesFromCodenames(
+  features: CatalogFeature[],
+  codenames: string[],
+): { yes: YesState; multi: MultiState; report: ReportState } {
+  const codes = new Set(codenames.map(bareCodename))
+  const yes: YesState = {}
+  const multi: MultiState = {}
+  const report: ReportState = {}
+  for (const feature of features) {
+    const codenameFor = (label: string): string => {
+      const codename = feature.permissions.find(
+        (permission) => permission.label === label,
+      )?.codename
+      return codename ? bareCodename(codename) : ''
+    }
+    if (feature.mode === 'yes') {
+      yes[feature.key] = codes.has(codenameFor(feature.permissions[0]?.label ?? ''))
+    } else if (feature.mode === 'multi') {
+      multi[feature.key] = feature.options.filter((option) => {
+        const codename = feature.permissions.find(
+          (permission) => permission.label === option,
+        )?.codename
+        return codename ? codes.has(bareCodename(codename)) : false
+      })
+    } else {
+      report[feature.key] = {
+        show: codes.has(codenameFor('View')),
+        displayValues: codes.has(codenameFor('Display Values')),
+        days: 'No Restriction',
+      }
+    }
+  }
+  return { yes, multi, report }
+}
+
 export function BillerPermissionsPanel({
   initial,
   onChange,
@@ -283,13 +343,24 @@ export function BillerPermissionsPanel({
   const [defs, setDefs] = useState<PermissionDef[]>([])
   const [features, setFeatures] = useState<CatalogFeature[]>([])
   const [categories, setCategories] = useState<PermissionCategory[]>([])
+<<<<<<< HEAD
   const [groups, setGroups] = useState<PermissionGroup[]>([])
   const [selectedGroups, setSelectedGroups] = useState<string[]>([])
+=======
+  const [groups, setGroups] = useState<GroupSummary[]>([])
+  const [groupError, setGroupError] = useState<string | null>(null)
+  const [groupLoading, setGroupLoading] = useState(false)
+  const [savingGroup, setSavingGroup] = useState(false)
+  const [group, setGroup] = useState(NO_GROUP_LABEL)
+>>>>>>> origin/main
   const [category, setCategory] = useState<PermissionCategoryId>('pos')
   const [search, setSearch] = useState('')
   const [yesState, setYesState] = useState<YesState>({})
   const [multiState, setMultiState] = useState<MultiState>({})
   const [reportState, setReportState] = useState<ReportState>({})
+
+  const saveTimer = useRef<number | null>(null)
+  const lastSaved = useRef<string>('')
 
   useEffect(() => {
     let cancelled = false
@@ -317,6 +388,7 @@ export function BillerPermissionsPanel({
   }, [])
 
   useEffect(() => {
+<<<<<<< HEAD
     if (!initial || features.length === 0) return
     const applied = applyBareCodenames(
       features,
@@ -339,6 +411,116 @@ export function BillerPermissionsPanel({
     setSelectedGroups(savedGroups)
     if (initial.tables) setSelectedTables(initial.tables)
   }, [initial, features])
+=======
+    let cancelled = false
+    listGroupsApi()
+      .then((rows) => {
+        if (cancelled) return
+        setGroups(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setGroupError('Could not load groups.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const groupNames = useMemo(() => groups.map((row) => row.name), [groups])
+  const groupById = useMemo(
+    () => new Map(groups.map((row) => [row.name, row.id])),
+    [groups],
+  )
+  const groupOptions = useMemo(
+    () => [NO_GROUP_LABEL, ...groupNames],
+    [groupNames],
+  )
+
+  useEffect(() => {
+    if (!initial) return
+    setGroup(initial.group || NO_GROUP_LABEL)
+  }, [initial])
+
+  const selectedCodenames = useMemo(
+    () => computeSelectedCodenames(features, yesState, multiState, reportState),
+    [features, yesState, multiState, reportState],
+  )
+
+  useEffect(() => {
+    if (!group || group === NO_GROUP_LABEL) return
+    const groupId = groupById.get(group)
+    if (!groupId) return
+    if (features.length === 0) return
+    let cancelled = false
+    setGroupLoading(true)
+    getGroupPermissionsApi(groupId)
+      .then((codenames) => {
+        if (cancelled) return
+        const seeded = seedStatesFromCodenames(features, codenames)
+        setYesState(seeded.yes)
+        setMultiState(seeded.multi)
+        setReportState(seeded.report)
+        lastSaved.current = canonical(
+          computeSelectedCodenames(features, seeded.yes, seeded.multi, seeded.report),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) {
+          showToast('Could not load group permissions', 'Please try again.', 'danger')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGroupLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [group, groupById, features])
+
+  async function flushGroupSave() {
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    if (!group || group === NO_GROUP_LABEL) return
+    const groupId = groupById.get(group)
+    if (!groupId) return
+    const payload = canonical(selectedCodenames)
+    if (payload === lastSaved.current) return
+    setSavingGroup(true)
+    try {
+      await updateGroupPermissionsApi(groupId, selectedCodenames)
+      lastSaved.current = payload
+      showToast(`${group} group permissions saved`, undefined, 'success')
+    } catch (err) {
+      showToast(
+        `Could not save ${group} permissions`,
+        err instanceof ApiError ? err.message : 'Please try again.',
+        'danger',
+      )
+    } finally {
+      setSavingGroup(false)
+    }
+  }
+
+  function scheduleGroupSave() {
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(() => {
+      saveTimer.current = null
+      void flushGroupSave()
+    }, 500)
+  }
+
+  function handleGroupChange(next: string) {
+    if (next === group) return
+    void flushGroupSave()
+    setGroup(next)
+  }
+
+  useEffect(() => {
+    onChange?.({ group })
+  }, [onChange, group])
+>>>>>>> origin/main
 
   const groupOptions = useMemo(() => {
     const names = groups.map((item) => item.name)
@@ -390,6 +572,7 @@ export function BillerPermissionsPanel({
     )
   }
 
+<<<<<<< HEAD
   const selectedCodenames = useMemo(
     () => computeSelectedCodenames(features, yesState, multiState, reportState),
     [features, yesState, multiState, reportState],
@@ -406,6 +589,8 @@ export function BillerPermissionsPanel({
     })
   }, [onChange, selectedGroups, selectedCodenames, selectedTables])
 
+=======
+>>>>>>> origin/main
   const enabledCount = useMemo(
     () =>
       defs.filter((item) =>
@@ -435,10 +620,13 @@ export function BillerPermissionsPanel({
     : (categories.find((item) => item.id === category)?.label ?? 'Permissions')
 
   function toggleYes(id: string) {
+    if (groupLoading) return
     setYesState((prev) => ({ ...prev, [id]: !prev[id] }))
+    scheduleGroupSave()
   }
 
   function toggleMulti(id: string, option: string) {
+    if (groupLoading) return
     setMultiState((prev) => {
       const current = prev[id] ?? []
       const next = current.includes(option)
@@ -446,12 +634,14 @@ export function BillerPermissionsPanel({
         : [...current, option]
       return { ...prev, [id]: next }
     })
+    scheduleGroupSave()
   }
 
   function patchReport(
     id: string,
     patch: Partial<{ show: boolean; displayValues: boolean; days: string }>,
   ) {
+    if (groupLoading) return
     setReportState((prev) => ({
       ...prev,
       [id]: {
@@ -461,6 +651,7 @@ export function BillerPermissionsPanel({
         ...patch,
       },
     }))
+    scheduleGroupSave()
   }
 
   if (loading) {
@@ -491,12 +682,27 @@ export function BillerPermissionsPanel({
         <div className="w-full min-w-[200px] sm:max-w-xs">
           <SearchableSelect
             label=""
+<<<<<<< HEAD
             value=""
             options={groupOptions}
             placeholder="Select a group"
             searchPlaceholder="Search groups"
             onChange={addGroup}
+=======
+            value={group}
+            options={groupOptions}
+            onChange={handleGroupChange}
+>>>>>>> origin/main
           />
+          {groupError ? (
+            <p className="mt-1 text-xs text-danger">{groupError}</p>
+          ) : null}
+          {savingGroup ? (
+            <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted">
+              <Loader2 size={12} className="animate-spin" />
+              Saving group permissions…
+            </p>
+          ) : null}
         </div>
         <label className="relative ml-auto min-w-[200px] flex-1 sm:max-w-xs">
           <Search

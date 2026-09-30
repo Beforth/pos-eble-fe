@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+<<<<<<< HEAD
 import { downloadCsv } from '../../utils/downloadFile'
+=======
+import { downloadCsv } from '../../utils/exportCsv'
+>>>>>>> origin/main
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
@@ -125,11 +129,24 @@ export default function ManualStockEntryReport() {
     void load()
   }, [load])
 
+  function exportRows(
+    rows: (string | number | null | undefined)[][],
+    suffix: 'page' | 'all',
+  ) {
+    downloadCsv(
+      `manual-stock-entry-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Raw Material', 'Unit', 'Category', 'Adjustment Type', 'Qty'],
+      rows,
+    )
+    showToast(`Exported ${rows.length} rows`)
+  }
+
   return (
     <InventoryPageShell activeItem="other-reports">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Manual Adjustment List</h1>
         <ExportMenu
+<<<<<<< HEAD
           onExportReport={() => {
             downloadCsv(
               [
@@ -158,6 +175,10 @@ export default function ManualStockEntryReport() {
             )
             showToast('Exported report')
           }}
+=======
+          onExportPage={() => exportRows([], 'page')}
+          onExportAll={() => exportRows([], 'all')}
+>>>>>>> origin/main
         />
       </div>
 

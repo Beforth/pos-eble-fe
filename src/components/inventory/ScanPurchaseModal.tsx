@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Barcode, Trash2, X } from 'lucide-react'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 
 interface LineItem {
   id: string
@@ -61,6 +62,7 @@ export function ScanPurchaseModal({
   const [invoiceDate, setInvoiceDate] = useState('2026-08-10')
   const [scanQuery, setScanQuery] = useState('')
   const [lines, setLines] = useState<LineItem[]>([emptyLine()])
+  const [pendingRemove, setPendingRemove] = useState<LineItem | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -419,11 +421,7 @@ export function ScanPurchaseModal({
                         type="button"
                         aria-label="Remove row"
                         disabled={lines.length <= 1}
-                        onClick={() =>
-                          setLines((prev) =>
-                            prev.filter((row) => row.id !== line.id),
-                          )
-                        }
+                        onClick={() => setPendingRemove(line)}
                         className="rounded p-1.5 text-muted hover:bg-primary/10 hover:text-primary disabled:opacity-30"
                       >
                         <Trash2 size={15} />
@@ -475,6 +473,24 @@ export function ScanPurchaseModal({
             </button>
           </div>
         </div>
+
+        <ConfirmDialog
+          open={Boolean(pendingRemove)}
+          compact
+          title="Remove purchase line"
+          target={pendingRemove?.rawMaterial?.trim() || undefined}
+          message="This line will be removed from the purchase being recorded."
+          note="The purchase is not saved yet — the line can be re-added before saving."
+          confirmLabel="Remove"
+          onConfirm={() => {
+            if (pendingRemove)
+              setLines((prev) =>
+                prev.filter((row) => row.id !== pendingRemove.id),
+              )
+            setPendingRemove(null)
+          }}
+          onClose={() => setPendingRemove(null)}
+        />
       </aside>
     </div>,
     document.body,

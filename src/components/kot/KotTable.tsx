@@ -1,5 +1,17 @@
 import type { ReactNode } from 'react'
+<<<<<<< HEAD
 import { Eye, Info, List, Pencil, PencilLine } from 'lucide-react'
+=======
+import {
+  ArrowDown,
+  Eye,
+  Info,
+  List,
+  Pencil,
+  PencilLine,
+  ShoppingCart,
+} from 'lucide-react'
+>>>>>>> origin/main
 import type { KotRow, KotStatus } from '../../mocks/kotData'
 import { SortableTh } from '../common/SortableTh'
 import { useListQuery } from '../../hooks/useListQuery'
@@ -9,12 +21,14 @@ interface KotTableProps {
   onEdit?: (row: KotRow) => void
   onView?: (row: KotRow) => void
   onDetails?: (row: KotRow) => void
+  onOpenInBilling?: (row: KotRow) => void
 }
 
 const statusClass: Record<KotStatus, string> = {
   'Used In Bill': 'text-success',
   Pending: 'text-accent',
   Cancelled: 'text-danger',
+  Ready: 'text-primary',
 }
 
 function ActionButton({
@@ -39,6 +53,7 @@ function ActionButton({
   )
 }
 
+<<<<<<< HEAD
 export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
     rows,
@@ -68,9 +83,18 @@ export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
     },
   )
 
+=======
+export function KotTable({
+  rows,
+  onEdit,
+  onView,
+  onDetails,
+  onOpenInBilling,
+}: KotTableProps) {
+>>>>>>> origin/main
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-line bg-page/80 text-[11px] font-semibold uppercase tracking-wide text-muted">
             <SortableTh
@@ -235,6 +259,14 @@ export function KotTable({ rows, onEdit, onView, onDetails }: KotTableProps) {
                   >
                     <List size={13} />
                   </ActionButton>
+                  {onOpenInBilling ? (
+                    <ActionButton
+                      label="Open in billing"
+                      onClick={() => onOpenInBilling(row)}
+                    >
+                      <ShoppingCart size={13} />
+                    </ActionButton>
+                  ) : null}
                   <ActionButton
                     label="Edit"
                     onClick={() => onEdit?.(row)}

@@ -5,13 +5,14 @@ import { Sidebar } from '../../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../../components/layout/SupportAgentDrawer'
 import { TopBar } from '../../components/layout/TopBar'
 import { brand } from '../../theme/brand'
+import { useChrome } from '../../state/ChromeContext'
 
 interface DuePaymentsShellProps {
   children: ReactNode
 }
 
 export function DuePaymentsShell({ children }: DuePaymentsShellProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -28,7 +29,7 @@ export function DuePaymentsShell({ children }: DuePaymentsShellProps) {
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((prev) => !prev)}
+        onToggleCollapse={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
         activeItem="due-payments"
       />

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -32,6 +32,7 @@ import {
 import { brand } from '../../theme/brand'
 import type { StockCountKind } from '../../services/inventoryService'
 import { BrandLogo } from '../brand/BrandLogo'
+import { useChrome } from '../../state/ChromeContext'
 
 type IconType = typeof ArrowLeft
 
@@ -198,6 +199,7 @@ export function InventorySidebar({
   canCountStock = { available: true, closing: true },
 }: InventorySidebarProps) {
   const navigate = useNavigate()
+<<<<<<< HEAD
 
   /** Drops Manage Stock leaves the user has no right for; hides the branch when both are gone. */
   const stockCountBranch = (branch: NavBranch): NavBranch | null => {
@@ -232,6 +234,11 @@ export function InventorySidebar({
       masters: MASTERS_IDS.includes(activeItem),
     }
   })
+=======
+  const { expanded: expandedIds, toggleExpanded, mergeExpanded, navScroll, setNavScroll } =
+    useChrome()
+  const expandedList = expandedIds.inventory
+>>>>>>> origin/main
 
   useEffect(() => {
     const purchaseChildIds = [
@@ -240,26 +247,27 @@ export function InventorySidebar({
       'purchase-return',
     ]
     const manageStockChildIds = ['available-stock', 'closing-stock']
-    setExpanded((prev) => ({
-      ...prev,
-      ...(purchaseChildIds.includes(activeItem) ? { purchase: true } : {}),
-      ...(manageStockChildIds.includes(activeItem)
-        ? { 'manage-stock': true }
-        : {}),
-      ...(PRODUCTION_IDS.includes(activeItem) ? { production: true } : {}),
-      ...(REPORTS_IDS.includes(activeItem) ? { reports: true } : {}),
-      ...(MASTERS_IDS.includes(activeItem) ? { masters: true } : {}),
-    }))
-  }, [activeItem])
+    const ids: string[] = []
+    if (purchaseChildIds.includes(activeItem)) ids.push('purchase')
+    if (manageStockChildIds.includes(activeItem)) ids.push('manage-stock')
+    if (PRODUCTION_IDS.includes(activeItem)) ids.push('production')
+    if (REPORTS_IDS.includes(activeItem)) ids.push('reports')
+    if (MASTERS_IDS.includes(activeItem)) ids.push('masters')
+    if (CONSUMPTION_MORE.some((item) => item.id === activeItem))
+      ids.push('consumption-more')
+    if (MASTERS_MORE.some((item) => item.id === activeItem))
+      ids.push('masters-more')
+    mergeExpanded('inventory', ids)
+  }, [activeItem, mergeExpanded])
+
+  const navRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    if (CONSUMPTION_MORE.some((item) => item.id === activeItem)) {
-      setConsumptionMore(true)
+    const el = navRef.current
+    if (el && el.scrollTop !== navScroll.inventory) {
+      el.scrollTop = navScroll.inventory
     }
-    if (MASTERS_MORE.some((item) => item.id === activeItem)) {
-      setMastersMore(true)
-    }
-  }, [activeItem])
+  }, [navScroll.inventory])
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -319,7 +327,9 @@ export function InventorySidebar({
       item.id === 'masters'
         ? [
             ...(item.children ?? []),
-            ...(mastersMore ? (item.moreChildren ?? []) : []),
+            ...(expandedList.includes('masters-more')
+              ? (item.moreChildren ?? [])
+              : []),
           ]
         : (item.children ?? [])
     const childActive = [
@@ -327,7 +337,7 @@ export function InventorySidebar({
       ...(item.moreChildren ?? []),
     ].some((c) => c.id === activeItem)
     const active = activeItem === item.id || Boolean(childActive)
-    const isOpen = Boolean(expanded[item.id])
+    const isOpen = expandedList.includes(item.id)
     return (
       <li key={item.id}>
         <button
@@ -336,7 +346,7 @@ export function InventorySidebar({
           aria-expanded={item.expandable ? isOpen : undefined}
           onClick={() => {
             if (item.expandable && !collapsed) {
-              setExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+              toggleExpanded('inventory', item.id)
               return
             }
             if (childList[0]) {
@@ -389,10 +399,10 @@ export function InventorySidebar({
               <li>
                 <button
                   type="button"
-                  onClick={() => setMastersMore((prev) => !prev)}
+                  onClick={() => toggleExpanded('inventory', 'masters-more')}
                   className="w-full cursor-pointer px-4 py-2 pl-11 text-left text-sm font-medium text-primary hover:bg-page"
                 >
-                  {mastersMore ? 'View Less' : 'View More'}
+                  {expandedList.includes('masters-more') ? 'View Less' : 'View More'}
                 </button>
               </li>
             ) : null}
@@ -459,7 +469,11 @@ export function InventorySidebar({
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2">
+        <nav
+          ref={navRef}
+          onScroll={(e) => setNavScroll('inventory', e.currentTarget.scrollTop)}
+          className="flex-1 overflow-y-auto overflow-x-hidden py-2"
+        >
           <ul className="space-y-0.5">
             {TOP_NAV.map((item) => {
               if (item.id === 'back-billing' || item.id === 'dashboard') {
@@ -481,17 +495,17 @@ export function InventorySidebar({
           ) : null}
           <ul className="space-y-0.5">
             {CONSUMPTION.map((item) => renderLeaf(item))}
-            {consumptionMore
+            {expandedList.includes('consumption-more')
               ? CONSUMPTION_MORE.map((item) => renderLeaf(item))
               : null}
             {!collapsed ? (
               <li>
                 <button
                   type="button"
-                  onClick={() => setConsumptionMore((prev) => !prev)}
+                  onClick={() => toggleExpanded('inventory', 'consumption-more')}
                   className="w-full cursor-pointer px-4 py-2 text-left text-sm font-medium text-primary hover:bg-page"
                 >
-                  {consumptionMore ? 'View Less' : 'View More'}
+                  {expandedList.includes('consumption-more') ? 'View Less' : 'View More'}
                 </button>
               </li>
             ) : null}
