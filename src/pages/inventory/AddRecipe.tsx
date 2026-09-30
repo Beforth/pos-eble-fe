@@ -167,7 +167,7 @@ export default function AddRecipe() {
               </p>
               <button
                 type="button"
-                onClick={() => navigate('/base-menu')}
+                onClick={() => navigate('/menu/base-menu')}
                 className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-amber-700"
               >
                 Go to Menu Management →

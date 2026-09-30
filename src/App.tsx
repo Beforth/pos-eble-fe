@@ -1323,6 +1323,10 @@ export default function App() {
             }
           />
           <Route
+            path="/base-menu"
+            element={<Navigate to="/menu/base-menu" replace />}
+          />
+          <Route
             path="/menu/channel/:channel/:id/edit"
             element={
               <ProtectedRoute>
