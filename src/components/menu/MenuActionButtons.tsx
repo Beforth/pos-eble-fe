@@ -9,6 +9,7 @@ export function OutlineButton({
   className = '',
   disabled = false,
   title,
+  type = 'button',
 }: {
   children: ReactNode
   onClick?: () => void
@@ -16,10 +17,11 @@ export function OutlineButton({
   className?: string
   disabled?: boolean
   title?: string
+  type?: 'button' | 'submit' | 'reset'
 }) {
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -41,15 +43,17 @@ export function PrimaryButton({
   onClick,
   disabled,
   title,
+  type = 'button',
 }: {
   children: ReactNode
   onClick?: () => void
   disabled?: boolean
   title?: string
+  type?: 'button' | 'submit' | 'reset'
 }) {
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={disabled}
       title={title}
