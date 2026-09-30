@@ -125,12 +125,26 @@ export default function AddMenuItem() {
         <p className="text-sm text-muted">
           No outlet selected. Please switch to an outlet from the header.
         </p>
-      ) : categories.length === 0 && !loadFailed ? (
+      ) : refStatus.categories === 'idle' || refStatus.categories === 'loading' ? (
         <p className="text-sm text-muted">Loading menu data…</p>
       ) : loadFailed ? (
         <p className="text-sm text-muted">
           Could not load menu data. Check the API connection and try again.
         </p>
+      ) : categories.length === 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+          <h3 className="font-semibold text-base">No Menu Categories Found</h3>
+          <p className="mt-1 text-sm text-amber-800">
+            Every menu item must belong to a Category (e.g. Starters, Main Course, Beverages, Snacks). No categories exist in this outlet yet.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/menu/categories/new')}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white shadow hover:bg-amber-700 cursor-pointer"
+          >
+            + Create New Category →
+          </button>
+        </div>
       ) : (
         <MenuItemForm
           mode="create"
