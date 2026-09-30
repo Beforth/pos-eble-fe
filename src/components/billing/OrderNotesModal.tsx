@@ -1,5 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
+import { listSpecialNotesApi } from '../../services/menuService'
+import type { SpecialNote } from '../../types/menu'
+import { SelectDropdown } from '../common/SelectDropdown'
+import {
+  matchSpecialNoteId,
+  specialNoteOptions,
+  specialNoteText,
+} from '../../utils/specialNotes'
 
 interface OrderNotesModalProps {
   open: boolean
@@ -14,11 +23,28 @@ export function OrderNotesModal({
   onClose,
   onSave,
 }: OrderNotesModalProps) {
+  const { encryptedOutletId } = useAuth()
   const [comment, setComment] = useState(value)
+  const [notes, setNotes] = useState<SpecialNote[]>([])
 
   useEffect(() => {
     if (open) setComment(value)
   }, [open, value])
+
+  useEffect(() => {
+    if (!open || !encryptedOutletId) return
+    let cancelled = false
+    listSpecialNotesApi(encryptedOutletId)
+      .then((rows) => {
+        if (!cancelled) setNotes(rows)
+      })
+      .catch(() => {
+        // Dropdown stays empty; the textarea still works for custom notes.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, encryptedOutletId])
 
   useEffect(() => {
     if (!open) return
@@ -37,6 +63,18 @@ export function OrderNotesModal({
       document.body.style.overflow = previous
     }
   }, [open])
+
+  const options = useMemo(() => specialNoteOptions(notes), [notes])
+
+  const selectedNoteId = useMemo(
+    () => matchSpecialNoteId(notes, comment),
+    [notes, comment],
+  )
+
+  function handleSelectNote(id: string) {
+    const note = notes.find((n) => n.id === id)
+    if (note) setComment(specialNoteText(note))
+  }
 
   if (!open) return null
 
@@ -68,7 +106,19 @@ export function OrderNotesModal({
           </button>
         </header>
 
-        <div className="px-5 py-4">
+        <div className="space-y-4 px-5 py-4">
+          <div>
+            <SelectDropdown
+              value={selectedNoteId}
+              options={options}
+              onChange={handleSelectNote}
+              caption="Special notes"
+              placeholder="Select a note"
+              searchable
+              triggerClassName="w-full"
+            />
+          </div>
+
           <label className="block text-sm font-semibold text-ink">
             Comment:
             <textarea

@@ -28,7 +28,15 @@ import {
   type TaxBreakdownLine,
   type TaxSettings,
 } from '../../utils/taxEngine'
-import type { TaxSummary } from '../../types/menu'
+import type { SpecialNote, TaxSummary } from '../../types/menu'
+import { useAuth } from '../../auth/AuthContext'
+import { listSpecialNotesApi } from '../../services/menuService'
+import { SelectDropdown } from '../common/SelectDropdown'
+import {
+  matchSpecialNoteId,
+  specialNoteOptions,
+  specialNoteText,
+} from '../../utils/specialNotes'
 import {
   AppliedDiscountModal,
   type AppliedDiscount,
@@ -108,6 +116,7 @@ interface BillPanelProps {
     kotNo: number
     amount: number
     createdAt?: number
+    persons?: number
     items: {
       id: string
       /** Menu item id, so KOT lines are priced by the same tax engine. */
@@ -244,6 +253,7 @@ export function BillPanel({
   draftCount = 0,
   canSettle = true,
 }: BillPanelProps) {
+  const { encryptedOutletId } = useAuth()
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
   const [guestsPickerOpen, setGuestsPickerOpen] = useState(false)
   const [expandedKotNo, setExpandedKotNo] = useState<number | null>(null)
@@ -273,7 +283,35 @@ export function BillPanel({
   // a temporal-dead-zone ReferenceError whenever the cart has a line.
   const noteLine = lines.find((line) => line.id === noteLineId) ?? null
   const [noteDraft, setNoteDraft] = useState('')
+  const [specialNotes, setSpecialNotes] = useState<SpecialNote[]>([])
   const [discount, setDiscount] = useState(0)
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    listSpecialNotesApi(encryptedOutletId)
+      .then((rows) => {
+        if (!cancelled) setSpecialNotes(rows)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
+
+  const noteOptions = useMemo(
+    () => specialNoteOptions(specialNotes),
+    [specialNotes],
+  )
+  const selectedNoteId = useMemo(
+    () => matchSpecialNoteId(specialNotes, noteDraft),
+    [specialNotes, noteDraft],
+  )
+
+  function handleSelectNote(id: string) {
+    const note = specialNotes.find((n) => n.id === id)
+    if (note) setNoteDraft(specialNoteText(note))
+  }
   const [discountDetails, setDiscountDetails] = useState<AppliedDiscount | null>(
     null,
   )
@@ -520,6 +558,15 @@ export function BillPanel({
             <h3 id="line-note-title" className="sr-only">
               Add note for {noteLine.name}
             </h3>
+            <SelectDropdown
+              value={selectedNoteId}
+              options={noteOptions}
+              onChange={handleSelectNote}
+              caption="Special notes"
+              placeholder="Select a note"
+              searchable
+              triggerClassName="mb-3 w-full"
+            />
             <textarea
               value={noteDraft}
               onChange={(event) => setNoteDraft(event.target.value)}

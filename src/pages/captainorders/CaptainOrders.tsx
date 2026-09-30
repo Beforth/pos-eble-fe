@@ -51,7 +51,6 @@ import {
   settleOrderApi,
   splitOrderApi,
   updateDraftBillApi,
-  updateKotApi,
   type CreateKotPayload,
   type KotEventData,
   type KotOrderType,
@@ -70,6 +69,7 @@ import {
   markTablePrinted,
   removeKotTicket,
   replaceKotTickets,
+  saveAllKotTickets,
   settleTableSession,
   upsertKotTicketFromServer,
 } from '../../utils/tableStatusStore'
@@ -838,6 +838,7 @@ export default function CaptainOrders() {
       kotNo: t.kotNo,
       amount: kotTicketAmount(t),
       createdAt: t.createdAt,
+      persons: t.persons,
       items: t.items.map((item) => ({
         id: item.id,
         // Carried through so the bill panel can price KOT lines with the same
@@ -964,19 +965,31 @@ export default function CaptainOrders() {
     }[]
     let kotCount: number
 
+    const kotsSnapshot = tableKotSummary
+    const kotItems = kotsSnapshot.flatMap((kot) =>
+      kot.items.map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        price: item.price,
+        kotNo: kot.kotNo,
+      })),
+    )
+    kotCount = kotsSnapshot.length
+
     if (!hasTableSelected) {
-      // No table: bill current cart only; KOTs stay on Kot View only.
-      items = lines.map((line) => ({
-        name: line.name,
-        qty: line.qty,
-        price: line.price,
-      }))
-      kotCount = 0
+      // No table: bill the cart plus any KOT pinned from Kot View.
+      items = [
+        ...lines.map((line) => ({
+          name: line.name,
+          qty: line.qty,
+          price: line.price,
+        })),
+        ...kotItems,
+      ]
       setLines([])
       setOrderNote('')
     } else {
-      const kotsSnapshot = ticketsForTable(kotTickets, kotKey)
-      kotCount = kotsSnapshot.length
+      items = kotItems
       items = kotsSnapshot.flatMap((kot) =>
         kot.items.map((item) => ({
           name: item.name,
@@ -1061,6 +1074,13 @@ export default function CaptainOrders() {
           paymentLabel: paymentTypeLabel(payment, otherPayment?.type),
         })
         settledBillNo = order.bill_no ? Number(order.bill_no) : null
+        // The billed KOTs are now a paid order — remove them from KOT view.
+        const billedIds = new Set(kotsSnapshot.map((k) => k.id))
+        const remainingKots = kotTickets.filter((t) => !billedIds.has(t.id))
+        if (remainingKots.length !== kotTickets.length) {
+          saveAllKotTickets(remainingKots)
+          setKotTickets(remainingKots)
+        }
       } catch (error) {
         showToast(
           error instanceof Error ? error.message : 'Failed to save the bill',
@@ -1147,6 +1167,12 @@ export default function CaptainOrders() {
       showToast(
         `Settlement saved · ₹${amount}${due > 0 ? ` · Due ₹${due}` : ''}`,
       )
+      if (pinnedKotId) {
+        const remaining = kotTickets.filter((t) => t.id !== pinnedKotId)
+        saveAllKotTickets(remaining)
+        setKotTickets(remaining)
+        setPinnedKotId(null)
+      }
       return
     }
     const kotsSnapshot = ticketsForTable(kotTickets, tableId)
@@ -1205,7 +1231,7 @@ export default function CaptainOrders() {
 
   async function startFinalBill(action: 'Save' | 'Save & Print' | 'Save & eBill') {
     if (!hasTableSelected) {
-      if (lines.length === 0) {
+      if (lines.length === 0 && tableKotSummary.length === 0) {
         showToast('Add items before saving the bill')
         return
       }
@@ -1221,7 +1247,7 @@ export default function CaptainOrders() {
       return
     }
 
-    const hasKots = tableKotTickets.length > 0
+    const hasKots = tableKotSummary.length > 0
     if (!hasKots && lines.length === 0) {
       showToast('Add items or send a KOT before saving the bill')
       return
@@ -1386,7 +1412,7 @@ export default function CaptainOrders() {
 
       <FinalBillCustomerModal
         open={finalBillOpen}
-        kotCount={hasTableSelected ? tableKotTickets.length : 0}
+        kotCount={tableKotSummary.length}
         total={payableTotal}
         tableNo={selectedTableNo}
         confirmLabel={
@@ -1553,25 +1579,13 @@ export default function CaptainOrders() {
               )
             }
           }}
-          onDismiss={async (id) => {
-            const ticket = kotTickets.find((t) => t.id === id)
-            try {
-              if (ticket && encryptedOutletId && !ticket.id.startsWith('kot-')) {
-                await updateKotApi(encryptedOutletId, ticket.id, {
-                  status: 'Cancelled',
-                })
-              }
-              setKotTickets((prev) => {
-                const next = prev.filter((t) => t.id !== id)
-                replaceKotTickets(next)
-                return next
-              })
-              showToast('KOT cancelled')
-            } catch (error) {
-              showToast(
-                error instanceof Error ? error.message : 'Failed to cancel KOT',
-              )
-            }
+          onDismiss={(id) => {
+            setKotTickets((prev) => {
+              const next = prev.filter((t) => t.id !== id)
+              replaceKotTickets(next)
+              return next
+            })
+            showToast('KOT dismissed')
           }}
           onSettleSave={async ({ tableId: settledTableId, ticketIds, result }) => {
             const settled = kotTickets.filter((t) => ticketIds.includes(t.id))

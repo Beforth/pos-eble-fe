@@ -178,15 +178,17 @@ function KotCard({
       </div>
 
       <footer className="flex items-center gap-2 border-t border-line px-3 py-2.5">
-        <button
-          type="button"
-          data-tooltip="Dismiss KOT"
-          aria-label="Dismiss KOT"
-          onClick={() => onDismiss(ticket.id)}
-          className="flex size-8 items-center justify-center rounded-full border border-line text-muted hover:bg-page hover:text-primary"
-        >
-          <X size={16} />
-        </button>
+        {isReady ? (
+          <button
+            type="button"
+            data-tooltip="Dismiss KOT"
+            aria-label="Dismiss KOT"
+            onClick={() => onDismiss(ticket.id)}
+            className="flex size-8 items-center justify-center rounded-full border border-line text-muted hover:bg-page hover:text-primary"
+          >
+            <X size={16} />
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={isReady}
@@ -322,13 +324,6 @@ export function KotView({
 
       {/* Filters / legend */}
       <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-2.5">
-        <button
-          type="button"
-          className="h-8 rounded-md border border-line px-3 text-sm font-medium text-ink hover:bg-page"
-        >
-          Search
-        </button>
-
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {ORDER_TYPE_LEGEND.map((item) => (
             <span
@@ -349,12 +344,6 @@ export function KotView({
             placeholder="Enter kot/Order no."
             className="h-8 w-[180px] rounded-md border border-line bg-white px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
           />
-          <button
-            type="button"
-            className="h-8 rounded-md bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
-          >
-            MFR
-          </button>
         </div>
       </div>
 
