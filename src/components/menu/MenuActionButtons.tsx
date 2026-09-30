@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search } from 'lucide-react'
 
 export function OutlineButton({
@@ -391,47 +390,17 @@ export function RowActionButton({
   boxed?: boolean
   children: ReactNode
 }) {
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState({ top: 0, left: 0 })
-
-  function handleEnter() {
-    const btn = btnRef.current
-    if (!btn) return
-    const rect = btn.getBoundingClientRect()
-    setPos({ top: rect.top - 8, left: rect.left + rect.width / 2 })
-    setOpen(true)
-  }
-
   return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        aria-label={label}
-        onClick={onClick}
-        onMouseEnter={handleEnter}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={handleEnter}
-        onBlur={() => setOpen(false)}
-        className={`inline-flex cursor-pointer rounded p-1.5 text-muted transition-colors hover:bg-page hover:text-ink ${
-          boxed ? 'border border-line bg-card hover:border-muted' : ''
-        }`}
-      >
-        {children}
-      </button>
-      {open
-        ? createPortal(
-            <span
-              role="tooltip"
-              style={{ top: pos.top, left: pos.left }}
-              className="pointer-events-none fixed z-[200] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-ink px-2.5 py-1 text-[11px] font-medium text-white shadow-sm"
-            >
-              {label}
-            </span>,
-            document.body,
-          )
-        : null}
-    </>
+    <button
+      type="button"
+      aria-label={label}
+      data-tooltip={label}
+      onClick={onClick}
+      className={`inline-flex cursor-pointer rounded p-1.5 text-muted transition-colors hover:bg-page hover:text-ink ${
+        boxed ? 'border border-line bg-card hover:border-muted' : ''
+      }`}
+    >
+      {children}
+    </button>
   )
 }

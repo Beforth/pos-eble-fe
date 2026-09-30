@@ -150,6 +150,7 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
         <button
           type="button"
           aria-label="Scroll tabs left"
+          data-tooltip="Scroll tabs left"
           disabled={!canScrollLeft}
           onClick={() => scrollBy(-1)}
           className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-ink disabled:cursor-default disabled:opacity-30"
@@ -217,6 +218,7 @@ export function MenuSectionNav({ activeTab }: MenuSectionNavProps) {
         <button
           type="button"
           aria-label="Scroll tabs right"
+          data-tooltip="Scroll tabs right"
           disabled={!canScrollRight}
           onClick={() => scrollBy(1)}
           className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-ink disabled:cursor-default disabled:opacity-30"

@@ -236,6 +236,7 @@ export function DateTimeField({
                   )
                 }
                 aria-label="Previous month"
+                data-tooltip="Previous month"
                 className="rounded-md p-1 text-muted transition-colors hover:bg-page hover:text-ink"
               >
                 <ChevronLeft size={18} />
@@ -251,6 +252,7 @@ export function DateTimeField({
                   )
                 }
                 aria-label="Next month"
+                data-tooltip="Next month"
                 className="rounded-md p-1 text-muted transition-colors hover:bg-page hover:text-ink"
               >
                 <ChevronRight size={18} />

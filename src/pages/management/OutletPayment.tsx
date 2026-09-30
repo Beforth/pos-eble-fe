@@ -537,7 +537,7 @@ export default function OutletPayment() {
                           type="button"
                           onClick={() => deleteUpiProvider(row.id)}
                           aria-label={`Delete ${row.customName} UPI provider`}
-                          title="Remove UPI provider"
+                          data-tooltip="Remove UPI provider"
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-danger/10 hover:text-danger"
                         >
                           <Trash2 size={16} />

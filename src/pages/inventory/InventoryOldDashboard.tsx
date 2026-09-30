@@ -81,6 +81,7 @@ export default function InventoryOldDashboard() {
             <button
               type="button"
               aria-label="Tip"
+              data-tooltip="Tip"
               className="rounded p-1 text-accent hover:bg-page"
             >
               <Lightbulb size={16} />
@@ -115,6 +116,7 @@ export default function InventoryOldDashboard() {
             <button
               type="button"
               aria-label="Info"
+              data-tooltip="Info"
               className="rounded p-1 text-muted hover:bg-page"
             >
               <Info size={16} />

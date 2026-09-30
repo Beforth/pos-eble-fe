@@ -190,6 +190,7 @@ export function AdvanceOrderModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -317,6 +318,7 @@ export function AdvanceOrderModal({
                     type="button"
                     onClick={() => items.length > 1 && setPendingRemove(item)}
                     aria-label="Remove item"
+                    data-tooltip="Remove item"
                     className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-red-500"
                   >
                     <Trash2 size={14} />

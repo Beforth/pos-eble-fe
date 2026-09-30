@@ -229,6 +229,7 @@ export default function EditRecipe() {
                       <button
                         type="button"
                         aria-label="Remove raw material"
+                        data-tooltip="Remove raw material"
                         onClick={() => removeRow(row.id)}
                         className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
                       >

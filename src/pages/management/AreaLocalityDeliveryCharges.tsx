@@ -137,6 +137,7 @@ export default function AreaLocalityDeliveryCharges() {
                         <button
                           type="button"
                           aria-label={`Edit ${row.area}`}
+                          data-tooltip={`Edit ${row.area}`}
                           onClick={() =>
                             navigate(
                               `/management/configuration/area-locality-delivery/edit/${row.id}`,
@@ -149,6 +150,7 @@ export default function AreaLocalityDeliveryCharges() {
                         <button
                           type="button"
                           aria-label={`Delete ${row.area}`}
+                          data-tooltip={`Delete ${row.area}`}
                           onClick={() => handleDelete(row.id)}
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
                         >

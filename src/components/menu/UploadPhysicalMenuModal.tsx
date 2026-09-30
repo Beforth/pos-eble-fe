@@ -127,6 +127,7 @@ export function UploadPhysicalMenuModal({
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
+            data-tooltip="Close dialog"
             className="rounded-md p-1 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />

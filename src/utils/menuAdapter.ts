@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { useMenuChannels } from '../state/MenuChannelsContext'
-import { useMenuReference } from '../state/MenuReferenceContext'
+import {
+  useMenuReference,
+  type MenuReferenceStatus,
+} from '../state/MenuReferenceContext'
 import { fetchAllItemsCached } from '../state/menuItemsCache'
 import type { Category, Item, TaxSummary } from '../types/menu'
 
@@ -97,8 +100,18 @@ export type BillingMenuStatus = 'loading' | 'ready' | 'error'
 export interface BillingMenuState {
   items: MenuItemRow[]
   categories: Category[]
+  /** Status of the *items* fetch. */
   status: BillingMenuStatus
   error: string | null
+  /**
+   * Status of the *categories* fetch. Tracked separately because it used to be
+   * dropped here, which let an empty category list reach the screens as a
+   * silent "Favorite Items / All Categories" rail with no error and no way to
+   * recover. The rail now gates on this.
+   */
+  categoriesStatus: MenuReferenceStatus
+  categoriesError: string | null
+  /** Force-refetches items *and* categories. */
   reload: () => Promise<void>
 }
 
@@ -110,7 +123,12 @@ export interface BillingMenuState {
 export function useBillingMenu(): BillingMenuState {
   const { encryptedOutletId } = useAuth()
   const { channels } = useMenuChannels()
-  const { categories } = useMenuReference(['categories'])
+  const {
+    categories,
+    reload: reloadReference,
+    status: referenceStatus,
+    error: referenceError,
+  } = useMenuReference(['categories'])
   const [rawItems, setRawItems] = useState<Item[]>([])
   const [status, setStatus] = useState<BillingMenuStatus>('loading')
   const [error, setError] = useState<string | null>(null)
@@ -154,5 +172,17 @@ export function useBillingMenu(): BillingMenuState {
     [rawItems, channelId],
   )
 
-  return { items, categories, status, error, reload: () => load(true) }
+  return {
+    items,
+    categories,
+    status,
+    error,
+    categoriesStatus: referenceStatus.categories,
+    categoriesError: referenceError.categories,
+    reload: async () => {
+      // Both halves of the menu: the old retry only reloaded items, so a failed
+      // categories fetch could never be recovered from the Retry button.
+      await Promise.all([load(true), reloadReference('categories', { force: true })])
+    },
+  }
 }

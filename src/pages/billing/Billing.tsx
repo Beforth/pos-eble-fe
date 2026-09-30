@@ -225,8 +225,21 @@ export default function Billing() {
     categories: menuReferenceCategories,
     status: menuStatus,
     error: menuError,
+    categoriesStatus: menuCategoriesStatus,
+    categoriesError: menuCategoriesError,
     reload: reloadMenu,
   } = useBillingMenu()
+  // Items and reference categories are two independent fetches, and the rail is
+  // built from the categories list. Gating on the items status alone let a
+  // pending or failed categories fetch render as a plausible-looking
+  // "Favorite Items / All Categories" rail with no error and no retry, so both
+  // must settle before the rail is trusted.
+  const menuLoading =
+    menuStatus === 'loading' ||
+    menuCategoriesStatus === 'idle' ||
+    menuCategoriesStatus === 'loading'
+  const menuFailed = menuStatus === 'error' || menuCategoriesStatus === 'error'
+  const menuFailureMessage = menuStatus === 'error' ? menuError : menuCategoriesError
   const { tables: billingTableRows, tablesById } = useDiningTables()
 
   // Outlet tax switches (tax-before-discount, tax-on-charges, …). The engine
@@ -402,6 +415,19 @@ export default function Billing() {
 
   const [railCategoryId, setRailCategoryId] = useState(FAVORITES_ID)
   const [dropdownCategory, setDropdownCategory] = useState('all')
+
+  // The selected category must always exist in the rail. A category can vanish
+  // from the list (deactivated, or its last item removed), which would
+  // otherwise leave the grid filtered to nothing with no active rail pill.
+  useEffect(() => {
+    if (
+      railCategoryId !== FAVORITES_ID &&
+      railCategoryId !== ALL_CATEGORIES_ID &&
+      !railCategories.some((cat) => cat.id === railCategoryId)
+    ) {
+      setRailCategoryId(FAVORITES_ID)
+    }
+  }, [railCategories, railCategoryId])
   const [search, setSearch] = useState('')
   const [shortCode, setShortCode] = useState('')
   const [lines, setLines] = useState<CartLine[]>([])
@@ -1817,16 +1843,16 @@ export default function Billing() {
       ) : (
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:p-0">
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-card shadow-[0_1px_0_rgba(0,0,0,0.03)]">
-        {menuStatus === 'loading' ? (
+        {menuLoading ? (
           <div className="flex flex-1 items-center justify-center bg-page text-sm text-muted">
             Loading menu…
           </div>
-        ) : menuStatus === 'error' ? (
+        ) : menuFailed ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-page p-6 text-center">
             <p className="text-sm font-semibold text-ink">
               Could not load the menu
             </p>
-            <p className="max-w-sm text-xs text-muted">{menuError}</p>
+            <p className="max-w-sm text-xs text-muted">{menuFailureMessage}</p>
             <button
               type="button"
               onClick={() => void reloadMenu()}

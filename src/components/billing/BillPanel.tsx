@@ -655,7 +655,8 @@ export function BillPanel({
       <div className="relative flex items-center gap-1.5 border-b border-line px-2 py-2">
         <button
           type="button"
-          title="Select table"
+          aria-label="Select table"
+          data-tooltip="Select table"
           onClick={() => {
             setTablePickerOpen((open) => !open)
             setGuestsPickerOpen(false)
@@ -674,7 +675,7 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
+          data-tooltip={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
           aria-label={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
           onClick={() => {
             setTablePickerOpen(false)
@@ -696,7 +697,8 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title="Customer"
+          aria-label="Customer"
+          data-tooltip="Customer"
           onClick={() => {
             setTablePickerOpen(false)
             setGuestsPickerOpen(false)
@@ -712,7 +714,8 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title="Notes"
+          aria-label="Notes"
+          data-tooltip="Notes"
           onClick={() => {
             setTablePickerOpen(false)
             setGuestsPickerOpen(false)
@@ -731,7 +734,7 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title="Draft bills"
+          data-tooltip="Draft bills"
           aria-label="Draft bills"
           onClick={() => {
             setTablePickerOpen(false)
@@ -748,7 +751,6 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title="Delete all items"
           aria-label="Delete all items"
           disabled={lines.length === 0}
           onClick={onClearItems ? () => setClearAllOpen(true) : undefined}
@@ -845,7 +847,8 @@ export function BillPanel({
               <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-page p-0.5">
                 <button
                   type="button"
-                  title="History"
+                  aria-label="History"
+                  data-tooltip="History"
                   onClick={() => setHistoryOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
@@ -853,7 +856,8 @@ export function BillPanel({
                 </button>
                 <button
                   type="button"
-                  title="Tax / GST"
+                  aria-label="Tax / GST"
+                  data-tooltip="Tax / GST"
                   onClick={() => setGstOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
@@ -861,7 +865,8 @@ export function BillPanel({
                 </button>
                 <button
                   type="button"
-                  title="Order list"
+                  aria-label="Order list"
+                  data-tooltip="Order list"
                   onClick={() => setHistoryOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
@@ -869,7 +874,8 @@ export function BillPanel({
                 </button>
                 <button
                   type="button"
-                  title="Wallet balance"
+                  aria-label="Wallet balance"
+                  data-tooltip="Wallet balance"
                   onClick={() => {
                     if (!customer.mobile.trim()) {
                       showToast('Enter a mobile number first')
@@ -883,7 +889,8 @@ export function BillPanel({
                 </button>
                 <button
                   type="button"
-                  title="Delete customer history"
+                  aria-label="Delete customer history"
+                  data-tooltip="Delete customer history"
                   onClick={() => setClearCustomerOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-primary"
                 >
@@ -958,6 +965,7 @@ export function BillPanel({
                     <button
                       type="button"
                       aria-label="Clear address"
+                      data-tooltip="Clear address"
                       onClick={() => updateCustomer('address', '')}
                       className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted transition-colors hover:text-ink"
                     >
@@ -1077,7 +1085,7 @@ export function BillPanel({
                                     <div className="flex min-w-0 items-start gap-2">
                                       <button
                                         type="button"
-                                        title={`Delete ${item.name}`}
+                                        data-tooltip={`Delete ${item.name}`}
                                         aria-label={`Delete ${item.name}`}
                                         onClick={() =>
                                           setDeleteTarget({
@@ -1159,6 +1167,7 @@ export function BillPanel({
                               <button
                                 type="button"
                                 aria-label="Decrease quantity"
+                                data-tooltip="Decrease quantity"
                                 onClick={() => onQtyChange(line.id, line.qty - 1)}
                                 className="inline-flex size-6 items-center justify-center rounded border border-line text-muted hover:bg-page"
                               >
@@ -1170,6 +1179,7 @@ export function BillPanel({
                               <button
                                 type="button"
                                 aria-label="Increase quantity"
+                                data-tooltip="Increase quantity"
                                 onClick={() => onQtyChange(line.id, line.qty + 1)}
                                 className="inline-flex size-6 items-center justify-center rounded border border-line text-muted hover:bg-page"
                               >
@@ -1182,7 +1192,7 @@ export function BillPanel({
                             <span className="flex items-center">
                               <button
                                 type="button"
-                                title={line.note ? 'Edit note' : 'Add note'}
+                                data-tooltip={line.note ? 'Edit note' : 'Add note'}
                                 aria-label={`Add note to ${line.name}`}
                                 onClick={() => {
                                   setNoteDraft(line.note ?? '')
@@ -1199,6 +1209,7 @@ export function BillPanel({
                               <button
                                 type="button"
                                 aria-label={`Remove ${line.name}`}
+                                data-tooltip={`Remove ${line.name}`}
                                 onClick={() => setPendingLineDelete(line)}
                                 className="inline-flex size-7 items-center justify-center rounded text-muted hover:bg-primary/10 hover:text-primary"
                               >
@@ -1222,7 +1233,8 @@ export function BillPanel({
           <div className="flex justify-center">
             <button
               type="button"
-              title={detailsOpen ? 'Hide bill details' : 'Show bill details'}
+              aria-label={detailsOpen ? 'Hide bill details' : 'Show bill details'}
+              data-tooltip={detailsOpen ? 'Hide bill details' : 'Show bill details'}
               aria-expanded={detailsOpen}
               onClick={() => setDetailsOpen((open) => !open)}
               className="relative z-10 -mt-3 inline-flex h-6 w-12 items-center justify-center rounded-t-md border border-b-0 border-line bg-white text-muted shadow-sm hover:text-ink"
@@ -1527,7 +1539,12 @@ export function BillPanel({
               <button
                 key={action.id}
                 type="button"
-                title={
+                aria-label={
+                  action.id === 'Draft'
+                    ? 'Save current order as draft'
+                    : action.label
+                }
+                data-tooltip={
                   action.id === 'Draft'
                     ? 'Save current order as draft'
                     : action.label

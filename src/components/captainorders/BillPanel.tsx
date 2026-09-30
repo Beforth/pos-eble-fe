@@ -167,6 +167,13 @@ interface BillPanelProps {
   hasOrderNote?: boolean
   onOpenDrafts?: () => void
   draftCount?: number
+  /**
+   * Whether the user may take money on this order. A captain is denied
+   * `pos_settle_save` (and `pos_allow_billing_rights`), so the payment
+   * methods, the settlement box and the bill Save actions are hidden for them
+   * rather than left on screen to fail. Order-taker actions (KOT, Draft) stay.
+   */
+  canSettle?: boolean
 }
 
 const ORDER_TYPES: { id: OrderType; label: string }[] = [
@@ -235,6 +242,7 @@ export function BillPanel({
   hasOrderNote = false,
   onOpenDrafts,
   draftCount = 0,
+  canSettle = true,
 }: BillPanelProps) {
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
   const [guestsPickerOpen, setGuestsPickerOpen] = useState(false)
@@ -637,7 +645,8 @@ export function BillPanel({
       <div className="relative flex items-center gap-1.5 border-b border-line px-2 py-2">
         <button
           type="button"
-          title="Select table"
+          aria-label="Select table"
+          data-tooltip="Select table"
           onClick={() => {
             setTablePickerOpen((open) => !open)
             setGuestsPickerOpen(false)
@@ -654,7 +663,7 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
+          data-tooltip={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
           aria-label={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
           onClick={() => {
             setTablePickerOpen(false)
@@ -676,7 +685,8 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title="Customer"
+          aria-label="Customer"
+          data-tooltip="Customer"
           onClick={() => {
             setTablePickerOpen(false)
             setGuestsPickerOpen(false)
@@ -692,7 +702,8 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title="Notes"
+          aria-label="Notes"
+          data-tooltip="Notes"
           onClick={() => {
             setTablePickerOpen(false)
             setGuestsPickerOpen(false)
@@ -711,7 +722,7 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          title="Draft bills"
+          data-tooltip="Draft bills"
           aria-label="Draft bills"
           onClick={() => {
             setTablePickerOpen(false)
@@ -729,10 +740,9 @@ export function BillPanel({
           ) : null}
         </button>
         <button
-          type="button"
-          title="Delete all items"
-          aria-label="Delete all items"
-          disabled={lines.length === 0}
+            type="button"
+            aria-label="Delete all items"
+            disabled={lines.length === 0}
           onClick={onClearItems ? () => setClearAllOpen(true) : undefined}
           className="ml-auto inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-ink hover:border-primary hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -829,7 +839,8 @@ export function BillPanel({
               <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-page p-0.5">
                 <button
                   type="button"
-                  title="History"
+                  aria-label="History"
+                  data-tooltip="History"
                   onClick={() => setHistoryOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
@@ -837,7 +848,8 @@ export function BillPanel({
                 </button>
                 <button
                   type="button"
-                  title="Tax / GST"
+                  aria-label="Tax / GST"
+                  data-tooltip="Tax / GST"
                   onClick={() => setGstOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
@@ -845,21 +857,24 @@ export function BillPanel({
                 </button>
                 <button
                   type="button"
-                  title="List"
+                  aria-label="List"
+                  data-tooltip="List"
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
                   <List size={14} />
                 </button>
                 <button
                   type="button"
-                  title="Wallet"
+                  aria-label="Wallet"
+                  data-tooltip="Wallet"
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-ink"
                 >
                   <Wallet size={14} />
                 </button>
                 <button
                   type="button"
-                  title="Delete customer history"
+                  aria-label="Delete customer history"
+                  data-tooltip="Delete customer history"
                   onClick={() => setClearCustomerOpen(true)}
                   className="rounded-md p-1.5 text-muted transition-colors hover:bg-card hover:text-primary"
                 >
@@ -919,6 +934,7 @@ export function BillPanel({
                     <button
                       type="button"
                       aria-label="Clear address"
+                      data-tooltip="Clear address"
                       onClick={() => updateCustomer('address', '')}
                       className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted transition-colors hover:text-ink"
                     >
@@ -1043,7 +1059,7 @@ export function BillPanel({
                                     <div className="flex min-w-0 items-start gap-2">
                                       <button
                                         type="button"
-                                        title={`Delete ${item.name}`}
+                                        data-tooltip={`Delete ${item.name}`}
                                         aria-label={`Delete ${item.name}`}
                                         onClick={() =>
                                           setDeleteTarget({
@@ -1125,6 +1141,7 @@ export function BillPanel({
                             <button
                               type="button"
                               aria-label="Decrease quantity"
+                              data-tooltip="Decrease quantity"
                               onClick={() => onQtyChange(line.id, line.qty - 1)}
                               className="inline-flex size-6 items-center justify-center rounded border border-line text-muted hover:bg-page"
                             >
@@ -1136,6 +1153,7 @@ export function BillPanel({
                             <button
                               type="button"
                               aria-label="Increase quantity"
+                              data-tooltip="Increase quantity"
                               onClick={() => onQtyChange(line.id, line.qty + 1)}
                               className="inline-flex size-6 items-center justify-center rounded border border-line text-muted hover:bg-page"
                             >
@@ -1148,7 +1166,7 @@ export function BillPanel({
                           <span className="flex items-center">
                             <button
                               type="button"
-                              title={line.note ? 'Edit note' : 'Add note'}
+                              data-tooltip={line.note ? 'Edit note' : 'Add note'}
                               aria-label={`Add note to ${line.name}`}
                               onClick={() => {
                                 setNoteDraft(line.note ?? '')
@@ -1165,6 +1183,7 @@ export function BillPanel({
                             <button
                               type="button"
                               aria-label={`Remove ${line.name}`}
+                              data-tooltip={`Remove ${line.name}`}
                               onClick={() => setPendingLineDelete(line)}
                               className="inline-flex size-7 items-center justify-center rounded text-muted hover:bg-primary/10 hover:text-primary"
                             >
@@ -1188,7 +1207,8 @@ export function BillPanel({
           <div className="flex justify-center">
             <button
               type="button"
-              title={detailsOpen ? 'Hide bill details' : 'Show bill details'}
+              aria-label={detailsOpen ? 'Hide bill details' : 'Show bill details'}
+              data-tooltip={detailsOpen ? 'Hide bill details' : 'Show bill details'}
               aria-expanded={detailsOpen}
               onClick={() => setDetailsOpen((open) => !open)}
               className="relative z-10 -mt-3 inline-flex h-6 w-12 items-center justify-center rounded-t-md border border-b-0 border-line bg-white text-muted shadow-sm hover:text-ink"
@@ -1325,13 +1345,16 @@ export function BillPanel({
               >
                 Bogo Offer
               </button>
-              <button
-                type="button"
-                onClick={() => onAction('Split')}
-                className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-              >
-                Split
-              </button>
+              {/* order-split is gated on pos_allow_billing_rights. */}
+              {canSettle ? (
+                <button
+                  type="button"
+                  onClick={() => onAction('Split')}
+                  className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
+                >
+                  Split
+                </button>
+              ) : null}
             </div>
               </div>
             </div>
@@ -1339,52 +1362,55 @@ export function BillPanel({
         ) : null}
 
         <div className="space-y-3 bg-white p-3">
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-ink">
-                Settlement Amount
-              </span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={settlementInput}
-                onChange={(e) => {
-                  setSettlementInput(e.target.value)
-                  if (settlementError) setSettlementError(null)
-                }}
-                onBlur={handleSettlementBlur}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleSettleSave()
-                  }
-                }}
-                className={`h-9 w-[110px] rounded-md border bg-white px-2.5 text-sm text-ink outline-none focus:border-primary ${
-                  settlementError ? 'border-primary' : 'border-line'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={handleSettleSave}
-                className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-              >
-                Settle & Save
-              </button>
-              <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
+          {/* order-settle is gated on pos_settle_save: no settlement box for a captain. */}
+          {canSettle ? (
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-ink">
+                  Settlement Amount
+                </span>
                 <input
-                  type="checkbox"
-                  checked={complimentary}
-                  onChange={(event) => onComplimentaryChange(event.target.checked)}
-                  className="size-3.5 accent-primary"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={settlementInput}
+                  onChange={(e) => {
+                    setSettlementInput(e.target.value)
+                    if (settlementError) setSettlementError(null)
+                  }}
+                  onBlur={handleSettlementBlur}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleSettleSave()
+                    }
+                  }}
+                  className={`h-9 w-[110px] rounded-md border bg-white px-2.5 text-sm text-ink outline-none focus:border-primary ${
+                    settlementError ? 'border-primary' : 'border-line'
+                  }`}
                 />
-                Complimentary
-              </label>
+                <button
+                  type="button"
+                  onClick={handleSettleSave}
+                  className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
+                >
+                  Settle & Save
+                </button>
+                <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
+                  <input
+                    type="checkbox"
+                    checked={complimentary}
+                    onChange={(event) => onComplimentaryChange(event.target.checked)}
+                    className="size-3.5 accent-primary"
+                  />
+                  Complimentary
+                </label>
+              </div>
+              {settlementError ? (
+                <p className="text-xs text-primary">{settlementError}</p>
+              ) : null}
             </div>
-            {settlementError ? (
-              <p className="text-xs text-primary">{settlementError}</p>
-            ) : null}
-          </div>
+          ) : null}
 
           <div className="flex items-end justify-between">
             <div>
@@ -1408,25 +1434,27 @@ export function BillPanel({
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-            {PAYMENTS.map((method) => (
-              <label
-                key={method.id}
-                className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-ink"
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={payment === method.id}
-                  onChange={() => onPaymentChange(method.id)}
-                  className="size-3.5 accent-primary"
-                />
-                {method.label}
-              </label>
-            ))}
-          </div>
+          {canSettle ? (
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+              {PAYMENTS.map((method) => (
+                <label
+                  key={method.id}
+                  className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-ink"
+                >
+                  <input
+                    type="radio"
+                    name="payment"
+                    checked={payment === method.id}
+                    onChange={() => onPaymentChange(method.id)}
+                    className="size-3.5 accent-primary"
+                  />
+                  {method.label}
+                </label>
+              ))}
+            </div>
+          ) : null}
 
-          {payment === 'other' ? (
+          {canSettle && payment === 'other' ? (
             <label className="block text-sm font-semibold text-ink">
               Other Payment Type
               <select
@@ -1443,23 +1471,28 @@ export function BillPanel({
             </label>
           ) : null}
 
-          {payment === 'due' ? (
+          {canSettle && payment === 'due' ? (
             <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
               <Clock3 size={13} />
               Due payment — customer details required
             </p>
           ) : null}
 
+          {canSettle ? (
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
+                <input
+                  type="checkbox"
+                  checked={itsPaid}
+                  onChange={(event) => onItsPaidChange(event.target.checked)}
+                  className="size-3.5 accent-primary"
+                />
+                It&apos;s Paid
+              </label>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
-              <input
-                type="checkbox"
-                checked={itsPaid}
-                onChange={(event) => onItsPaidChange(event.target.checked)}
-                className="size-3.5 accent-primary"
-              />
-              It&apos;s Paid
-            </label>
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
               <input
                 type="checkbox"
@@ -1483,8 +1516,14 @@ export function BillPanel({
           <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
             {(
               [
-                { id: 'Save', label: 'Save' },
-                { id: 'Save & Print', label: 'Save & Print' },
+                // Save / Save & Print create a bill, which a captain is denied;
+                // KOT, KOT & Print and Draft are order-taker actions they keep.
+                ...(canSettle
+                  ? [
+                      { id: 'Save', label: 'Save' },
+                      { id: 'Save & Print', label: 'Save & Print' },
+                    ]
+                  : []),
                 // { id: 'Save & eBill', label: 'Save & eBill' },
                 { id: 'KOT', label: 'KOT' },
                 { id: 'KOT & Print', label: 'KOT & Print' },
@@ -1494,7 +1533,12 @@ export function BillPanel({
               <button
                 key={action.id}
                 type="button"
-                title={
+                aria-label={
+                  action.id === 'Draft'
+                    ? 'Save current order as draft'
+                    : action.label
+                }
+                data-tooltip={
                   action.id === 'Draft'
                     ? 'Save current order as draft'
                     : action.label

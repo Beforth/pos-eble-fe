@@ -192,7 +192,7 @@ export default function DayEndSummary() {
                       <div className="flex items-center justify-center gap-2">
                         <button
                           type="button"
-                          title="View summary"
+                          data-tooltip="View summary"
                           aria-label={`View summary for ${row.createdDate}`}
                           onClick={() => setViewRow(row)}
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-primary"
@@ -201,7 +201,7 @@ export default function DayEndSummary() {
                         </button>
                         <button
                           type="button"
-                          title="Download summary"
+                          data-tooltip="Download summary"
                           aria-label={`Download summary for ${row.createdDate}`}
                           onClick={() =>
                             downloadCsv(

@@ -30,8 +30,13 @@ import {
 } from './storage'
 import { isAdminUser } from './isAdmin'
 import {
+  ALL_ORDERS_PATH,
+  CAPTAIN_TABLE_VIEW_PATH,
   OUTLET_GATE_PERMISSION,
-  resolveUrlName,
+  isCaptainOnly,
+  isCashierRestrictedPath,
+  isCashierUser,
+  resolveRequiredCodename,
 } from './routePermissions'
 
 interface AuthContextValue {
@@ -53,9 +58,14 @@ interface AuthContextValue {
   requiredPermission: (pathname: string) => string | null
   /** Hybrid gate: outlet permission OR the screen's catalog codename. */
   canAccess: (pathname: string) => boolean
-  /** First screen the user may open — admins land on /dashboard, billers on /table-view. */
+  /**
+   * First screen the user may open — admins /dashboard, cashiers the All Orders
+   * board, billers /table-view, captains the floor plan in captain mode.
+   */
   homePath: () => string
-  login: (credentials: LoginCredentials) => Promise<string[]>
+  login: (
+    credentials: LoginCredentials,
+  ) => Promise<{ permissions: string[]; user: AuthUser }>
   logout: () => void
   updateProfile: (patch: Partial<AuthUser>) => void
   switchOutlet: (outletId: number) => Promise<void>
@@ -197,7 +207,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermissionsReady(true)
     setOutletId(result.outletId)
     setEncryptedOutletId(encryptedId)
-    return result.permissions
+    // The user is returned alongside the permissions because the landing
+    // screen is role-aware: a cashier and a biller hold identical permissions
+    // but land on different screens, so the caller needs both.
+    return { permissions: result.permissions, user: result.user }
   }, [])
 
   const logout = useCallback(() => {
@@ -228,34 +241,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const requiredPermission = useCallback(
-    (pathname: string): string | null => {
-      const urlName = resolveUrlName(pathname)
-      if (urlName) return screens[urlName] ?? null
-      // Fail closed: a screen is reachable for non-admin users only once it is
-      // mapped in PATH_URL_NAMES. `/profile` is the one always-open exception.
-      if (pathname === '/profile') return null
-      return OUTLET_GATE_PERMISSION
-    },
+    (pathname: string): string | null =>
+      resolveRequiredCodename(pathname, screens),
     [screens],
   )
 
   const canAccess = useCallback(
     (pathname: string): boolean => {
+      // A cashier never sees Menu, Reports or Management. Checked before the
+      // permission lookup because some of those screens map to a right a
+      // cashier legitimately holds (`pos_item_master_read` gates
+      // `/menu/multi-item-images`), so permission alone would let them in.
+      if (isCashierUser(user) && isCashierRestrictedPath(pathname)) return false
       const codename = requiredPermission(pathname)
       if (!codename) return true
       return (
         hasPermission(OUTLET_GATE_PERMISSION) || hasPermission(codename)
       )
     },
-    [requiredPermission, hasPermission],
+    [requiredPermission, hasPermission, user],
   )
 
   const homePath = useCallback((): string => {
+    // A captain is denied the billing right, so the floor plan in captain mode
+    // is the only screen that suits them — branch out before the list below.
+    if (isCaptainOnly(permissions)) return CAPTAIN_TABLE_VIEW_PATH
+    // A cashier works from the order list, not the floor plan. canAccess is the
+    // guard: `/all-orders` is a billing screen, so a cashier stripped of the
+    // billing right must not be sent somewhere ProtectedRoute would refuse.
+    if (isCashierUser(user) && canAccess(ALL_ORDERS_PATH)) return ALL_ORDERS_PATH
     for (const pathname of ['/dashboard', '/table-view', '/billing', '/profile']) {
       if (canAccess(pathname)) return pathname
     }
     return '/profile'
-  }, [canAccess])
+  }, [canAccess, permissions, user])
 
   const switchOutlet = useCallback(
     async (targetOutletId: number) => {
@@ -351,20 +370,30 @@ export function useAuth(): AuthContextValue {
 
 /** Redirects unauthenticated visitors to /login, preserving origin. */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, permissionsReady, canAccess, requiredPermission, homePath } =
+  const { isAuthenticated, permissionsReady, canAccess, requiredPermission, homePath, user } =
     useAuth()
   const location = useLocation()
   const notifiedRef = useRef<string | null>(null)
 
   const codename = isAuthenticated ? requiredPermission(location.pathname) : null
   const allowed = !codename || canAccess(location.pathname)
+  // A cashier turned away from Menu, Reports or Management is refused by role,
+  // not by a missing right. Naming the codename here would tell them to obtain a
+  // permission they already hold (`pos_item_master_read` gates
+  // `/menu/multi-item-images`), so the message states the role rule instead.
+  const roleRestricted =
+    !allowed && isCashierUser(user) && isCashierRestrictedPath(location.pathname)
 
   useEffect(() => {
     if (!isAuthenticated || !codename || allowed) return
     if (notifiedRef.current === location.pathname) return
     notifiedRef.current = location.pathname
-    showToast(`Permission denied. Required permission: ${codename}.`)
-  }, [isAuthenticated, codename, allowed, location.pathname])
+    showToast(
+      roleRestricted
+        ? 'Menu, Reports and Management are not available for your role.'
+        : `Permission denied. Required permission: ${codename}.`,
+    )
+  }, [isAuthenticated, codename, allowed, roleRestricted, location.pathname])
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />

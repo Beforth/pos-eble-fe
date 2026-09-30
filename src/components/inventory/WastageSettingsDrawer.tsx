@@ -60,6 +60,7 @@ export function WastageSettingsDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-md p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />

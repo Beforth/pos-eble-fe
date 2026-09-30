@@ -122,6 +122,7 @@ export function UpdateNutritionModal({
             onClick={onClose}
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
             aria-label="Close"
+            data-tooltip="Close"
           >
             <X size={18} />
           </button>

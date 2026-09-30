@@ -60,8 +60,6 @@ const GROUPS: SearchGroupDef[] = [
         ['captain all'],
       ],
       ['Captain Orders – KOT', '/captain-orders/kot', ['captain kot']],
-      ['Captain Orders – Day End', '/captain-orders/day-end', ['captain day end']],
-      ['Captain Orders – Logs', '/captain-orders/logs', ['captain logs', 'activity']],
     ],
   },
   {

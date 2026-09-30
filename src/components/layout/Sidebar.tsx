@@ -27,6 +27,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
+import { isCashierUser } from '../../auth/routePermissions'
 import { Avatar } from '../common/Avatar'
 import { brand } from '../../theme/brand'
 import { BrandLogo } from '../brand/BrandLogo'
@@ -42,6 +43,18 @@ type NavEntry =
   | { kind: 'link'; item: NavItemDef }
   | { kind: 'group'; group: NavGroupDef }
   | { kind: 'divider' }
+
+/**
+ * Top-level sections a cashier never sees, matching the prefixes in
+ * `isCashierRestrictedPath`.
+ *
+ * These three carry no `ROUTES` entry, so `filterNavEntry` returns them (and
+ * their whole child tree) unfiltered — the `canAccess` check cannot drop them.
+ * Giving them a route would be the real fix, but that also changes what a
+ * biller and a captain see, so for now the cashier restriction is applied here
+ * by id.
+ */
+const CASHIER_HIDDEN_NAV_IDS = new Set(['menu', 'reports', 'management'])
 
 /** Keep a nav entry only when the user can access at least one of its routes. */
 function filterNavEntry(
@@ -462,7 +475,16 @@ export function Sidebar({
     navScroll,
     setNavScroll,
   } = useChrome()
-  const visibleNav = NAV.filter((entry) => filterNavEntry(entry, canAccess) !== null)
+  const cashier = isCashierUser(user)
+  const visibleNav = NAV.filter(
+    (entry) =>
+      // A cashier's nav collapses to the Daily Operations group, so the dividers
+      // that separated the hidden sections would render as a stack of empty
+      // lines. Drop them for a cashier only; other roles keep their separators.
+      !(cashier && entry.kind === 'divider') &&
+      !(cashier && entry.kind === 'link' && CASHIER_HIDDEN_NAV_IDS.has(entry.item.id)) &&
+      filterNavEntry(entry, canAccess) !== null,
+  )
   const expandedIds = useMemo(() => new Set(expanded.main), [expanded.main])
 
   useEffect(() => {
@@ -540,6 +562,7 @@ export function Sidebar({
                 type="button"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
+                data-tooltip="Close menu"
                 className="rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
               >
                 <X size={18} />
@@ -651,7 +674,7 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={() => handleNavigate('logout')}
-                title="Logout"
+                data-tooltip="Logout"
                 aria-label="Logout"
                 className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-page hover:text-ink"
               >
@@ -671,7 +694,7 @@ export function Sidebar({
                 <button
                   type="button"
                   onClick={() => handleNavigate('logout')}
-                  title="Logout"
+                  data-tooltip="Logout"
                   aria-label="Logout"
                   className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-page hover:text-ink"
                 >

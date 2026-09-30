@@ -383,6 +383,7 @@ export default function RecipeCostingReport() {
                     <button
                       type="button"
                       aria-label={`Calculate ${row.menuName}`}
+                      data-tooltip={`Calculate ${row.menuName}`}
                       onClick={() => setSelectedRow(row)}
                       className={`inline-flex size-8 items-center justify-center rounded-md border bg-card hover:bg-primary/5 ${
                         selectedRow?.id === row.id

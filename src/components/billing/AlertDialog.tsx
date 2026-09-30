@@ -40,6 +40,7 @@ export function AlertDialog({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded p-1 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />

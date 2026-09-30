@@ -37,7 +37,7 @@ function ActionButton({
   return (
     <button
       type="button"
-      title={label}
+      data-tooltip={label}
       aria-label={label}
       onClick={onClick}
       className="flex size-7 items-center justify-center rounded border border-line text-muted transition-colors hover:bg-page hover:text-ink"
@@ -89,7 +89,7 @@ export function KotTable({
                   {row.modified ? (
                     <button
                       type="button"
-                      title="Edit modified KOT"
+                      data-tooltip="Edit modified KOT"
                       aria-label={`Edit KOT ${row.kotId}`}
                       onClick={() => onEdit?.(row)}
                       className="inline-flex size-5 items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"

@@ -22,28 +22,24 @@ class TooltipManager {
   private init(): void {
     document.addEventListener('mouseover', (e) => {
       if (this.isDisabled()) return
-      const target = this.resolveTarget(e.target)
-      if (!target) return
-      if (this.hideTimeout !== null) {
-        window.clearTimeout(this.hideTimeout)
-        this.hideTimeout = null
-      }
-      if (target !== this.activeTarget) {
-        this.activeTarget = target
-        this.show(target)
-      }
+      this.showFor(this.resolveTarget(e.target))
     })
 
     document.addEventListener('mouseout', (e) => {
       if (this.isDisabled()) return
-      const target = this.resolveTarget(e.target)
-      if (!target || target !== this.activeTarget) return
-      const related = e.relatedTarget
-      if (related instanceof Node && target.contains(related)) return
-      this.hideTimeout = window.setTimeout(() => {
-        this.activeTarget = null
-        this.hide()
-      }, HIDE_DEBOUNCE_MS)
+      this.hideFor(this.resolveTarget(e.target), e.relatedTarget)
+    })
+
+    // Keyboard parity: icon-only controls must explain themselves on focus,
+    // not on hover alone. Focus/blur bubble, so use focusin/focusout.
+    document.addEventListener('focusin', (e) => {
+      if (this.isDisabled()) return
+      this.showFor(this.resolveTarget(e.target))
+    })
+
+    document.addEventListener('focusout', (e) => {
+      if (this.isDisabled()) return
+      this.hideFor(this.resolveTarget(e.target), e.relatedTarget)
     })
 
     window.addEventListener(
@@ -63,6 +59,27 @@ class TooltipManager {
         this.hide()
       }
     })
+  }
+
+  private showFor(target: HTMLElement | null): void {
+    if (!target) return
+    if (this.hideTimeout !== null) {
+      window.clearTimeout(this.hideTimeout)
+      this.hideTimeout = null
+    }
+    if (target !== this.activeTarget) {
+      this.activeTarget = target
+      this.show(target)
+    }
+  }
+
+  private hideFor(target: HTMLElement | null, related: EventTarget | null): void {
+    if (!target || target !== this.activeTarget) return
+    if (related instanceof Node && target.contains(related)) return
+    this.hideTimeout = window.setTimeout(() => {
+      this.activeTarget = null
+      this.hide()
+    }, HIDE_DEBOUNCE_MS)
   }
 
   private resolveTarget(target: EventTarget | null): HTMLElement | null {

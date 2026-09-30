@@ -76,7 +76,7 @@ function KotCard({
           {onOpenInBilling ? (
             <button
               type="button"
-              title="Open in order view"
+              data-tooltip="Open in order view"
               aria-label={`Open KOT ${ticket.kotNo} in order view`}
               onClick={() => onOpenInBilling(ticket)}
               className="mt-0.5 rounded underline-offset-2 opacity-90 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -92,7 +92,7 @@ function KotCard({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              title="KOT view"
+              data-tooltip="KOT view"
               aria-label="KOT view"
               onClick={() => onView(ticket)}
               className="inline-flex size-7 items-center justify-center rounded border border-black/15 bg-white/80 text-ink hover:bg-white"
@@ -101,7 +101,7 @@ function KotCard({
             </button>
             <button
               type="button"
-              title="Save and settle"
+              data-tooltip="Save and settle"
               aria-label="Save and settle"
               onClick={() => onSettle(ticket)}
               className="inline-flex size-7 items-center justify-center rounded border border-black/15 bg-white/80 text-ink hover:bg-white"
@@ -110,7 +110,7 @@ function KotCard({
             </button>
             <button
               type="button"
-              title="Cancel order"
+              data-tooltip="Cancel order"
               aria-label="Cancel order"
               onClick={() => onCancelOrder(ticket)}
               className="inline-flex size-7 items-center justify-center rounded border border-black/15 bg-white/80 text-primary hover:bg-white"
@@ -167,7 +167,7 @@ function KotCard({
       <footer className="flex items-center gap-2 border-t border-line px-3 py-2.5">
         <button
           type="button"
-          title="Dismiss KOT"
+          data-tooltip="Dismiss KOT"
           aria-label="Dismiss KOT"
           onClick={() => onDismiss(ticket.id)}
           className="flex size-8 items-center justify-center rounded-full border border-line text-muted hover:bg-page hover:text-primary"

@@ -108,6 +108,7 @@ export function FinanceSidebar({
                 type="button"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
+                data-tooltip="Close menu"
                 className="cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
               >
                 <X size={18} />
@@ -152,7 +153,8 @@ export function FinanceSidebar({
                   <li>
                     <button
                       type="button"
-                      title={collapsed ? item.label : undefined}
+                      aria-label={collapsed ? item.label : undefined}
+                      data-tooltip={collapsed ? item.label : undefined}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => go(item.id)}
                       className={`relative flex w-full cursor-pointer items-center gap-2.5 text-sm transition-colors ${

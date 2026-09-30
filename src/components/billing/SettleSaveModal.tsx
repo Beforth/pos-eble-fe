@@ -317,6 +317,7 @@ export function SettleSaveModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -473,6 +474,7 @@ export function SettleSaveModal({
                       <button
                         type="button"
                         aria-label={`Remove ${entry.label}`}
+                        data-tooltip={`Remove ${entry.label}`}
                         onClick={() => setPendingPart(entry)}
                         className="cursor-pointer rounded p-1 text-muted hover:bg-page hover:text-ink"
                       >

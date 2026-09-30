@@ -560,6 +560,7 @@ export default function OutletDetails() {
                     <button
                       type="button"
                       aria-label={`Remove ${cuisine}`}
+                      data-tooltip={`Remove ${cuisine}`}
                       onClick={() => removeCuisine(cuisine)}
                       className="rounded hover:bg-primary/15"
                     >

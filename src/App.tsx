@@ -41,8 +41,6 @@ import CaptainOrders from './pages/captainorders/CaptainOrders'
 import CaptainOrdersLiveOrders from './pages/captainorders/CaptainOrdersLiveOrders'
 import CaptainOrdersAllOrders from './pages/captainorders/CaptainOrdersAllOrders'
 import CaptainOrdersKot from './pages/captainorders/CaptainOrdersKot'
-import CaptainOrdersDayEnd from './pages/captainorders/CaptainOrdersDayEnd'
-import CaptainOrdersLogs from './pages/captainorders/CaptainOrdersLogs'
 import CategoryManagement from './pages/CategoryManagement'
 import DineInMenu from './pages/DineInMenu'
 import DiscountsManagement from './pages/DiscountsManagement'
@@ -603,22 +601,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <CaptainOrdersKot />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/captain-orders/day-end"
-            element={
-              <ProtectedRoute>
-                <CaptainOrdersDayEnd />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/captain-orders/logs"
-            element={
-              <ProtectedRoute>
-                <CaptainOrdersLogs />
               </ProtectedRoute>
             }
           />

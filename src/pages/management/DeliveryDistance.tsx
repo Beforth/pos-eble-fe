@@ -77,6 +77,7 @@ export default function DeliveryDistance() {
                         <button
                           type="button"
                           aria-label="Edit distance"
+                          data-tooltip="Edit distance"
                           onClick={() =>
                             navigate(
                               `/management/configuration/delivery-distance/edit/${row.id}`,
@@ -89,6 +90,7 @@ export default function DeliveryDistance() {
                         <button
                           type="button"
                           aria-label="Delete distance"
+                          data-tooltip="Delete distance"
                           onClick={() => handleDelete(row.id)}
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
                         >

@@ -79,6 +79,7 @@ export function PublishDateModal({
           <button
             type="button"
             aria-label="Close"
+            data-tooltip="Close"
             onClick={onClose}
             className="shrink-0 cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >

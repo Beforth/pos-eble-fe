@@ -153,6 +153,7 @@ function ChartTypeDropdown({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Chart type"
+        data-tooltip="Chart type"
         className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-medium text-ink transition-colors hover:border-muted"
       >
         <SelectedIcon size={14} className="text-primary" />

@@ -48,6 +48,7 @@ export function PiPredictiveDrawer({ open, onClose }: PiPredictiveDrawerProps) {
             type="button"
             onClick={onClose}
             aria-label="Close panel"
+            data-tooltip="Close panel"
             className="inline-flex size-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-page hover:text-ink"
           >
             <X size={18} />

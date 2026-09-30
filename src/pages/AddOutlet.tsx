@@ -786,23 +786,27 @@ export default function AddOutlet() {
                         className="h-9 w-32 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
                       />
                       {index > 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => removeDaySlot(day, index)}
-                          className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-danger"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${day} slot`}
+                            data-tooltip={`Remove ${day} slot`}
+                            onClick={() => removeDaySlot(day, index)}
+                            className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-danger"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                       ) : null}
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => addDaySlot(day)}
-                    className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-primary"
-                  >
-                    <Plus size={14} />
-                  </button>
+                    <button
+                      type="button"
+                      aria-label={`Add ${day} slot`}
+                      data-tooltip={`Add ${day} slot`}
+                      onClick={() => addDaySlot(day)}
+                      className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-primary"
+                    >
+                      <Plus size={14} />
+                    </button>
                 </div>
               ))}
             </div>
@@ -834,13 +838,15 @@ export default function AddOutlet() {
                       }
                       className="h-9 w-48 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
                     />
-                    <button
-                      type="button"
-                      onClick={() => removeHoliday(index)}
-                      className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-danger"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove holiday ${date || ''}`.trim()}
+                        data-tooltip={`Remove holiday ${date || ''}`.trim()}
+                        onClick={() => removeHoliday(index)}
+                        className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-danger"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                   </div>
                 ))}
               </div>

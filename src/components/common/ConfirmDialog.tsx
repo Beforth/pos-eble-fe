@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertTriangle, Info, X } from 'lucide-react'
 import { Button } from './Button'
+import { TooltipWrapper } from './TooltipWrapper'
 
 export interface ConfirmDialogProps {
   open: boolean
@@ -14,7 +15,7 @@ export interface ConfirmDialogProps {
   /**
    * Truthful outcome line. Supplied per call site on purpose: a soft-deleted
    * record is restorable, but an unsaved cart edit is simply gone. Never let
-   * this default to "cannot be undone" — see STANDARDS.md §19.
+   * this default to "cannot be undone" â€” see STANDARDS.md Â§19.
    */
   note?: ReactNode
   confirmLabel?: string
@@ -144,15 +145,17 @@ export function ConfirmDialog({
               </span>
             ) : null}
           </div>
-          <button
-            type="button"
-            aria-label="Close"
-            disabled={loading}
-            onClick={onClose}
-            className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink disabled:opacity-40"
-          >
-            <X size={18} />
-          </button>
+            <TooltipWrapper label="Close">
+              <button
+                type="button"
+                aria-label="Close"
+                disabled={loading}
+                onClick={onClose}
+                className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink disabled:opacity-40"
+              >
+                <X size={18} />
+              </button>
+            </TooltipWrapper>
         </div>
 
         {hasBody ? (

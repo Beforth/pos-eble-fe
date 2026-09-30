@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../../auth/AuthContext'
+import { SETTLE_CODENAME } from '../../auth/routePermissions'
 import { showToast } from '../../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CaptainOrdersHeader } from '../../components/captainorders/CaptainOrdersHeader'
@@ -204,7 +205,7 @@ function findBySearchQuery(
 
 export default function CaptainOrders() {
   const navigate = useNavigate()
-  const { user, encryptedOutletId, token } = useAuth()
+  const { user, encryptedOutletId, token, hasPermission } = useAuth()
   const billerName = user?.name?.trim() || user?.identifier?.trim() || ''
   const [searchParams] = useSearchParams()
   const [billNo, setBillNo] = useState('')
@@ -214,8 +215,21 @@ export default function CaptainOrders() {
     categories: menuReferenceCategories,
     status: menuStatus,
     error: menuError,
+    categoriesStatus: menuCategoriesStatus,
+    categoriesError: menuCategoriesError,
     reload: reloadMenu,
   } = useBillingMenu()
+  // Items and reference categories are two independent fetches, and the rail is
+  // built from the categories list. Gating on the items status alone let a
+  // pending or failed categories fetch render as a plausible-looking
+  // "Favorite Items / All Categories" rail with no error and no retry, so both
+  // must settle before the rail is trusted.
+  const menuLoading =
+    menuStatus === 'loading' ||
+    menuCategoriesStatus === 'idle' ||
+    menuCategoriesStatus === 'loading'
+  const menuFailed = menuStatus === 'error' || menuCategoriesStatus === 'error'
+  const menuFailureMessage = menuStatus === 'error' ? menuError : menuCategoriesError
   const { tables: billingTableRows, tablesById } = useDiningTables()
 
   // Outlet tax switches (tax-before-discount, tax-on-charges, …). The engine
@@ -391,6 +405,19 @@ export default function CaptainOrders() {
 
   const [railCategoryId, setRailCategoryId] = useState(FAVORITES_ID)
   const [dropdownCategory, setDropdownCategory] = useState('all')
+
+  // The selected category must always exist in the rail. A category can vanish
+  // from the list (deactivated, or its last item removed), which would
+  // otherwise leave the grid filtered to nothing with no active rail pill.
+  useEffect(() => {
+    if (
+      railCategoryId !== FAVORITES_ID &&
+      railCategoryId !== ALL_CATEGORIES_ID &&
+      !railCategories.some((cat) => cat.id === railCategoryId)
+    ) {
+      setRailCategoryId(FAVORITES_ID)
+    }
+  }, [railCategories, railCategoryId])
   const [search, setSearch] = useState('')
   const [shortCode, setShortCode] = useState('')
   const [lines, setLines] = useState<CartLine[]>([])
@@ -1663,16 +1690,16 @@ export default function CaptainOrders() {
           } lg:flex`}
         >
           <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-            {menuStatus === 'loading' ? (
+            {menuLoading ? (
               <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center bg-page text-sm text-muted">
                 Loading menu…
               </div>
-            ) : menuStatus === 'error' ? (
+            ) : menuFailed ? (
               <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-page p-6 text-center">
                 <p className="text-sm font-semibold text-ink">
                   Could not load the menu
                 </p>
-                <p className="max-w-sm text-xs text-muted">{menuError}</p>
+                <p className="max-w-sm text-xs text-muted">{menuFailureMessage}</p>
                 <button
                   type="button"
                   onClick={() => void reloadMenu()}
@@ -1784,6 +1811,7 @@ export default function CaptainOrders() {
           }`}
         >
           <BillPanel
+            canSettle={hasPermission(SETTLE_CODENAME)}
             lines={lines}
             tableKots={tableKotSummary}
             focusKotNo={focusKotNo}

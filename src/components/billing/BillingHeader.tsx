@@ -25,7 +25,6 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import { QuickTooltip } from '../common/QuickTooltip'
 import { BrandLogo } from '../brand/BrandLogo'
 import { brand } from '../../theme/brand'
 import {
@@ -62,7 +61,7 @@ export function BillingHeader({
 }: BillingHeaderProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { logout, user, encryptedOutletId, isAdmin } = useAuth()
+  const { logout, user, encryptedOutletId, isAdmin, canAccess } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
 
@@ -163,6 +162,7 @@ export function BillingHeader({
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Open navigation"
+          data-tooltip="Open navigation"
           className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
         >
           <Menu size={20} />
@@ -230,49 +230,41 @@ export function BillingHeader({
               onClick?: () => void
             }[]
           ).map(({ icon: Icon, label, onClick }) => (
-            <QuickTooltip
+            <button
               key={label}
-              label={label}
-              className="hidden sm:inline-flex"
+              type="button"
+              aria-label={label}
+              data-tooltip={label}
+              onClick={onClick}
+              className="hidden size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink sm:inline-flex lg:size-9"
             >
-              <button
-                type="button"
-                aria-label={label}
-                onClick={onClick}
-                className="inline-flex size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink lg:size-9"
-              >
-                <Icon size={16} />
-              </button>
-            </QuickTooltip>
+              <Icon size={16} />
+            </button>
           ))}
 
           <div className="relative">
-            <QuickTooltip
-              label={user?.name ?? 'Profile'}
-              className="hidden sm:inline-flex"
+            <button
+              type="button"
+              data-profile-trigger
+              aria-label={user?.name ?? 'Profile'}
+              data-tooltip={user?.name ?? 'Profile'}
+              onClick={() => setProfileOpen((p) => !p)}
+              className={`hidden size-8 items-center justify-center rounded-lg sm:inline-flex lg:size-9 ${
+                profileOpen
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted hover:bg-page hover:text-ink'
+              }`}
             >
-              <button
-                type="button"
-                data-profile-trigger
-                aria-label={user?.name ?? 'Profile'}
-                onClick={() => setProfileOpen((p) => !p)}
-                className={`inline-flex size-8 items-center justify-center rounded-lg lg:size-9 ${
-                  profileOpen
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted hover:bg-page hover:text-ink'
-                }`}
-              >
-                {user?.photoUrl ? (
-                  <img
-                    src={user.photoUrl}
-                    alt={user.name}
-                    className="size-6 rounded-full object-cover"
-                  />
-                ) : (
-                  <User size={16} />
-                )}
-              </button>
-            </QuickTooltip>
+              {user?.photoUrl ? (
+                <img
+                  src={user.photoUrl}
+                  alt={user.name}
+                  className="size-6 rounded-full object-cover"
+                />
+              ) : (
+                <User size={16} />
+              )}
+            </button>
 
             {profileOpen ? (
               <div
@@ -338,16 +330,15 @@ export function BillingHeader({
               </div>
             ) : null}
           </div>
-          <QuickTooltip label="Logout">
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Logout"
-              className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-primary"
-            >
-              <LogOut size={16} />
-            </button>
-          </QuickTooltip>
+          <button
+            type="button"
+            onClick={handleLogout}
+            aria-label="Logout"
+            data-tooltip="Logout"
+            className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-primary"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </header>
 
@@ -372,6 +363,7 @@ export function BillingHeader({
                 type="button"
                 onClick={closeDrawer}
                 aria-label="Close"
+                data-tooltip="Close"
                 className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
               >
                 <X size={18} />
@@ -379,34 +371,36 @@ export function BillingHeader({
             </div>
             <nav className="flex-1 overflow-y-auto p-2">
               <ul className="space-y-0.5">
-                {SIDEBAR_LINKS.map(({ to, label, icon: Icon }) => {
-                  const active =
-                    to === '/billing'
-                      ? pathname === '/billing'
-                      : pathname.startsWith(to)
-                  return (
-                    <li key={to}>
-                      <Link
-                        to={to}
-                        onClick={closeDrawer}
-                        aria-current={active ? 'page' : undefined}
-                        className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
-                          active
-                            ? 'bg-primary/10 text-primary font-semibold'
-                            : 'text-ink hover:bg-page'
-                        }`}
-                      >
-                        <Icon
-                          size={18}
-                          className={
-                            active ? 'text-primary' : 'text-muted'
-                          }
-                        />
-                        {label}
-                      </Link>
-                    </li>
-                  )
-                })}
+                {SIDEBAR_LINKS.filter(({ to }) => canAccess(to)).map(
+                  ({ to, label, icon: Icon }) => {
+                    const active =
+                      to === '/billing'
+                        ? pathname === '/billing'
+                        : pathname.startsWith(to)
+                    return (
+                      <li key={to}>
+                        <Link
+                          to={to}
+                          onClick={closeDrawer}
+                          aria-current={active ? 'page' : undefined}
+                          className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                            active
+                              ? 'bg-primary/10 text-primary font-semibold'
+                              : 'text-ink hover:bg-page'
+                          }`}
+                        >
+                          <Icon
+                            size={18}
+                            className={
+                              active ? 'text-primary' : 'text-muted'
+                            }
+                          />
+                          {label}
+                        </Link>
+                      </li>
+                    )
+                  },
+                )}
 
                 {isAdmin ? (
                   <>
@@ -487,6 +481,7 @@ export function BillingHeader({
                   setMenuSearch('')
                 }}
                 aria-label="Close"
+                data-tooltip="Close"
                 className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
               >
                 <X size={18} />
@@ -579,6 +574,7 @@ export function BillingHeader({
                 type="button"
                 onClick={() => setStoreInfoOpen(false)}
                 aria-label="Close"
+                data-tooltip="Close"
                 className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
               >
                 <X size={18} />
@@ -708,6 +704,7 @@ export function BillingHeader({
                 type="button"
                 onClick={() => setQuickReportsOpen(false)}
                 aria-label="Close"
+                data-tooltip="Close"
                 className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
               >
                 <X size={18} />
@@ -844,6 +841,7 @@ function BillingSettingsModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />

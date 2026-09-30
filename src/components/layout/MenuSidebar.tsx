@@ -116,6 +116,7 @@ export function MenuSidebar({
                 type="button"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
+                data-tooltip="Close menu"
                 className="cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
               >
                 <X size={18} />

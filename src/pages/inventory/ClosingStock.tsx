@@ -290,6 +290,7 @@ export default function ClosingStock() {
                         <button
                           type="button"
                           aria-label={`Add note for ${row.name}`}
+                          data-tooltip={`Add note for ${row.name}`}
                           onClick={() => setNoteRowId(row.id)}
                           className={`inline-flex size-8 items-center justify-center rounded-full border border-line hover:bg-page ${
                             notes[row.id]
@@ -302,6 +303,7 @@ export default function ClosingStock() {
                         <button
                           type="button"
                           aria-label={`Reset ${row.name}`}
+                          data-tooltip={`Reset ${row.name}`}
                           onClick={() => resetRow(row.id)}
                           className="inline-flex size-8 items-center justify-center rounded-full border border-line text-muted hover:bg-page hover:text-ink"
                         >

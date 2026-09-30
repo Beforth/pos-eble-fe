@@ -10,6 +10,7 @@ import { menuItems } from '../mocks/menuItemsData'
 import { createComboApi } from '../services/menuService'
 import { useAuth } from '../auth/AuthContext'
 import type { ComboPayload } from '../types/menu'
+import { TooltipWrapper } from '../components/common/TooltipWrapper'
 
 interface ComboItemDraft {
   key: string
@@ -121,7 +122,7 @@ export default function AddCombo() {
       }
     >
 
-      {/* ── Combo Details ── */}
+      {/* â”€â”€ Combo Details â”€â”€ */}
       <section className="relative z-0 mb-4 rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:z-30">
         <div className="flex items-center gap-2.5 px-4 py-3">
           <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -184,7 +185,7 @@ export default function AddCombo() {
         </div>
       </section>
 
-      {/* ── Combo Items ── */}
+      {/* â”€â”€ Combo Items â”€â”€ */}
       <section className="relative z-0 mb-4 rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:z-30">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2.5">
@@ -256,7 +257,7 @@ export default function AddCombo() {
   )
 }
 
-/* ── Single combo-item row with searchable dropdown ── */
+/* â”€â”€ Single combo-item row with searchable dropdown â”€â”€ */
 
 function ComboItemRow({
   row,
@@ -403,7 +404,7 @@ function ComboItemRow({
                                   {item.name}
                                 </span>
                                 <span className="block text-xs text-muted">
-                                  {item.shortCode} · ₹{item.price}
+                                  {item.shortCode} Â· â‚¹{item.price}
                                 </span>
                               </span>
                               {selected ? (
@@ -440,15 +441,17 @@ function ComboItemRow({
         />
       </td>
       <td className="px-3 py-2.5">
-        <button
-          type="button"
-          aria-label="Remove item"
-          disabled={!canRemove}
-          onClick={onRemove}
-          className="rounded p-1.5 text-muted hover:bg-primary/10 hover:text-primary disabled:opacity-30"
-        >
-          <Trash2 size={15} />
-        </button>
+        <TooltipWrapper label="Remove item">
+          <button
+            type="button"
+            aria-label="Remove item"
+            disabled={!canRemove}
+            onClick={onRemove}
+            className="rounded p-1.5 text-muted hover:bg-primary/10 hover:text-primary disabled:opacity-30"
+          >
+            <Trash2 size={15} />
+          </button>
+        </TooltipWrapper>
       </td>
     </tr>
   )

@@ -299,6 +299,7 @@ export default function BarcodeGeneration() {
                       <button
                         type="button"
                         aria-label="Remove row"
+                        data-tooltip="Remove row"
                         onClick={() =>
                           setRows((prev) =>
                             prev.filter((item) => item.id !== row.id),

@@ -399,6 +399,7 @@ export function VariationModal({
           <button
             type="button"
             aria-label="Close"
+            data-tooltip="Close"
             onClick={onClose}
             className="cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >
@@ -629,6 +630,7 @@ export function VariationModal({
                         <button
                           type="button"
                           aria-label={`Remove variation ${row.name || index + 1}`}
+                          data-tooltip={`Remove variation ${row.name || index + 1}`}
                           onClick={() => setPendingRemove({ index, name: row.name })}
                           className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-line text-muted hover:border-error hover:text-error"
                         >

@@ -191,6 +191,7 @@ function TimeSlotTable({
                   <button
                     type="button"
                     aria-label={`Delete ${row.name}`}
+                    data-tooltip={`Delete ${row.name}`}
                     onClick={() => onRemove(row.id)}
                     className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
                   >

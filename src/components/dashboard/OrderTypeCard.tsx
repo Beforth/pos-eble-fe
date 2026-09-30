@@ -88,6 +88,7 @@ export function OrderTypeCard({
           <button
             type="button"
             aria-label={`${summary.label} details`}
+            data-tooltip={`${summary.label} details`}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((prev) => !prev)}

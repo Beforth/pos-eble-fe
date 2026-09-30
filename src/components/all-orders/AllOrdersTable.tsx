@@ -51,7 +51,7 @@ function ActionButton({
     <button
       type="button"
       aria-label={label}
-      title={label}
+      data-tooltip={label}
       onClick={onClick}
       className="flex size-7 items-center justify-center rounded border border-line bg-card text-muted transition-colors hover:border-muted hover:bg-page hover:text-ink"
     >
@@ -192,25 +192,36 @@ export function AllOrdersTable({
     {
       key: 'actions',
       header: 'Actions',
+      // Billing-gated actions render only when the caller passes their handler,
+      // so a role that may read the board but not settle it (Captain) gets a
+      // read-only row instead of a button that silently does nothing.
       render: (row) => (
         <div className="flex items-center gap-1.5">
-          <ActionButton label="View" onClick={() => onView?.(row)}>
-            <Eye size={13} />
-          </ActionButton>
-          <ActionButton label="View KOT" onClick={() => onViewKot?.(row)}>
-            <ReceiptText size={13} />
-          </ActionButton>
-          <ActionButton label="Edit" onClick={() => onEdit?.(row)}>
-            <Pencil size={13} />
-          </ActionButton>
-          <ActionButton
-            label="Change Payment Type"
-            onClick={() => onChangePayment?.(row)}
-          >
-            <ChangePaymentIcon width={13} height={13} />
-          </ActionButton>
-          {(row.balanceDue ?? 0) > 0 && (
-            <ActionButton label="Settle Due" onClick={() => onSettleDue?.(row)}>
+          {onView && (
+            <ActionButton label="View" onClick={() => onView(row)}>
+              <Eye size={13} />
+            </ActionButton>
+          )}
+          {onViewKot && (
+            <ActionButton label="View KOT" onClick={() => onViewKot(row)}>
+              <ReceiptText size={13} />
+            </ActionButton>
+          )}
+          {onEdit && (
+            <ActionButton label="Edit" onClick={() => onEdit(row)}>
+              <Pencil size={13} />
+            </ActionButton>
+          )}
+          {onChangePayment && (
+            <ActionButton
+              label="Change Payment Type"
+              onClick={() => onChangePayment(row)}
+            >
+              <ChangePaymentIcon width={13} height={13} />
+            </ActionButton>
+          )}
+          {onSettleDue && (row.balanceDue ?? 0) > 0 && (
+            <ActionButton label="Settle Due" onClick={() => onSettleDue(row)}>
               <Banknote size={13} />
             </ActionButton>
           )}

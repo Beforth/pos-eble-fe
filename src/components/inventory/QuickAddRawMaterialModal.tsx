@@ -281,6 +281,7 @@ export function QuickAddRawMaterialModal({
               type="button"
               onClick={onClose}
               aria-label="Close dialog"
+              data-tooltip="Close dialog"
               className="shrink-0 rounded-md p-1 text-muted hover:bg-page hover:text-ink"
             >
               <X size={18} />

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { formatMinutesAgo } from '../../utils/format'
+import { TooltipWrapper } from '../common/TooltipWrapper'
 
 interface SyncStatusItem {
   label: string
@@ -47,24 +48,26 @@ export function PageContainer({
         <div className="flex flex-wrap items-center gap-2">
           {actions}
           {onRefresh && (
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              aria-label="Refresh data"
-              className="inline-flex size-9 items-center justify-center rounded-lg border border-line bg-card text-muted transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-80"
-            >
-              <RefreshCw
-                size={16}
-                className={
-                  refreshing
-                    ? 'animate-spin'
-                    : refreshHoverRotate
-                      ? 'transition-transform duration-300 hover:rotate-180'
-                      : undefined
-                }
-              />
-            </button>
+                <TooltipWrapper label="Refresh data">
+                  <button
+                    type="button"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    aria-label="Refresh data"
+                    className="inline-flex size-9 items-center justify-center rounded-lg border border-line bg-card text-muted transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-80"
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={
+                        refreshing
+                          ? 'animate-spin'
+                          : refreshHoverRotate
+                            ? 'transition-transform duration-300 hover:rotate-180'
+                            : undefined
+                      }
+                    />
+                  </button>
+                </TooltipWrapper>
           )}
         </div>
       </div>

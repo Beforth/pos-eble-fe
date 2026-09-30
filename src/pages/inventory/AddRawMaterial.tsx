@@ -711,6 +711,7 @@ export default function AddRawMaterial() {
                 <button
                   type="button"
                   aria-label="Remove max stock row"
+                  data-tooltip="Remove max stock row"
                   onClick={() =>
                     setMaxStockRows((prev) =>
                       prev.filter((item) => item.id !== row.id),

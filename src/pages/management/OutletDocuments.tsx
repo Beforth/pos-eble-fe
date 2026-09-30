@@ -250,7 +250,6 @@ export default function OutletDocuments() {
                         onClick={() => viewDocument(docName)}
                         className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-line bg-card px-2.5 text-xs font-medium text-ink hover:bg-page"
                         aria-label={`View ${docName}`}
-                        title="View document"
                       >
                         <Eye size={14} />
                         View
@@ -260,7 +259,7 @@ export default function OutletDocuments() {
                         onClick={() => removeDocument(docName, custom)}
                         className="inline-flex size-7 items-center justify-center rounded text-muted hover:bg-primary/10 hover:text-primary"
                         aria-label={`Remove ${docName}`}
-                        title="Remove document"
+                        data-tooltip="Remove document"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -339,6 +338,7 @@ export default function OutletDocuments() {
                 type="button"
                 onClick={closePreview}
                 aria-label="Close preview"
+                data-tooltip="Close preview"
                 className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
               >
                 <X size={16} />

@@ -28,8 +28,12 @@ export function kotRowToBillingOrderType(
   }
 }
 
-/** Deep-link into Billing Order View with this KOT pinned. */
-export function billingUrlForKot(row: KotRow): string {
+/**
+ * Deep-link into an order-taking screen with this KOT pinned. `base` is the
+ * screen root: `/billing` for a biller, `/captain-orders` for a captain (a
+ * captain is denied the billing right and would be bounced off `/billing`).
+ */
+export function billingUrlForKot(row: KotRow, base = '/billing'): string {
   const params = new URLSearchParams()
   params.set('openKot', row.id)
   if (row.tableId) params.set('tableId', row.tableId)
@@ -38,7 +42,7 @@ export function billingUrlForKot(row: KotRow): string {
     params.set('persons', String(row.guests))
   }
   params.set('orderType', kotRowToBillingOrderType(row.orderType))
-  return `/billing?${params.toString()}`
+  return `${base}?${params.toString()}`
 }
 
 /** `"Dabeli × 2, Vada Pav"` -> `[{name, qty}]` (KOT edit save payload). */

@@ -177,6 +177,7 @@ export function BillReceipt({
         className="no-print"
         style={closeButtonStyle}
         aria-label="Close bill preview"
+        data-tooltip="Close bill preview"
       >
         <X size={16} />
       </button>

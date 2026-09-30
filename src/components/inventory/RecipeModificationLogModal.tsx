@@ -81,6 +81,7 @@ export function RecipeModificationLogModal({
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
+            data-tooltip="Close dialog"
             className="shrink-0 rounded-md p-1 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -113,6 +114,7 @@ export function RecipeModificationLogModal({
                       <button
                         type="button"
                         aria-label="Download uploaded file"
+                        data-tooltip="Download uploaded file"
                         onClick={onDownload}
                         className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
                       >

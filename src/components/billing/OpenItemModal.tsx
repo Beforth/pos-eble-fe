@@ -77,6 +77,7 @@ export function OpenItemModal({ open, onClose, onSave }: OpenItemModalProps) {
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             <X size={18} />

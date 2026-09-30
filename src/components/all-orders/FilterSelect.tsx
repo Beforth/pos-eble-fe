@@ -41,6 +41,7 @@ export function FilterSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={label || 'Select'}
+        data-tooltip={label || 'Select'}
         className={`${label ? 'mt-1' : ''} flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-line bg-card px-2.5 text-left text-sm text-ink transition-colors hover:border-muted`}
       >
         <span className="truncate">{selected?.label}</span>

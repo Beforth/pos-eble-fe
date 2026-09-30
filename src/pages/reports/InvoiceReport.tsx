@@ -168,6 +168,7 @@ export default function InvoiceReport() {
             to="/dashboard"
             className="inline-flex items-center text-primary hover:underline"
             aria-label="Home"
+            data-tooltip="Home"
           >
             <Home size={15} />
           </Link>

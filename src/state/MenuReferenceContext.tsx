@@ -56,18 +56,30 @@ const FETCHERS: Record<
   addonGroups: listAddonGroupsApi,
 }
 
-const IDLE_STATUS: StatusStore = {
-  categories: 'idle',
-  taxes: 'idle',
-  variationGroups: 'idle',
-  addonGroups: 'idle',
+/**
+ * Factories, not constants. These stores are per-provider state, and they are
+ * written through `statusRef` from inside an async fetcher. A shared
+ * module-level object would be mutated in place, permanently poisoning the
+ * initial value: after the first successful fetch, `IDLE_STATUS.categories`
+ * would read 'ready' for the rest of the tab, so the outlet-change reset below
+ * would re-install 'ready' alongside wiped data and nothing would ever refetch.
+ */
+function makeStatus(value: MenuReferenceStatus): StatusStore {
+  return {
+    categories: value,
+    taxes: value,
+    variationGroups: value,
+    addonGroups: value,
+  }
 }
 
-const NO_ERRORS: ErrorStore = {
-  categories: null,
-  taxes: null,
-  variationGroups: null,
-  addonGroups: null,
+function makeErrors(): ErrorStore {
+  return {
+    categories: null,
+    taxes: null,
+    variationGroups: null,
+    addonGroups: null,
+  }
 }
 
 interface MenuReferenceContextValue {
@@ -94,10 +106,11 @@ export function MenuReferenceProvider({ children }: { children: ReactNode }) {
     variationGroups: [],
     addonGroups: [],
   })
-  const [status, setStatus] = useState<StatusStore>(IDLE_STATUS)
-  const [error, setError] = useState<ErrorStore>(NO_ERRORS)
-  const statusRef = useRef<StatusStore>(IDLE_STATUS)
+  const [status, setStatus] = useState<StatusStore>(() => makeStatus('idle'))
+  const [error, setError] = useState<ErrorStore>(() => makeErrors())
+  const statusRef = useRef<StatusStore>(makeStatus('idle'))
   const outletRef = useRef<string | null>(null)
+  const isFirstRun = useRef(true)
 
   const reload = useCallback(
     async (kind: MenuReferenceKind, options?: { force?: boolean }) => {
@@ -105,7 +118,7 @@ export function MenuReferenceProvider({ children }: { children: ReactNode }) {
       if (!outletId) return
       if (statusRef.current[kind] === 'loading') return
       if (!options?.force && statusRef.current[kind] === 'ready') return
-      statusRef.current[kind] = 'loading'
+      statusRef.current = { ...statusRef.current, [kind]: 'loading' }
       setStatus((prev) => ({ ...prev, [kind]: 'loading' }))
       setError((prev) => ({ ...prev, [kind]: null }))
       try {
@@ -114,10 +127,10 @@ export function MenuReferenceProvider({ children }: { children: ReactNode }) {
           ...prev,
           [kind]: result as DataStore[typeof kind],
         }))
-        statusRef.current[kind] = 'ready'
+        statusRef.current = { ...statusRef.current, [kind]: 'ready' }
         setStatus((prev) => ({ ...prev, [kind]: 'ready' }))
       } catch (err) {
-        statusRef.current[kind] = 'error'
+        statusRef.current = { ...statusRef.current, [kind]: 'error' }
         setStatus((prev) => ({ ...prev, [kind]: 'error' }))
         setError((prev) => ({
           ...prev,
@@ -133,15 +146,23 @@ export function MenuReferenceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     outletRef.current = encryptedOutletId
-    statusRef.current = IDLE_STATUS
+    // On mount the state is already the empty/'idle' initial value, and child
+    // effects (which React runs first) have usually started a fetch already.
+    // Wiping here would clobber that fetch and force a duplicate request, so
+    // the reset only applies to a genuine outlet change.
+    if (isFirstRun.current) {
+      isFirstRun.current = false
+      return
+    }
+    statusRef.current = makeStatus('idle')
     setData({
       categories: [],
       taxes: [],
       variationGroups: [],
       addonGroups: [],
     })
-    setStatus(IDLE_STATUS)
-    setError(NO_ERRORS)
+    setStatus(makeStatus('idle'))
+    setError(makeErrors())
   }, [encryptedOutletId])
 
   const value = useMemo<MenuReferenceContextValue>(
@@ -180,6 +201,10 @@ export function useMenuReference(
     for (const kind of kindsRef.current) {
       if (ctx.status[kind] === 'idle') void ctx.reload(kind)
     }
+    // 'error' is deliberately NOT auto-retried: this context has many
+    // simultaneous consumers (both POS screens, both headers, the item forms),
+    // so an invisible retry would multiply requests and fight the error +
+    // Retry UI that the POS screens now render. A failure is reported instead.
   }, [ctx])
 
   return ctx

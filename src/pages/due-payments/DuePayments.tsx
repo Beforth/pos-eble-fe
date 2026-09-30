@@ -165,7 +165,7 @@ export default function DuePayments() {
         <div className="flex items-center justify-end gap-1.5">
           <button
             type="button"
-            title="View details"
+            data-tooltip="View details"
             aria-label={`View ${row.name}`}
             onClick={() => navigate(`/due-payments/${row.id}`)}
             className="flex size-8 items-center justify-center rounded-md border border-line bg-card text-muted transition-colors hover:border-muted hover:bg-page hover:text-ink"
@@ -174,7 +174,7 @@ export default function DuePayments() {
           </button>
           <button
             type="button"
-            title="Download statement"
+            data-tooltip="Download statement"
             aria-label={`Download statement for ${row.name}`}
             onClick={() => {
               downloadStatement(row, monthIndex, yearNumber)

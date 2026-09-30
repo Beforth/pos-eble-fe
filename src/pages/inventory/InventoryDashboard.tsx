@@ -274,7 +274,12 @@ export default function InventoryDashboard() {
                     onClick={() => {
                       if (!isFuture) setSelectedDay(day)
                     }}
-                    title={
+                    aria-label={
+                      isFuture
+                        ? `Future date (${MONTHS[monthIndex]} ${day}) - unavailable`
+                        : `View data for ${MONTHS[monthIndex]} ${day}`
+                    }
+                    data-tooltip={
                       isFuture
                         ? `Future date (${MONTHS[monthIndex]} ${day}) - unavailable`
                         : `View data for ${MONTHS[monthIndex]} ${day}`
@@ -607,6 +612,7 @@ export default function InventoryDashboard() {
             <button
               type="button"
               aria-label="Refresh"
+              data-tooltip="Refresh"
               className="inline-flex size-8 items-center justify-center rounded-md border border-line text-muted hover:bg-page hover:text-ink"
             >
               <RefreshCw size={14} />

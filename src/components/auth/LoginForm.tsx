@@ -59,12 +59,12 @@ export function LoginForm() {
   }
 
   const completeLogin = async (outletId?: number) => {
-    const permissions = await login({
+    const { permissions, user } = await login({
       identifier: identifier.trim(),
       password,
       outletId,
     })
-    navigate(homePathFor(permissions), { replace: true })
+    navigate(homePathFor(permissions, user), { replace: true })
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

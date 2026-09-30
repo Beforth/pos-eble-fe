@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { showToast } from '../utils/toast'
-import { createPortal } from 'react-dom'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ChevronDown,
@@ -18,6 +17,7 @@ import { NoRecordFound } from '../components/menu/NoRecordFound'
 import { ConfirmDeleteModal } from '../components/common/ConfirmDeleteModal'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
 import { AddTagDrawer } from '../components/menu/AddTagDrawer'
+import { RowActionButton } from '../components/menu/MenuActionButtons'
 import { useAuth } from '../auth/AuthContext'
 import { listParentCategoriesApi, deleteParentCategoryApi, listMenuGroupsApi, deleteMenuGroupApi } from '../services/menuService'
 import type { Category, MenuGroup, ParentCategory } from '../types/menu'
@@ -96,71 +96,6 @@ function OutlineButton({
     >
       {children}
     </button>
-  )
-}
-
-function RowActionButton({
-  label,
-  onClick,
-  children,
-  boxed = false,
-}: {
-  label: string
-  onClick?: () => void
-  children: ReactNode
-  boxed?: boolean
-}) {
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState({ top: 0, left: 0 })
-
-  function updatePosition() {
-    const btn = btnRef.current
-    if (!btn) return
-    const rect = btn.getBoundingClientRect()
-    setPos({
-      top: rect.top - 8,
-      left: rect.left + rect.width / 2,
-    })
-  }
-
-  function handleEnter() {
-    updatePosition()
-    setOpen(true)
-  }
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        aria-label={label}
-        onClick={onClick}
-        onMouseEnter={handleEnter}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={handleEnter}
-        onBlur={() => setOpen(false)}
-        className={`inline-flex cursor-pointer text-muted transition-colors hover:bg-page hover:text-ink ${
-          boxed
-            ? 'rounded border border-line p-1.5'
-            : 'rounded p-1.5'
-        }`}
-      >
-        {children}
-      </button>
-      {open
-        ? createPortal(
-            <span
-              role="tooltip"
-              style={{ top: pos.top, left: pos.left }}
-              className="pointer-events-none fixed z-[200] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-ink px-2.5 py-1 text-[11px] font-medium text-white shadow-sm"
-            >
-              {label}
-            </span>,
-            document.body,
-          )
-        : null}
-    </>
   )
 }
 
@@ -688,6 +623,7 @@ export default function CategoryManagement() {
                         <button
                           type="button"
                           aria-label={`Upload image for ${row.name}`}
+                          data-tooltip={`Upload image for ${row.name}`}
                           className="cursor-pointer rounded p-1.5 text-muted hover:bg-page hover:text-ink"
                         >
                           <Upload size={16} />

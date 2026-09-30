@@ -377,6 +377,7 @@ export default function AddPurchaseReturn() {
                     <button
                       type="button"
                       aria-label="Duplicate row"
+                      data-tooltip="Duplicate row"
                       onClick={() => duplicateLine(line.id)}
                       className="rounded p-1.5 text-muted hover:bg-page hover:text-ink"
                     >
@@ -385,6 +386,7 @@ export default function AddPurchaseReturn() {
                     <button
                       type="button"
                       aria-label="Remove row"
+                      data-tooltip="Remove row"
                       disabled={lines.length <= 1}
                       onClick={() =>
                         setLines((prev) =>

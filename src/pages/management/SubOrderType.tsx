@@ -217,6 +217,7 @@ export default function SubOrderType() {
                         <button
                           type="button"
                           aria-label={`Edit ${row.name}`}
+                          data-tooltip={`Edit ${row.name}`}
                           onClick={() =>
                             navigate(
                               `/management/configuration/sub-order-type/edit/${row.id}`,

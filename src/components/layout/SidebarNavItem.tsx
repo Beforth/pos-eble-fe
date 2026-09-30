@@ -213,7 +213,8 @@ export function SidebarNavItem({
       ) : (
         <button
           type="button"
-          title={collapsed ? item.label : undefined}
+          aria-label={collapsed ? item.label : undefined}
+          data-tooltip={collapsed ? item.label : undefined}
           aria-current={active ? 'page' : undefined}
           aria-expanded={item.children?.length ? expanded : undefined}
           onClick={handleClick}

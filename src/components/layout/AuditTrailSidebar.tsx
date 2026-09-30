@@ -142,6 +142,7 @@ export function AuditTrailSidebar({
                 type="button"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
+                data-tooltip="Close menu"
                 className="rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
               >
                 <X size={18} />
@@ -189,7 +190,8 @@ export function AuditTrailSidebar({
                   <li>
                     <button
                       type="button"
-                      title={collapsed ? item.label : undefined}
+                      aria-label={collapsed ? item.label : undefined}
+                      data-tooltip={collapsed ? item.label : undefined}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => {
                         if (hasChildren) {

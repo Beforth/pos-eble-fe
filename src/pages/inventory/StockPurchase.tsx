@@ -131,7 +131,7 @@ function PurchaseListPage({
             <button
               type="button"
               aria-label={settingsTitle}
-              title={settingsTitle}
+              data-tooltip={settingsTitle}
               onClick={() => setSettingsOpen(true)}
               className="inline-flex size-9 items-center justify-center rounded-md border border-line bg-card text-muted hover:bg-page hover:text-ink"
             >

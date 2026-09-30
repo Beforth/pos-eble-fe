@@ -4,6 +4,7 @@ import { Check, ChevronDown, Plus, Trash2, X } from 'lucide-react'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import type { MenuItemRow } from '../../mocks/menuItemsData'
 import { menuItems } from '../../mocks/menuItemsData'
+import { TooltipWrapper } from '../common/TooltipWrapper'
 
 interface ComboItemDraft {
   key: string
@@ -137,13 +138,14 @@ export function AddComboModal({ open, onClose, onSave }: AddComboModalProps) {
             onClick={onClose}
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
             aria-label="Close"
+            data-tooltip="Close"
           >
             <X size={18} />
           </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-5">
-          {/* ── Combo Details ── */}
+          {/* â”€â”€ Combo Details â”€â”€ */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-ink">
@@ -196,7 +198,7 @@ export function AddComboModal({ open, onClose, onSave }: AddComboModalProps) {
             </div>
           </div>
 
-          {/* ── Combo Items ── */}
+          {/* â”€â”€ Combo Items â”€â”€ */}
           <div className="mt-6">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-ink">Combo Items</h3>
@@ -272,7 +274,7 @@ export function AddComboModal({ open, onClose, onSave }: AddComboModalProps) {
           compact
           title="Remove item from combo"
           message="This item will be removed from the combo being built."
-          note="The combo is not saved yet — you can re-add the item before saving."
+          note="The combo is not saved yet â€” you can re-add the item before saving."
           confirmLabel="Remove"
           onConfirm={() => {
             if (pendingRemoveKey) removeItem(pendingRemoveKey)
@@ -286,7 +288,7 @@ export function AddComboModal({ open, onClose, onSave }: AddComboModalProps) {
   )
 }
 
-/* ── Single combo-item row with searchable dropdown ── */
+/* â”€â”€ Single combo-item row with searchable dropdown â”€â”€ */
 
 function ComboItemRow({
   row,
@@ -411,7 +413,7 @@ function ComboItemRow({
                               <span className="min-w-0">
                                 <span className="block truncate">{item.name}</span>
                                 <span className="block text-xs text-muted">
-                                  {item.shortCode} · ₹{item.price}
+                                  {item.shortCode} Â· â‚¹{item.price}
                                 </span>
                               </span>
                               {selected ? (
@@ -446,15 +448,17 @@ function ComboItemRow({
         />
       </td>
       <td className="px-3 py-2.5">
-        <button
-          type="button"
-          aria-label="Remove item"
-          disabled={!canRemove}
-          onClick={onRemove}
-          className="rounded p-1.5 text-muted hover:bg-primary/10 hover:text-primary disabled:opacity-30"
-        >
-          <Trash2 size={15} />
-        </button>
+        <TooltipWrapper label="Remove item">
+          <button
+            type="button"
+            aria-label="Remove item"
+            disabled={!canRemove}
+            onClick={onRemove}
+            className="rounded p-1.5 text-muted hover:bg-primary/10 hover:text-primary disabled:opacity-30"
+          >
+            <Trash2 size={15} />
+          </button>
+        </TooltipWrapper>
       </td>
     </tr>
   )

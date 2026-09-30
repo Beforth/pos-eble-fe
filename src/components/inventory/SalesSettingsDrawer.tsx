@@ -116,6 +116,7 @@ export function SalesSettingsDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-md p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -135,6 +136,7 @@ export function SalesSettingsDrawer({
               <button
                 type="button"
                 aria-label="Open email template settings"
+                data-tooltip="Open email template settings"
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-line bg-card text-muted hover:text-ink"
               >
                 <ExternalLink size={14} />
@@ -228,6 +230,7 @@ export function SalesSettingsDrawer({
                         key={item.label}
                         type="button"
                         aria-label={item.label}
+                        data-tooltip={item.label}
                         className="inline-flex size-8 items-center justify-center rounded text-muted hover:bg-card hover:text-ink"
                       >
                         <Icon size={14} />

@@ -246,7 +246,8 @@ export function InventorySidebar({
       <li key={item.id}>
         <button
           type="button"
-          title={collapsed ? item.label : undefined}
+          aria-label={collapsed ? item.label : undefined}
+          data-tooltip={collapsed ? item.label : undefined}
           aria-current={active ? 'page' : undefined}
           onClick={() => go(item.id)}
           className={`relative flex w-full cursor-pointer items-center gap-2.5 text-sm transition-colors ${
@@ -297,7 +298,8 @@ export function InventorySidebar({
       <li key={item.id}>
         <button
           type="button"
-          title={collapsed ? item.label : undefined}
+          aria-label={collapsed ? item.label : undefined}
+          data-tooltip={collapsed ? item.label : undefined}
           aria-expanded={item.expandable ? isOpen : undefined}
           onClick={() => {
             if (item.expandable && !collapsed) {
@@ -403,6 +405,7 @@ export function InventorySidebar({
                 type="button"
                 onClick={onCloseMobile}
                 aria-label="Close menu"
+                data-tooltip="Close menu"
                 className="cursor-pointer rounded-lg p-1.5 text-muted hover:bg-page lg:hidden"
               >
                 <X size={18} />
@@ -500,7 +503,8 @@ export function InventorySidebar({
           <div className="flex justify-center p-2">
             <button
               type="button"
-              title="Need Assistance?"
+              aria-label="Need Assistance?"
+              data-tooltip="Need Assistance?"
               className="cursor-pointer rounded-lg p-2 text-primary hover:bg-primary/10"
             >
               <Phone size={16} />

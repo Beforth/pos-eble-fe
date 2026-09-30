@@ -79,6 +79,7 @@ export function DeleteReasonModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />

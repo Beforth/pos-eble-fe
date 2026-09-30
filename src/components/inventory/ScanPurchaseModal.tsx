@@ -201,6 +201,7 @@ export function ScanPurchaseModal({
             type="button"
             onClick={onClose}
             aria-label="Close drawer"
+            data-tooltip="Close drawer"
             className="rounded-md p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -420,6 +421,7 @@ export function ScanPurchaseModal({
                       <button
                         type="button"
                         aria-label="Remove row"
+                        data-tooltip="Remove row"
                         disabled={lines.length <= 1}
                         onClick={() => setPendingRemove(line)}
                         className="rounded p-1.5 text-muted hover:bg-primary/10 hover:text-primary disabled:opacity-30"

@@ -63,6 +63,7 @@ function UnitNameModal({
           <button
             type="button"
             aria-label="Close"
+            data-tooltip="Close"
             onClick={onClose}
             className="rounded p-1 text-muted transition-colors hover:bg-page hover:text-ink"
           >

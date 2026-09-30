@@ -104,6 +104,7 @@ export function TransferSettingsDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-md p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -123,6 +124,7 @@ export function TransferSettingsDrawer({
               <button
                 type="button"
                 aria-label="Open email template settings"
+                data-tooltip="Open email template settings"
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-line bg-card text-muted hover:text-ink"
               >
                 <ExternalLink size={14} />

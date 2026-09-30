@@ -167,6 +167,7 @@ export function UpdateItemCommissionModal({
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
+            data-tooltip="Close dialog"
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />

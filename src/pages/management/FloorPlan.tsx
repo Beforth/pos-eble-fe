@@ -24,6 +24,7 @@ import {
   updateFloorPlanApi,
   type FloorPlanRecord,
 } from '../../services/outletService'
+import { TooltipWrapper } from '../../components/common/TooltipWrapper'
 
 type ShapeKind =
   | 'circle'
@@ -205,7 +206,7 @@ function NumberStepper({
             onClick={() => onChange(Math.min(max, value + 1))}
             className="flex h-4 w-6 items-center justify-center text-[10px] text-muted hover:bg-page"
           >
-            ▲
+            â–²
           </button>
           <button
             type="button"
@@ -213,7 +214,7 @@ function NumberStepper({
             onClick={() => onChange(Math.max(min, value - 1))}
             className="flex h-4 w-6 items-center justify-center border-t border-line text-[10px] text-muted hover:bg-page"
           >
-            ▼
+            â–¼
           </button>
         </span>
       </span>
@@ -478,6 +479,7 @@ export default function FloorPlan() {
                 <button
                   type="button"
                   aria-label="Rename floor plan"
+                  data-tooltip="Rename floor plan"
                   onClick={() => setRenaming(true)}
                   className="inline-flex size-7 items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
                 >
@@ -491,7 +493,8 @@ export default function FloorPlan() {
                   <button
                     key={table.id}
                     type="button"
-                    title={`Add table ${table.label}`}
+                    aria-label={`Add table ${table.label}`}
+                    data-tooltip={`Add table ${table.label}`}
                     onClick={() => addItem('table', table.label)}
                     className="flex size-11 items-center justify-center rounded-sm bg-muted/35 text-sm font-semibold text-ink hover:bg-muted/55"
                   >
@@ -587,6 +590,7 @@ export default function FloorPlan() {
                 <button
                   type="button"
                   aria-label="Rotate left"
+                  data-tooltip="Rotate left"
                   disabled={!selected}
                   onClick={() =>
                     updateSelected({
@@ -600,6 +604,7 @@ export default function FloorPlan() {
                 <button
                   type="button"
                   aria-label="Rotate right"
+                  data-tooltip="Rotate right"
                   disabled={!selected}
                   onClick={() =>
                     updateSelected({
@@ -610,15 +615,17 @@ export default function FloorPlan() {
                 >
                   <RotateCw size={15} />
                 </button>
-                <button
-                  type="button"
-                  aria-label="Delete selected"
-                  disabled={!selected}
-                  onClick={deleteSelected}
-                  className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-primary/10 hover:text-primary disabled:opacity-40"
-                >
-                  <Trash2 size={15} />
-                </button>
+                  <TooltipWrapper label="Delete selected">
+                    <button
+                      type="button"
+                      aria-label="Delete selected"
+                      disabled={!selected}
+                      onClick={deleteSelected}
+                      className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </TooltipWrapper>
 
                 <div className="mx-1 hidden h-8 w-px bg-line sm:block" />
 
@@ -637,7 +644,7 @@ export default function FloorPlan() {
                     <button
                       key={tool.kind}
                       type="button"
-                      title={tool.label}
+                      data-tooltip={tool.label}
                       aria-label={`Add ${tool.label}`}
                       onClick={() => addItem(tool.kind)}
                       className="inline-flex size-9 items-center justify-center rounded-md border border-line bg-card hover:border-primary/40 hover:bg-primary/5"
@@ -661,7 +668,7 @@ export default function FloorPlan() {
                   <span className="text-xs font-medium text-ink">Barriers</span>
                   <button
                     type="button"
-                    title="Vertical barrier"
+                    data-tooltip="Vertical barrier"
                     aria-label="Add vertical barrier"
                     onClick={() => addItem('barrier-v')}
                     className="inline-flex size-9 items-center justify-center rounded-md border border-line bg-card hover:border-primary/40 hover:bg-primary/5"
@@ -670,7 +677,7 @@ export default function FloorPlan() {
                   </button>
                   <button
                     type="button"
-                    title="Horizontal barrier"
+                    data-tooltip="Horizontal barrier"
                     aria-label="Add horizontal barrier"
                     onClick={() => addItem('barrier-h')}
                     className="inline-flex size-9 items-center justify-center rounded-md border border-line bg-card hover:border-primary/40 hover:bg-primary/5"

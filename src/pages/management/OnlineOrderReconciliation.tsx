@@ -548,6 +548,7 @@ export default function OnlineOrderReconciliation() {
                 <button
                   type="button"
                   aria-label={`${tab.label} info`}
+                  data-tooltip={`${tab.label} info`}
                   className="inline-flex text-muted hover:text-ink"
                 >
                   <Info size={13} aria-hidden />

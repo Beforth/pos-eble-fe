@@ -177,6 +177,7 @@ export default function PrintLogoSettings() {
               <button
                 type="button"
                 aria-label="Remove logo"
+                data-tooltip="Remove logo"
                 onClick={handleRemoveLogo}
                 className="absolute -right-1 -top-1 inline-flex size-7 items-center justify-center rounded-full bg-primary text-white shadow hover:bg-primary-hover"
               >

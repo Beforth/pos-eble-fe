@@ -48,6 +48,7 @@ export function StockUpdateCycleSelect({
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-label="Stock update cycle"
+          data-tooltip="Stock update cycle"
           onClick={() => setOpen((prev) => !prev)}
           className="inline-flex h-9 min-w-[120px] items-center justify-between gap-2 rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
         >

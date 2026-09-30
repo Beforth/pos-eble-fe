@@ -293,6 +293,7 @@ export default function AvailableStock() {
                         <button
                           type="button"
                           aria-label={`Increase ${row.name}`}
+                          data-tooltip={`Increase ${row.name}`}
                           onClick={() => bumpRow(row.id)}
                           className="inline-flex size-8 items-center justify-center rounded-full border border-line text-muted hover:bg-page hover:text-ink"
                         >
@@ -301,6 +302,7 @@ export default function AvailableStock() {
                         <button
                           type="button"
                           aria-label={`Reset ${row.name}`}
+                          data-tooltip={`Reset ${row.name}`}
                           onClick={() => resetRow(row.id)}
                           className="inline-flex size-8 items-center justify-center rounded-full border border-line text-muted hover:bg-page hover:text-ink"
                         >
