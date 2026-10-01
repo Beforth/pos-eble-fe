@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Plus, Search, Trash2, X } from 'lucide-react'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import type {
@@ -23,6 +24,22 @@ const DEPARTMENT_OPTIONS = [
   'Customisation',
   'Preparation',
 ] as const
+
+/**
+ * Viewport coordinates for the Department Name listbox. It is portalled to
+ * `document.body` as `position: fixed` because the modal body is an
+ * `overflow-y-auto` scroll container, which would clip an in-flow panel right
+ * where the footer begins.
+ */
+interface DeptMenuPos {
+  top: number
+  left: number
+  width: number
+  flipUp: boolean
+}
+
+/** Below this many px the list opens above the trigger instead. */
+const DEPT_FLIP_THRESHOLD = 300
 
 interface VariationModalProps {
   open: boolean
@@ -147,6 +164,7 @@ export function VariationModal({
   const [status, setStatus] = useState(true)
   const [deptOpen, setDeptOpen] = useState(false)
   const [deptQuery, setDeptQuery] = useState('')
+  const [deptPos, setDeptPos] = useState<DeptMenuPos | null>(null)
   const [saving, setSaving] = useState(false)
   const [variationInputs, setVariationInputs] = useState<VariationInput[]>([])
   const [pendingRemove, setPendingRemove] = useState<{ index: number; name: string } | null>(null)
@@ -158,7 +176,9 @@ export function VariationModal({
     Record<number, string[]>
   >({})
   const { channels } = useMenuChannels()
-  const deptRef = useRef<HTMLDivElement>(null)
+  const deptRef = useRef<HTMLButtonElement>(null)
+  const deptPanelRef = useRef<HTMLDivElement>(null)
+  const deptSearchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -203,6 +223,9 @@ export function VariationModal({
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // The nested ConfirmDialog owns Escape while it is open, otherwise one
+        // keypress both cancels the confirm and closes the whole modal.
+        if (pendingRemove) return
         if (deptOpen) setDeptOpen(false)
         else onClose()
       }
@@ -214,21 +237,55 @@ export function VariationModal({
       window.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previous
     }
-  }, [open, onClose, deptOpen])
+  }, [open, onClose, deptOpen, pendingRemove])
+
+  const measureDeptMenu = useCallback(() => {
+    const trigger = deptRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const flipUp = window.innerHeight - rect.bottom < DEPT_FLIP_THRESHOLD
+    setDeptPos({
+      top: flipUp ? rect.top - 4 : rect.bottom + 4,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)),
+      width: rect.width,
+      flipUp,
+    })
+  }, [])
 
   useEffect(() => {
     if (!deptOpen) {
       setDeptQuery('')
+      setDeptPos(null)
       return
     }
+    measureDeptMenu()
+    const focusTimer = window.setTimeout(
+      () => deptSearchRef.current?.focus(),
+      0,
+    )
     const onPointerDown = (event: MouseEvent) => {
-      if (deptRef.current && !deptRef.current.contains(event.target as Node)) {
-        setDeptOpen(false)
+      const target = event.target as Node
+      // The panel is portalled out of `deptRef`, so both nodes must count as
+      // "inside" — mousedown fires before click, and closing here would unmount
+      // the panel before an option could be picked.
+      if (
+        deptRef.current?.contains(target) ||
+        deptPanelRef.current?.contains(target)
+      ) {
+        return
       }
+      setDeptOpen(false)
     }
     document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [deptOpen])
+    window.addEventListener('resize', measureDeptMenu)
+    window.addEventListener('scroll', measureDeptMenu, true)
+    return () => {
+      window.clearTimeout(focusTimer)
+      document.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('resize', measureDeptMenu)
+      window.removeEventListener('scroll', measureDeptMenu, true)
+    }
+  }, [deptOpen, measureDeptMenu])
 
   const filteredDepartments = useMemo(() => {
     const q = deptQuery.trim().toLowerCase()
@@ -449,11 +506,12 @@ export function VariationModal({
               />
             </div>
 
-            <div ref={deptRef} className="relative">
+            <div>
               <label className="mb-1.5 block text-sm font-medium text-ink">
                 Department Name <span className="text-primary">*</span>
               </label>
               <button
+                ref={deptRef}
                 type="button"
                 aria-haspopup="listbox"
                 aria-expanded={deptOpen}
@@ -467,57 +525,73 @@ export function VariationModal({
                 />
               </button>
 
-              {deptOpen ? (
-                <div className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-lg border border-line bg-card shadow-lg">
-                  <div className="border-b border-line p-2">
-                    <label className="flex h-9 items-center gap-2 rounded-md border border-line px-2.5">
-                      <Search size={14} className="shrink-0 text-muted" />
-                      <input
-                        type="text"
-                        value={deptQuery}
-                        onChange={(event) => setDeptQuery(event.target.value)}
-                        placeholder="Search"
-                        className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
-                      />
-                    </label>
-                  </div>
-                  <ul role="listbox" className="max-h-56 overflow-y-auto py-1">
-                    {filteredDepartments.map((option) => {
-                      const active = option === department
-                      return (
-                        <li key={option}>
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={active}
-                            onClick={() => {
-                              setDepartment(option)
-                              setDeptOpen(false)
-                            }}
-                            className={`flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-page ${
-                              active
-                                ? 'bg-page font-medium text-ink'
-                                : 'text-ink'
-                            }`}
-                          >
-                            {option}
-                            {active ? (
-                              <Check size={14} className="text-success" />
-                            ) : (
-                              <span className="size-3.5" />
-                            )}
-                          </button>
-                        </li>
-                      )
-                    })}
-                    {filteredDepartments.length === 0 ? (
-                      <li className="px-3 py-2 text-sm text-muted">
-                        No matches
-                      </li>
-                    ) : null}
-                  </ul>
-                </div>
-              ) : null}
+              {deptOpen && deptPos
+                ? createPortal(
+                    <div
+                      ref={deptPanelRef}
+                      style={{
+                        top: deptPos.top,
+                        left: deptPos.left,
+                        width: deptPos.width,
+                      }}
+                      className={`fixed z-[130] overflow-hidden rounded-lg border border-line bg-card shadow-lg ${
+                        deptPos.flipUp ? '-translate-y-full' : ''
+                      }`}
+                    >
+                      <div className="border-b border-line p-2">
+                        <label className="flex h-9 items-center gap-2 rounded-md border border-line px-2.5">
+                          <Search size={14} className="shrink-0 text-muted" />
+                          <input
+                            ref={deptSearchRef}
+                            type="text"
+                            value={deptQuery}
+                            onChange={(event) =>
+                              setDeptQuery(event.target.value)
+                            }
+                            placeholder="Search"
+                            className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+                          />
+                        </label>
+                      </div>
+                      <ul role="listbox" className="max-h-56 overflow-y-auto py-1">
+                        {filteredDepartments.map((option) => {
+                          const active = option === department
+                          return (
+                            <li key={option}>
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={active}
+                                onClick={() => {
+                                  setDepartment(option)
+                                  setDeptOpen(false)
+                                }}
+                                className={`flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-page ${
+                                  active
+                                    ? 'bg-page font-medium text-ink'
+                                    : 'text-ink'
+                                }`}
+                              >
+                                {option}
+                                {active ? (
+                                  <Check size={14} className="text-success" />
+                                ) : (
+                                  <span className="size-3.5" />
+                                )}
+                              </button>
+                            </li>
+                          )
+                        })}
+                        {filteredDepartments.length === 0 ? (
+                          <li className="px-3 py-2 text-sm text-muted">
+                            No matches
+                          </li>
+                        ) : null}
+                      </ul>
+                    </div>,
+                    document.body,
+                  )
+                : null}
             </div>
           </div>
 
@@ -686,6 +760,7 @@ export function VariationModal({
         <ConfirmDialog
           open={Boolean(pendingRemove)}
           compact
+          zClassName="z-[130]"
           title="Remove variation"
           target={pendingRemove?.name?.trim() || undefined}
           message="This variation line will be removed from the group being edited."

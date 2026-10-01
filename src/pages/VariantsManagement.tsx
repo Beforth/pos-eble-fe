@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ClipboardList,
+  Eye,
   Pencil,
   Plus,
   Search,
@@ -18,6 +19,7 @@ import {
   RowActionButton,
 } from '../components/menu/MenuActionButtons'
 import { EditVariationModal, VariationModal } from '../components/menu/EditVariationModal'
+import { VariationGroupDetailsModal } from '../components/menu/VariationGroupDetailsModal'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
 import { useAuth } from '../auth/AuthContext'
@@ -156,6 +158,7 @@ export default function VariantsManagement() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [changesName, setChangesName] = useState<string | null>(null)
   const [editing, setEditing] = useState<VariationGroup | null>(null)
+  const [viewing, setViewing] = useState<VariationGroup | null>(null)
   const [adding, setAdding] = useState(false)
 
   const { variationGroups: refVariationGroups, reload } = useMenuReference([
@@ -376,6 +379,12 @@ export default function VariantsManagement() {
                 <td className="px-3 py-3.5">
                   <div className="flex items-center gap-1">
                     <RowActionButton
+                      label="View"
+                      onClick={() => setViewing(row)}
+                    >
+                      <Eye size={16} />
+                    </RowActionButton>
+                    <RowActionButton
                       label="Edit"
                       onClick={() => setEditing(row)}
                     >
@@ -422,6 +431,12 @@ export default function VariantsManagement() {
         open={Boolean(changesName)}
         name={changesName}
         onClose={() => setChangesName(null)}
+      />
+
+      <VariationGroupDetailsModal
+        open={Boolean(viewing)}
+        group={viewing}
+        onClose={() => setViewing(null)}
       />
     </MenuPageShell>
   )
