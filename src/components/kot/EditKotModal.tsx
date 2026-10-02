@@ -37,13 +37,25 @@ function buildLineItems(kot: KotRow): EditLineItem[] {
   })
 }
 
-const STATUS_OPTIONS: KotStatus[] = ['Used In Bill', 'Pending', 'Cancelled']
+// Every real Kot.status, not just the ones the kitchen usually sets: the board
+// reads Pending -> In Preparation and Ready/Printed -> Running Orders, so
+// offering only three of the five made Ready/Printed unreachable here. It also
+// used to default to 'Used In Bill', which meant Edit + Save silently retired a
+// ticket that was still cooking.
+const STATUS_OPTIONS: KotStatus[] = [
+  'Pending',
+  'Ready',
+  'Printed',
+  'Used In Bill',
+  'Cancelled',
+]
 
 export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) {
   const [items, setItems] = useState<EditLineItem[]>([])
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
-  const [status, setStatus] = useState<KotStatus>('Used In Bill')
+  // Overwritten from `kot.status` on open; the literal is just the pre-open value.
+  const [status, setStatus] = useState<KotStatus>('Pending')
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [pendingRemove, setPendingRemove] = useState<{ id: string; name: string } | null>(null)
 

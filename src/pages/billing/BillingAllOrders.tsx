@@ -15,6 +15,7 @@ import { SettleDueModal } from '../../components/all-orders/SettleDueModal'
 import { useAllOrdersData } from '../../services/useAllOrdersData'
 import { type AllOrderRow } from '../../mocks/allOrdersData'
 import { formatINR } from '../../utils/format'
+import { billingUrlForOrder } from '../../utils/billingLinks'
 
 const PAGE_SIZE = 10
 
@@ -251,6 +252,7 @@ export default function BillingAllOrders() {
               onEdit={setEditOrder}
               onChangePayment={setChangePaymentOrder}
               onSettleDue={setDueOrder}
+              onOpenInBilling={(row) => navigate(billingUrlForOrder(row.id))}
             />
           </div>
 

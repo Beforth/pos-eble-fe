@@ -41,6 +41,7 @@ const STATUS_OPTIONS = [
   { value: 'Used In Bill', label: 'Used In Bill' },
   { value: 'Pending', label: 'Pending' },
   { value: 'Cancelled', label: 'Cancelled' },
+  { value: 'Printed', label: 'Printed' },
 ]
 
 export default function CaptainOrdersKot() {
@@ -140,6 +141,20 @@ export default function CaptainOrdersKot() {
                 : row,
             ),
           )
+          return
+        }
+        // Save & Print moved a served ticket onto a printed bill. It leaves the
+        // kitchen's work but is not billed until payment, so keep the row and
+        // only restyle it.
+        if (event === 'kot.printed') {
+          const row = toKotRow(data as KotEventData)
+          setRows((prev) => {
+            const index = prev.findIndex((existing) => existing.id === row.id)
+            if (index === -1) return [row, ...prev]
+            const next = [...prev]
+            next[index] = { ...row, status: 'Printed' as const }
+            return next
+          })
         }
       },
     })

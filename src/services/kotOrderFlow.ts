@@ -2,8 +2,8 @@ import type { KotTicket } from '../mocks/kotViewData'
 import type { TaxBreakdownLine } from '../utils/taxEngine'
 import { getTableSession, upsertTableSession } from '../utils/tableStatusStore'
 import {
+  adoptOrderKotsApi,
   createOrderApi,
-  markKotUsedApi,
   settleOrderApi,
   updateOrderApi,
   type CreateKotPayload,
@@ -228,15 +228,15 @@ export async function settleKotOrder(options: SettleKotOrderOptions): Promise<vo
       ...bill,
       items: bill.items,
     })
+    // Attach the tickets this bill is built from before paying, so the settle
+    // can retire them server-side. Local-only tickets (id ``kot-…``) skipped —
+    // they were never persisted, so there is nothing to close.
+    const ticketIds = tickets
+      .map((t) => t.id)
+      .filter((id) => !id.startsWith('kot-'))
+    if (ticketIds.length > 0) {
+      await adoptOrderKotsApi(outletId, order.id, ticketIds)
+    }
     await settleOrderApi(outletId, order.id, money)
   }
-
-  // The order settle marks it paid; its KOTs stay Pending on the board, so
-  // best-effort flag every server-backed ticket as Used In Bill (a filled
-  // ticket that has been billed). Local-only tickets (id ``kot-…``) skipped.
-  await Promise.allSettled(
-    tickets
-      .filter((t) => !t.id.startsWith('kot-'))
-      .map((t) => markKotUsedApi(outletId, t.id)),
-  )
 }

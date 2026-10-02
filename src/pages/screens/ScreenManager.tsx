@@ -111,11 +111,11 @@ export default function ScreenManager() {
         </div>
         <button
           type="button"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/billing')}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
         >
           <ArrowLeft size={15} />
-          Back to Dashboard
+          Back to billing
         </button>
       </header>
 

@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Clock3, CreditCard, Plus, Trash2, X } from 'lucide-react'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import type { PaymentMethod } from './BillPanel'
 import {
-  OtherPaymentModal,
-  OTHER_PAYMENT_TYPES,
-  type OtherPaymentDetails,
-} from './OtherPaymentModal'
-import { roundSettlementAmount } from '../../utils/settlementRound'
+  SelectDropdown,
+  type SelectDropdownOption,
+} from '../common/SelectDropdown'
+import type { PaymentMethod } from './BillPanel'
+import { OTHER_PAYMENT_TYPES, type OtherPaymentType } from './OtherPaymentModal'
 import { showToast } from '../../utils/toast'
 
 const PAYMENT_OPTIONS: { id: PaymentMethod; label: string }[] = [
@@ -17,6 +16,10 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string }[] = [
   { id: 'other', label: 'Other' },
   { id: 'part', label: 'Part' },
 ]
+
+const OTHER_PAYMENT_OPTIONS: SelectDropdownOption[] = OTHER_PAYMENT_TYPES.map(
+  (type) => ({ value: type, label: type }),
+)
 
 type PartMethod = 'cash' | 'card' | 'upi' | 'other' | 'due'
 
@@ -71,18 +74,26 @@ export function SettleSaveModal({
   onClose,
   onConfirm,
 }: SettleSaveModalProps) {
-  const defaultSettlement = roundSettlementAmount(billAmount)
+  /** The tax-inclusive `grand_total` this settle will send, at 2dp.
+   *
+   *  Every cap in this modal runs against this exact figure, never against a
+   *  whole-rupee rounding of it: a bill of 1234.40 pre-fills to "1234.40", and
+   *  clamping that to `roundSettlementAmount(billAmount)` (1234) would settle
+   *  40 paise short and book a phantom `balance_due` on an untouched settle.
+   *  Capping on the exact value also returns the right change when the cashier
+   *  types an over-payment. */
+  const exactBill = useMemo(
+    () => Math.round(Number(billAmount) * 100) / 100,
+    [billAmount],
+  )
   const [payment, setPayment] = useState<PaymentMethod>('cash')
   const [customerPaid, setCustomerPaid] = useState('')
   const [tip, setTip] = useState('0')
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
-  const [otherPayment, setOtherPayment] = useState<OtherPaymentDetails | null>(
-    null,
+  const [otherType, setOtherType] = useState<OtherPaymentType>(
+    OTHER_PAYMENT_TYPES[0],
   )
-  const [otherOpen, setOtherOpen] = useState(false)
-  const [paymentBeforeOther, setPaymentBeforeOther] =
-    useState<PaymentMethod>('cash')
   const [partEntries, setPartEntries] = useState<PartEntry[]>([])
   const [pendingPart, setPendingPart] = useState<PartEntry | null>(null)
   const [partMethod, setPartMethod] = useState<PartMethod>('cash')
@@ -92,38 +103,46 @@ export function SettleSaveModal({
   )
   const nameInputRef = useRef<HTMLInputElement>(null)
   const wasOpen = useRef(false)
+  const customerPaidTouched = useRef(false)
 
   useEffect(() => {
     if (open && !wasOpen.current) {
       setPayment('cash')
-      setCustomerPaid('')
+      setCustomerPaid(String(exactBill))
       setTip('0')
       setName((customerName ?? '').trim())
       setNameError('')
-      setOtherPayment(null)
-      setOtherOpen(false)
+      setOtherType(OTHER_PAYMENT_TYPES[0])
       setPartEntries([])
       setPartMethod('cash')
-      setPartAmount(String(roundSettlementAmount(billAmount) || ''))
+      setPartAmount(String(exactBill || ''))
       setPartOtherType(OTHER_PAYMENT_TYPES[0])
+      customerPaidTouched.current = false
     }
     wasOpen.current = open
-  }, [open, customerName, billAmount])
+  }, [open, customerName, billAmount, exactBill])
+
+  /**
+   * Both terminals feed one kitchen, so another KOT can land on this table while
+   * the settle modal is open. Re-fill the amount when the bill grows, but only
+   * while the cashier has not typed — otherwise a stale prefill would settle
+   * short and silently book a due.
+   */
+  useEffect(() => {
+    if (!open || customerPaidTouched.current) return
+    setCustomerPaid(String(exactBill))
+  }, [open, exactBill])
 
   useEffect(() => {
     if (!open) return
-    const onKey = (event: KeyboardEvent) => {
+const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (otherOpen) {
-          setOtherOpen(false)
-          return
-        }
         onClose()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose, otherOpen])
+  }, [open, onClose])
 
   useEffect(() => {
     if (!open) return
@@ -140,7 +159,7 @@ export function SettleSaveModal({
   )
   const partRemaining = Math.max(
     0,
-    Math.round((defaultSettlement - partPaid) * 100) / 100,
+    Math.round((exactBill - partPaid) * 100) / 100,
   )
 
   useEffect(() => {
@@ -150,21 +169,21 @@ export function SettleSaveModal({
 
   const settlementValue = useMemo(() => {
     if (payment === 'part') {
-      return Math.min(defaultSettlement, partPaid)
+      return Math.min(exactBill, partPaid)
     }
     if (payment === 'due') {
       const raw = Number(customerPaid)
       if (customerPaid.trim() === '' || Number.isNaN(raw) || raw < 0) {
         return 0
       }
-      return raw >= defaultSettlement ? defaultSettlement : raw
+      return raw >= exactBill ? exactBill : raw
     }
     const raw = Number(customerPaid)
     if (customerPaid.trim() === '' || Number.isNaN(raw) || raw < 0) {
-      return defaultSettlement
+      return exactBill
     }
-    return raw >= defaultSettlement ? defaultSettlement : raw
-  }, [customerPaid, defaultSettlement, payment, partPaid])
+    return raw >= exactBill ? exactBill : raw
+  }, [customerPaid, exactBill, payment, partPaid])
 
   const tipValue = Number(tip) || 0
   const paidValue =
@@ -180,22 +199,21 @@ export function SettleSaveModal({
 
   function handlePaymentSelect(method: PaymentMethod) {
     if (method === 'other') {
-      setPaymentBeforeOther(payment === 'other' ? 'cash' : payment)
-      setOtherOpen(true)
+      setPayment('other')
+      setPartEntries([])
+      setNameError('')
       return
     }
     if (method === 'part') {
       setPayment('part')
-      setOtherPayment(null)
       setNameError('')
       if (partEntries.length === 0) {
-        setPartAmount(String(defaultSettlement || ''))
+        setPartAmount(String(exactBill || ''))
       }
       return
     }
     if (method === 'due') {
       setPayment('due')
-      setOtherPayment(null)
       setPartEntries([])
       window.setTimeout(() => nameInputRef.current?.focus(), 0)
       if (!name.trim()) {
@@ -206,14 +224,12 @@ export function SettleSaveModal({
     }
     if (method === 'card') {
       setPayment('card')
-      setOtherPayment(null)
       setPartEntries([])
       setNameError('')
       showToast('Card payment selected')
       return
     }
     setPayment(method)
-    setOtherPayment(null)
     setPartEntries([])
     setNameError('')
   }
@@ -270,12 +286,6 @@ export function SettleSaveModal({
       return
     }
 
-    if (payment === 'other' && !otherPayment) {
-      setPaymentBeforeOther('cash')
-      setOtherOpen(true)
-      return
-    }
-
     onConfirm({
       payment,
       customerPaid: payment === 'part' ? partPaid : Number(customerPaid) || 0,
@@ -284,7 +294,7 @@ export function SettleSaveModal({
       returnToCustomer: payment === 'part' ? 0 : returnToCustomer,
       due: balanceDue,
       customerName: name.trim(),
-      otherType: otherPayment?.type,
+      otherType: payment === 'other' ? otherType : undefined,
       partEntries: payment === 'part' ? partEntries : undefined,
     })
   }
@@ -342,10 +352,8 @@ export function SettleSaveModal({
                     }`}
                   >
                     {option.label}
-                    {option.id === 'other' && otherPayment ? (
-                      <span className="ml-1 text-xs text-muted">
-                        ({otherPayment.type})
-                      </span>
+                    {option.id === 'other' && payment === 'other' ? (
+                      <span className="ml-1 text-xs text-muted">({otherType})</span>
                     ) : null}
                   </button>
                 )
@@ -362,6 +370,19 @@ export function SettleSaveModal({
                 <CreditCard size={13} />
                 Card payment selected
               </p>
+            ) : null}
+            {payment === 'other' ? (
+              <div className="mt-2 grid grid-cols-[140px_1fr] items-center gap-3">
+                <span className="text-sm font-semibold text-ink">Paid via</span>
+                <SelectDropdown
+                  value={otherType}
+                  options={OTHER_PAYMENT_OPTIONS}
+                  onChange={(next) => setOtherType(next as OtherPaymentType)}
+                  caption="Paid via"
+                  searchable={false}
+                  triggerClassName="w-full"
+                />
+              </div>
             ) : null}
           </div>
 
@@ -498,7 +519,10 @@ export function SettleSaveModal({
                   min={0}
                   step="0.01"
                   value={customerPaid}
-                  onChange={(e) => setCustomerPaid(e.target.value)}
+                  onChange={(e) => {
+                    customerPaidTouched.current = true
+                    setCustomerPaid(e.target.value)
+                  }}
                   autoFocus
                   className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
                 />
@@ -559,24 +583,6 @@ export function SettleSaveModal({
           </button>
         </footer>
       </div>
-
-      <OtherPaymentModal
-        open={otherOpen}
-        initial={otherPayment ?? undefined}
-        onNo={() => {
-          setOtherOpen(false)
-          if (payment !== 'other') {
-            setPayment(paymentBeforeOther)
-          }
-        }}
-        onYes={(details) => {
-          setOtherPayment(details)
-          setPayment('other')
-          setOtherOpen(false)
-          setPartEntries([])
-          showToast(`Other payment · ${details.type}`)
-        }}
-      />
 
       <ConfirmDialog
         open={Boolean(pendingPart)}

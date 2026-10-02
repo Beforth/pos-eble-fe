@@ -126,6 +126,7 @@ export type KotOrderType = 'DINE IN' | 'PARCEL' | 'DELIVERY' | 'PICK UP' | 'OTHE
 export type KotRowStatus =
   | 'Pending'
   | 'Ready'
+  | 'Printed'
   | 'Used In Bill'
   | 'Cancelled'
 export type KotSource = 'billing' | 'captain'
@@ -312,7 +313,13 @@ export interface CreateKotPayload {
   draft_id?: string
 }
 
-export type UpdateOrderAction = 'edit' | 'settle' | 'cancel' | 'reprint' | 'change_payment'
+export type UpdateOrderAction =
+  | 'edit'
+  | 'settle'
+  | 'cancel'
+  | 'reprint'
+  | 'change_payment'
+  | 'adopt_kots'
 
 export interface UpdateOrderPayload {
   action?: UpdateOrderAction
@@ -336,6 +343,8 @@ export interface UpdateOrderPayload {
   items?: OrderItemPayload[]
   /** KOT entries appended to the order by the edit action (server-side). */
   kots?: CreateKotPayload[]
+  /** Encrypted KOT ids to re-parent onto this order (`adopt_kots`). */
+  kot_ids?: string[]
 }
 
 export interface SplitPartPayload {
@@ -477,17 +486,9 @@ export interface LiveBoardKotRecord {
 
 export type LiveBoardRecord = LiveBoardOrderRecord | LiveBoardKotRecord
 
-export async function liveBoardOrdersApi(
-  outletId: string,
-  rowId: string,
-): Promise<LiveBoardOrderRecord[]> {
-  const qs = new URLSearchParams({ board: 'running', row: rowId })
-  const dto = await jsonRequest<{ rows: OrderDto[]; count: number }>(
-    ordersPath(outletId, `/live/orders/?${qs.toString()}`),
-    'GET',
-  )
-  return dto.rows.map((order) => ({
-    kind: 'order' as const,
+export function toLiveBoardOrderRecord(order: OrderDto): LiveBoardOrderRecord {
+  return {
+    kind: 'order',
     id: order.id,
     orderNo: order.order_no,
     billNo: order.bill_no,
@@ -496,20 +497,12 @@ export async function liveBoardOrdersApi(
     itemCount: order.items.reduce((sum, i) => sum + Number(i.qty || 0), 0),
     total: Number(order.grand_total || 0),
     items: order.items,
-  }))
+  }
 }
 
-export async function liveBoardKotsApi(
-  outletId: string,
-  rowId: string,
-): Promise<LiveBoardKotRecord[]> {
-  const qs = new URLSearchParams({ board: 'pending', row: rowId })
-  const dto = await jsonRequest<{ rows: KotDto[]; count: number }>(
-    ordersPath(outletId, `/live/orders/?${qs.toString()}`),
-    'GET',
-  )
-  return dto.rows.map((kot) => ({
-    kind: 'kot' as const,
+export function toLiveBoardKotRecord(kot: KotDto): LiveBoardKotRecord {
+  return {
+    kind: 'kot',
     id: kot.id,
     kotNo: kot.kot_no,
     tableNo: kot.table_no,
@@ -521,7 +514,39 @@ export async function liveBoardKotsApi(
       0,
     ),
     items: kot.items as LiveBoardOrderItemDto[],
-  }))
+  }
+}
+
+/**
+ * Running-board drill-down. The server returns a mixed list (printed/ready
+ * orders plus orphan Ready KOTs folded into the row), each tagged with `kind`.
+ */
+export async function liveBoardOrdersApi(
+  outletId: string,
+  rowId: string,
+): Promise<LiveBoardRecord[]> {
+  const qs = new URLSearchParams({ board: 'running', row: rowId })
+  const dto = await jsonRequest<{
+    rows: Array<{ kind?: string }>
+    count: number
+  }>(ordersPath(outletId, `/live/orders/?${qs.toString()}`), 'GET')
+  return dto.rows.map((row) =>
+    row.kind === 'kot'
+      ? toLiveBoardKotRecord(row as unknown as KotDto)
+      : toLiveBoardOrderRecord(row as unknown as OrderDto),
+  )
+}
+
+export async function liveBoardKotsApi(
+  outletId: string,
+  rowId: string,
+): Promise<LiveBoardKotRecord[]> {
+  const qs = new URLSearchParams({ board: 'pending', row: rowId })
+  const dto = await jsonRequest<{ rows: KotDto[]; count: number }>(
+    ordersPath(outletId, `/live/orders/?${qs.toString()}`),
+    'GET',
+  )
+  return dto.rows.map(toLiveBoardKotRecord)
 }
 
 export async function listOrdersApi(
@@ -582,6 +607,20 @@ export async function reprintOrderApi(outletId: string, id: string): Promise<Ord
     'POST',
     {},
   )
+}
+
+/**
+ * Attach already-sent kitchen tickets to a bill. Save & Print creates the
+ * order from the cart, so the KOT it is billing has to be re-parented onto it —
+ * otherwise the ticket keeps its own row on the Running board next to the bill
+ * that now contains it. A `Ready` ticket also flips to `Printed` server-side.
+ */
+export async function adoptOrderKotsApi(
+  outletId: string,
+  id: string,
+  kotIds: string[],
+): Promise<OrderDto> {
+  return updateOrderApi(outletId, id, { action: 'adopt_kots', kot_ids: kotIds })
 }
 
 export interface ChangePaymentPayload {

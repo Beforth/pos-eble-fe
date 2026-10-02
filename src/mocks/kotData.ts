@@ -1,5 +1,5 @@
 export type KotOrderType = 'DINE IN' | 'PARCEL' | 'DELIVERY' | 'PICK UP' | 'OTHER'
-export type KotStatus = 'Used In Bill' | 'Pending' | 'Cancelled' | 'Ready'
+export type KotStatus = 'Used In Bill' | 'Pending' | 'Cancelled' | 'Ready' | 'Printed'
 export type KotRowSource = 'billing' | 'captain'
 
 export interface KotRow {

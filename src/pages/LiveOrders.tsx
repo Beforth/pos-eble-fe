@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useChrome } from '../state/ChromeContext'
 import {
   ChefHat,
@@ -11,6 +12,10 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import {
+  BILLING_RIGHT_CODENAME,
+  CAPTAIN_ORDER_CODENAME,
+} from '../auth/routePermissions'
 import { LiveOrdersBoard } from '../components/live-orders/LiveOrdersBoard'
 import { LiveOrdersDetailModal } from '../components/live-orders/LiveOrdersDetailModal'
 import { RunningTablesView } from '../components/live-orders/RunningTablesView'
@@ -26,6 +31,11 @@ import {
   type LiveOrdersSummary,
   type RunningTablesSummary,
 } from '../services/orderService'
+import {
+  billingUrlForKotId,
+  billingUrlForOrder,
+} from '../utils/billingLinks'
+import { LIVE_BOARD_REFRESH_EVENTS, subscribeToRail } from '../services/liveRailClient'
 import { brand } from '../theme/brand'
 
 type LiveTab = 'orders' | 'tables'
@@ -45,7 +55,16 @@ const channelIcons: Record<string, ReactNode> = {
 }
 
 export default function LiveOrders() {
-  const { encryptedOutletId } = useAuth()
+  const navigate = useNavigate()
+  const { encryptedOutletId, hasPermission, token } = useAuth()
+  // This standalone board is reachable by both roles, so the order-taking
+  // target has to follow the rights the user actually holds: a captain (no
+  // billing right) would be bounced off `/billing`.
+  const billingBase = hasPermission(BILLING_RIGHT_CODENAME)
+    ? '/billing'
+    : hasPermission(CAPTAIN_ORDER_CODENAME)
+      ? '/captain-orders'
+      : '/billing'
   const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
@@ -89,6 +108,24 @@ export default function LiveOrders() {
       cancelled = true
     }
   }, [encryptedOutletId, reload])
+
+  // The board is a snapshot of several aggregates (running orders, orphan Ready
+  // KOTs, pending kitchen counts, occupied tables), so there is nothing
+  // meaningful to patch locally from a single event — refetch instead. Without
+  // this the board only changed when it was opened or Refresh was pressed, so a
+  // bill settled on another screen kept sitting on Running Orders.
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event) => {
+        if (LIVE_BOARD_REFRESH_EVENTS.has(event)) {
+          setReload((key) => key + 1)
+        }
+      },
+    })
+  }, [encryptedOutletId, token])
 
   function handleRefresh() {
     if (refreshing) return
@@ -229,6 +266,7 @@ export default function LiveOrders() {
                 title="Running Orders"
                 data={running}
                 icons={channelIcons}
+                hideEmptyRows={false}
                 onRowClick={(row) => setDetail({ board: 'running', row })}
               />
               <LiveOrdersBoard
@@ -276,6 +314,12 @@ export default function LiveOrders() {
             } Orders`}
             icon={channelIcons[detail.row.icon]}
             onClose={() => setDetail(null)}
+            onOpenOrder={(orderId) =>
+              navigate(billingUrlForOrder(orderId, billingBase))
+            }
+            onOpenKot={(kotId) =>
+              navigate(billingUrlForKotId(kotId, billingBase))
+            }
           />
         )}
       </div>

@@ -41,6 +41,7 @@ const STATUS_OPTIONS = [
   { value: 'Used In Bill', label: 'Used In Bill' },
   { value: 'Pending', label: 'Pending' },
   { value: 'Cancelled', label: 'Cancelled' },
+  { value: 'Printed', label: 'Printed' },
 ]
 
 export default function BillingKot() {
@@ -71,7 +72,6 @@ export default function BillingKot() {
     let cancelled = false
     setLoading(true)
     listKotsApi(encryptedOutletId, {
-      source: 'billing',
       from: appliedStart || undefined,
       to: appliedEnd || undefined,
       order_type: appliedType || undefined,
@@ -141,6 +141,20 @@ export default function BillingKot() {
                 : row,
             ),
           )
+          return
+        }
+        // Save & Print moved a served ticket onto a printed bill. It leaves the
+        // kitchen's work but is not billed until payment, so keep the row and
+        // only restyle it.
+        if (event === 'kot.printed') {
+          const row = toKotRow(data as KotEventData)
+          setRows((prev) => {
+            const index = prev.findIndex((existing) => existing.id === row.id)
+            if (index === -1) return [row, ...prev]
+            const next = [...prev]
+            next[index] = { ...row, status: 'Printed' as const }
+            return next
+          })
         }
       },
     })
@@ -226,7 +240,6 @@ export default function BillingKot() {
     try {
       const all: KotRow[] = []
       const first = await listKotsApi(encryptedOutletId, {
-        source: 'billing',
         from: appliedStart || undefined,
         to: appliedEnd || undefined,
         order_type: appliedType || undefined,
@@ -238,7 +251,6 @@ export default function BillingKot() {
       const pages = Math.max(1, Math.ceil(first.count / 100))
       for (let p = 2; p <= pages; p += 1) {
         const next = await listKotsApi(encryptedOutletId, {
-          source: 'billing',
           from: appliedStart || undefined,
           to: appliedEnd || undefined,
           order_type: appliedType || undefined,

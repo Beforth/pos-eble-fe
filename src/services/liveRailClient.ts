@@ -17,6 +17,30 @@ const PERMANENT_CLOSE_CODES = new Set([4401, 4403])
 
 export type RailConnectionStatus = 'connecting' | 'open' | 'closed'
 
+/**
+ * Rail events that can change what an aggregate board shows.
+ *
+ * The Live Orders screens display several server-computed aggregates (running
+ * orders, orphan Ready KOTs, pending kitchen counts, occupied tables), so there
+ * is nothing meaningful to patch from a single event — they refetch instead.
+ * Subscribing is what makes a bill settled on one screen disappear from the
+ * board on another; without it the board only changed when opened or refreshed
+ * by hand.
+ */
+export const LIVE_BOARD_REFRESH_EVENTS = new Set([
+  'order.created',
+  'order.settle',
+  'order.printed',
+  'order.modified',
+  'order.cancelled',
+  'kot.prep',
+  'kot.modified',
+  'kot.printed',
+  'kot.used_in_bill',
+  'kot.deleted',
+  'kot.cancelled',
+])
+
 export interface RailSubscriptionOptions {
   outletId: string
   token: string

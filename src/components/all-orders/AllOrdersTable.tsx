@@ -1,5 +1,5 @@
 import type { ReactNode, SVGProps } from 'react'
-import { Banknote, Eye, Pencil, ReceiptText, Search } from 'lucide-react'
+import { Banknote, Eye, Pencil, ReceiptText, Search, ShoppingCart } from 'lucide-react'
 import type { AllOrderRow } from '../../mocks/allOrdersData'
 import { formatINR } from '../../utils/format'
 import { Badge } from '../common/Badge'
@@ -36,6 +36,7 @@ interface AllOrdersTableProps {
   onEdit?: (row: AllOrderRow) => void
   onChangePayment?: (row: AllOrderRow) => void
   onSettleDue?: (row: AllOrderRow) => void
+  onOpenInBilling?: (row: AllOrderRow) => void
 }
 
 function ActionButton({
@@ -70,6 +71,7 @@ export function AllOrdersTable({
   onEdit,
   onChangePayment,
   onSettleDue,
+  onOpenInBilling,
 }: AllOrdersTableProps) {
   const allSelected = rows.length > 0 && rows.every((row) => selected.has(row.id))
 
@@ -207,6 +209,14 @@ export function AllOrdersTable({
               <ReceiptText size={13} />
             </ActionButton>
           )}
+          {onOpenInBilling && row.status === 'Printed' ? (
+            <ActionButton
+              label="Open in billing"
+              onClick={() => onOpenInBilling(row)}
+            >
+              <ShoppingCart size={13} />
+            </ActionButton>
+          ) : null}
           {onEdit && (
             <ActionButton label="Edit" onClick={() => onEdit(row)}>
               <Pencil size={13} />
