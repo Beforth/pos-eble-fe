@@ -1263,7 +1263,8 @@ export default function CaptainOrders() {
 
     // A counter print must not settle: the cart stays editable and Settle &
     // Save closes this same order later (print-then-settle, §21). So create
-    // the order, then `reprint` to promote saved → printed and bump print_count.
+    // the order — and only for the print actions `reprint` it, which promotes
+    // saved → printed and bumps print_count. Plain `Save` stops at `saved`.
     if (!hasTableSelected) {
       if (!encryptedOutletId) {
         showToast('No outlet selected — open Captain Orders from the sidebar')
@@ -1302,14 +1303,18 @@ export default function CaptainOrders() {
           await adoptOrderKotsApi(outletId, order.id, billedKotIds)
         }
         // Allocate the invoice number now — settle would otherwise be the only
-        // allocator, and this bill is being printed before anyone pays.
+        // allocator, and this bill may be printed before anyone pays.
         const withBillNo = await allocateBillNoApi(
           outletId,
           order.id,
           orderTypeForApi(orderType),
         )
         printedBillNo = withBillNo.bill_no ? Number(withBillNo.bill_no) : null
-        await reprintOrderApi(outletId, order.id)
+        // Plain `Save` must leave the order `saved` so All Orders shows Saved
+        // rather than Printed; the table branch guards this the same way.
+        if (action === 'Save & Print' || action === 'Save & eBill') {
+          await reprintOrderApi(outletId, order.id)
+        }
       } catch (error) {
         showToast(
           error instanceof Error ? error.message : 'Failed to save the bill',

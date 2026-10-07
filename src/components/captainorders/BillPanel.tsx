@@ -435,6 +435,10 @@ export function BillPanel({
    * keeps the table it came with but has no covers. The previous type is tracked
    * in a ref so this runs on a switch only, never on mount — otherwise a deep
    * link that arrives already set would be wiped before it was read.
+   *
+   * Guard: when switching to delivery and no table is currently selected, do not
+   * call onTableIdChange('') (that would clear a pinned takeaway KOT opened via
+   * deep-link with no table).
    */
   useEffect(() => {
     const previous = previousOrderType.current
@@ -444,9 +448,11 @@ export function BillPanel({
     setTablePickerOpen(false)
     setGuestsPickerOpen(false)
 
-    if (orderType === 'delivery') onTableIdChange('')
+    if (orderType === 'delivery' && tableId) {
+      onTableIdChange('')
+    }
     if (orderType !== 'dine-in') onGuestsChange(0)
-  }, [orderType, onTableIdChange, onGuestsChange])
+  }, [orderType, onTableIdChange, onGuestsChange, tableId])
 
   function chargesSnapshot(): BillChargesSnapshot {
     return {

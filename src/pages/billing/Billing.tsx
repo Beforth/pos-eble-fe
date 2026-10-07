@@ -1281,7 +1281,8 @@ export default function Billing() {
 
     // A counter print must not settle: the cart stays editable and Settle &
     // Save closes this same order later (print-then-settle, §21). So create
-    // the order, then `reprint` to promote saved → printed and bump print_count.
+    // the order — and only for the print actions `reprint` it, which promotes
+    // saved → printed and bumps print_count. Plain `Save` stops at `saved`.
     if (!hasTableSelected) {
       if (!encryptedOutletId) {
         showToast('No outlet selected — open Billing from the sidebar')
@@ -1320,14 +1321,18 @@ export default function Billing() {
           await adoptOrderKotsApi(outletId, order.id, billedKotIds)
         }
         // Allocate the invoice number now — settle would otherwise be the only
-        // allocator, and this bill is being printed before anyone pays.
+        // allocator, and this bill may be printed before anyone pays.
         const withBillNo = await allocateBillNoApi(
           outletId,
           order.id,
           orderTypeForApi(orderType),
         )
         printedBillNo = withBillNo.bill_no ? Number(withBillNo.bill_no) : null
-        await reprintOrderApi(outletId, order.id)
+        // Plain `Save` must leave the order `saved` so All Orders shows Saved
+        // rather than Printed; the table branch guards this the same way.
+        if (action === 'Save & Print' || action === 'Save & eBill') {
+          await reprintOrderApi(outletId, order.id)
+        }
       } catch (error) {
         showToast(
           error instanceof Error ? error.message : 'Failed to save the bill',
@@ -1821,7 +1826,7 @@ export default function Billing() {
 
     if (action === 'Save') {
       if (lines.length === 0) {
-        showToast('Add items before saving to View KOT')
+        showToast('Add items before saving')
         return
       }
       if (payment === 'due' && !isCustomerComplete(customer)) {
@@ -1832,25 +1837,9 @@ export default function Billing() {
         return
       }
 
-      const ticket = createKotFromLines(lines, orderNote)
-      if (!ticket) return
-
-      let saved: KotTicket
-      try {
-        saved = await sendKotViaApi(ticket)
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Failed to send KOT')
-        return
-      }
-
-      const next = appendKotTicket(saved)
-      setKotTickets(next)
-      setLines([])
-      setOrderNote('')
-      showToast(
-        `Table ${saved.tableNo} · KOT ${saved.kotNo} saved · opening View KOT`,
-      )
-      setKotViewOpen(true)
+      // Keep charges across startFinalBill (which may clear cart lines / billTotal).
+      setPendingCharges(charges ?? null)
+      void startFinalBill(action)
       return
     }
 
