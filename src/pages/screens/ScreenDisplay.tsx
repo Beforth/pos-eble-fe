@@ -41,17 +41,16 @@ import { EditScreenModal } from '../../components/screens/EditScreenModal'
 import { subscribeToRail } from '../../services/liveRailClient'
 import {
   kotEventToTicket,
-  listKotsApi,
   markKotReadyApi,
   type KotEventData,
 } from '../../services/orderService'
 import { isServerBackedKotId } from '../../utils/kotListStore'
+import { syncKotStoreFromServer } from '../../utils/kotStoreSync'
 import { useAuth } from '../../auth/AuthContext'
 
 const POLL_INTERVAL_MS = 1500
 const TICK_INTERVAL_MS = 1000
 const SYNC_INTERVAL_MS = 15000
-const KITCHEN_OPEN_STATUSES = new Set<string>(['Pending', 'Ready', 'Printed'])
 
 function formatElapsed(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000))
@@ -106,38 +105,7 @@ export default function ScreenDisplay() {
   }, [])
 
   const syncTicketsFromServer = useCallback(async () => {
-    if (!encryptedOutletId) return
-    const known = new Map(loadAllKotTickets().map((ticket) => [ticket.id, ticket]))
-    const openIds = new Set<string>()
-    let changed = false
-    try {
-      let page = 1
-      for (;;) {
-        const res = await listKotsApi(encryptedOutletId, { page, page_size: 100 })
-        for (const dto of res.results) {
-          if (!isServerBackedKotId(dto.id)) continue
-          if (!KITCHEN_OPEN_STATUSES.has(dto.status)) continue
-          openIds.add(dto.id)
-          if (known.has(dto.id)) continue
-          const mapped = kotEventToTicket(dto)
-          known.set(dto.id, mapped)
-          upsertKotTicketFromServer(mapped)
-          changed = true
-        }
-        if (res.results.length === 0) break
-        page += 1
-        if (page * 100 >= res.count) break
-      }
-    } catch {
-      return
-    }
-    const stale = loadAllKotTickets()
-      .filter((ticket) => isServerBackedKotId(ticket.id) && !openIds.has(ticket.id))
-      .map((ticket) => ticket.id)
-    for (const staleId of stale) {
-      removeKotTicket(staleId)
-      changed = true
-    }
+    const changed = await syncKotStoreFromServer(encryptedOutletId ?? '')
     if (changed) refreshTickets()
   }, [encryptedOutletId, refreshTickets])
 
@@ -254,7 +222,7 @@ export default function ScreenDisplay() {
         return { ticket, items, amount }
       })
       .filter((entry): entry is FilteredScreenTicket => entry !== null)
-    return [...entries].reverse()
+    return entries
   }, [tickets, screen, readyByTicket])
 
   function handleComplete(ticketId: string, itemIds: string[]) {

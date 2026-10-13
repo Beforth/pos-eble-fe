@@ -30,6 +30,9 @@ export interface KotTicket {
   customerName?: string
   /** Customer-facing token (10–99). */
   displayToken?: number
+  /** True once the ticket's bill is settled. The KOT view hides billed
+   *  tickets; the kitchen screen ignores it and keeps cooking. */
+  billed?: boolean
 }
 
 export const ORDER_TYPE_LEGEND: {

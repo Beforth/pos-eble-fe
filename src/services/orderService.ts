@@ -157,6 +157,8 @@ export interface KotDto {
   complete_duration: string
   created: string
   modified: boolean
+  /** True once the ticket's bill is settled (KOT view hides it; KDS keeps it). */
+  billed: boolean
 }
 
 // ─── live-rail payloads (events carry a subset of the read DTOs) ─────────
@@ -1144,6 +1146,7 @@ export function kotEventToTicket(dto: KotDto | KotEventData): KotTicket {
     createdAt: parseKotCreated(dto.created),
     status: dto.status === 'Ready' ? 'ready' : 'active',
     customerName: dto.customer_name?.trim() || undefined,
+    billed: Boolean(dto.billed),
   }
 }
 

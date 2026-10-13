@@ -62,7 +62,12 @@ import {
   type KotOrderType,
   type OrderDto,
 } from '../../services/orderService'
-import { getItemInitials, itemNameMatchesQuery } from '../../utils/itemSearch'
+import {
+  getItemInitials,
+  itemNameMatchesQuery,
+  matchesShortCode,
+  resolveByShortCode,
+} from '../../utils/itemSearch'
 import { recordCoverSize } from '../../utils/coverSizeStore'
 import {
   toDraftBillPayload,
@@ -158,26 +163,6 @@ function customerFieldErrors(customer: CustomerDetails) {
     address: customer.address.trim().length === 0,
     locality: customer.locality.trim().length === 0,
   }
-}
-
-function normalizeShortCode(value: string): string {
-  return value.trim().replace(/^0+(\d)/, '$1')
-}
-
-function findByShortCode(
-  items: MenuItemRow[],
-  codeInput: string,
-): MenuItemRow | null {
-  const raw = codeInput.trim()
-  if (!raw) return null
-  const code = normalizeShortCode(raw)
-  return (
-    items.find(
-      (item) =>
-        item.available &&
-        (item.shortCode === raw || normalizeShortCode(item.shortCode) === code),
-    ) ?? null
-  )
 }
 
 function findBySearchQuery(
@@ -760,11 +745,7 @@ export default function CaptainOrders() {
         if (!itemNameMatchesQuery(item.name, search)) return false
       }
       if (shortCode.trim()) {
-        const code = shortCode.trim().replace(/^0+(\d)/, '$1')
-        const itemCode = item.shortCode.replace(/^0+(\d)/, '$1')
-        if (itemCode !== code && item.shortCode !== shortCode.trim()) {
-          return false
-        }
+        if (!matchesShortCode(item, shortCode)) return false
       }
       return true
     })
@@ -828,9 +809,13 @@ export default function CaptainOrders() {
   }
 
   function quickAddFromShortCode() {
-    const item = findByShortCode(menuItems, shortCode)
+    const { item, matches } = resolveByShortCode(menuItems, shortCode)
     if (!item) {
-      showToast('No item for this short code')
+      if (matches.length > 1) {
+        showToast(`Multiple items match "${shortCode.trim()}"`)
+      } else {
+        showToast('No item for this short code')
+      }
       return
     }
     addItem(item)
@@ -1258,12 +1243,15 @@ export default function CaptainOrders() {
           roundOffAmt) *
           100,
       ) / 100
-    const total =
-      pendingCharges?.settlementTotal ?? settlementAmount ?? computedTotal
+
+    // The bill's money is `computedTotal`. `settlementTotal` in the snapshot
+    // is the tendered cash — it belongs in received_amount at settle time,
+    // never in grand_total or on the printed receipt.
 
     // A counter print must not settle: the cart stays editable and Settle &
     // Save closes this same order later (print-then-settle, §21). So create
-    // the order, then `reprint` to promote saved → printed and bump print_count.
+    // the order — and only for the print actions `reprint` it, which promotes
+    // saved → printed and bumps print_count. Plain `Save` stops at `saved`.
     if (!hasTableSelected) {
       if (!encryptedOutletId) {
         showToast('No outlet selected — open Captain Orders from the sidebar')
@@ -1283,7 +1271,7 @@ export default function CaptainOrders() {
           tax_breakdown: taxBreakdown,
           round_off: roundOffAmt,
           discount: discountAmt,
-          grand_total: total,
+          grand_total: computedTotal,
           items: items.map((item) => ({
             name: item.name,
             qty: item.qty,
@@ -1302,14 +1290,18 @@ export default function CaptainOrders() {
           await adoptOrderKotsApi(outletId, order.id, billedKotIds)
         }
         // Allocate the invoice number now — settle would otherwise be the only
-        // allocator, and this bill is being printed before anyone pays.
+        // allocator, and this bill may be printed before anyone pays.
         const withBillNo = await allocateBillNoApi(
           outletId,
           order.id,
           orderTypeForApi(orderType),
         )
         printedBillNo = withBillNo.bill_no ? Number(withBillNo.bill_no) : null
-        await reprintOrderApi(outletId, order.id)
+        // Plain `Save` must leave the order `saved` so All Orders shows Saved
+        // rather than Printed; the table branch guards this the same way.
+        if (action === 'Save & Print' || action === 'Save & eBill') {
+          await reprintOrderApi(outletId, order.id)
+        }
       } catch (error) {
         showToast(
           error instanceof Error ? error.message : 'Failed to save the bill',
@@ -1369,7 +1361,7 @@ export default function CaptainOrders() {
         subtotal,
         tax,
         taxBreakdown,
-        total,
+        total: computedTotal,
         roundOff: roundOffAmt,
         discount: discountAmt,
         orderType,
@@ -1555,7 +1547,12 @@ export default function CaptainOrders() {
           taxBreakdown,
           roundOff: roundOffAmt,
           discount: discountAmt,
-          grandTotal: amount,
+          // `amount` is the tendered cash, so the bill itself is amount + due.
+          // Sending the tender as grand_total would make it equal
+          // received_amount and wipe balance_due, so the due would never
+          // reach the customer ledger (§5) - the toast below would promise a
+          // due the API never booked.
+          grandTotal: Math.round((amount + due) * 100) / 100,
           receivedAmount: amount,
           customerName: customer.name,
           customerPhone: customer.mobile,

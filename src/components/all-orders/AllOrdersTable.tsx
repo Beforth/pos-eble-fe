@@ -1,9 +1,19 @@
 import type { ReactNode, SVGProps } from 'react'
 import { Banknote, Eye, Pencil, ReceiptText, Search, ShoppingCart } from 'lucide-react'
-import type { AllOrderRow } from '../../mocks/allOrdersData'
+import type { AllOrderRow, OrderStatus } from '../../mocks/allOrdersData'
 import { formatINR } from '../../utils/format'
-import { Badge } from '../common/Badge'
+import { Badge, type BadgeVariant } from '../common/Badge'
 import { Table, type Column } from '../common/Table'
+
+/** `accent` (orange) marks a bill nobody has printed yet — same convention as
+ *  `LiveOrdersDetailModal`'s `saved` chip. Exhaustive over `OrderStatus` so a
+ *  new status fails to compile instead of silently defaulting to green. */
+const STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
+  Saved: 'accent',
+  Printed: 'success',
+  Settled: 'success',
+  Cancelled: 'primary',
+}
 
 /** Credit card + edit mark — matches POS-Eble “Change Payment Type” action. */
 function ChangePaymentIcon(props: SVGProps<SVGSVGElement>) {
@@ -174,10 +184,7 @@ export function AllOrdersTable({
       key: 'status',
       header: 'Status',
       render: (row) => (
-        <Badge
-          variant={row.status === 'Cancelled' ? 'primary' : 'success'}
-          size="sm"
-        >
+        <Badge variant={STATUS_VARIANT[row.status]} size="sm">
           {row.status}
         </Badge>
       ),
@@ -209,7 +216,7 @@ export function AllOrdersTable({
               <ReceiptText size={13} />
             </ActionButton>
           )}
-          {onOpenInBilling && row.status === 'Printed' ? (
+          {onOpenInBilling && (row.status === 'Printed' || row.status === 'Saved') ? (
             <ActionButton
               label="Open in billing"
               onClick={() => onOpenInBilling(row)}

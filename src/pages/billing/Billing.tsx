@@ -63,7 +63,12 @@ import {
   type KotOrderType,
   type OrderDto,
 } from '../../services/orderService'
-import { getItemInitials, itemNameMatchesQuery } from '../../utils/itemSearch'
+import {
+  getItemInitials,
+  itemNameMatchesQuery,
+  matchesShortCode,
+  resolveByShortCode,
+} from '../../utils/itemSearch'
 import { recordCoverSize } from '../../utils/coverSizeStore'
 import { randomDisplayToken } from '../customer-screen/customerDisplayData'
 import {
@@ -74,19 +79,27 @@ import {
   appendKotTicket,
   getTableSession,
   loadAllKotTickets,
+  loadWalkInKotIds,
   markTablePrinted,
   removeKotTicket,
   replaceKotTickets,
   saveAllKotTickets,
+  saveWalkInKotIds,
   settleTableSession,
   upsertKotTicketFromServer,
 } from '../../utils/tableStatusStore'
 import {
+  kotItemsForOrder,
   sendKotForOrder,
   settleKotOrder,
   type KotTaxTotals,
 } from '../../services/kotOrderFlow'
 import { subscribeToRail } from '../../services/liveRailClient'
+import {
+  isKotDismissed,
+  markKotDismissed,
+} from '../../utils/kotDismissStore'
+import { syncKotStoreFromServer } from '../../utils/kotStoreSync'
 import {
   computeTax,
   DEFAULT_TAX_SETTINGS,
@@ -113,6 +126,9 @@ const KOT_ORDER_TYPE_UPPER: Record<KotViewOrderType, KotOrderType> = {
   'pick-up': 'PICK UP',
   other: 'OTHER',
 }
+
+/** How often the KOT view re-reconciles with the server's open tickets. */
+const KOT_SYNC_INTERVAL_MS = 15000
 
 function orderTypeForApi(orderType: OrderType): 'dine-in' | 'delivery' | 'pick-up' {
   switch (orderType) {
@@ -167,26 +183,6 @@ function customerFieldErrors(customer: CustomerDetails) {
     mobile: normalizeCustomerMobile(customer.mobile).length !== 10,
     name: nameLen < 3 || nameLen > 12,
   }
-}
-
-function normalizeShortCode(value: string): string {
-  return value.trim().replace(/^0+(\d)/, '$1')
-}
-
-function findByShortCode(
-  items: MenuItemRow[],
-  codeInput: string,
-): MenuItemRow | null {
-  const raw = codeInput.trim()
-  if (!raw) return null
-  const code = normalizeShortCode(raw)
-  return (
-    items.find(
-      (item) =>
-        item.available &&
-        (item.shortCode === raw || normalizeShortCode(item.shortCode) === code),
-    ) ?? null
-  )
 }
 
 function findBySearchQuery(
@@ -484,8 +480,34 @@ export default function Billing() {
   const [focusKotNo, setFocusKotNo] = useState<number | null>(null)
   /** KOT opened from Kot View — always shown on the bill even without a table. */
   const [pinnedKotId, setPinnedKotId] = useState<string | null>(null)
+  /**
+   * Walk-in (no table) billable KOT session: every KOT sent in the current
+   * counter sale, in order, so print/settle bills them together. Persisted —
+   * a mid-session reload must not drop tickets from the bill (table sessions
+   * survive reloads the same way).
+   */
+  const [walkInKotIds, setWalkInKotIds] = useState<string[]>(() =>
+    loadWalkInKotIds(),
+  )
+  useEffect(() => {
+    saveWalkInKotIds(walkInKotIds)
+  }, [walkInKotIds])
   const [kotTickets, setKotTickets] = useState<KotTicket[]>(() =>
     loadAllKotTickets(),
+  )
+
+  /**
+   * KOTs the board shows. A settled ticket is hidden (`billed`) — the kitchen
+   * still cooks it. Dismissed KOTs stay in the shared store and on the server
+   * (register, kitchen, customer routes keep them) but are hidden from this
+   * terminal's KOT view for good.
+   */
+  const kotViewTickets = useMemo(
+    () =>
+      kotTickets.filter(
+        (ticket) => !isKotDismissed(ticket.id) && !ticket.billed,
+      ),
+    [kotTickets],
   )
   const [finalBillOpen, setFinalBillOpen] = useState(false)
   const [finalBillAction, setFinalBillAction] = useState<
@@ -531,6 +553,19 @@ export default function Billing() {
     }
   }, [encryptedOutletId])
 
+  /**
+   * Reconcile the KOT view with the server's open tickets. Run after a rail
+   * (re)connect — the rail has no backlog, so a ticket closed while this screen
+   * was disconnected would otherwise linger locally and read as a ticket "from
+   * nowhere".
+   */
+  const reconcileKotTickets = useCallback(() => {
+    if (!encryptedOutletId) return
+    void syncKotStoreFromServer(encryptedOutletId).then((changed) => {
+      if (changed) setKotTickets(loadAllKotTickets())
+    })
+  }, [encryptedOutletId])
+
   useEffect(() => {
     if (!encryptedOutletId || !token) return
 
@@ -542,6 +577,9 @@ export default function Billing() {
     return subscribeToRail({
       outletId: encryptedOutletId,
       token,
+      onStatus: (status) => {
+        if (status === 'open') reconcileKotTickets()
+      },
       onEvent: (event, data) => {
         if (event === 'kot.prep' || event === 'kot.modified') {
           upsertKotTicketFromServer(kotEventToTicket(data as KotEventData))
@@ -557,7 +595,20 @@ export default function Billing() {
         }
       },
     })
-  }, [encryptedOutletId, token])
+  }, [encryptedOutletId, token, reconcileKotTickets])
+
+  /**
+   * Keep the KOT view a live projection of the server's open tickets: on mount
+   * and every KOT_SYNC_INTERVAL_MS, tickets closed elsewhere are pruned and
+   * genuinely-open ones filled in. No date scope — live work carries across
+   * midnight (STANDARDS §22).
+   */
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    reconcileKotTickets()
+    const interval = window.setInterval(reconcileKotTickets, KOT_SYNC_INTERVAL_MS)
+    return () => window.clearInterval(interval)
+  }, [encryptedOutletId, reconcileKotTickets])
 
   useEffect(() => {
     const nextTableId = searchParams.get('tableId')
@@ -640,6 +691,9 @@ export default function Billing() {
         )
       }
       setPinnedKotId(ticket.id)
+      // Walk-in: the opened ticket joins the billable session so its items
+      // land on the same bill as every KOT sent after it.
+      if (!nextTableId) appendWalkInKotId(ticket.id)
       setFocusKotNo(ticket.kotNo)
       setKotViewOpen(false)
       if (toastedOpenKotRef.current !== id) {
@@ -728,6 +782,7 @@ export default function Billing() {
       )
       setPinnedKotId(null)
       setFocusKotNo(null)
+      clearWalkInKotSession()
       setResumeOrderId(order.id)
       if (toastedOpenOrderRef.current !== id) {
         toastedOpenOrderRef.current = id
@@ -769,11 +824,7 @@ export default function Billing() {
         if (!itemNameMatchesQuery(item.name, search)) return false
       }
       if (shortCode.trim()) {
-        const code = shortCode.trim().replace(/^0+(\d)/, '$1')
-        const itemCode = item.shortCode.replace(/^0+(\d)/, '$1')
-        if (itemCode !== code && item.shortCode !== shortCode.trim()) {
-          return false
-        }
+        if (!matchesShortCode(item, shortCode)) return false
       }
       return true
     })
@@ -843,15 +894,19 @@ export default function Billing() {
   }
 
   function quickAddFromShortCode() {
-    const code = shortCode.trim()
-    if (code === '00') {
+    const input = shortCode.trim()
+    if (input === '00') {
       setShortCode('')
       setOpenItemModalOpen(true)
       return
     }
-    const item = findByShortCode(menuItems, shortCode)
+    const { item, matches } = resolveByShortCode(menuItems, shortCode)
     if (!item) {
-      showToast('No item for this short code')
+      if (matches.length > 1) {
+        showToast(`Multiple items match "${shortCode.trim()}"`)
+      } else {
+        showToast('No item for this short code')
+      }
       return
     }
     addItem(item)
@@ -930,11 +985,20 @@ export default function Billing() {
     setOtherPayment(null)
   }
 
+  function appendWalkInKotId(id: string) {
+    setWalkInKotIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  }
+
+  function clearWalkInKotSession() {
+    setWalkInKotIds([])
+  }
+
   function clearBillForNextCustomer() {
     setLines([])
     setOrderNote('')
     setPinnedKotId(null)
     setFocusKotNo(null)
+    clearWalkInKotSession()
     setOrderType('dine-in')
     setPayment('cash')
     setTableId('')
@@ -1035,6 +1099,7 @@ export default function Billing() {
   function newOrder() {
     setPinnedKotId(null)
     setFocusKotNo(null)
+    clearWalkInKotSession()
     setResumeOrderId(null)
     navigate('/table-view')
   }
@@ -1077,6 +1142,15 @@ export default function Billing() {
       return base
     }
 
+    // Walk-in: every KOT sent in this counter sale shares one bill. Session
+    // ids persist across reloads; the pin alone used to bill a single ticket
+    // and strand the rest as their own bills.
+    const sessionTickets = walkInKotIds
+      .map((id) => kotTickets.find((t) => t.id === id))
+      .filter((t): t is KotTicket => Boolean(t))
+    if (sessionTickets.length > 0) {
+      return sessionTickets.map(toSummary)
+    }
     if (pinnedKotId) {
       const pinned = kotTickets.find((t) => t.id === pinnedKotId)
       return pinned ? [toSummary(pinned)] : []
@@ -1086,6 +1160,7 @@ export default function Billing() {
     hasTableSelected,
     tableKotTickets,
     pinnedKotId,
+    walkInKotIds,
     kotTickets,
   ])
 
@@ -1107,9 +1182,9 @@ export default function Billing() {
     [tableKotSummary],
   )
 
-  // Table KOTs (and a KOT pinned from Kot View) fold into the bill total.
+  // Table KOTs (and the walk-in KOT session) fold into the bill total.
   const billTotal =
-    hasTableSelected || pinnedKotId
+    hasTableSelected || pinnedKotId || walkInKotIds.length > 0
       ? currentLinesTotal + kotTotal
       : currentLinesTotal
 
@@ -1276,12 +1351,15 @@ export default function Billing() {
           roundOffAmt) *
           100,
       ) / 100
-    const total =
-      pendingCharges?.settlementTotal ?? settlementAmount ?? computedTotal
+
+    // The bill's money is `computedTotal`. `settlementTotal` in the snapshot
+    // is the tendered cash — it belongs in received_amount at settle time,
+    // never in grand_total or on the printed receipt.
 
     // A counter print must not settle: the cart stays editable and Settle &
     // Save closes this same order later (print-then-settle, §21). So create
-    // the order, then `reprint` to promote saved → printed and bump print_count.
+    // the order — and only for the print actions `reprint` it, which promotes
+    // saved → printed and bumps print_count. Plain `Save` stops at `saved`.
     if (!hasTableSelected) {
       if (!encryptedOutletId) {
         showToast('No outlet selected — open Billing from the sidebar')
@@ -1301,7 +1379,7 @@ export default function Billing() {
           tax_breakdown: taxBreakdown,
           round_off: roundOffAmt,
           discount: discountAmt,
-          grand_total: total,
+          grand_total: computedTotal,
           items: items.map((item) => ({
             name: item.name,
             qty: item.qty,
@@ -1320,14 +1398,18 @@ export default function Billing() {
           await adoptOrderKotsApi(outletId, order.id, billedKotIds)
         }
         // Allocate the invoice number now — settle would otherwise be the only
-        // allocator, and this bill is being printed before anyone pays.
+        // allocator, and this bill may be printed before anyone pays.
         const withBillNo = await allocateBillNoApi(
           outletId,
           order.id,
           orderTypeForApi(orderType),
         )
         printedBillNo = withBillNo.bill_no ? Number(withBillNo.bill_no) : null
-        await reprintOrderApi(outletId, order.id)
+        // Plain `Save` must leave the order `saved` so All Orders shows Saved
+        // rather than Printed; the table branch guards this the same way.
+        if (action === 'Save & Print' || action === 'Save & eBill') {
+          await reprintOrderApi(outletId, order.id)
+        }
       } catch (error) {
         showToast(
           error instanceof Error ? error.message : 'Failed to save the bill',
@@ -1387,7 +1469,7 @@ export default function Billing() {
         subtotal,
         tax,
         taxBreakdown,
-        total,
+        total: computedTotal,
         roundOff: roundOffAmt,
         discount: discountAmt,
         orderType,
@@ -1466,7 +1548,20 @@ export default function Billing() {
       // received_amount carries the short payment — grand_total must keep the
       // full amount or the order's balance_due would be wiped (§5).
       const billTotal = Math.round((amount + due) * 100) / 100
+      const billedKotIds = billedKots
+        .map((kot) => kot.id)
+        .filter((id) => !id.startsWith('kot-'))
       try {
+        // Attach every KOT on this bill first — a walk-in session KOT sent
+        // after the print would otherwise settle with the money but stay
+        // orphaned and surface as a second bill.
+        if (billedKotIds.length > 0) {
+          await adoptOrderKotsApi(
+            encryptedOutletId,
+            resumeOrderId,
+            billedKotIds,
+          )
+        }
         await updateOrderApi(encryptedOutletId, resumeOrderId, {
           action: 'edit',
           customer_name: customer.name.trim(),
@@ -1507,6 +1602,7 @@ export default function Billing() {
         }
         setPinnedKotId(null)
         setFocusKotNo(null)
+        clearWalkInKotSession()
       }
       setLines([])
       setOrderNote('')
@@ -1574,7 +1670,12 @@ export default function Billing() {
           taxBreakdown,
           roundOff: roundOffAmt,
           discount: discountAmt,
-          grandTotal: amount,
+          // `amount` is the tendered cash, so the bill itself is amount + due.
+          // Sending the tender as grand_total would make it equal
+          // received_amount and wipe balance_due, so the due would never
+          // reach the customer ledger (§5) - the toast below would promise a
+          // due the API never booked.
+          grandTotal: Math.round((amount + due) * 100) / 100,
           receivedAmount: amount,
           customerName: customer.name,
           customerPhone: customer.mobile,
@@ -1598,6 +1699,7 @@ export default function Billing() {
       }
       setPinnedKotId(null)
       setFocusKotNo(null)
+      clearWalkInKotSession()
       setSettlementAmount(null)
       setPendingCharges(null)
       setLines([])
@@ -1804,6 +1906,42 @@ export default function Billing() {
       setKotTickets(next)
       setLines([])
       setOrderNote('')
+      // No table: the new KOT joins the billable session — otherwise it is
+      // billed as its own second bill.
+      if (!hasTableSelected) appendWalkInKotId(saved.id)
+      // A printed counter bill already owns an order: write the KOT session
+      // back into it right away, so a later reprint shows this ticket and the
+      // settle adopts it instead of leaving it to be billed a second time.
+      if (!hasTableSelected && resumeOrderId && encryptedOutletId) {
+        const sessionIds = walkInKotIds.includes(saved.id)
+          ? walkInKotIds
+          : [...walkInKotIds, saved.id]
+        const sessionTickets = sessionIds
+          .map((id) => next.find((t) => t.id === id))
+          .filter((t): t is KotTicket => Boolean(t))
+        const bill = kotItemsForOrder(
+          sessionTickets,
+          kotTaxTotals(sessionTickets),
+        )
+        const serverIds = sessionTickets
+          .map((t) => t.id)
+          .filter((id) => !id.startsWith('kot-'))
+        try {
+          await updateOrderApi(encryptedOutletId, resumeOrderId, {
+            action: 'edit',
+            ...bill,
+          })
+          if (serverIds.length > 0) {
+            await adoptOrderKotsApi(
+              encryptedOutletId,
+              resumeOrderId,
+              serverIds,
+            )
+          }
+        } catch {
+          // Best-effort — the settle path re-syncs items and adopts too.
+        }
+      }
       if (action === 'KOT & Print') {
         setPrintTicket(saved)
       }
@@ -1821,7 +1959,7 @@ export default function Billing() {
 
     if (action === 'Save') {
       if (lines.length === 0) {
-        showToast('Add items before saving to View KOT')
+        showToast('Add items before saving')
         return
       }
       if (payment === 'due' && !isCustomerComplete(customer)) {
@@ -1832,25 +1970,9 @@ export default function Billing() {
         return
       }
 
-      const ticket = createKotFromLines(lines, orderNote)
-      if (!ticket) return
-
-      let saved: KotTicket
-      try {
-        saved = await sendKotViaApi(ticket)
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Failed to send KOT')
-        return
-      }
-
-      const next = appendKotTicket(saved)
-      setKotTickets(next)
-      setLines([])
-      setOrderNote('')
-      showToast(
-        `Table ${saved.tableNo} · KOT ${saved.kotNo} saved · opening View KOT`,
-      )
-      setKotViewOpen(true)
+      // Keep charges across startFinalBill (which may clear cart lines / billTotal).
+      setPendingCharges(charges ?? null)
+      void startFinalBill(action)
       return
     }
 
@@ -2078,7 +2200,7 @@ export default function Billing() {
         />
       ) : kotViewOpen ? (
         <KotView
-          tickets={kotTickets}
+          tickets={kotViewTickets}
           priceTickets={kotTaxTotals}
           onBack={() => setKotViewOpen(false)}
           onOpenInBilling={(ticket) => {
@@ -2106,6 +2228,7 @@ export default function Billing() {
               )
             }
             setPinnedKotId(ticket.id)
+            if (!nextTableId) appendWalkInKotId(ticket.id)
             setFocusKotNo(ticket.kotNo)
             setKotViewOpen(false)
             showToast(
@@ -2138,11 +2261,8 @@ export default function Billing() {
             }
           }}
           onDismiss={(id) => {
-            setKotTickets((prev) => {
-              const next = prev.filter((t) => t.id !== id)
-              replaceKotTickets(next)
-              return next
-            })
+            markKotDismissed(id)
+            setKotTickets((prev) => prev.filter((t) => t.id !== id))
             showToast('KOT dismissed')
           }}
           onSettleSave={async ({ tableId: settledTableId, ticketIds, result }) => {
@@ -2278,6 +2398,7 @@ export default function Billing() {
         lines={lines}
           tableKots={tableKotSummary}
           focusKotNo={focusKotNo}
+          hideSentKotRows={!hasTableSelected}
           taxSource={taxSource}
           taxSettings={calcTaxSettings}
           orderType={orderType}
@@ -2298,6 +2419,9 @@ export default function Billing() {
             setTableId(id)
             setPinnedKotId(null)
             setFocusKotNo(null)
+            // Picking a real table abandons the walk-in KOT session; simply
+            // re-picking "No table" keeps it so its tickets stay on the bill.
+            if (id) clearWalkInKotSession()
           }}
           onGuestsChange={setGuests}
           onComplimentaryChange={setComplimentary}

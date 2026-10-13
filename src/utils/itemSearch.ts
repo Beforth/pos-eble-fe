@@ -1,3 +1,52 @@
+import type { MenuItemRow } from './menuAdapter'
+
+/**
+ * Normalize a short code for comparison: trim, lowercase, strip leading zeros
+ * ("01" → "1", "Vb" → "vb").
+ */
+export function normalizeShortCode(value: string): string {
+  return value.trim().toLowerCase().replace(/^0+(\d)/, '$1')
+}
+
+function itemShortCodes(
+  item: Pick<MenuItemRow, 'shortCode' | 'shortCode2'>,
+): string[] {
+  return [item.shortCode, item.shortCode2].filter((c): c is string => Boolean(c))
+}
+
+/** Case-insensitive exact or prefix match against the item's short codes. */
+export function matchesShortCode(
+  item: Pick<MenuItemRow, 'shortCode' | 'shortCode2'>,
+  input: string,
+): boolean {
+  const query = normalizeShortCode(input)
+  if (!query) return false
+  return itemShortCodes(item).some((code) => {
+    const normalized = normalizeShortCode(code)
+    return normalized === query || normalized.includes(query)
+  })
+}
+
+/**
+ * Resolve a short-code input to a single addable item. Exact matches win; else
+ * a unique prefix match; `matches` counts every candidate so a caller can tell
+ * an ambiguous prefix from a miss.
+ */
+export function resolveByShortCode(
+  items: MenuItemRow[],
+  input: string,
+): { item: MenuItemRow | null; matches: MenuItemRow[] } {
+  const query = normalizeShortCode(input)
+  if (!query) return { item: null, matches: [] }
+  const candidates = items.filter((item) => item.available && matchesShortCode(item, query))
+  if (candidates.length === 0) return { item: null, matches: [] }
+  const exact = candidates.filter((item) =>
+    itemShortCodes(item).some((code) => normalizeShortCode(code) === query),
+  )
+  const item = exact.length > 0 ? exact[0]! : candidates.length === 1 ? candidates[0]! : null
+  return { item, matches: candidates }
+}
+
 /** Collapse stretched vowels so "pani" matches "paani". */
 export function normalizeFoodText(value: string): string {
   return value

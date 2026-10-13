@@ -5,6 +5,7 @@ import { kotTicketAmount } from '../mocks/kotViewData'
 const STATUS_KEY = 'pos-eble-table-floor-statuses'
 const SESSION_KEY = 'pos-eble-table-sessions'
 const KOT_KEY = 'pos-eble-all-kot-tickets'
+const WALK_IN_SESSION_KEY = 'pos-eble-walkin-kot-session'
 
 export const KOT_STORE_EVENT = 'pos-eble-kot-store'
 
@@ -133,6 +134,28 @@ export function saveAllKotTickets(tickets: KotTicket[]): void {
   }
 }
 
+/**
+ * The walk-in (no table) billable KOT session: every KOT sent in the current
+ * counter sale, in order. Table sessions are keyed by table id, but a walk-in
+ * tableId is always '' so it needs its own list — otherwise only a single
+ * pinned KOT ever reaches the bill and the rest are billed separately.
+ */
+export function loadWalkInKotIds(): string[] {
+  try {
+    const raw = localStorage.getItem(WALK_IN_SESSION_KEY)
+    const parsed = JSON.parse(raw ?? '[]')
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+export function saveWalkInKotIds(ids: string[]): void {
+  localStorage.setItem(WALK_IN_SESSION_KEY, JSON.stringify(ids))
+}
+
 export function updateKotTicketStatus(
   ticketId: string,
   status: 'active' | 'ready',
@@ -194,6 +217,7 @@ export function upsertKotTicketFromServer(ticket: KotTicket): KotTicket[] {
     orderType: ticket.orderType ?? existing.orderType,
     customerName: ticket.customerName ?? existing.customerName,
     status: ticket.status === 'ready' ? 'ready' : existing.status,
+    billed: ticket.billed ?? existing.billed,
     items:
       ticket.items.length > 0
         ? ticket.items.map((item, i) => ({

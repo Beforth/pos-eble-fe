@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-type BadgeVariant = 'primary' | 'secondary' | 'accent' | 'success' | 'neutral'
+export type BadgeVariant = 'primary' | 'secondary' | 'accent' | 'success' | 'neutral'
 type BadgeSize = 'sm' | 'md'
 
 interface BadgeProps {
