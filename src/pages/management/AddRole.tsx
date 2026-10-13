@@ -133,6 +133,7 @@ export default function AddRole() {
             type="button"
             onClick={goBack}
             aria-label="Back to Roles"
+            data-tooltip="Back to Roles"
             className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
           >
             <ArrowLeft size={18} />

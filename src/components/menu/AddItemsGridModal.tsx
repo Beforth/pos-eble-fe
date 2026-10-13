@@ -158,6 +158,7 @@ export function AddItemsGridModal({
             onClick={onClose}
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
             aria-label="Close"
+            data-tooltip="Close"
           >
             <X size={18} />
           </button>
@@ -255,6 +256,7 @@ export function AddItemsGridModal({
                       <button
                         type="button"
                         aria-label="Remove row"
+                        data-tooltip="Remove row"
                         disabled={rows.length <= 1}
                         onClick={() =>
                           rows.length > 1 && setPendingRemove(row)

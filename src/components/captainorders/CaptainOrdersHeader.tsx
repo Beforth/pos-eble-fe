@@ -13,11 +13,9 @@ import {
   Monitor,
   Phone,
   Plus,
-  ScrollText,
   Search,
   Settings,
   Store,
-  Sun,
   TrendingUp,
   User,
   UtensilsCrossed,
@@ -36,13 +34,14 @@ import {
   toDayEndSummaryRow,
 } from '../../services/orderService'
 
+// Only screens a captain can actually open. No Day End and no Logs: both are
+// gated on pos_day_end, which captain is denied, so there is no captain
+// Day End or Logs screen. Billing's own /logs is unchanged.
 const CAPTAIN_SIDEBAR_LINKS = [
   { to: '/captain-orders',            label: 'Captain Orders', icon: ChefHat },
   { to: '/captain-orders/live-orders', label: 'Live Orders',    icon: Monitor },
   { to: '/captain-orders/all-orders',  label: 'All Orders',     icon: BookOpen },
   { to: '/captain-orders/kot',         label: 'KOT',            icon: UtensilsCrossed },
-  { to: '/captain-orders/day-end',     label: 'Day End',        icon: Sun },
-  { to: '/captain-orders/logs',        label: 'Logs',           icon: ScrollText },
 ] as const
 
 interface CaptainOrdersHeaderProps {
@@ -60,7 +59,7 @@ export function CaptainOrdersHeader({
 }: CaptainOrdersHeaderProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { logout, user, encryptedOutletId, isAdmin } = useAuth()
+  const { logout, user, encryptedOutletId, isAdmin, canAccess } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [menuViewOpen, setMenuViewOpen] = useState(false)
@@ -160,6 +159,7 @@ export function CaptainOrdersHeader({
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Open navigation"
+          data-tooltip="Open navigation"
           className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
         >
           <Menu size={20} />
@@ -175,7 +175,6 @@ export function CaptainOrdersHeader({
         <button
           type="button"
           onClick={onNewOrder}
-          title="New Order"
           aria-label="New Order"
           className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
         >
@@ -231,7 +230,7 @@ export function CaptainOrdersHeader({
             <button
               key={label}
               type="button"
-              title={label}
+              data-tooltip={label}
               aria-label={label}
               onClick={onClick}
               className="hidden size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink sm:inline-flex lg:size-9"
@@ -244,7 +243,7 @@ export function CaptainOrdersHeader({
             <button
               type="button"
               data-profile-trigger
-              title={user?.name ?? 'Profile'}
+              data-tooltip={user?.name ?? 'Profile'}
               aria-label={user?.name ?? 'Profile'}
               onClick={() => setProfileOpen((p) => !p)}
               className={`hidden size-8 items-center justify-center rounded-lg sm:inline-flex lg:size-9 ${
@@ -331,7 +330,7 @@ export function CaptainOrdersHeader({
           <button
             type="button"
             onClick={handleLogout}
-            title="Logout"
+            data-tooltip="Logout"
             aria-label="Logout"
             className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-primary"
           >
@@ -358,6 +357,7 @@ export function CaptainOrdersHeader({
                 type="button"
                 onClick={closeDrawer}
                 aria-label="Close"
+                data-tooltip="Close"
                 className="rounded-lg p-1.5 text-muted hover:bg-page"
               >
                 <X size={18} />
@@ -365,32 +365,34 @@ export function CaptainOrdersHeader({
             </div>
             <nav className="flex-1 overflow-y-auto p-2">
               <ul className="space-y-0.5">
-                {CAPTAIN_SIDEBAR_LINKS.map(({ to, label, icon: Icon }) => {
-                  const active =
-                    to === '/captain-orders'
-                      ? pathname === '/captain-orders'
-                      : pathname.startsWith(to)
-                  return (
-                    <li key={to}>
-                      <Link
-                        to={to}
-                        onClick={closeDrawer}
-                        aria-current={active ? 'page' : undefined}
-                        className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
-                          active
-                            ? 'bg-primary/10 text-primary font-semibold'
-                            : 'text-ink hover:bg-page'
-                        }`}
-                      >
-                        <Icon
-                          size={18}
-                          className={active ? 'text-primary' : 'text-muted'}
-                        />
-                        {label}
-                      </Link>
-                    </li>
-                  )
-                })}
+                {CAPTAIN_SIDEBAR_LINKS.filter(({ to }) => canAccess(to)).map(
+                  ({ to, label, icon: Icon }) => {
+                    const active =
+                      to === '/captain-orders'
+                        ? pathname === '/captain-orders'
+                        : pathname.startsWith(to)
+                    return (
+                      <li key={to}>
+                        <Link
+                          to={to}
+                          onClick={closeDrawer}
+                          aria-current={active ? 'page' : undefined}
+                          className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                            active
+                              ? 'bg-primary/10 text-primary font-semibold'
+                              : 'text-ink hover:bg-page'
+                          }`}
+                        >
+                          <Icon
+                            size={18}
+                            className={active ? 'text-primary' : 'text-muted'}
+                          />
+                          {label}
+                        </Link>
+                      </li>
+                    )
+                  },
+                )}
 
                 {isAdmin ? (
                   <>
@@ -471,6 +473,7 @@ export function CaptainOrdersHeader({
                   setMenuSearch('')
                 }}
                 aria-label="Close"
+                data-tooltip="Close"
                 className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
               >
                 <X size={18} />
@@ -563,6 +566,7 @@ export function CaptainOrdersHeader({
                 type="button"
                 onClick={() => setStoreInfoOpen(false)}
                 aria-label="Close"
+                data-tooltip="Close"
                 className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
               >
                 <X size={18} />
@@ -683,6 +687,7 @@ export function CaptainOrdersHeader({
                 type="button"
                 onClick={() => setQuickReportsOpen(false)}
                 aria-label="Close"
+                data-tooltip="Close"
                 className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
               >
                 <X size={18} />
@@ -818,6 +823,7 @@ function BillingSettingsModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />

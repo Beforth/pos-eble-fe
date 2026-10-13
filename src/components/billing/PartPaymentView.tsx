@@ -342,6 +342,7 @@ export function PartPaymentView({
                 <button
                   type="button"
                   aria-label={`Remove ${entry.label}`}
+                  data-tooltip={`Remove ${entry.label}`}
                   onClick={() => removeEntry(entry.id)}
                   className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary text-white hover:bg-primary-hover"
                 >

@@ -4,6 +4,7 @@ import { showToast } from '../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, Plus, RefreshCw } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
+import { CaptainOrdersHeader } from '../components/captainorders/CaptainOrdersHeader'
 import {
   TABLE_STATUS_LEGEND,
   tableCardClass,
@@ -25,7 +26,7 @@ const AREA_ORDER = ['Ground Floor', 'BASEMENT', 'Party Hall'] as const
 
 export default function TableView() {
   const navigate = useNavigate()
-  const { encryptedOutletId, token } = useAuth()
+  const { encryptedOutletId, token, canAccess } = useAuth()
   const [searchParams] = useSearchParams()
   const [billNo, setBillNo] = useState('')
   const [moveKot, setMoveKot] = useState(false)
@@ -112,55 +113,66 @@ export default function TableView() {
     showToast('Table view refreshed')
   }
 
+  /**
+   * The order-taking screen this floor plan feeds. A captain is denied the
+   * billing right, so they get `?from=captain` on the URL and everything here
+   * must follow them into Captain Orders; a biller stays on Billing. A user who
+   * cannot open Billing at all is treated as a captain even without the flag,
+   * so a stray `/table-view` never dead-ends on a denied screen.
+   */
+  const isCaptainMode =
+    searchParams.get('from') === 'captain' || !canAccess('/billing')
+  const orderBase = isCaptainMode ? '/captain-orders' : '/billing'
+
   function openTable(tableId: string, tableNo: string, persons: number) {
     const query = `tableId=${encodeURIComponent(tableId)}&tableNo=${encodeURIComponent(tableNo)}&persons=${persons}`
-    if (searchParams.get('from') === 'captain') {
-      navigate(`/captain-orders?${query}`)
-      return
-    }
-    navigate(`/billing?${query}`)
+    navigate(`${orderBase}?${query}`)
   }
 
   function viewTable(tableId: string, tableNo: string, persons: number) {
     const query = `tableId=${encodeURIComponent(tableId)}&tableNo=${encodeURIComponent(tableNo)}&persons=${persons}&view=1`
-    if (searchParams.get('from') === 'captain') {
-      navigate(`/captain-orders?${query}`)
-      return
-    }
-    navigate(`/billing?${query}`)
+    navigate(`${orderBase}?${query}`)
   }
 
   function openOrderType(type: 'delivery' | 'pick-up') {
-    navigate(`/billing?orderType=${type}`)
+    navigate(`${orderBase}?orderType=${type}`)
   }
 
   function openNoTable() {
-    if (searchParams.get('from') === 'captain') {
-      navigate('/captain-orders')
-      return
-    }
-    navigate('/billing')
+    navigate(orderBase)
   }
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
 
-      <BillingHeader
-        billNo={billNo}
-        onBillNoChange={setBillNo}
-        onNewOrder={() => {
-          setBillNo('')
-          showToast('Select a table to start a new order')
-        }}
-        onViewKot={() => navigate('/billing?kot=1')}
-      />
+      {isCaptainMode ? (
+        <CaptainOrdersHeader
+          billNo={billNo}
+          onBillNoChange={setBillNo}
+          onNewOrder={() => {
+            setBillNo('')
+            showToast('Select a table to start a new order')
+          }}
+          onViewKot={() => navigate('/captain-orders/kot')}
+        />
+      ) : (
+        <BillingHeader
+          billNo={billNo}
+          onBillNoChange={setBillNo}
+          onNewOrder={() => {
+            setBillNo('')
+            showToast('Select a table to start a new order')
+          }}
+          onViewKot={() => navigate('/billing?kot=1')}
+        />
+      )}
 
       <div className="flex items-center gap-2 border-b border-line bg-white px-4 py-2.5">
         <h1 className="text-base font-semibold text-ink">Table View</h1>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button
             type="button"
-            title="Refresh"
+            data-tooltip="Refresh"
             aria-label="Refresh"
             onClick={handleRefresh}
             className="inline-flex size-9 items-center justify-center rounded border border-line text-muted hover:bg-page hover:text-ink"
@@ -181,14 +193,16 @@ export default function TableView() {
           >
             Pick Up
           </button>
-          <button
-            type="button"
-            onClick={() => navigate('/menu/tables')}
-            className="inline-flex h-9 items-center gap-1 rounded bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            Add Table
-          </button>
+          {canAccess('/menu/tables') && (
+            <button
+              type="button"
+              onClick={() => navigate('/menu/tables')}
+              className="inline-flex h-9 items-center gap-1 rounded bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
+            >
+              <Plus size={14} strokeWidth={2.5} />
+              Add Table
+            </button>
+          )}
         </div>
       </div>
 
@@ -236,7 +250,8 @@ export default function TableView() {
           </h2>
           <button
             type="button"
-            title="Start order without a table"
+            aria-label="Start order without a table"
+            data-tooltip="Start order without a table"
             onClick={openNoTable}
             className="flex size-[72px] flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-[#bdbdbd] bg-[#e8e8e8] text-ink transition hover:brightness-95 sm:size-20"
           >
@@ -276,7 +291,7 @@ export default function TableView() {
                         </p>
                         <button
                           type="button"
-                          title="View order"
+                          data-tooltip="View order"
                           aria-label={`View table ${table.tableNo}`}
                           onClick={(event) => {
                             event.stopPropagation()
@@ -298,7 +313,8 @@ export default function TableView() {
                     <button
                       key={table.id}
                       type="button"
-                      title={`Table ${table.tableNo}`}
+                      aria-label={`Table ${table.tableNo}`}
+                      data-tooltip={`Table ${table.tableNo}`}
                       onClick={() =>
                         openTable(table.id, table.tableNo, table.persons)
                       }

@@ -94,6 +94,7 @@ export function ExpensesPanel({
                 <button
                   type="button"
                   aria-label={`Edit ${line.label}`}
+                  data-tooltip={`Edit ${line.label}`}
                   onClick={() => setEditing(line.type)}
                   className="rounded p-1 text-muted transition-colors hover:bg-page hover:text-ink"
                 >

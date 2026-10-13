@@ -89,6 +89,7 @@ export function OtherDetailsDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-md p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -199,6 +200,7 @@ export function OtherDetailsDrawer({
                           key={item.label}
                           type="button"
                           aria-label={item.label}
+                          data-tooltip={item.label}
                           className="inline-flex size-8 items-center justify-center rounded text-muted hover:bg-card hover:text-ink"
                         >
                           <Icon size={14} />

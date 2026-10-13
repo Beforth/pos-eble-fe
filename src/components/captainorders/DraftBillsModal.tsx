@@ -170,6 +170,7 @@ export function DraftBillsModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -223,7 +224,7 @@ export function DraftBillsModal({
                     </div>
                     <button
                       type="button"
-                      title="Delete draft"
+                      data-tooltip="Delete draft"
                       aria-label="Delete draft"
                       onClick={() => setPendingDelete(draft)}
                       className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-line text-muted hover:border-primary hover:text-primary"

@@ -75,6 +75,7 @@ export function KotTicketViewModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 hover:bg-black/10"
           >
             <X size={18} />

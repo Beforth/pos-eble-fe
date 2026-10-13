@@ -1068,7 +1068,7 @@ export default function BaseMenu({
                           type="button"
                           className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-success/40 bg-success/10 text-success hover:bg-success/20"
                           aria-label="Upload image"
-                          title={row.hasImage ? 'Manage image' : 'Upload image'}
+                          data-tooltip={row.hasImage ? 'Manage image' : 'Upload image'}
                         >
                           <Upload size={15} />
                         </button>
@@ -1193,6 +1193,7 @@ export default function BaseMenu({
                   onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                   className="inline-flex size-8 cursor-pointer items-center justify-center rounded border border-line bg-card text-ink hover:bg-page disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="Previous page"
+                  data-tooltip="Previous page"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -1222,6 +1223,7 @@ export default function BaseMenu({
                   }
                   className="inline-flex size-8 cursor-pointer items-center justify-center rounded border border-line bg-card text-ink hover:bg-page disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="Next page"
+                  data-tooltip="Next page"
                 >
                   <ChevronRight size={16} />
                 </button>

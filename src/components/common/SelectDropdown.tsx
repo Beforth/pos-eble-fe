@@ -93,7 +93,8 @@ export function SelectDropdown({
         onClick={() => setOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        title={selectedOption?.label}
+        aria-label={selectedOption?.label}
+        data-tooltip={selectedOption?.label}
         className={`inline-flex min-w-0 items-center gap-2 rounded-lg border border-line bg-card px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-muted ${triggerClassName}`}
       >
         <span className="min-w-0 flex-1 truncate text-left">

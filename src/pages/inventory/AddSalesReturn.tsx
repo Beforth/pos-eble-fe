@@ -560,7 +560,7 @@ export default function AddSalesReturn() {
                     : 'Edit credit note number'
                 }
                 aria-pressed={creditNoteEditable}
-                title={
+                data-tooltip={
                   creditNoteEditable
                     ? 'Lock credit note number'
                     : 'Click to edit credit note number'
@@ -908,6 +908,7 @@ export default function AddSalesReturn() {
                     <button
                       type="button"
                       aria-label="Add note"
+                      data-tooltip="Add note"
                       onClick={() => {
                         if (!line.rawMaterial.trim()) {
                           setSelectItemAlertOpen(true)
@@ -926,6 +927,7 @@ export default function AddSalesReturn() {
                     <button
                       type="button"
                       aria-label="Remove row"
+                      data-tooltip="Remove row"
                       onClick={() =>
                         setLines((prev) => {
                           const next = prev.filter((row) => row.id !== line.id)

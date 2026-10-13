@@ -4,6 +4,7 @@ import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
 import { BarChart3, Download, Loader2, Search } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
+import { BILLING_RIGHT_CODENAME } from '../../auth/routePermissions'
 import { CaptainOrdersHeader } from '../../components/captainorders/CaptainOrdersHeader'
 import { AllOrdersChart } from '../../components/all-orders/AllOrdersChart'
 import { AllOrdersTable } from '../../components/all-orders/AllOrdersTable'
@@ -20,9 +21,14 @@ const PAGE_SIZE = 10
 
 export default function CaptainOrdersAllOrders() {
   const navigate = useNavigate()
-  const { encryptedOutletId, token } = useAuth()
+  const { encryptedOutletId, token, hasPermission } = useAuth()
+  // A Captain reaches this board on `kot_kot_management_read` (the backend opens
+  // GET order-list for it) but holds no billing right, so the billing-gated
+  // money and edits stay hidden. Per-order amounts on each row are part of the
+  // ticket they manage and are always shown.
+  const canBill = hasPermission(BILLING_RIGHT_CODENAME)
   const { orders, chartSeries, grandTotal, loading, saveChangePayment, saveDueCollect } =
-    useAllOrdersData(encryptedOutletId, token)
+    useAllOrdersData(encryptedOutletId, token, { includeRevenue: canBill })
   const [billNo, setBillNo] = useState('')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -133,45 +139,55 @@ export default function CaptainOrdersAllOrders() {
         order={viewKotOrder}
         onClose={() => setViewKotOrder(null)}
       />
-      <EditOrderModal
-        open={Boolean(editOrder)}
-        order={editOrder}
-        onClose={() => setEditOrder(null)}
-      />
-      <ChangePaymentModal
-        open={Boolean(changePaymentOrder)}
-        order={changePaymentOrder}
-        onClose={() => setChangePaymentOrder(null)}
-        onSave={saveChangePayment}
-      />
-      <SettleDueModal
-        open={Boolean(dueOrder)}
-        order={dueOrder}
-        onClose={() => setDueOrder(null)}
-        onSave={saveDueCollect}
-      />
+      {canBill && (
+        <EditOrderModal
+          open={Boolean(editOrder)}
+          order={editOrder}
+          onClose={() => setEditOrder(null)}
+        />
+      )}
+      {canBill && (
+        <ChangePaymentModal
+          open={Boolean(changePaymentOrder)}
+          order={changePaymentOrder}
+          onClose={() => setChangePaymentOrder(null)}
+          onSave={saveChangePayment}
+        />
+      )}
+      {canBill && (
+        <SettleDueModal
+          open={Boolean(dueOrder)}
+          order={dueOrder}
+          onClose={() => setDueOrder(null)}
+          onSave={saveDueCollect}
+        />
+      )}
 
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold text-ink">All Orders</h1>
-            <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">
-              {loading ? '—' : formatINR(grandTotal)}
-            </span>
+            {canBill && (
+              <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">
+                {loading ? '—' : formatINR(grandTotal)}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setChartOpen((o) => !o)}
-              className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium ${
-                chartOpen
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-line bg-card text-ink hover:bg-page'
-              }`}
-            >
-              <BarChart3 size={14} />
-              Last 15 Days
-            </button>
+            {canBill && (
+              <button
+                type="button"
+                onClick={() => setChartOpen((o) => !o)}
+                className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium ${
+                  chartOpen
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-line bg-card text-ink hover:bg-page'
+                }`}
+              >
+                <BarChart3 size={14} />
+                Last 15 Days
+              </button>
+            )}
             <button
               type="button"
               onClick={handleExport}
@@ -183,7 +199,7 @@ export default function CaptainOrdersAllOrders() {
           </div>
         </div>
 
-        {chartOpen ? (
+        {canBill && chartOpen ? (
           <div className="mb-4 rounded-xl border border-line bg-card p-4">
             <AllOrdersChart series={chartSeries} />
           </div>
@@ -248,9 +264,9 @@ export default function CaptainOrdersAllOrders() {
               onToggleAll={handleToggleAll}
               onView={setViewOrder}
               onViewKot={setViewKotOrder}
-              onEdit={setEditOrder}
-              onChangePayment={setChangePaymentOrder}
-              onSettleDue={setDueOrder}
+              onEdit={canBill ? setEditOrder : undefined}
+              onChangePayment={canBill ? setChangePaymentOrder : undefined}
+              onSettleDue={canBill ? setDueOrder : undefined}
             />
           </div>
 

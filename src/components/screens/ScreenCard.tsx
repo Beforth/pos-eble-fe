@@ -40,7 +40,7 @@ export function ScreenCard({ screen, onOpen, onEdit, onDelete }: ScreenCardProps
                 type="button"
                 onClick={() => onEdit(screen)}
                 aria-label={`Settings for ${screen.name}`}
-                title="Screen Settings"
+                data-tooltip="Screen Settings"
                 className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
               >
                 <Settings size={16} />
@@ -50,6 +50,7 @@ export function ScreenCard({ screen, onOpen, onEdit, onDelete }: ScreenCardProps
               type="button"
               onClick={() => onDelete(screen)}
               aria-label={`Delete ${screen.name}`}
+              data-tooltip={`Delete ${screen.name}`}
               className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-primary"
             >
               <Trash2 size={16} />

@@ -124,6 +124,7 @@ export default function RoleManagement() {
                         <button
                           type="button"
                           aria-label={`Edit ${role.name}`}
+                          data-tooltip={`Edit ${role.name}`}
                           onClick={() =>
                             navigate(
                               `/management/user-management/roles/${role.id}`,
@@ -136,6 +137,7 @@ export default function RoleManagement() {
                         <button
                           type="button"
                           aria-label={`Delete ${role.name}`}
+                          data-tooltip={`Delete ${role.name}`}
                           onClick={() => setDeleteTarget(role)}
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-danger/10 hover:text-danger"
                         >

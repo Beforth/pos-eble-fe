@@ -710,6 +710,7 @@ export function BillerPermissionsPanel({
                             <button
                               type="button"
                               aria-label={`About ${item.label}`}
+                              data-tooltip={`About ${item.label}`}
                               className="inline-flex size-4 items-center justify-center rounded-full text-muted hover:text-primary"
                             >
                               <Info size={13} aria-hidden />

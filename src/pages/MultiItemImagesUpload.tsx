@@ -712,6 +712,7 @@ export default function MultiItemImagesUpload() {
                             type="button"
                             onClick={() => removeImage(img.id)}
                             aria-label={`Remove ${img.file.name}`}
+                            data-tooltip={`Remove ${img.file.name}`}
                             className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-ink/75 text-white opacity-0 transition-opacity group-hover:opacity-100"
                           >
                             <X size={12} />

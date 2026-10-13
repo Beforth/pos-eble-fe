@@ -84,6 +84,7 @@ export default function InvoiceTemplateFullscreen() {
           onClick={() => goBack()}
           className="inline-flex size-8 items-center justify-center rounded-md border border-line text-ink hover:bg-page"
           aria-label="Back"
+          data-tooltip="Back"
         >
           <ArrowLeft size={16} />
         </button>
@@ -94,6 +95,7 @@ export default function InvoiceTemplateFullscreen() {
           <button
             type="button"
             aria-label="Previous template"
+            data-tooltip="Previous template"
             onClick={showPrevious}
             className="inline-flex size-8 items-center justify-center rounded-md border border-line text-ink hover:bg-page"
           >
@@ -105,6 +107,7 @@ export default function InvoiceTemplateFullscreen() {
           <button
             type="button"
             aria-label="Next template"
+            data-tooltip="Next template"
             onClick={showNext}
             className="inline-flex size-8 items-center justify-center rounded-md border border-line text-ink hover:bg-page"
           >
@@ -120,6 +123,7 @@ export default function InvoiceTemplateFullscreen() {
           onClick={() => goBack()}
           className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
           aria-label="Close"
+          data-tooltip="Close"
         >
           <X size={16} />
         </button>

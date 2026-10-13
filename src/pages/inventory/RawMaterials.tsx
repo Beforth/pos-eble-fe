@@ -216,6 +216,7 @@ function CategoryTabBar({
       <button
         type="button"
         aria-label="Scroll categories left"
+        data-tooltip="Scroll categories left"
         disabled={!canScrollLeft}
         onClick={() => scrollBy(-1)}
         className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-ink disabled:cursor-default disabled:opacity-30"
@@ -253,6 +254,7 @@ function CategoryTabBar({
       <button
         type="button"
         aria-label="Scroll categories right"
+        data-tooltip="Scroll categories right"
         disabled={!canScrollRight}
         onClick={() => scrollBy(1)}
         className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-ink disabled:cursor-default disabled:opacity-30"

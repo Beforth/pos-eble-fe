@@ -18,6 +18,10 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import {
+  CAPTAIN_TABLE_VIEW_PATH,
+  isCaptainOnly,
+} from '../../auth/routePermissions'
+import {
   listOutletsApi,
   type OutletMembershipSummary,
 } from '../../services/outletService'
@@ -40,7 +44,8 @@ export function TopBar({
   outletName,
 }: TopBarProps) {
   const navigate = useNavigate()
-  const { logout, user, outletId, encryptedOutletId, switchOutlet } = useAuth()
+  const { logout, user, outletId, encryptedOutletId, switchOutlet, permissions, canAccess } =
+    useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [legalDoc, setLegalDoc] = useState<LegalDocKind | null>(null)
@@ -168,7 +173,8 @@ export function TopBar({
             onClick={toggleOutlet}
             disabled={outletSwitching}
             className="inline-flex min-w-0 max-lg:w-full items-center gap-2 rounded-lg border border-line bg-card px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-muted disabled:opacity-60"
-            title={user?.outlet ?? outletName}
+            aria-label={user?.outlet ?? outletName}
+            data-tooltip={user?.outlet ?? outletName}
             aria-haspopup="listbox"
             aria-expanded={outletOpen}
           >
@@ -248,22 +254,29 @@ export function TopBar({
 
         <button
           type="button"
-          onClick={() => navigate('/table-view')}
+          onClick={() =>
+            navigate(
+              isCaptainOnly(permissions) ? CAPTAIN_TABLE_VIEW_PATH : '/table-view',
+            )
+          }
           className="inline-flex h-9 max-lg:shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
         >
           <Plus size={16} strokeWidth={2.5} />
           <span>New Order</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => navigate('/captain-orders')}
-          title="Captain Orders"
-          className="inline-flex h-9 max-lg:shrink-0 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-medium text-ink transition-colors hover:border-muted"
-        >
-          <ChefHat size={16} className="text-primary" />
-          <span className="hidden sm:inline">Captain Orders</span>
-        </button>
+        {canAccess('/captain-orders') && (
+          <button
+            type="button"
+            onClick={() => navigate('/captain-orders')}
+            aria-label="Captain Orders"
+            data-tooltip="Captain Orders"
+            className="inline-flex h-9 max-lg:shrink-0 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-medium text-ink transition-colors hover:border-muted"
+          >
+            <ChefHat size={16} className="text-primary" />
+            <span className="hidden sm:inline">Captain Orders</span>
+          </button>
+        )}
 
         <IconButton label="Display">
           <Monitor size={18} />

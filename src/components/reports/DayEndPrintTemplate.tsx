@@ -157,7 +157,13 @@ export function DayEndPrintTemplate({
         }
       `}</style>
 
-      <button onClick={onClose} className="no-print" style={closeButtonStyle}>
+      <button
+        onClick={onClose}
+        aria-label="Close day-end print preview"
+        data-tooltip="Close print preview"
+        className="no-print"
+        style={closeButtonStyle}
+      >
         <X size={16} />
       </button>
 

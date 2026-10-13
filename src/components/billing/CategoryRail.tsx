@@ -57,7 +57,11 @@ export function CategoryRail({
                   className={
                     active ? 'category-rail-item-active' : 'category-rail-item'
                   }
-                  style={{ animationDelay: `${Math.min(index, 14) * 40}ms` }}
+                  // Stagger is capped: `category-rail-in` starts at opacity 0
+                  // with fill-mode `both`, so a long stagger leaves the tail of
+                  // the rail genuinely invisible for ~1s, which reads as
+                  // "the categories did not load" while the data is fine.
+                  style={{ animationDelay: `${Math.min(index, 6) * 25}ms` }}
                 >
                   <button
                     type="button"

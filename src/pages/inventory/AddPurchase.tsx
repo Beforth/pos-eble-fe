@@ -778,6 +778,7 @@ export default function AddPurchase() {
                     <button
                       type="button"
                       aria-label="Remove row"
+                      data-tooltip="Remove row"
                       disabled={lines.length <= 1}
                       onClick={() =>
                         setLines((prev) =>

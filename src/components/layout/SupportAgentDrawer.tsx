@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import { brand } from '../../theme/brand'
+import { TooltipWrapper } from '../common/TooltipWrapper'
 
 interface ChatMessage {
   id: string
@@ -67,7 +68,7 @@ const SEED_SESSIONS: ChatSession[] = [
       {
         id: 'seed-2-a',
         role: 'assistant',
-        text: "I can help add 'Spicy Mango Salad' under Appetizers at ₹ 179. (Demo reply.)",
+        text: "I can help add 'Spicy Mango Salad' under Appetizers at â‚¹ 179. (Demo reply.)",
       },
     ],
   },
@@ -84,7 +85,7 @@ const SEED_SESSIONS: ChatSession[] = [
       {
         id: 'seed-3-a',
         role: 'assistant',
-        text: 'Go to Inventory → Purchase Requests → Create New. (Demo reply.)',
+        text: 'Go to Inventory â†’ Purchase Requests â†’ Create New. (Demo reply.)',
       },
     ],
   },
@@ -212,7 +213,7 @@ export function SupportAgentDrawer({ open, onClose }: SupportAgentDrawerProps) {
     const reply: ChatMessage = {
       id: createId(),
       role: 'assistant',
-      text: `Got it — I'll help with that for ${brand.shortName}. (Demo reply; connect a real agent API later.)`,
+      text: `Got it â€” I'll help with that for ${brand.shortName}. (Demo reply; connect a real agent API later.)`,
     }
 
     upsertActiveSession((prev) => [...prev, userMsg, reply], trimmed)
@@ -259,6 +260,7 @@ export function SupportAgentDrawer({ open, onClose }: SupportAgentDrawerProps) {
               type="button"
               onClick={() => setShowHistory((prev) => !prev)}
               aria-label="Recent chats"
+              data-tooltip="Recent chats"
               aria-pressed={showHistory}
               className={`rounded-lg p-2 transition-colors ${
                 showHistory
@@ -272,7 +274,7 @@ export function SupportAgentDrawer({ open, onClose }: SupportAgentDrawerProps) {
               type="button"
               onClick={startNewChat}
               aria-label="Start new chat"
-              title="Start new chat"
+              data-tooltip="Start new chat"
               className="rounded-lg p-2 text-muted transition-colors hover:bg-page hover:text-ink"
             >
               <Plus size={18} />
@@ -292,6 +294,7 @@ export function SupportAgentDrawer({ open, onClose }: SupportAgentDrawerProps) {
               type="button"
               onClick={onClose}
               aria-label="Close"
+              data-tooltip="Close"
               className="rounded-lg p-2 text-muted transition-colors hover:bg-page hover:text-ink"
             >
               <X size={18} />
@@ -299,7 +302,7 @@ export function SupportAgentDrawer({ open, onClose }: SupportAgentDrawerProps) {
           </div>
         </header>
 
-        {/* Main chat area — Welcome stays underneath */}
+        {/* Main chat area â€” Welcome stays underneath */}
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-6">
             {!hasChat ? (
@@ -364,22 +367,24 @@ export function SupportAgentDrawer({ open, onClose }: SupportAgentDrawerProps) {
                 placeholder="Ask me anything..."
                 className="w-full resize-none rounded-2xl border border-line bg-card py-3 pl-4 pr-12 text-sm text-ink shadow-sm placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
-              <button
-                type="submit"
-                disabled={!draft.trim()}
-                aria-label="Send message"
-                className="absolute bottom-3 right-3 flex size-8 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-muted"
-              >
-                <ArrowUp size={16} strokeWidth={2.5} />
-              </button>
+                <TooltipWrapper label="Send message">
+                  <button
+                    type="submit"
+                    disabled={!draft.trim()}
+                    aria-label="Send message"
+                    className="absolute bottom-3 right-3 flex size-8 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-muted"
+                  >
+                    <ArrowUp size={16} strokeWidth={2.5} />
+                  </button>
+                </TooltipWrapper>
             </form>
             <p className="mt-2 text-center text-[11px] leading-snug text-muted">
-              Note: {brand.shortName} Support Agent is continuously learning —
+              Note: {brand.shortName} Support Agent is continuously learning â€”
               responses may occasionally be incomplete or incorrect.
             </p>
           </div>
 
-          {/* Recent chats — full panel below header, slides from right */}
+          {/* Recent chats â€” full panel below header, slides from right */}
           <div
             className={`absolute inset-0 z-20 ${showHistory ? 'pointer-events-auto' : 'pointer-events-none'}`}
             aria-hidden={!showHistory}
@@ -397,6 +402,7 @@ export function SupportAgentDrawer({ open, onClose }: SupportAgentDrawerProps) {
                   type="button"
                   onClick={() => setShowHistory(false)}
                   aria-label="Close recent chats"
+                  data-tooltip="Close recent chats"
                   className="rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
                 >
                   <X size={16} />

@@ -141,6 +141,7 @@ export default function PhysicalMenu() {
                   rel="noreferrer"
                   className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
                   aria-label="View physical menu"
+                  data-tooltip="View physical menu"
                   title="View physical menu"
                 >
                   <Eye size={16} />
@@ -151,7 +152,7 @@ export default function PhysicalMenu() {
                 onClick={() => setConfirmDelete(true)}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
                 aria-label="Delete physical menu"
-                title="Delete physical menu"
+                data-tooltip="Delete physical menu"
               >
                 <Trash2 size={15} />
               </button>

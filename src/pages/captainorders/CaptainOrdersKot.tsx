@@ -357,7 +357,7 @@ export default function CaptainOrdersKot() {
                 onView={setViewKot}
                 onEdit={setEditKot}
                 onDetails={setDetailsKot}
-                onOpenInBilling={(row) => navigate(billingUrlForKot(row))}
+                onOpenInBilling={(row) => navigate(billingUrlForKot(row, '/captain-orders'))}
               />
             </div>
 

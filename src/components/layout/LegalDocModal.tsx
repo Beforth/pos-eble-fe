@@ -202,6 +202,7 @@ export function LegalDocModal({ kind, onClose }: LegalDocModalProps) {
           <button
             type="button"
             aria-label="Close"
+            data-tooltip="Close"
             onClick={onClose}
             className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
           >

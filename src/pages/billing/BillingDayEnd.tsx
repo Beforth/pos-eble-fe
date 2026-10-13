@@ -253,7 +253,8 @@ export default function BillingDayEnd() {
                             type="button"
                             onClick={() => setViewRow(row)}
                             className="inline-flex size-7 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
-                            title="View summary"
+                            aria-label="View summary"
+                            data-tooltip="View summary"
                           >
                             <FileText size={14} />
                           </button>
@@ -263,7 +264,8 @@ export default function BillingDayEnd() {
                               exportRows([row], row.dateKey)
                             }
                             className="inline-flex size-7 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
-                            title="Download"
+                            aria-label="Download"
+                            data-tooltip="Download"
                           >
                             <Download size={14} />
                           </button>

@@ -94,7 +94,7 @@ function ReportCard({
         </h3>
         <button
           type="button"
-          title={favourite ? 'Remove from favourite' : 'Add to favourite'}
+          data-tooltip={favourite ? 'Remove from favourite' : 'Add to favourite'}
           aria-label={
             favourite
               ? `Remove ${report.title} from favourite`
@@ -294,7 +294,7 @@ export default function OtherReports() {
             </label>
             <button
               type="button"
-              title="Edit favourites"
+              data-tooltip="Edit favourites"
               aria-label="Edit favourites"
               onClick={() => showToast('Edit mode coming soon')}
               className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-line text-primary transition-colors hover:bg-primary/5"

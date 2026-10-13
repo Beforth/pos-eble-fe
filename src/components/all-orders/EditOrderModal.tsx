@@ -154,6 +154,7 @@ export function EditOrderModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -224,6 +225,7 @@ export function EditOrderModal({
                         <button
                           type="button"
                           aria-label={`Remove ${item.name}`}
+                          data-tooltip={`Remove ${item.name}`}
                           onClick={() => setPendingRemove(item)}
                           className="flex size-7 items-center justify-center rounded border border-line text-danger hover:bg-page"
                         >
@@ -234,6 +236,9 @@ export function EditOrderModal({
                         <button
                           type="button"
                           aria-label={
+                            isEditing ? `Done editing ${item.name}` : `Edit ${item.name}`
+                          }
+                          data-tooltip={
                             isEditing ? `Done editing ${item.name}` : `Edit ${item.name}`
                           }
                           onClick={() =>

@@ -223,6 +223,7 @@ export default function FinanceDashboard() {
           <button
             type="button"
             aria-label="Refresh"
+            data-tooltip="Refresh"
             onClick={() => showToast('Data refreshed')}
             className="inline-flex size-9 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
           >

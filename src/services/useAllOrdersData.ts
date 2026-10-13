@@ -40,7 +40,12 @@ function upsertOrder(prev: AllOrderRow[], row: AllOrderRow): AllOrderRow[] {
 export function useAllOrdersData(
   encryptedOutletId: string | null,
   token: string | null,
+  options?: { includeRevenue?: boolean },
 ) {
+  // The revenue chart comes from `daily-summary`, a billing-gated endpoint. A
+  // role that can read the board but not the money skips the call entirely, so
+  // it never fires a request it would be refused.
+  const includeRevenue = options?.includeRevenue ?? true
   const [orders, setOrders] = useState<AllOrderRow[]>([])
   const [chartSeries, setChartSeries] = useState<OrdersChartPoint[]>([])
   const [loading, setLoading] = useState(true)
@@ -86,7 +91,7 @@ export function useAllOrdersData(
   }, [encryptedOutletId])
 
   useEffect(() => {
-    if (!encryptedOutletId) return
+    if (!encryptedOutletId || !includeRevenue) return
     let cancelled = false
     dailySummaryApi(encryptedOutletId, { days: 15, resource: 'orders' })
       .then((result) => {
@@ -99,7 +104,7 @@ export function useAllOrdersData(
     return () => {
       cancelled = true
     }
-  }, [encryptedOutletId])
+  }, [encryptedOutletId, includeRevenue])
 
   useEffect(() => {
     if (!encryptedOutletId || !token) return

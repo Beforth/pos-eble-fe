@@ -250,6 +250,7 @@ export function SplitBillModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -447,6 +448,7 @@ export function SplitBillModal({
                           <button
                             type="button"
                             aria-label={`Delete Part ${partIndex + 1}`}
+                            data-tooltip={`Delete Part ${partIndex + 1}`}
                             onClick={() =>
                           parts.length > 2 && setPendingPartIndex(partIndex)
                         }
@@ -474,6 +476,7 @@ export function SplitBillModal({
                               <button
                                 type="button"
                                 aria-label={`Remove ${line.name}`}
+                                data-tooltip={`Remove ${line.name}`}
                                 onClick={() =>
                                   removeFromPart(partIndex, id)
                                 }

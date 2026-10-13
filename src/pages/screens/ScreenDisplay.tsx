@@ -62,7 +62,7 @@ function formatTime(timestamp: number): string {
 
 export default function ScreenDisplay() {
   const { id } = useParams<{ id: string }>()
-  const { encryptedOutletId, token } = useAuth()
+  const { encryptedOutletId, token, canAccess } = useAuth()
   const [screen, setScreen] = useState<KotScreen | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [tickets, setTickets] = useState<KotTicket[]>([])
@@ -285,6 +285,7 @@ export default function ScreenDisplay() {
           <Link
             to="/screens"
             aria-label="Back to screens"
+            data-tooltip="Back to screens"
             className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-card text-muted hover:bg-page hover:text-ink"
           >
             <ArrowLeft size={17} />
@@ -300,7 +301,7 @@ export default function ScreenDisplay() {
               <button
                 type="button"
                 onClick={() => setEditOpen(true)}
-                title="Configure screen filters"
+                aria-label="Configure screen filters"
                 className="inline-flex items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 text-xs font-medium text-muted hover:border-primary/40 hover:text-primary"
               >
                 <Settings size={13} />
@@ -391,13 +392,24 @@ export default function ScreenDisplay() {
             </div>
           ) : tickets.length === 0 ? (
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <Link
-                to="/billing"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-white hover:bg-primary-hover"
-              >
-                <Plus size={14} />
-                Go to Billing & Place Order
-              </Link>
+              {canAccess('/billing') && (
+                <Link
+                  to="/billing"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-white hover:bg-primary-hover"
+                >
+                  <Plus size={14} />
+                  Go to Billing & Place Order
+                </Link>
+              )}
+              {canAccess('/captain-orders') && (
+                <Link
+                  to="/captain-orders"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-white hover:bg-primary-hover"
+                >
+                  <Plus size={14} />
+                  Go to Captain Orders & Place Order
+                </Link>
+              )}
             </div>
           ) : null}
 
@@ -543,7 +555,7 @@ export default function ScreenDisplay() {
                           )
                         }
                         className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-line bg-page px-2.5 text-xs font-semibold text-muted hover:bg-card hover:text-primary"
-                        title="Mark this station done"
+                          aria-label="Mark this station done"
                       >
                         <CheckCheck size={14} />
                         Done

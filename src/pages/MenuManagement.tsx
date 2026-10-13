@@ -281,6 +281,8 @@ function OutletCard({
         </button>
         <button
           type="button"
+          aria-label="Delete menu item"
+          data-tooltip="Delete menu item"
           onClick={onDelete}
           className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-danger"
         >

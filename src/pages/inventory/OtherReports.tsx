@@ -272,6 +272,7 @@ function ReportCard({
             <button
               type="button"
               aria-label={bookmarked ? 'Remove bookmark' : 'Add bookmark'}
+              data-tooltip={bookmarked ? 'Remove bookmark' : 'Add bookmark'}
               onClick={(e) => {
                 e.stopPropagation()
                 onToggleBookmark()

@@ -227,6 +227,7 @@ export function DayEndSummaryModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -275,7 +276,12 @@ export function DayEndSummaryModal({
             onClick={() => setPrintOpen(true)}
             disabled={!detail?.summary}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-4 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            title={
+            aria-label={
+              detail?.summary
+                ? 'Print 80mm receipt'
+                : 'Detail not loaded yet'
+            }
+            data-tooltip={
               detail?.summary
                 ? 'Print 80mm receipt'
                 : 'Detail not loaded yet'

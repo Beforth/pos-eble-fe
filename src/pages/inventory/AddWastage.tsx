@@ -551,6 +551,7 @@ export default function AddWastage() {
                         <button
                           type="button"
                           aria-label="Select batch"
+                          data-tooltip="Select batch"
                           onClick={() => {
                             if (!line.rawMaterial.trim()) {
                               setAlertMessage(
@@ -567,6 +568,7 @@ export default function AddWastage() {
                         <button
                           type="button"
                           aria-label="Add description"
+                          data-tooltip="Add description"
                           onClick={() => {
                             setNoteDraft(line.note)
                             setNoteLineId(line.id)
@@ -582,6 +584,7 @@ export default function AddWastage() {
                         <button
                           type="button"
                           aria-label="Remove row"
+                          data-tooltip="Remove row"
                           onClick={() =>
                             setLines((prev) => {
                               const next = prev.filter(
@@ -603,6 +606,7 @@ export default function AddWastage() {
                       <button
                         type="button"
                         aria-label="Add description"
+                        data-tooltip="Add description"
                         onClick={() => {
                           setNoteDraft(line.note)
                           setNoteLineId(line.id)
@@ -618,6 +622,7 @@ export default function AddWastage() {
                       <button
                         type="button"
                         aria-label="Remove row"
+                        data-tooltip="Remove row"
                         onClick={() =>
                           setLines((prev) => {
                             const next = prev.filter(

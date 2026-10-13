@@ -223,7 +223,8 @@ export default function Configuration() {
               <button
                 key={tile.id}
                 type="button"
-                title={tile.shortcut ? `${tile.label} (${tile.shortcut})` : tile.label}
+                aria-label={tile.shortcut ? `${tile.label} (${tile.shortcut})` : tile.label}
+                data-tooltip={tile.shortcut ? `${tile.label} (${tile.shortcut})` : tile.label}
                 onClick={() => handleTileClick(tile)}
                 className={`group relative flex aspect-square flex-col items-center justify-center gap-2 rounded-md border px-2 py-3 text-center transition ${
                   active

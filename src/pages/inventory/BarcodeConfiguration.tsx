@@ -473,6 +473,7 @@ export default function BarcodeConfiguration() {
                       <button
                         type="button"
                         aria-label="Remove field"
+                        data-tooltip="Remove field"
                         onClick={() => removeField(field.id)}
                         className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
                       >

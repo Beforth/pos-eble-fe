@@ -144,6 +144,7 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
             type="button"
             onClick={onClose}
             aria-label="Close"
+            data-tooltip="Close"
             className="rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             <X size={18} />
@@ -244,6 +245,11 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
                                 ? `Done editing ${item.name}`
                                 : `Edit ${item.name}`
                             }
+                            data-tooltip={
+                              isEditing
+                                ? `Done editing ${item.name}`
+                                : `Edit ${item.name}`
+                            }
                             onClick={() =>
                               setEditingItemId(isEditing ? null : item.id)
                             }
@@ -258,6 +264,7 @@ export function EditKotModal({ open, kot, onClose, onSave }: EditKotModalProps) 
                           <button
                             type="button"
                             aria-label={`Remove ${item.name}`}
+                            data-tooltip={`Remove ${item.name}`}
                             onClick={() => setPendingRemove({ id: item.id, name: item.name })}
                             className="flex size-7 items-center justify-center rounded border border-line text-danger hover:bg-page"
                           >

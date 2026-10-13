@@ -139,6 +139,7 @@ function TemplatePreviewModal({
             <button
               type="button"
               aria-label="Previous template"
+              data-tooltip="Previous template"
               onClick={() =>
                 onIndexChange(
                   (index - 1 + templates.length) % templates.length,
@@ -151,6 +152,7 @@ function TemplatePreviewModal({
             <button
               type="button"
               aria-label="Next template"
+              data-tooltip="Next template"
               onClick={() => onIndexChange((index + 1) % templates.length)}
               className="inline-flex size-8 items-center justify-center rounded-md border border-line text-ink hover:bg-page"
             >
@@ -168,6 +170,7 @@ function TemplatePreviewModal({
           <button
             type="button"
             aria-label="Close"
+            data-tooltip="Close"
             onClick={onClose}
             className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
           >

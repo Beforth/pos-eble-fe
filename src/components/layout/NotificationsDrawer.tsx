@@ -166,6 +166,7 @@ export function NotificationsDrawer({
               type="button"
               onClick={onClose}
               aria-label="Close"
+              data-tooltip="Close"
               className="rounded-lg p-2 text-muted transition-colors hover:bg-page hover:text-ink"
             >
               <X size={18} />

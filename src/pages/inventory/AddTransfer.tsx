@@ -758,6 +758,7 @@ export default function AddTransfer() {
                     <button
                       type="button"
                       aria-label="Add note"
+                      data-tooltip="Add note"
                       onClick={() => {
                         if (!line.rawMaterial.trim()) {
                           setSelectItemAlertOpen(true)
@@ -776,6 +777,7 @@ export default function AddTransfer() {
                     <button
                       type="button"
                       aria-label="Remove row"
+                      data-tooltip="Remove row"
                       onClick={() =>
                         setLines((prev) => {
                           const next = prev.filter((row) => row.id !== line.id)

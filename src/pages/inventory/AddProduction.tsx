@@ -444,6 +444,7 @@ export default function AddProduction() {
                       <button
                         type="button"
                         aria-label="Remove row"
+                        data-tooltip="Remove row"
                         onClick={() =>
                           setFromRows((prev) =>
                             prev.filter((item) => item.id !== row.id),

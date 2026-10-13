@@ -104,6 +104,7 @@ export default function AddAreaLocalityDeliveryCharge() {
             to="/"
             className="inline-flex items-center text-primary hover:underline"
             aria-label="Home"
+            data-tooltip="Home"
           >
             <Home size={14} />
           </Link>

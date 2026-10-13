@@ -7,6 +7,7 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CornerDownLeft, Search } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
 import { searchIndex, type SearchEntry } from '../../config/searchIndex'
 
 interface UniversalSearchBarProps {
@@ -36,6 +37,7 @@ export function UniversalSearchBar({
   className = '',
 }: UniversalSearchBarProps) {
   const navigate = useNavigate()
+  const { canAccess } = useAuth()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -49,6 +51,9 @@ export function UniversalSearchBar({
     const prefixMatches: SearchEntry[] = []
     const containsMatches: SearchEntry[] = []
     for (const entry of searchIndex) {
+      // Never offer a screen the user would be bounced off: a captain, for
+      // instance, would find "Billing" here and get denied.
+      if (!canAccess(entry.path)) continue
       const label = entry.label.toLowerCase()
       const haystack = `${entry.label} ${entry.path} ${(entry.keywords ?? []).join(' ')}`.toLowerCase()
       if (!haystack.includes(trimmed)) continue
@@ -62,7 +67,7 @@ export function UniversalSearchBar({
       }
     }
     return [...prefixMatches, ...containsMatches].slice(0, MAX_RESULTS)
-  }, [trimmed])
+  }, [trimmed, canAccess])
 
   const showResults = open && trimmed.length >= 2
   const safeIndex =
