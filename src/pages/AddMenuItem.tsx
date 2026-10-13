@@ -5,6 +5,7 @@ import { MenuItemForm } from '../components/menu/MenuItemForm'
 import { useAuth } from '../auth/AuthContext'
 import { useMenuChannels } from '../state/MenuChannelsContext'
 import { useMenuReference } from '../state/MenuReferenceContext'
+import { invalidateMenuItemCache } from '../state/menuItemsCache'
 import { createItemApi } from '../services/menuService'
 import { ApiError } from '../services/apiClient'
 import { showToast } from '../utils/toast'
@@ -85,6 +86,7 @@ export default function AddMenuItem() {
     createItemApi(encryptedOutletId, payload)
       .then(() => {
         showToast('Item created successfully')
+        invalidateMenuItemCache(encryptedOutletId, payload)
         window.setTimeout(() => navigate('/menu/base-menu'), 800)
       })
       .catch((error: unknown) => {

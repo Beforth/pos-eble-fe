@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart3, Download, Loader2, Search } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { BILLING_RIGHT_CODENAME } from '../../auth/routePermissions'
+import { billingUrlForOrder } from '../../utils/billingLinks'
 import { CaptainOrdersHeader } from '../../components/captainorders/CaptainOrdersHeader'
 import { AllOrdersChart } from '../../components/all-orders/AllOrdersChart'
 import { AllOrdersTable } from '../../components/all-orders/AllOrdersTable'
@@ -267,6 +268,11 @@ export default function CaptainOrdersAllOrders() {
               onEdit={canBill ? setEditOrder : undefined}
               onChangePayment={canBill ? setChangePaymentOrder : undefined}
               onSettleDue={canBill ? setDueOrder : undefined}
+              onOpenInBilling={
+                canBill
+                  ? (row) => navigate(billingUrlForOrder(row.id, '/captain-orders'))
+                  : undefined
+              }
             />
           </div>
 

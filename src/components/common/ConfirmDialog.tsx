@@ -25,6 +25,12 @@ export interface ConfirmDialogProps {
   /** Tighter layout for high-frequency edits (cart lines, applied discounts). */
   compact?: boolean
   loading?: boolean
+  /**
+   * Overlay z-index, for a confirm that is portalled to `document.body` from
+   * inside a higher-tier modal root. Must be one tier above the host modal, or
+   * the confirm paints behind the host's own backdrop.
+   */
+  zClassName?: string
   onConfirm: () => void
   onClose: () => void
 }
@@ -41,6 +47,7 @@ export function ConfirmDialog({
   tone = 'danger',
   compact = false,
   loading = false,
+  zClassName = 'z-[90]',
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -104,7 +111,9 @@ export function ConfirmDialog({
   const hasBody = Boolean(message || consequences?.length || note)
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+    <div
+      className={`fixed inset-0 ${zClassName} flex items-center justify-center p-4`}
+    >
       <button
         type="button"
         aria-label="Close"

@@ -6,6 +6,7 @@ import { MenuItemForm } from '../components/menu/MenuItemForm'
 import { useAuth } from '../auth/AuthContext'
 import { useMenuChannels } from '../state/MenuChannelsContext'
 import { useMenuReference } from '../state/MenuReferenceContext'
+import { invalidateMenuItemCache } from '../state/menuItemsCache'
 import {
   addItemImageApi,
   deleteItemImageApi,
@@ -111,6 +112,9 @@ export default function EditMenuItem() {
       .then((updated) => {
         setItem(updated)
         showToast('Item updated successfully')
+        invalidateMenuItemCache(encryptedOutletId, {
+          category_id: item.category_id ?? payload.category_id,
+        })
         window.setTimeout(() => navigate(channel.path), 800)
       })
       .catch((error: unknown) => {

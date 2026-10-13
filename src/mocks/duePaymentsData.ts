@@ -7,6 +7,8 @@ export type DuePaymentMode = 'Cash' | 'UPI' | 'Card' | 'Other'
 export interface DueBill {
   id: string
   billNo: string
+  /** Name typed at billing for this bill; absent on mock/legacy rows. */
+  customerName?: string
   date: string
   dateMs: number
   total: number
@@ -16,6 +18,7 @@ export interface DueBill {
 export interface DueSale {
   id: string
   billNo: string
+  customerName?: string
   date: string
   dateMs: number
   total: number

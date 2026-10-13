@@ -11,6 +11,14 @@ interface LiveOrdersBoardProps {
   data: LiveOrdersSummary
   icons: Record<string, ReactNode>
   onRowClick?: (row: LiveOrderChannelRow) => void
+  /**
+   * Hide channels with zero orders (default). The Running Orders board passes
+   * `false` because the server zero-fills every order type, so all of its rows
+   * are meaningful — filtering would make a channel look deleted the moment its
+   * last bill settled. Pending Orders leaves this on: its `out` row is a
+   * placeholder with no data behind it yet.
+   */
+  hideEmptyRows?: boolean
 }
 
 export function LiveOrdersBoard({
@@ -18,7 +26,12 @@ export function LiveOrdersBoard({
   data,
   icons,
   onRowClick,
+  hideEmptyRows = true,
 }: LiveOrdersBoardProps) {
+  const rows = hideEmptyRows
+    ? data.rows.filter((row) => row.orders > 0)
+    : data.rows
+
   return (
     <section className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
       <div className="mb-4 flex items-center gap-2">
@@ -44,7 +57,7 @@ export function LiveOrdersBoard({
         </div>
       </div>
 
-      {data.totalOrders === 0 ? (
+      {rows.length === 0 ? (
         <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-line px-4 py-8 text-center">
           <p className="text-sm font-medium text-muted">
             No {title.toLowerCase()} right now
@@ -55,17 +68,19 @@ export function LiveOrdersBoard({
         </div>
       ) : (
         <ul className="space-y-2.5">
-          {data.rows
-            .filter((row) => row.orders > 0)
-            .map((row) => (
-              <li key={row.id}>
-                <LiveOrderRow
-                  row={row}
-                  icon={icons[row.icon]}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                />
-              </li>
-            ))}
+          {rows.map((row) => (
+            <li key={row.id}>
+              <LiveOrderRow
+                row={row}
+                icon={icons[row.icon]}
+                onClick={
+                  onRowClick && row.orders > 0
+                    ? () => onRowClick(row)
+                    : undefined
+                }
+              />
+            </li>
+          ))}
         </ul>
       )}
     </section>

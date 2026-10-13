@@ -1,6 +1,7 @@
-import { apiRequest, multipartApiRequest, paginatedApiRequest } from './apiClient'
+import { apiRequest, multipartApiRequest, paginatedApiRequest, ApiError } from './apiClient'
 import type { Paginated } from './apiClient'
-import { AUTH_TOKEN_KEY } from '../auth/storage'
+import { API_BASE_URL } from '../config/api'
+import { AUTH_TOKEN_KEY, clearAuthStorage } from '../auth/storage'
 import type {
   AddonCommission,
   Category,
@@ -219,6 +220,156 @@ export async function listItemsApi(outletId: string, params: ListItemsParams = {
 
 export async function createItemApi(outletId: string, payload: ItemPayload): Promise<Item> {
   return jsonRequest<Item>(menusPath(outletId, '/items/'), 'POST', payload)
+}
+
+export interface SheetImportResult {
+  created: number
+  skipped: number
+  errors: string[]
+}
+
+export interface SheetPreviewRow {
+  row: number
+  name: string
+  category_path: string
+  category_exists: boolean
+  description: string
+  prices: Record<string, string>
+  action: 'create' | 'skip' | 'error'
+  message: string | null
+}
+
+export interface SheetPreview {
+  dry_run: boolean
+  rows: SheetPreviewRow[]
+  errors: string[]
+  summary: {
+    will_create: number
+    will_skip: number
+    row_errors: number
+  }
+}
+
+/**
+ * Download the outlet's current menu items as an xlsx file.
+ * Triggers a browser file-save; returns when the download has started.
+ */
+export async function exportItemsSheetApi(outletId: string): Promise<void> {
+  await _downloadXlsx(menusPath(outletId, '/items/sheet/'), 'menu-items.xlsx')
+}
+
+/**
+ * Preview a filled-in xlsx sheet without creating anything
+ * (POST items/sheet/?dry_run=1) — powers the review screen.
+ */
+export async function previewItemsSheetApi(
+  outletId: string,
+  file: File,
+): Promise<SheetPreview> {
+  const token = authToken()
+  const form = new FormData()
+  form.append('file', file)
+  return multipartApiRequest<SheetPreview>(
+    menusPath(outletId, '/items/sheet/?dry_run=1'),
+    form,
+    { method: 'POST', token },
+  )
+}
+
+/**
+ * Upload a filled-in xlsx sheet to create items (POST items/sheet/).
+ * The backend auto-creates missing categories and returns per-row errors
+ * for rows it could not process.
+ */
+export async function importItemsSheetApi(
+  outletId: string,
+  file: File,
+): Promise<SheetImportResult> {
+  const token = authToken()
+  const form = new FormData()
+  form.append('file', file)
+  return multipartApiRequest<SheetImportResult>(
+    menusPath(outletId, '/items/sheet/'),
+    form,
+    { method: 'POST', token },
+  )
+}
+
+/** The 11 column headers that the xlsx template must have. */
+export const SHEET_TEMPLATE_HEADERS = [
+  'Master Category',
+  'Category',
+  'Sub Category',
+  'Item',
+  'Description',
+  'Base Menu',
+  'Home Delivery',
+  'Parcel',
+  'Dine In',
+  'Zomato',
+  'Swiggy',
+] as const
+
+/**
+ * Download a blank xlsx template with the 11 header columns.
+ * The server generates it so no client-side xlsx library is needed.
+ */
+export async function downloadItemSheetTemplate(outletId: string): Promise<void> {
+  await _downloadXlsx(
+    menusPath(outletId, '/items/sheet/?template=1'),
+    'menu-items-template.xlsx',
+  )
+}
+
+/**
+ * Shared helper: fetch a binary xlsx from `path`, handle 401, and trigger a
+ * browser file-save with `filename`. Throws `ApiError` on non-OK responses.
+ */
+async function _downloadXlsx(path: string, filename: string): Promise<void> {
+  const token = authToken()
+  const headers: Record<string, string> = {
+    Accept:
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { method: 'GET', headers })
+  } catch {
+    throw new ApiError('Unable to reach the server. Check that the API is running.', 0)
+  }
+
+  if (response.status === 401) {
+    // Mirror apiClient's 401 handling
+    clearAuthStorage()
+    if (window.location.pathname !== '/login') {
+      window.location.replace('/login')
+    }
+    return
+  }
+
+  if (!response.ok) {
+    // Try to extract the envelope message if the server returned JSON
+    let message = `Download failed (${response.status})`
+    try {
+      const body = (await response.json()) as { message?: string }
+      if (body.message) message = body.message
+    } catch {
+      // non-JSON body — keep the generic message
+    }
+    throw new ApiError(message, response.status)
+  }
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 export async function getItemApi(outletId: string, id: EncId): Promise<Item> {

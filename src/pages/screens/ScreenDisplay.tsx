@@ -39,11 +39,18 @@ import {
 } from '../../utils/kotPrepStore'
 import { EditScreenModal } from '../../components/screens/EditScreenModal'
 import { subscribeToRail } from '../../services/liveRailClient'
-import { kotEventToTicket, type KotEventData } from '../../services/orderService'
+import {
+  kotEventToTicket,
+  markKotReadyApi,
+  type KotEventData,
+} from '../../services/orderService'
+import { isServerBackedKotId } from '../../utils/kotListStore'
+import { syncKotStoreFromServer } from '../../utils/kotStoreSync'
 import { useAuth } from '../../auth/AuthContext'
 
 const POLL_INTERVAL_MS = 1500
 const TICK_INTERVAL_MS = 1000
+const SYNC_INTERVAL_MS = 15000
 
 function formatElapsed(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000))
@@ -96,6 +103,11 @@ export default function ScreenDisplay() {
     setTickets(next)
     setReadyByTicket(loadReadyProgress())
   }, [])
+
+  const syncTicketsFromServer = useCallback(async () => {
+    const changed = await syncKotStoreFromServer(encryptedOutletId ?? '')
+    if (changed) refreshTickets()
+  }, [encryptedOutletId, refreshTickets])
 
   useEffect(() => {
     refreshTickets()
@@ -171,10 +183,21 @@ export default function ScreenDisplay() {
         }
         if (event === 'kot.used_in_bill') {
           handleKotRemoved((data as KotEventData).id)
+          return
         }
+
       },
     })
   }, [encryptedOutletId, token, refreshTickets])
+
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+    void syncTicketsFromServer()
+    const interval = window.setInterval(() => {
+      void syncTicketsFromServer()
+    }, SYNC_INTERVAL_MS)
+    return () => window.clearInterval(interval)
+  }, [encryptedOutletId, token, syncTicketsFromServer])
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), TICK_INTERVAL_MS)
@@ -199,7 +222,7 @@ export default function ScreenDisplay() {
         return { ticket, items, amount }
       })
       .filter((entry): entry is FilteredScreenTicket => entry !== null)
-    return [...entries].reverse()
+    return entries
   }, [tickets, screen, readyByTicket])
 
   function handleComplete(ticketId: string, itemIds: string[]) {
@@ -208,6 +231,14 @@ export default function ScreenDisplay() {
     const fullyReady = Boolean(ticket && isKotFullyReady(ticket))
     if (fullyReady) {
       updateKotTicketStatus(ticketId, 'ready')
+      // localStorage alone never reached the server, so the ticket stayed
+      // Pending on the boards forever and never reached Running Orders. The
+      // id is a server-encrypted token for a saved ticket; client-created
+      // tickets use a `kot-…` synthetic id, and those have no server row to
+      // update, so skip them rather than firing a request that 404s.
+      if (encryptedOutletId && isServerBackedKotId(ticketId)) {
+        void markKotReadyApi(encryptedOutletId, ticketId).catch(() => {})
+      }
     }
     refreshTickets()
     showToast(

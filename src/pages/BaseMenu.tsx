@@ -28,6 +28,7 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { AddNewItemsModal } from '../components/menu/AddNewItemsModal'
 import { AddItemsGridModal } from '../components/menu/AddItemsGridModal'
+import { ImportSheetCsvModal } from '../components/menu/ImportSheetCsvModal'
 import { MenuItemDetailsModal } from '../components/menu/MenuItemDetailsModal'
 import { PublishDateModal } from '../components/menu/PublishDateModal'
 import { UpdateAreaWisePriceModal } from '../components/menu/UpdateAreaWisePriceModal'
@@ -219,6 +220,7 @@ export default function BaseMenu({
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
   const [addItemsOpen, setAddItemsOpen] = useState(false)
   const [addGridOpen, setAddGridOpen] = useState(false)
+  const [importSheetOpen, setImportSheetOpen] = useState(false)
   const [detailsItem, setDetailsItem] = useState<Item | null>(null)
   const [areaPriceItem, setAreaPriceItem] = useState<Item | null>(null)
   const [nutritionItem, setNutritionItem] = useState<Item | null>(null)
@@ -1245,16 +1247,16 @@ export default function BaseMenu({
         onGrid={() => setAddGridOpen(true)}
         onSingleItem={() => navigate('/menu/add-item')}
         onAddCombo={() => navigate('/menu/add-combo')}
-        onSheet={() => {
-          const header =
-            'Name,Short Code,Online Display Name,Price,Description\n'
-          const blob = new Blob([header], { type: 'text/csv;charset=utf-8' })
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = 'menu-items-sheet.csv'
-          link.click()
-          URL.revokeObjectURL(url)
+        onSheet={() => setImportSheetOpen(true)}
+      />
+      <ImportSheetCsvModal
+        open={importSheetOpen}
+        onClose={() => setImportSheetOpen(false)}
+        categories={categoriesApi}
+        initialCategoryId={categoryId}
+        onSaved={() => {
+          setPage(1)
+          invalidateAndRefresh()
         }}
       />
       <AddItemsGridModal

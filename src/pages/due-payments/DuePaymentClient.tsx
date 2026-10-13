@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { Link, Navigate, useParams } from 'react-router-dom'
@@ -30,6 +30,10 @@ import { useAuth } from '../../auth/AuthContext'
 import { DuePaymentsShell } from './DuePaymentsShell'
 
 type DetailTab = 'outstanding' | 'sales' | 'payments'
+
+/** Mirror of the dues list's poll: another counter settling a bill changes
+ * this ledger too, and the live rail carries no dues events. */
+const DUES_POLL_INTERVAL_MS = 15000
 
 const TABS: { id: DetailTab; label: string }[] = [
   { id: 'outstanding', label: 'Outstanding Bills' },
@@ -66,28 +70,51 @@ export default function DuePaymentClient() {
   const [mode, setMode] = useState<DuePaymentMode>('Cash')
   const [tab, setTab] = useState<DetailTab>('outstanding')
   const [settleOpen, setSettleOpen] = useState(false)
+  const inFlightRef = useRef(false)
 
-  const loadClient = useCallback(async () => {
-    if (!encryptedOutletId) {
-      showToast('No outlet selected — open from the sidebar')
-      setLoaded(true)
-      return
-    }
-    try {
-      const history = await customerHistoryApi(encryptedOutletId, clientId as string)
-      setClient(dueClientFromHistory(history))
-    } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : 'Failed to load customer',
-      )
-    } finally {
-      setLoaded(true)
-    }
-  }, [encryptedOutletId, clientId])
+  const fetchClient = useCallback(
+    async (silent: boolean) => {
+      if (!encryptedOutletId) {
+        if (!silent) showToast('No outlet selected — open from the sidebar')
+        setLoaded(true)
+        return
+      }
+      inFlightRef.current = true
+      try {
+        const history = await customerHistoryApi(encryptedOutletId, clientId as string)
+        setClient(dueClientFromHistory(history))
+      } catch (error) {
+        if (!silent) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load customer',
+          )
+        }
+      } finally {
+        inFlightRef.current = false
+        setLoaded(true)
+      }
+    },
+    [encryptedOutletId, clientId],
+  )
+
+  const loadClient = useCallback(() => fetchClient(false), [fetchClient])
 
   useEffect(() => {
     loadClient()
   }, [loadClient])
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.hidden || inFlightRef.current) return
+      void fetchClient(true)
+    }
+    const interval = window.setInterval(tick, DUES_POLL_INTERVAL_MS)
+    window.addEventListener('focus', tick)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', tick)
+    }
+  }, [fetchClient])
 
   const due = client ? clientDue(client) : 0
 
@@ -139,6 +166,24 @@ export default function DuePaymentClient() {
       key: 'billNo',
       header: 'Bill #',
       render: (row) => <span className="font-medium text-ink">{row.billNo}</span>,
+    },
+    {
+      key: 'customerName',
+      header: 'Name at Billing',
+      render: (row) =>
+        row.customerName ? (
+          <span
+            className={
+              row.customerName.toLowerCase() === client.name.toLowerCase()
+                ? 'text-muted'
+                : 'text-ink'
+            }
+          >
+            {row.customerName}
+          </span>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
     },
     {
       key: 'date',
@@ -203,6 +248,24 @@ export default function DuePaymentClient() {
       key: 'billNo',
       header: 'Bill #',
       render: (row) => <span className="font-medium text-ink">{row.billNo}</span>,
+    },
+    {
+      key: 'customerName',
+      header: 'Name at Billing',
+      render: (row) =>
+        row.customerName ? (
+          <span
+            className={
+              row.customerName.toLowerCase() === client.name.toLowerCase()
+                ? 'text-muted'
+                : 'text-ink'
+            }
+          >
+            {row.customerName}
+          </span>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
     },
     {
       key: 'date',

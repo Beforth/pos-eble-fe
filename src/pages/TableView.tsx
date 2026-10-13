@@ -74,6 +74,7 @@ export default function TableView() {
           event === 'kot.prep' ||
           event === 'kot.modified' ||
           event === 'kot.cancelled' ||
+          event === 'kot.printed' ||
           event === 'kot.used_in_bill' ||
           event === 'kot.deleted' ||
           event === 'order.settle'

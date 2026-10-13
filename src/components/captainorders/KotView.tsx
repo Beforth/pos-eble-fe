@@ -12,7 +12,6 @@ import {
 import {
   ORDER_TYPE_LEGEND,
   headerClassForOrderType,
-  kotTicketAmount,
   labelForOrderType,
   sortKotTicketsForDisplay,
   ticketsForTable,
@@ -21,12 +20,23 @@ import {
 import { CancelKotModal } from './CancelKotModal'
 import { KotTicketViewModal } from './KotTicketViewModal'
 import { SettleSaveModal, type SettleSaveResult } from './SettleSaveModal'
+import {
+  kotItemsForOrder,
+  type KotTaxTotals,
+} from '../../services/kotOrderFlow'
 
 interface KotViewProps {
   tickets: KotTicket[]
   onBack: () => void
   onFoodReady: (id: string) => void
   onDismiss: (id: string) => void
+  /**
+   * Price a ticket set with the page's tax engine. The settle modal must be
+   * handed the same tax-inclusive `grand_total` the settle call will send — a
+   * pre-tax figure makes every settle short by the tax, which the server books
+   * as `balance_due`.
+   */
+  priceTickets: (tickets: KotTicket[]) => KotTaxTotals
   /** Open the ticket's table/order in Order View. */
   onOpenInBilling?: (ticket: KotTicket) => void
   onSettleSave: (payload: {
@@ -198,6 +208,7 @@ export function KotView({
   onBack,
   onFoodReady,
   onDismiss,
+  priceTickets,
   onOpenInBilling,
   onSettleSave,
 }: KotViewProps) {
@@ -232,8 +243,9 @@ export function KotView({
   }, [settleTicket, tickets])
 
   const settleAmount = useMemo(
-    () => settleGroup.reduce((sum, t) => sum + kotTicketAmount(t), 0),
-    [settleGroup],
+    () =>
+      kotItemsForOrder(settleGroup, priceTickets(settleGroup)).grand_total,
+    [settleGroup, priceTickets],
   )
 
   return (

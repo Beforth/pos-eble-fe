@@ -18,6 +18,8 @@ export interface MenuItemRow {
   categoryId: string
   name: string
   shortCode: string
+  /** Secondary short code (`short_code_2`) — matched for quick-add, optional. */
+  shortCode2?: string
   onlineDisplayName: string
   price: number
   description: string
@@ -82,6 +84,7 @@ export function adaptItem(item: Item, channelId: string): MenuItemRow {
     categoryId: item.category_id ?? '',
     name: item.name,
     shortCode: item.short_code,
+    shortCode2: item.short_code_2,
     onlineDisplayName: item.online_display_name,
     price,
     description: item.description,

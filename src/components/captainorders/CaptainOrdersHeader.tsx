@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
+import { isCashierUser } from '../../auth/routePermissions'
 import { BrandLogo } from '../brand/BrandLogo'
 import { brand } from '../../theme/brand'
 import {
@@ -59,7 +60,12 @@ export function CaptainOrdersHeader({
 }: CaptainOrdersHeaderProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { logout, user, encryptedOutletId, isAdmin, canAccess } = useAuth()
+  const { logout, user, encryptedOutletId, isAdmin, canAccess, homePath } = useAuth()
+  // The Home entry is a counter-role affordance: an admin (whose landing is the
+  // dashboard) and a cashier (whose landing is All Orders) get it, a plain
+  // biller and a captain do not. `isAdmin` implies `canSeeHome`, so the
+  // admin-only cross-links below keep rendering whenever this block does.
+  const canSeeHome = isAdmin || isCashierUser(user)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [menuViewOpen, setMenuViewOpen] = useState(false)
@@ -201,9 +207,30 @@ export function CaptainOrdersHeader({
             [
               { icon: BookOpen, label: 'Digital menu', onClick: () => setMenuViewOpen(true) },
               { icon: Store, label: 'Store', onClick: () => setStoreInfoOpen(true) },
-              { icon: Monitor, label: 'Display', onClick: () => navigate('/customer-display') },
+              // Navigating icons are gated exactly like UniversalSearchBar gates
+              // its results: `/customer-display` is unmapped (admin-only) and
+              // `/screens` resolves to `cfg_pos_configuration_details_read`,
+              // which no role template carries — rendering them for anyone else
+              // offered a screen ProtectedRoute refuses.
+              ...(canAccess('/customer-display')
+                ? [
+                    {
+                      icon: Monitor,
+                      label: 'Display',
+                      onClick: () => navigate('/customer-display'),
+                    },
+                  ]
+                : []),
               { icon: Grid2x2, label: 'View KOT', onClick: onViewKot },
-              { icon: ChefHat, label: 'Kitchen', onClick: () => navigate('/screens') },
+              ...(canAccess('/screens')
+                ? [
+                    {
+                      icon: ChefHat,
+                      label: 'Kitchen',
+                      onClick: () => navigate('/screens'),
+                    },
+                  ]
+                : []),
               { icon: LayoutDashboard, label: 'Reports', onClick: () => setQuickReportsOpen(true) },
               ...(isAdmin
                 ? [
@@ -212,10 +239,19 @@ export function CaptainOrdersHeader({
                       label: 'Billing',
                       onClick: () => navigate('/billing'),
                     },
+                  ]
+                : []),
+              // It goes to *this* user's landing screen, so a cashier reaches
+              // All Orders exactly as login leaves them, while an admin keeps
+              // the dashboard. `/dashboard` itself is unmapped (admin-only), so
+              // hard-coding it here would bounce everyone else. A plain biller
+              // and a captain get no Home entry at all (`canSeeHome`).
+              ...(canSeeHome
+                ? [
                     {
                       icon: Home,
-                      label: 'Admin Dashboard',
-                      onClick: () => navigate('/dashboard'),
+                      label: isAdmin ? 'Admin Dashboard' : 'Home',
+                      onClick: () => navigate(homePath()),
                     },
                   ]
                 : []),
@@ -394,27 +430,29 @@ export function CaptainOrdersHeader({
                   },
                 )}
 
-                {isAdmin ? (
+                {canSeeHome ? (
                   <>
                     <li className="my-2 border-t border-line" />
+                    {isAdmin ? (
+                      <li>
+                        <Link
+                          to="/billing"
+                          onClick={closeDrawer}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
+                        >
+                          <UtensilsCrossed size={18} className="text-muted" />
+                          Billing
+                        </Link>
+                      </li>
+                    ) : null}
                     <li>
                       <Link
-                        to="/billing"
-                        onClick={closeDrawer}
-                        className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
-                      >
-                        <UtensilsCrossed size={18} className="text-muted" />
-                        Billing
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        to="/dashboard"
+                        to={homePath()}
                         onClick={closeDrawer}
                         className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
                       >
                         <Home size={18} className="text-muted" />
-                        Admin Dashboard
+                        {isAdmin ? 'Admin Dashboard' : 'Home'}
                       </Link>
                     </li>
                   </>

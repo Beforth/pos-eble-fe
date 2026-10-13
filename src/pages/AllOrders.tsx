@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useChrome } from '../state/ChromeContext'
-
 import { showToast } from '../utils/toast'
+import { billingUrlForOrder } from '../utils/billingLinks'
 import {
   BarChart3,
   ChevronDown,
@@ -165,6 +166,7 @@ function emptyChart(days: number): OrdersChartPoint[] {
 
 export default function AllOrders() {
   const { encryptedOutletId, token } = useAuth()
+  const navigate = useNavigate()
   const { collapsed, toggleCollapsed } = useChrome()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
@@ -1024,6 +1026,7 @@ export default function AllOrders() {
                     onEdit={setEditOrder}
                     onChangePayment={setPaymentOrder}
                     onSettleDue={setDueOrder}
+                    onOpenInBilling={(row) => navigate(billingUrlForOrder(row.id))}
                   />
                 </div>
 

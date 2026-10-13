@@ -115,7 +115,9 @@ export default function CustomerDisplay() {
         }
         if (event === 'kot.used_in_bill') {
           handleKotRemoved((data as KotEventData).id)
+          return
         }
+
       },
     })
   }, [encryptedOutletId, token])
@@ -148,11 +150,11 @@ export default function CustomerDisplay() {
           </p>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/billing')}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-medium text-muted hover:bg-page hover:text-ink"
           >
             <ArrowLeft size={14} />
-            Back
+            Back to Billing
           </button>
         </div>
       </header>

@@ -15,12 +15,43 @@ interface LiveOrdersDetailModalProps {
   title: string
   icon: ReactNode
   onClose: () => void
+  /** Present when the record can be opened on the order-taking screen. */
+  onOpenOrder?: (orderId: string) => void
+  onOpenKot?: (kotId: string) => void
 }
 
 function statusChip(status: string): string {
   if (status === 'printed' || status === 'Ready') return 'bg-success/10 text-success'
   if (status === 'saved') return 'bg-accent/10 text-accent'
   return 'bg-primary/10 text-primary'
+}
+
+/** Card wrapper: a clickable button when an open handler exists, else a plain
+ * card. Kept at module scope so the list rows do not redefine a component. */
+function CardShell({
+  interactive,
+  label,
+  onClick,
+  children,
+}: {
+  interactive: boolean
+  label: string
+  onClick: () => void
+  children: ReactNode
+}) {
+  if (!interactive) {
+    return <div className="rounded-xl border border-line bg-card p-4">{children}</div>
+  }
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="w-full rounded-xl border border-line bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-primary/[0.03]"
+    >
+      {children}
+    </button>
+  )
 }
 
 export function LiveOrdersDetailModal({
@@ -31,6 +62,8 @@ export function LiveOrdersDetailModal({
   title,
   icon,
   onClose,
+  onOpenOrder,
+  onOpenKot,
 }: LiveOrdersDetailModalProps) {
   const [records, setRecords] = useState<LiveBoardRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -146,7 +179,11 @@ export function LiveOrdersDetailModal({
                 if (record.kind === 'order') {
                   return (
                     <li key={record.id}>
-                      <div className="rounded-xl border border-line bg-card p-4">
+                      <CardShell
+                        interactive={Boolean(onOpenOrder)}
+                        label={`Open order ${record.orderNo} in billing`}
+                        onClick={() => onOpenOrder?.(record.id)}
+                      >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-ink">
@@ -187,13 +224,22 @@ export function LiveOrdersDetailModal({
                             </li>
                           ))}
                         </ul>
-                      </div>
+                        {onOpenOrder && (
+                          <p className="mt-3 border-t border-line pt-2 text-xs font-semibold text-primary">
+                            Open in billing →
+                          </p>
+                        )}
+                      </CardShell>
                     </li>
                   )
                 }
                 return (
                   <li key={record.id}>
-                    <div className="rounded-xl border border-line bg-card p-4">
+                    <CardShell
+                      interactive={Boolean(onOpenKot)}
+                      label={`Open KOT ${record.kotNo} in billing`}
+                      onClick={() => onOpenKot?.(record.id)}
+                    >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-ink">
@@ -234,7 +280,12 @@ export function LiveOrdersDetailModal({
                           </li>
                         ))}
                       </ul>
-                    </div>
+                      {onOpenKot && (
+                        <p className="mt-3 border-t border-line pt-2 text-xs font-semibold text-primary">
+                          Open in billing →
+                        </p>
+                      )}
+                    </CardShell>
                   </li>
                 )
               })}

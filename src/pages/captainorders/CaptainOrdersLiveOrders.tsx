@@ -22,6 +22,14 @@ import {
   type LiveOrdersSummary,
   type RunningTablesSummary,
 } from '../../services/orderService'
+import {
+  LIVE_BOARD_REFRESH_EVENTS,
+  subscribeToRail,
+} from '../../services/liveRailClient'
+import {
+  billingUrlForKotId,
+  billingUrlForOrder,
+} from '../../utils/billingLinks'
 
 type LiveTab = 'orders' | 'tables'
 
@@ -41,7 +49,7 @@ const channelIcons: Record<string, ReactNode> = {
 
 export default function CaptainOrdersLiveOrders() {
   const navigate = useNavigate()
-  const { encryptedOutletId } = useAuth()
+  const { encryptedOutletId, token } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [tab, setTab] = useState<LiveTab>('orders')
   const [running, setRunning] = useState<LiveOrdersSummary | null>(null)
@@ -81,6 +89,21 @@ export default function CaptainOrdersLiveOrders() {
       cancelled = true
     }
   }, [encryptedOutletId, reload])
+
+  // Live rail → refetch, so a bill settled on the Captain screen leaves Running
+  // Orders here without waiting for a manual Refresh.
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event) => {
+        if (LIVE_BOARD_REFRESH_EVENTS.has(event)) {
+          setReload((key) => key + 1)
+        }
+      },
+    })
+  }, [encryptedOutletId, token])
 
   function handleRefresh() {
     if (refreshing) return
@@ -185,6 +208,7 @@ export default function CaptainOrdersLiveOrders() {
                 title="Running Orders"
                 data={running}
                 icons={channelIcons}
+                hideEmptyRows={false}
                 onRowClick={(row) => setDetail({ board: 'running', row })}
               />
               <LiveOrdersBoard
@@ -231,6 +255,12 @@ export default function CaptainOrdersLiveOrders() {
             } Orders`}
             icon={channelIcons[detail.row.icon]}
             onClose={() => setDetail(null)}
+            onOpenOrder={(orderId) =>
+              navigate(billingUrlForOrder(orderId, '/captain-orders'))
+            }
+            onOpenKot={(kotId) =>
+              navigate(billingUrlForKotId(kotId, '/captain-orders'))
+            }
           />
         )}
       </main>

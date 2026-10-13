@@ -49,6 +49,9 @@ export interface DueBillDto {
   order: string
   order_no: string
   bill_no: string
+  /** Name the cashier typed when this bill was rung up (may differ from the
+   * customer profile name — identity is phone + name, not the phone alone). */
+  customer_name?: string
   created_at: string
   status: string
   total: string
@@ -220,6 +223,7 @@ export function toDueClient(dto: DueClientDto): DueClientMock {
   const bills: DueBillMock[] = dto.bills.map((bill) => ({
     id: `${bill.order}-bill`,
     billNo: bill.bill_no,
+    customerName: bill.customer_name?.trim() || undefined,
     ...toDateParts(bill.created_at),
     total: Number(bill.total),
     paid: Number(bill.paid),
@@ -236,6 +240,7 @@ export function toDueClient(dto: DueClientDto): DueClientMock {
     return {
       id: `${bill.order}-sale`,
       billNo: bill.bill_no,
+      customerName: bill.customer_name?.trim() || undefined,
       ...toDateParts(bill.created_at),
       total: Number(bill.total),
       status,

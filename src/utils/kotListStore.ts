@@ -61,6 +61,17 @@ export function parseKotItems(itemsText: string): { name: string; qty: number }[
     })
 }
 
+/**
+ * Is this a KOT id the server issued?
+ *
+ * Saved tickets carry an encrypted token (`<pk>:<base64url>`, 48 chars here);
+ * a ticket created client-side and not yet POSTed uses a synthetic
+ * `kot-<key>-<no>-<timestamp>` id. Only the former has a server row to PATCH.
+ */
+export function isServerBackedKotId(id: string): boolean {
+  return /^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$/.test(id)
+}
+
 const MONTHS_SHORT = [
   'Jan',
   'Feb',

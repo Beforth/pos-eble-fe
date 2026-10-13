@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import {
@@ -32,6 +32,7 @@ import type { SpecialNote, TaxSummary } from '../../types/menu'
 import { useAuth } from '../../auth/AuthContext'
 import { listSpecialNotesApi } from '../../services/menuService'
 import { SelectDropdown } from '../common/SelectDropdown'
+import { TooltipWrapper } from '../common/TooltipWrapper'
 import {
   matchSpecialNoteId,
   specialNoteOptions,
@@ -139,6 +140,12 @@ interface BillPanelProps {
   chargeTaxes?: TaxSummary[]
   /** When set (e.g. opened from Kot View), expand that KOT in the sent list. */
   focusKotNo?: number | null
+  /**
+   * Keep the sent-KOT rows out of the item list (walk-in cart): the KOTs
+   * still price tax and totals — they just aren't listed, so the cart reads
+   * as cleared after a send.
+   */
+  hideSentKotRows?: boolean
   orderType: OrderType
   payment: PaymentMethod
   tableId: string
@@ -169,7 +176,11 @@ interface BillPanelProps {
   }) => void
   onClearItems?: () => void
   onAction: (action: string, charges?: BillChargesSnapshot) => void
-  onSettleSave?: (amount: number, due?: number) => void
+  onSettleSave?: (
+    amount: number,
+    due?: number,
+    charges?: BillChargesSnapshot,
+  ) => void
   onCustomerChange: (customer: CustomerDetails) => void
   onCustomerFormOpenChange: (open: boolean) => void
   onNotesClick?: () => void
@@ -220,6 +231,7 @@ export function BillPanel({
   lines,
   tableKots = [],
   focusKotNo = null,
+  hideSentKotRows = false,
   taxSource,
   taxSettings,
   chargeTaxes,
@@ -270,6 +282,8 @@ export function BillPanel({
   const [clearAllOpen, setClearAllOpen] = useState(false)
   const [clearCustomerOpen, setClearCustomerOpen] = useState(false)
   const selectedTable = tables.find((t) => t.id === tableId)
+  const dineInFieldsLocked = orderType === 'delivery'
+  const previousOrderType = useRef(orderType)
 
   useEffect(() => {
     setExpandedKotNo(focusKotNo ?? null)
@@ -285,6 +299,13 @@ export function BillPanel({
   const total = Math.round((currentTotal + kotTotal) * 100) / 100
   const hasSentKots = tableKots.length > 0
   const hasAnyItems = lines.length > 0 || hasSentKots
+  // With `hideSentKotRows` (walk-in), sent KOTs still price tax and totals —
+  // they just aren't listed, so the cart reads as cleared after a send. The
+  // one exception is the KOT explicitly opened from Kot View (`focusKotNo`),
+  // which the cashier asked to see and must stay visible.
+  const visibleSentKots = hideSentKotRows
+    ? tableKots.filter((kot) => kot.kotNo === focusKotNo)
+    : tableKots
   const [settlementInput, setSettlementInput] = useState('')
   const [settlementError, setSettlementError] = useState<string | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -429,6 +450,32 @@ export function BillPanel({
     }
   }, [orderType])
 
+  /**
+   * Table and guests only apply to a dine-in bill, so they are locked for every
+   * takeaway type. On switching to one, drop whatever no longer belongs: delivery
+   * has no table at all, pick-up (and `other`, which the API folds into pick-up)
+   * keeps the table it came with but has no covers. The previous type is tracked
+   * in a ref so this runs on a switch only, never on mount — otherwise a deep
+   * link that arrives already set would be wiped before it was read.
+   *
+   * Guard: when switching to delivery and no table is currently selected, do not
+   * call onTableIdChange('') (that would clear a pinned takeaway KOT opened via
+   * deep-link with no table).
+   */
+  useEffect(() => {
+    const previous = previousOrderType.current
+    previousOrderType.current = orderType
+    if (previous === orderType) return
+
+    setTablePickerOpen(false)
+    setGuestsPickerOpen(false)
+
+    if (orderType === 'delivery' && tableId) {
+      onTableIdChange('')
+    }
+    if (orderType === 'delivery') onGuestsChange(0)
+  }, [orderType, onTableIdChange, onGuestsChange, tableId])
+
   function chargesSnapshot(): BillChargesSnapshot {
     return {
       deliveryCharge: orderType === 'delivery' ? deliveryValue : 0,
@@ -483,7 +530,7 @@ export function BillPanel({
       return
     }
     setSettlementError(null)
-    onSettleSave?.(rounded, due)
+    onSettleSave?.(rounded, due, chargesSnapshot())
   }
 
   function money(n: number) {
@@ -700,48 +747,64 @@ export function BillPanel({
 
       {/* Quick tools */}
       <div className="relative flex items-center gap-1.5 border-b border-line px-2 py-2">
-        <button
-          type="button"
-          aria-label="Select table"
-          data-tooltip="Select table"
-          onClick={() => {
-            setTablePickerOpen((open) => !open)
-            setGuestsPickerOpen(false)
-            onCustomerFormOpenChange(false)
-          }}
-          className="relative inline-flex size-9 items-center justify-center rounded-lg border border-line text-muted hover:bg-page hover:text-ink"
+        <TooltipWrapper
+          label={
+            dineInFieldsLocked ? 'Not applicable for this order type' : 'Select table'
+          }
         >
-          <Utensils size={16} />
-          {selectedTable ? (
-            <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-              {selectedTable.areaName === 'Party Hall'
-                ? `P${selectedTable.tableNo.replace(/\D/g, '')}`
-                : selectedTable.tableNo}
-            </span>
-          ) : null}
-        </button>
-        <button
-          type="button"
-          data-tooltip={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
-          aria-label={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
-          onClick={() => {
-            setTablePickerOpen(false)
-            onCustomerFormOpenChange(false)
-            setGuestsPickerOpen((open) => !open)
-          }}
-          className={`relative inline-flex size-9 items-center justify-center rounded-lg border transition-colors ${
-            guestsPickerOpen || guests > 0
-              ? 'border-primary bg-primary/5 text-primary'
-              : 'border-line text-muted hover:bg-page hover:text-ink'
-          }`}
+          <button
+            type="button"
+            aria-label="Select table"
+            disabled={dineInFieldsLocked}
+            onClick={() => {
+              setTablePickerOpen((open) => !open)
+              setGuestsPickerOpen(false)
+              onCustomerFormOpenChange(false)
+            }}
+            className="relative inline-flex size-9 items-center justify-center rounded-lg border border-line text-muted hover:bg-page hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Utensils size={16} />
+            {selectedTable ? (
+              <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                {selectedTable.areaName === 'Party Hall'
+                  ? `P${selectedTable.tableNo.replace(/\D/g, '')}`
+                  : selectedTable.tableNo}
+              </span>
+            ) : null}
+          </button>
+        </TooltipWrapper>
+        <TooltipWrapper
+          label={
+            dineInFieldsLocked
+              ? 'Not applicable for this order type'
+              : guests === 0
+                ? 'No. of Persons'
+                : `Guests: ${guests}`
+          }
         >
-          <Users size={16} />
-          {guests > 0 ? (
-            <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-              {guests}
-            </span>
-          ) : null}
-        </button>
+          <button
+            type="button"
+            aria-label={guests === 0 ? 'No. of Persons' : `Guests: ${guests}`}
+            disabled={dineInFieldsLocked}
+            onClick={() => {
+              setTablePickerOpen(false)
+              onCustomerFormOpenChange(false)
+              setGuestsPickerOpen((open) => !open)
+            }}
+            className={`relative inline-flex size-9 items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              guestsPickerOpen || guests > 0
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-line text-muted hover:bg-page hover:text-ink'
+            }`}
+          >
+            <Users size={16} />
+            {guests > 0 ? (
+              <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                {guests}
+              </span>
+            ) : null}
+          </button>
+        </TooltipWrapper>
         <button
           type="button"
           aria-label="Customer"
@@ -1063,7 +1126,7 @@ export function BillPanel({
               </div>
             ) : (
               <div>
-                {hasSentKots ? (
+                {visibleSentKots.length > 0 ? (
                   <div className="border-b border-line bg-page/60">
                     <p className="border-b border-line px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
                       Sent KOTs ·{' '}
@@ -1072,7 +1135,7 @@ export function BillPanel({
                         : 'No table'}
                     </p>
                     <ul>
-                      {tableKots.map((kot) => {
+                      {visibleSentKots.map((kot) => {
                         const open = expandedKotNo === kot.kotNo
                         const timeLabel = kot.createdAt
                           ? new Date(kot.createdAt).toLocaleTimeString('en-IN', {

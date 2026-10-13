@@ -24,6 +24,7 @@ const statusClass: Record<KotStatus, string> = {
   Pending: 'text-accent',
   Cancelled: 'text-danger',
   Ready: 'text-primary',
+  Printed: 'text-primary',
 }
 
 function ActionButton({

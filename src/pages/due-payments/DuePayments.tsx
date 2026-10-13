@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
@@ -35,6 +35,11 @@ const SORT_OPTIONS = [
   { value: 'due-asc', label: 'Lowest Due' },
 ]
 
+/** Dues only move when someone settles a bill — possibly at another counter —
+ * and the live rail carries no dues events, so the list refetches on a timer
+ * (and on window focus) instead of waiting for a manual refresh. */
+const DUES_POLL_INTERVAL_MS = 15000
+
 function downloadStatement(client: DueClient, month: number, year: number) {
   const due = clientDue(client)
   const taken = monthlyTaken(client, month, year)
@@ -63,28 +68,56 @@ export default function DuePayments() {
   const [sortBy, setSortBy] = useState('name-asc')
   const [month, setMonth] = useState(String(now.getMonth()))
   const [year, setYear] = useState(String(now.getFullYear()))
+  const inFlightRef = useRef(false)
 
   const monthIndex = Number(month)
   const yearNumber = Number(year)
 
-  const loadClients = useCallback(async () => {
-    if (!encryptedOutletId) {
-      showToast('No outlet selected — open from the sidebar')
-      return
-    }
-    try {
-      const dueClients = await listDueClientsApi(encryptedOutletId)
-      setClients(dueClients.map(toDueClient))
-    } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : 'Failed to load due payments',
-      )
-    }
-  }, [encryptedOutletId])
+  const fetchClients = useCallback(
+    async (silent: boolean) => {
+      if (!encryptedOutletId) {
+        // A background tick with no outlet is not worth a toast — the page
+        // already showed one when it mounted.
+        if (!silent) showToast('No outlet selected — open from the sidebar')
+        return
+      }
+      inFlightRef.current = true
+      try {
+        const dueClients = await listDueClientsApi(encryptedOutletId)
+        setClients(dueClients.map(toDueClient))
+      } catch (error) {
+        // Manual refresh and first paint report; background ticks stay quiet
+        // so a flapping network cannot toast every 15 seconds.
+        if (!silent) {
+          showToast(
+            error instanceof Error ? error.message : 'Failed to load due payments',
+          )
+        }
+      } finally {
+        inFlightRef.current = false
+      }
+    },
+    [encryptedOutletId],
+  )
+
+  const loadClients = useCallback(() => fetchClients(false), [fetchClients])
 
   useEffect(() => {
     loadClients()
   }, [loadClients])
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.hidden || inFlightRef.current) return
+      void fetchClients(true)
+    }
+    const interval = window.setInterval(tick, DUES_POLL_INTERVAL_MS)
+    window.addEventListener('focus', tick)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', tick)
+    }
+  }, [fetchClients])
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()

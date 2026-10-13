@@ -46,7 +46,11 @@ const STATUS_OPTIONS = [
   { value: 'all', label: 'All Status' },
   { value: 'Used In Bill', label: 'Used In Bill' },
   { value: 'Pending', label: 'Pending' },
+  // Was missing entirely, so Ready work — the state that moves a ticket from
+  // In Preparation to Running Orders — could not be filtered for at all.
+  { value: 'Ready', label: 'Ready' },
   { value: 'Cancelled', label: 'Cancelled' },
+  { value: 'Printed', label: 'Printed' },
 ]
 
 function atStartOfDay(date: Date): Date {
@@ -61,16 +65,45 @@ function atStartOfDay(date: Date): Date {
   )
 }
 
+function atEndOfDay(date: Date): Date {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999,
+  )
+}
+
+/**
+ * How the date inputs are applied.
+ *
+ * `open` is the default: show everything still open (`Pending`/`Ready`/
+ * `Printed`) from any date, plus everything created today. The Live Orders
+ * boards carry work across midnight — an item leaves only when someone closes
+ * it — so a register that hid yesterday's unserved tickets would disagree with
+ * the kitchen's view of the same work.
+ * `range` is the explicit Start/End window, applied when Search is pressed.
+ * `all` ignores dates entirely ("Filters cleared").
+ */
+type KotDateMode = 'open' | 'range' | 'all'
+
+const OPEN_KOT_STATUSES: ReadonlySet<string> = new Set([
+  'Pending',
+  'Ready',
+  'Printed',
+])
+
+// Default date inputs still read as today; in `open` mode they decide only
+// which *closed* tickets to include.
 function defaultStartDate() {
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  return atStartOfDay(d)
+  return atStartOfDay(new Date())
 }
 
 function defaultEndDate() {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return atStartOfDay(d)
+  return atEndOfDay(new Date())
 }
 
 function filterInputClass() {
@@ -110,8 +143,8 @@ export default function Kot() {
 
   const [moreFilters, setMoreFilters] = useState(false)
   const [draft, setDraft] = useState<KotFilters>(createDefaultFilters)
-  const [applied, setApplied] = useState<KotFilters>(createDefaultFilters)
-  const [ignoreDateFilter, setIgnoreDateFilter] = useState(false)
+const [applied, setApplied] = useState<KotFilters>(createDefaultFilters)
+const [dateMode, setDateMode] = useState<KotDateMode>('open')
   const [searched, setSearched] = useState(true)
   const [page, setPage] = useState(1)
   const [searchFlash, setSearchFlash] = useState(false)
@@ -197,6 +230,20 @@ export default function Kot() {
                 : row,
             ),
           )
+          return
+        }
+        // Save & Print attaches a served ticket to the bill it is now on. It is
+        // no longer kitchen work, but it is not billed until payment either, so
+        // the row stays and only its status moves to Printed.
+        if (event === 'kot.printed') {
+          const row = toKotRow(data as KotEventData)
+          setRows((prev) => {
+            const index = prev.findIndex((existing) => existing.id === row.id)
+            if (index === -1) return [row, ...prev]
+            const next = [...prev]
+            next[index] = { ...row, status: 'Printed' as const }
+            return next
+          })
         }
       },
     })
@@ -212,11 +259,16 @@ export default function Kot() {
     if (!searched) return []
     return rows.filter((row) => {
       const created = parseKotDate(row.created)
+      const inRange = Boolean(
+        created &&
+          created.getTime() >= applied.startDate.getTime() &&
+          created.getTime() <= applied.endDate.getTime(),
+      )
       const dateOk =
-        ignoreDateFilter ||
+        dateMode === 'all' ||
         !created ||
-        (created.getTime() >= applied.startDate.getTime() &&
-          created.getTime() <= applied.endDate.getTime())
+        inRange ||
+        (dateMode === 'open' && OPEN_KOT_STATUSES.has(row.status))
 
       const typeOk =
         applied.orderType === 'all' || row.orderType === applied.orderType
@@ -240,7 +292,7 @@ export default function Kot() {
 
       return dateOk && typeOk && statusOk && nameOk && phoneOk && kotIdOk
     })
-  }, [applied, ignoreDateFilter, rows, searched])
+  }, [applied, dateMode, rows, searched])
 
   async function handleSaveKot(updated: KotRow) {
     if (!encryptedOutletId) return
@@ -308,7 +360,7 @@ export default function Kot() {
 
   function handleSearch() {
     setApplied({ ...draft })
-    setIgnoreDateFilter(false)
+    setDateMode('range')
     setSearched(true)
     setPage(1)
     flash(setSearchFlash)
@@ -318,7 +370,7 @@ export default function Kot() {
     const next = createDefaultFilters()
     setDraft(next)
     setApplied(next)
-    setIgnoreDateFilter(true)
+    setDateMode('all')
     setSearched(true)
     setPage(1)
     setMoreFilters(false)
