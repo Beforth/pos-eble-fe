@@ -841,7 +841,7 @@ export async function listKotsApi(
   if (options.page) params.push(`page=${options.page}`)
   if (options.page_size) params.push(`page_size=${options.page_size}`)
   const qs = params.length ? `?${params.join('&')}` : ''
-  return jsonRequest<KotsPage>(ordersPath(outletId, `/kots/${qs}/`), 'GET')
+  return jsonRequest<KotsPage>(ordersPath(outletId, `/kots/${qs}`), 'GET')
 }
 
 export async function getKotApi(outletId: string, id: string): Promise<KotDto> {

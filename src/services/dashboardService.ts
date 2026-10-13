@@ -97,7 +97,7 @@ export async function getDashboardSalesChartApi(
   outletId: string,
   from?: string,
   to?: string,
-): Promise<{ series: ChartPoint[]; status: ChartStatus }> {
+): Promise<{ series: ChartPoint[]; status: ChartStatus; totalOrders: number }> {
   const dto = await apiRequest<SalesChartDto>(dashboardPath(outletId, 'sales-chart', from, to), {
     method: 'GET',
     token: authToken(),
@@ -110,7 +110,15 @@ export async function getDashboardSalesChartApi(
       online: toNumber(point.online),
     })),
     status: dto.status,
+    totalOrders: dto.status.totalOrders,
   }
+}
+
+/** Backend order-type values -> the dashboard's card keys. */
+const ORDER_TYPE_KEYS: Record<string, OrderTypeSummary['key']> = {
+  'dine-in': 'dineIn',
+  delivery: 'delivery',
+  'pick-up': 'parcel',
 }
 
 /** Order-type summary cards. */
@@ -124,7 +132,7 @@ export async function getDashboardOrderTypesApi(
     { method: 'GET', token: authToken() },
   )
   return rows.map((row) => ({
-    key: row.key as OrderTypeSummary['key'],
+    key: ORDER_TYPE_KEYS[row.key] ?? (row.key as OrderTypeSummary['key']),
     label: row.label,
     revenue: toNumber(row.revenue),
     orders: row.orders,
