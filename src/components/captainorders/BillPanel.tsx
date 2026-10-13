@@ -271,7 +271,7 @@ export function BillPanel({
   const [clearAllOpen, setClearAllOpen] = useState(false)
   const [clearCustomerOpen, setClearCustomerOpen] = useState(false)
   const selectedTable = tables.find((t) => t.id === tableId)
-  const dineInFieldsLocked = orderType !== 'dine-in'
+  const dineInFieldsLocked = orderType === 'delivery'
   const previousOrderType = useRef(orderType)
 
   useEffect(() => {
@@ -451,7 +451,7 @@ export function BillPanel({
     if (orderType === 'delivery' && tableId) {
       onTableIdChange('')
     }
-    if (orderType !== 'dine-in') onGuestsChange(0)
+    if (orderType === 'delivery') onGuestsChange(0)
   }, [orderType, onTableIdChange, onGuestsChange, tableId])
 
   function chargesSnapshot(): BillChargesSnapshot {

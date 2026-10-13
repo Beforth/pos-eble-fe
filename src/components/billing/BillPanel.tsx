@@ -140,6 +140,12 @@ interface BillPanelProps {
   chargeTaxes?: TaxSummary[]
   /** When set (e.g. opened from Kot View), expand that KOT in the sent list. */
   focusKotNo?: number | null
+  /**
+   * Keep the sent-KOT rows out of the item list (walk-in cart): the KOTs
+   * still price tax and totals — they just aren't listed, so the cart reads
+   * as cleared after a send.
+   */
+  hideSentKotRows?: boolean
   orderType: OrderType
   payment: PaymentMethod
   tableId: string
@@ -225,6 +231,7 @@ export function BillPanel({
   lines,
   tableKots = [],
   focusKotNo = null,
+  hideSentKotRows = false,
   taxSource,
   taxSettings,
   chargeTaxes,
@@ -275,7 +282,7 @@ export function BillPanel({
   const [clearAllOpen, setClearAllOpen] = useState(false)
   const [clearCustomerOpen, setClearCustomerOpen] = useState(false)
   const selectedTable = tables.find((t) => t.id === tableId)
-  const dineInFieldsLocked = orderType !== 'dine-in'
+  const dineInFieldsLocked = orderType === 'delivery'
   const previousOrderType = useRef(orderType)
 
   useEffect(() => {
@@ -292,6 +299,13 @@ export function BillPanel({
   const total = Math.round((currentTotal + kotTotal) * 100) / 100
   const hasSentKots = tableKots.length > 0
   const hasAnyItems = lines.length > 0 || hasSentKots
+  // With `hideSentKotRows` (walk-in), sent KOTs still price tax and totals —
+  // they just aren't listed, so the cart reads as cleared after a send. The
+  // one exception is the KOT explicitly opened from Kot View (`focusKotNo`),
+  // which the cashier asked to see and must stay visible.
+  const visibleSentKots = hideSentKotRows
+    ? tableKots.filter((kot) => kot.kotNo === focusKotNo)
+    : tableKots
   const [settlementInput, setSettlementInput] = useState('')
   const [settlementError, setSettlementError] = useState<string | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -459,7 +473,7 @@ export function BillPanel({
     if (orderType === 'delivery' && tableId) {
       onTableIdChange('')
     }
-    if (orderType !== 'dine-in') onGuestsChange(0)
+    if (orderType === 'delivery') onGuestsChange(0)
   }, [orderType, onTableIdChange, onGuestsChange, tableId])
 
   function chargesSnapshot(): BillChargesSnapshot {
@@ -1112,7 +1126,7 @@ export function BillPanel({
               </div>
             ) : (
               <div>
-                {hasSentKots ? (
+                {visibleSentKots.length > 0 ? (
                   <div className="border-b border-line bg-page/60">
                     <p className="border-b border-line px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
                       Sent KOTs ·{' '}
@@ -1121,7 +1135,7 @@ export function BillPanel({
                         : 'No table'}
                     </p>
                     <ul>
-                      {tableKots.map((kot) => {
+                      {visibleSentKots.map((kot) => {
                         const open = expandedKotNo === kot.kotNo
                         const timeLabel = kot.createdAt
                           ? new Date(kot.createdAt).toLocaleTimeString('en-IN', {

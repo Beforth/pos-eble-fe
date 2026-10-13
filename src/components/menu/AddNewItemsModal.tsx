@@ -123,10 +123,10 @@ export function AddNewItemsModal({
             </span>
             <span className="min-w-0">
               <span className="block text-sm font-semibold text-ink">
-                Import via Sheet (CSV)
+                Import via Sheet (Excel)
               </span>
               <span className="mt-1 block text-xs leading-relaxed text-muted">
-                Download a CSV template, fill it in, and upload to bulk-add
+                Download an xlsx template, fill it in, and upload to bulk-add
                 items
               </span>
             </span>
@@ -156,9 +156,8 @@ export function AddNewItemsModal({
 
         <div className="border-t border-line px-5 py-3.5">
           <p className="text-xs leading-relaxed text-muted">
-            Items will be added to the base menu in{' '}
-            <span className="font-semibold text-ink">inactive</span> status
-            until you mark them activated.
+            Items are added to the base menu of the current outlet — manage
+            their availability later from the menu.
           </p>
         </div>
       </div>

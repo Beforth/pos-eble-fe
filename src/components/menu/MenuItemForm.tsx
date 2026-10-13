@@ -14,7 +14,24 @@ import type {
   VariationGroup,
 } from '../../types/menu'
 
-const TAG_OPTIONS = ['V+', 'NV', 'F', 'D', 'O', 'E']
+const TAG_OPTIONS = ['V+', 'V', 'A', 'F', 'D', 'O', 'NV', 'E']
+
+const TAG_META: Record<string, string> = {
+  'V+': 'Add variations',
+  V: 'Item has variation',
+  A: 'Addon details',
+  F: 'Favourite item',
+  D: 'Available in Dine-in QR',
+  O: 'Expose in online order',
+  NV: 'Non-veg',
+  E: 'Egg item',
+}
+
+/** Tags that only reflect the variation/add-on pickers (not togglable). */
+const REFLECT_TAGS = new Set(['V+', 'V', 'A'])
+
+const DINE_IN_SLUG = 'dine-in'
+const ONLINE_SLUGS = ['swiggy', 'zomato', 'home-website']
 
 const CHOICE_OPTIONS: Array<{ value: 'veg' | 'egg' | 'non-veg'; label: string }> = [
   { value: 'veg', label: 'Veg' },
@@ -142,7 +159,6 @@ const REQUIRED_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'description', label: 'Description' },
   { key: 'long_description', label: 'Long Description' },
   { key: 'sap_code', label: 'SAP Code' },
-  { key: 'hsn_code', label: 'HSN Code' },
   { key: 'fsn_code', label: 'FSN Code' },
 ]
 
@@ -272,7 +288,7 @@ export function MenuItemForm({
   const [longDescription, setLongDescription] = useState(
     item?.long_description ?? '',
   )
-  const [tags, setTags] = useState<string[]>(item?.tags ?? [])
+  const initialTags = useRef<string[]>(item?.tags ?? []).current
   const [choice, setChoice] = useState<'veg' | 'egg' | 'non-veg'>(
     item?.choice === 'egg' || item?.choice === 'non-veg' ? item.choice : 'veg',
   )
@@ -308,6 +324,56 @@ export function MenuItemForm({
     initAvailability(channels, item),
   )
 
+  const dineInChannelId = channels.find(
+    (channel) => channel.channel_slug === DINE_IN_SLUG,
+  )?.id
+  const onlineChannels = useMemo(
+    () => channels.filter((channel) => ONLINE_SLUGS.includes(channel.channel_slug)),
+    [channels],
+  )
+
+  const activeTags = useMemo(() => {
+    const active: string[] = []
+    const hasVariations =
+      variationIds.length > 0 ||
+      (mode === 'edit' &&
+        !variationsTouched &&
+        initialTags.some((tag) => tag === 'V+' || tag === 'V'))
+    const hasAddons =
+      addonGroupIds.length > 0 ||
+      (mode === 'edit' && !addonsTouched && initialTags.includes('A'))
+    if (hasVariations) active.push('V+', 'V')
+    if (hasAddons) active.push('A')
+    if (flags.set_as_favorite) active.push('F')
+    if (
+      dineInChannelId &&
+      (channelAvailability[dineInChannelId] ?? true)
+    ) {
+      active.push('D')
+    }
+    if (
+      onlineChannels.length > 0 &&
+      onlineChannels.every((channel) => channelAvailability[channel.id] ?? true)
+    ) {
+      active.push('O')
+    }
+    if (choice === 'non-veg') active.push('NV')
+    if (choice === 'egg') active.push('E')
+    return active
+  }, [
+    mode,
+    initialTags,
+    variationIds,
+    variationsTouched,
+    addonGroupIds,
+    addonsTouched,
+    flags.set_as_favorite,
+    dineInChannelId,
+    onlineChannels,
+    channelAvailability,
+    choice,
+  ])
+
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imageChannelId, setImageChannelId] = useState('')
   const [imagePosition, setImagePosition] = useState('')
@@ -324,7 +390,6 @@ export function MenuItemForm({
     description,
     long_description: longDescription,
     sap_code: sapCode,
-    hsn_code: hsnCode,
     fsn_code: fsnCode,
   }
 
@@ -415,6 +480,37 @@ export function MenuItemForm({
     }))
   }
 
+  function toggleChannelAvailability(channelId: string | undefined) {
+    if (!channelId) return
+    setChannelAvailability((prev) => ({
+      ...prev,
+      [channelId]: !(prev[channelId] ?? true),
+    }))
+  }
+
+  function toggleFoodTypeTag(tag: 'NV' | 'E') {
+    const target = tag === 'NV' ? 'non-veg' : 'egg'
+    setChoice((prev) => (prev === target ? 'veg' : target))
+  }
+
+  function toggleBehaviorTag(tag: string) {
+    if (tag === 'F') {
+      toggleFlag('set_as_favorite')
+      return
+    }
+    if (tag === 'D') {
+      toggleChannelAvailability(dineInChannelId)
+      return
+    }
+    if (tag === 'O') {
+      onlineChannels.forEach((channel) => toggleChannelAvailability(channel.id))
+      return
+    }
+    if (tag === 'NV' || tag === 'E') {
+      toggleFoodTypeTag(tag)
+    }
+  }
+
   function handleSubmit() {
     if (!name.trim()) {
       showError('Item name is required')
@@ -448,7 +544,7 @@ export function MenuItemForm({
       base_price: Number(basePrice),
       description: description.trim(),
       long_description: longDescription.trim(),
-      tags,
+      tags: activeTags,
       choice,
       order_types: orderTypes,
       days,
@@ -724,23 +820,43 @@ export function MenuItemForm({
           <FieldLabel>Tags</FieldLabel>
           <div className="flex flex-wrap gap-2 pt-1">
             {TAG_OPTIONS.map((tag) => {
-              const active = tags.includes(tag)
+              const active = activeTags.includes(tag)
+              const reflect = REFLECT_TAGS.has(tag)
+              const baseClasses = `inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition-colors ${
+                active
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-line bg-card text-muted'
+              }`
+              if (reflect) {
+                return (
+                  <span
+                    key={tag}
+                    data-tooltip={TAG_META[tag]}
+                    className={baseClasses}
+                  >
+                    {tag}
+                  </span>
+                )
+              }
               return (
                 <button
                   key={tag}
                   type="button"
-                  onClick={() => toggleArray(setTags, tag)}
-                  className={`inline-flex h-8 cursor-pointer items-center rounded-full border px-3 text-xs font-medium transition-colors ${
-                    active
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-line bg-card text-muted hover:border-muted'
-                  }`}
+                  aria-label={TAG_META[tag]}
+                  data-tooltip={TAG_META[tag]}
+                  onClick={() => toggleBehaviorTag(tag)}
+                  className={`${baseClasses} cursor-pointer hover:border-muted`}
                 >
                   {tag}
                 </button>
               )
             })}
           </div>
+          <p className="mt-2 max-w-md text-xs text-muted">
+            F favourites, D dine-in QR, O online order, NV non-veg and E egg
+            switch the saved flag and channel availability. V+, V and A reflect
+            the variations and add-ons assigned below.
+          </p>
         </div>
       </Section>
 
@@ -788,7 +904,7 @@ export function MenuItemForm({
             <FieldError message={serverErrors.sap_code} />
           </div>
           <div>
-            <FieldLabel required>HSN Code</FieldLabel>
+            <FieldLabel>HSN Code</FieldLabel>
             <input
               type="text"
               value={hsnCode}
