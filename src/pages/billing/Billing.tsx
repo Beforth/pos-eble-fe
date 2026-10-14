@@ -1961,9 +1961,22 @@ export default function Billing() {
       setKotTickets(next)
       setLines([])
       setOrderNote('')
-      // No table: the new KOT joins the billable session — otherwise it is
-      // billed as its own second bill.
-      if (!hasTableSelected) appendWalkInKotId(saved.id)
+      if (!hasTableSelected) {
+        if (resumeOrderId) {
+          // A printed counter bill that was resumed already owns a server order:
+          // the new KOT joins that bill (written back below), or it would be
+          // billed as its own second bill.
+          appendWalkInKotId(saved.id)
+        } else {
+          // A plain counter KOT is settled from the KOT screen, so Billing starts
+          // fresh: nothing sent here is merged into this screen's Total, which
+          // reads 0 until new items are added. A ticket opened from the KOT
+          // screen is dropped too, or its amount would still show.
+          clearWalkInKotSession()
+          setPinnedKotId(null)
+          setFocusKotNo(null)
+        }
+      }
       // A printed counter bill already owns an order: write the KOT session
       // back into it right away, so a later reprint shows this ticket and the
       // settle adopts it instead of leaving it to be billed a second time.
