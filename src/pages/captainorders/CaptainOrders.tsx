@@ -97,6 +97,7 @@ import {
   type TaxSettings,
 } from '../../utils/taxEngine'
 import { useOutletSettings } from '../../services/useOutletSettings'
+import { useFavoriteItems } from '../../state/useFavoriteItems'
 import { subscribeToRail } from '../../services/liveRailClient'
 
 const FAVORITES_ID = 'favorites'
@@ -718,16 +719,8 @@ export default function CaptainOrders() {
     }
   }, [openOrderId, encryptedOutletId, menuItems, menuLoading, navigate])
 
-  const favoriteIds = useMemo(
-    () =>
-      new Set(
-        menuItems
-          .filter((i) => i.isFavorite)
-          .slice(0, 12)
-          .map((i) => i.id),
-      ),
-    [menuItems],
-  )
+  // Manual favorites first, then best sellers fill the outlet's favorite slots.
+  const { favoriteIds } = useFavoriteItems(menuItems)
 
   const filteredItems = useMemo(() => {
     return menuItems.filter((item) => {
@@ -1029,21 +1022,23 @@ export default function CaptainOrders() {
       })),
     })
 
+    // A ticket whose bill is already paid (`billed`) is finished business:
+    // the KOT view hides it, so the bill must not keep adding it up either.
     if (hasTableSelected) {
-      const base = tableKotTickets.map(toSummary)
+      const base = tableKotTickets.filter((t) => !t.billed).map(toSummary)
       if (
         pinnedKotId &&
         !base.some((row) => row.id === pinnedKotId)
       ) {
         const pinned = kotTickets.find((t) => t.id === pinnedKotId)
-        if (pinned) return [...base, toSummary(pinned)]
+        if (pinned && !pinned.billed) return [...base, toSummary(pinned)]
       }
       return base
     }
 
     if (pinnedKotId) {
       const pinned = kotTickets.find((t) => t.id === pinnedKotId)
-      return pinned ? [toSummary(pinned)] : []
+      return pinned && !pinned.billed ? [toSummary(pinned)] : []
     }
     return []
   }, [hasTableSelected, tableKotTickets, pinnedKotId, kotTickets])
@@ -2079,7 +2074,7 @@ export default function CaptainOrders() {
                   result.otherType,
                 ),
                 customerName: result.customerName || settled[0]?.customerName || '',
-                customerPhone: '',
+                customerPhone: result.customerPhone,
                 settlementBy: billerName || undefined,
                 grandTotal: result.settlementAmount,
               })

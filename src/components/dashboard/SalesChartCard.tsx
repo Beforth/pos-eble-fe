@@ -229,7 +229,7 @@ export function SalesChartCard({
   onCustomRange,
   className = '',
 }: SalesChartCardProps) {
-  const [chartKind, setChartKind] = useState<ChartKind>('area')
+  const [chartKind, setChartKind] = useState<ChartKind>('line')
 
   const sharedAxis = [
     <CartesianGrid

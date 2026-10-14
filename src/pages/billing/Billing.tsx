@@ -108,6 +108,8 @@ import {
   type TaxSettings,
 } from '../../utils/taxEngine'
 import { useOutletSettings } from '../../services/useOutletSettings'
+import { useFavoriteItems } from '../../state/useFavoriteItems'
+import { updateItemApi } from '../../services/menuService'
 
 const FAVORITES_ID = 'favorites'
 const ALL_CATEGORIES_ID = 'all-categories'
@@ -229,6 +231,7 @@ export default function Billing() {
     categoriesStatus: menuCategoriesStatus,
     categoriesError: menuCategoriesError,
     reload: reloadMenu,
+    setItemFavorite,
   } = useBillingMenu()
   // Items and reference categories are two independent fetches, and the rail is
   // built from the categories list. Gating on the items status alone let a
@@ -797,16 +800,53 @@ export default function Billing() {
     }
   }, [openOrderId, encryptedOutletId, menuItems, menuLoading, navigate])
 
-  const favoriteIds = useMemo(
-    () =>
-      new Set(
-        menuItems
-          .filter((i) => i.isFavorite)
-          .slice(0, 12)
-          .map((i) => i.id),
-      ),
-    [menuItems],
-  )
+  // Manual favorites first, then best sellers fill the outlet's favorite slots.
+  const {
+    favoriteIds,
+    slots: favoriteSlots,
+    pinnedCount: pinnedFavoriteCount,
+  } = useFavoriteItems(menuItems)
+
+  /**
+   * Heart on a menu card. Red = the item is in Favorite Items, marked by hand
+   * or put there by its sales. Clicking a red heart removes it (and stops
+   * best sellers re-adding it); clicking a grey one adds it by hand.
+   */
+  async function toggleFavorite(item: MenuItemRow) {
+    if (!encryptedOutletId) return
+    const next = !favoriteIds.has(item.id)
+    if (next && pinnedFavoriteCount >= favoriteSlots) {
+      showToast(
+        `Favorite Items is full (${favoriteSlots}). Remove one, or raise "Favorite items shown" in Display settings.`,
+      )
+      return
+    }
+    const previous = {
+      favorite: Boolean(item.isFavorite),
+      excluded: Boolean(item.excludeFromAutoFavorites),
+    }
+    // Adding clears any earlier removal; removing also bars the auto picks.
+    const flags = { favorite: next, excluded: !next }
+    setItemFavorite(item.id, flags)
+    try {
+      await updateItemApi(encryptedOutletId, item.id, {
+        flags: {
+          set_as_favorite: flags.favorite,
+          exclude_from_auto_favorites: flags.excluded,
+        },
+      })
+      showToast(
+        next
+          ? `${item.name} added to Favorite Items`
+          : `${item.name} removed from Favorite Items`,
+      )
+    } catch (error) {
+      setItemFavorite(item.id, previous)
+      showToast(
+        error instanceof Error ? error.message : 'Could not update the favorite',
+      )
+    }
+  }
 
   const filteredItems = useMemo(() => {
     return menuItems.filter((item) => {
@@ -1109,6 +1149,18 @@ export default function Billing() {
     [kotTickets, tableId],
   )
 
+  // Forget walk-in tickets that were paid elsewhere. Only tickets we can see
+  // *and* that are billed are dropped: a just-sent KOT may be in the session
+  // a beat before it reaches `kotTickets`, and must not be pruned.
+  useEffect(() => {
+    const paid = new Set(kotTickets.filter((t) => t.billed).map((t) => t.id))
+    if (paid.size === 0) return
+    setWalkInKotIds((prev) =>
+      prev.some((id) => paid.has(id)) ? prev.filter((id) => !paid.has(id)) : prev,
+    )
+    setPinnedKotId((prev) => (prev && paid.has(prev) ? null : prev))
+  }, [kotTickets])
+
   const hasTableSelected = Boolean(tableId)
 
   const tableKotSummary = useMemo(() => {
@@ -1130,14 +1182,17 @@ export default function Billing() {
       })),
     })
 
+    // A ticket whose bill is already paid (`billed`) is finished business:
+    // the KOT view hides it, so the bill must not keep adding it up either —
+    // that was the amount that appeared with an empty cart.
     if (hasTableSelected) {
-      const base = tableKotTickets.map(toSummary)
+      const base = tableKotTickets.filter((t) => !t.billed).map(toSummary)
       if (
         pinnedKotId &&
         !base.some((row) => row.id === pinnedKotId)
       ) {
         const pinned = kotTickets.find((t) => t.id === pinnedKotId)
-        if (pinned) return [...base, toSummary(pinned)]
+        if (pinned && !pinned.billed) return [...base, toSummary(pinned)]
       }
       return base
     }
@@ -1147,13 +1202,13 @@ export default function Billing() {
     // and strand the rest as their own bills.
     const sessionTickets = walkInKotIds
       .map((id) => kotTickets.find((t) => t.id === id))
-      .filter((t): t is KotTicket => Boolean(t))
+      .filter((t): t is KotTicket => Boolean(t) && !t?.billed)
     if (sessionTickets.length > 0) {
       return sessionTickets.map(toSummary)
     }
     if (pinnedKotId) {
       const pinned = kotTickets.find((t) => t.id === pinnedKotId)
-      return pinned ? [toSummary(pinned)] : []
+      return pinned && !pinned.billed ? [toSummary(pinned)] : []
     }
     return []
   }, [
@@ -2301,7 +2356,7 @@ export default function Billing() {
                   result.otherType,
                 ),
                 customerName: result.customerName || settled[0]?.customerName || '',
-                customerPhone: '',
+                customerPhone: result.customerPhone,
                 settlementBy: billerName || undefined,
                 grandTotal: result.settlementAmount,
               })
@@ -2383,6 +2438,8 @@ export default function Billing() {
               onAddItem={addItem}
               selectedQtyByItemId={selectedQtyByItemId}
               showFavoriteHeart={railCategoryId === FAVORITES_ID}
+              onToggleFavorite={toggleFavorite}
+              favoriteIds={favoriteIds}
               showOpenItem={
                 railCategoryId === FAVORITES_ID ||
                 shortCode.trim() === '00' ||

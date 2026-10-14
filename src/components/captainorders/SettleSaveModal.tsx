@@ -8,6 +8,7 @@ import {
 import type { PaymentMethod } from './BillPanel'
 import { OTHER_PAYMENT_TYPES, type OtherPaymentType } from './OtherPaymentModal'
 import { showToast } from '../../utils/toast'
+import { isValidMobile, normalizeMobileDigits } from '../../utils/phone'
 
 const PAYMENT_OPTIONS: { id: PaymentMethod; label: string }[] = [
   { id: 'cash', label: 'Cash' },
@@ -46,6 +47,8 @@ export interface SettleSaveResult {
   returnToCustomer: number
   due: number
   customerName: string
+  /** 10-digit mobile; required (and sent) when a due is booked. */
+  customerPhone: string
   otherType?: string
   partEntries?: PartEntry[]
 }
@@ -55,6 +58,7 @@ interface SettleSaveModalProps {
   label: string
   billAmount: number
   customerName?: string
+  customerPhone?: string
   onClose: () => void
   onConfirm: (result: SettleSaveResult) => void
 }
@@ -71,6 +75,7 @@ export function SettleSaveModal({
   label,
   billAmount,
   customerName,
+  customerPhone,
   onClose,
   onConfirm,
 }: SettleSaveModalProps) {
@@ -91,6 +96,8 @@ export function SettleSaveModal({
   const [tip, setTip] = useState('0')
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
+  const [phone, setPhone] = useState('')
+  const [phoneError, setPhoneError] = useState('')
   const [otherType, setOtherType] = useState<OtherPaymentType>(
     OTHER_PAYMENT_TYPES[0],
   )
@@ -102,6 +109,7 @@ export function SettleSaveModal({
     OTHER_PAYMENT_TYPES[0],
   )
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const phoneInputRef = useRef<HTMLInputElement>(null)
   const wasOpen = useRef(false)
   const customerPaidTouched = useRef(false)
 
@@ -112,6 +120,8 @@ export function SettleSaveModal({
       setTip('0')
       setName((customerName ?? '').trim())
       setNameError('')
+      setPhone(normalizeMobileDigits(customerPhone ?? ''))
+      setPhoneError('')
       setOtherType(OTHER_PAYMENT_TYPES[0])
       setPartEntries([])
       setPartMethod('cash')
@@ -120,7 +130,7 @@ export function SettleSaveModal({
       customerPaidTouched.current = false
     }
     wasOpen.current = open
-  }, [open, customerName, billAmount, exactBill])
+  }, [open, customerName, customerPhone, billAmount, exactBill])
 
   /**
    * Both terminals feed one kitchen, so another KOT can land on this table while
@@ -196,17 +206,21 @@ const onKey = (event: KeyboardEvent) => {
     0,
     Math.round((Number(billAmount) - settlementValue) * 100) / 100,
   )
+  /** A due (chosen, or left by a short payment) must be filed under a named, reachable customer. */
+  const needsCustomerDetails = payment === 'due' || balanceDue > 0
 
   function handlePaymentSelect(method: PaymentMethod) {
     if (method === 'other') {
       setPayment('other')
       setPartEntries([])
       setNameError('')
+      setPhoneError('')
       return
     }
     if (method === 'part') {
       setPayment('part')
       setNameError('')
+      setPhoneError('')
       if (partEntries.length === 0) {
         setPartAmount(String(exactBill || ''))
       }
@@ -219,19 +233,21 @@ const onKey = (event: KeyboardEvent) => {
       if (!name.trim()) {
         setNameError('Customer name is required for Due payment')
       }
-      showToast('Due payment — enter customer name')
+      showToast('Due payment — enter customer name and mobile number')
       return
     }
     if (method === 'card') {
       setPayment('card')
       setPartEntries([])
       setNameError('')
+      setPhoneError('')
       showToast('Card payment selected')
       return
     }
     setPayment(method)
     setPartEntries([])
     setNameError('')
+    setPhoneError('')
   }
 
   function addPartEntry() {
@@ -286,6 +302,12 @@ const onKey = (event: KeyboardEvent) => {
       return
     }
 
+    if (needsCustomerDetails && !isValidMobile(phone)) {
+      setPhoneError('Required — enter a valid 10-digit mobile number')
+      phoneInputRef.current?.focus()
+      return
+    }
+
     onConfirm({
       payment,
       customerPaid: payment === 'part' ? partPaid : Number(customerPaid) || 0,
@@ -294,6 +316,7 @@ const onKey = (event: KeyboardEvent) => {
       returnToCustomer: payment === 'part' ? 0 : returnToCustomer,
       due: balanceDue,
       customerName: name.trim(),
+      customerPhone: isValidMobile(phone) ? normalizeMobileDigits(phone) : '',
       otherType: payment === 'other' ? otherType : undefined,
       partEntries: payment === 'part' ? partEntries : undefined,
     })
@@ -362,7 +385,7 @@ const onKey = (event: KeyboardEvent) => {
             {payment === 'due' ? (
               <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
                 <Clock3 size={13} />
-                Due payment — customer name is required
+                Due payment — customer name and mobile number are required
               </p>
             ) : null}
             {payment === 'card' ? (
@@ -409,6 +432,37 @@ const onKey = (event: KeyboardEvent) => {
             <p className="pl-[152px] text-xs font-medium text-amber-600">
               {nameError}
             </p>
+          ) : null}
+
+          {needsCustomerDetails ? (
+            <>
+              <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
+                <span>
+                  Mobile No <span className="text-primary">*</span>
+                </span>
+                <input
+                  ref={phoneInputRef}
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(normalizeMobileDigits(e.target.value))
+                    if (phoneError) setPhoneError('')
+                  }}
+                  maxLength={10}
+                  placeholder="10-digit mobile (required)"
+                  aria-required
+                  className={`h-10 rounded-md border bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary ${
+                    phoneError ? 'border-amber-500' : 'border-line'
+                  }`}
+                />
+              </label>
+              {phoneError ? (
+                <p className="pl-[152px] text-xs font-medium text-amber-600">
+                  {phoneError}
+                </p>
+              ) : null}
+            </>
           ) : null}
 
           {payment === 'part' ? (

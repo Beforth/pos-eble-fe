@@ -8,6 +8,7 @@ import { DayEndSummaryModal } from '../../components/reports/DayEndSummaryModal'
 import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
 import { formatNumber } from '../../utils/format'
 import {
+  downloadDayEndReportApi,
   listDayEndClosuresApi,
   toDayEndSummaryRow,
 } from '../../services/orderService'
@@ -41,6 +42,17 @@ export default function DayEndSummary() {
   const [ignoreDates, setIgnoreDates] = useState(false)
   const [page, setPage] = useState(1)
   const [viewRow, setViewRow] = useState<DayEndSummaryRow | null>(null)
+
+  async function handleDownloadReport(row: DayEndSummaryRow) {
+    if (!encryptedOutletId) return
+    try {
+      await downloadDayEndReportApi(encryptedOutletId, row.id, row.dateKey)
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to download the report',
+      )
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -201,14 +213,9 @@ export default function DayEndSummary() {
                         </button>
                         <button
                           type="button"
-                          data-tooltip="Download summary"
-                          aria-label={`Download summary for ${row.createdDate}`}
-                          onClick={() =>
-                            downloadCsv(
-                              [row],
-                              `day-end-summary-${row.dateKey}.csv`,
-                            )
-                          }
+                          data-tooltip="Download Excel report"
+                          aria-label={`Download Excel report for ${row.createdDate}`}
+                          onClick={() => handleDownloadReport(row)}
                           className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-primary"
                         >
                           <Download size={16} strokeWidth={1.75} />

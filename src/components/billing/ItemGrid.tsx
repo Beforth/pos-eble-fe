@@ -23,6 +23,17 @@ interface ItemGridProps {
   selectedQtyByItemId?: Record<string, number>
   /** Show pink heart on cards (Favorite Items section). */
   showFavoriteHeart?: boolean
+  /**
+   * When given, every card carries a heart button; clicking it adds the item
+   * to Favorite Items, or removes it when it is already there.
+   */
+  onToggleFavorite?: (item: MenuItemRow) => void
+  /**
+   * Every id currently in Favorite Items, marked by hand or an automatic best
+   * seller: those hearts are solid red, all others a grey outline. Without
+   * it, only items marked by hand count.
+   */
+  favoriteIds?: Set<string>
   /** Show Open Item tile at the end (Favorite Items section). */
   showOpenItem?: boolean
   onOpenItemClick?: () => void
@@ -75,6 +86,8 @@ export function ItemGrid({
   onAddItem,
   selectedQtyByItemId = {},
   showFavoriteHeart = false,
+  onToggleFavorite,
+  favoriteIds,
   showOpenItem = false,
   onOpenItemClick,
 }: ItemGridProps) {
@@ -167,14 +180,21 @@ export function ItemGrid({
               const diet = getDietType(item.tags, item.name)
               const selectedQty = selectedQtyByItemId[item.id] ?? 0
               const selected = selectedQty > 0
+              // solid red = in Favorite Items (by hand or best seller);
+              // grey outline = not a favorite.
+              const inFavorites = favoriteIds
+                ? favoriteIds.has(item.id)
+                : Boolean(item.isFavorite)
               return (
-                <li key={item.id}>
+                <li key={item.id} className="relative">
                   <button
                     type="button"
                     disabled={!item.available}
                     onClick={() => handleItemClick(item)}
                     aria-pressed={selected}
-                    className={`billing-item-card relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border px-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                    className={`billing-item-card relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border pl-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                      onToggleFavorite ? 'pr-10' : 'pr-8'
+                    } ${
                       selected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
                         : 'border-line bg-card hover:border-primary/40'
@@ -202,8 +222,7 @@ export function ItemGrid({
                         </span>
                       </span>
                       <span className="flex shrink-0 flex-col items-center justify-center gap-1">
-                        <DietMark type={diet} />
-                        {showFavoriteHeart ? (
+                        {showFavoriteHeart && !onToggleFavorite ? (
                           <span aria-hidden className="text-primary">
                             <Heart
                               size={14}
@@ -220,6 +239,35 @@ export function ItemGrid({
                       </span>
                     </span>
                   </button>
+                  <span className="pointer-events-none absolute right-2.5 top-2.5 z-10">
+                    <DietMark type={diet} />
+                  </span>
+                  {onToggleFavorite ? (
+                    <button
+                      type="button"
+                      onClick={() => onToggleFavorite(item)}
+                      aria-pressed={inFavorites}
+                      aria-label={
+                        inFavorites
+                          ? `Remove ${item.name} from Favorite Items`
+                          : `Add ${item.name} to Favorite Items`
+                      }
+                      data-tooltip={
+                        inFavorites
+                          ? 'Remove from Favorite Items'
+                          : 'Add to Favorite Items'
+                      }
+                      className={`absolute bottom-1 right-1.5 z-10 flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-page focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                        inFavorites ? 'text-primary' : 'text-muted hover:text-primary'
+                      }`}
+                    >
+                      <Heart
+                        size={16}
+                        strokeWidth={1.75}
+                        className={inFavorites ? 'fill-primary' : 'fill-transparent'}
+                      />
+                    </button>
+                  ) : null}
                 </li>
               )
             })}

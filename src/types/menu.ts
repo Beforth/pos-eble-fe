@@ -129,6 +129,8 @@ export interface ItemFlags {
   ignore_tax: boolean
   ignore_discount: boolean
   set_as_favorite: boolean
+  /** Removed from Favorite Items by the cashier: best sellers must not re-add it. */
+  exclude_from_auto_favorites?: boolean
   open_item: boolean
   open_quantity_popup: boolean
   create_self_recipe: boolean
