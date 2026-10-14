@@ -21,6 +21,7 @@ import {
 } from '../components/menu/MenuActionButtons'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
+import { PaginationControls } from '../components/common/PaginationControls'
 import type { AddonGroup } from '../types/menu'
 import { useMenuReference } from '../state/MenuReferenceContext'
 
@@ -50,6 +51,9 @@ export default function AddonsManagement() {
     setGroups(refAddonGroups)
   }, [refAddonGroups])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
   const rows = useMemo(() => {
     const dept = appliedDept.trim().toLowerCase()
     const item = appliedItem.trim().toLowerCase()
@@ -76,6 +80,11 @@ export default function AddonsManagement() {
       return matchesDept && matchesItem && matchesFilter
     })
   }, [appliedDept, appliedItem, appliedSearchBy, groups])
+
+  const pagedRows = useMemo(
+    () => rows.slice((page - 1) * pageSize, page * pageSize),
+    [rows, page, pageSize],
+  )
 
   const allSelected =
     rows.length > 0 && rows.every((row) => selected.has(row.id))
@@ -246,7 +255,7 @@ export default function AddonsManagement() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {pagedRows.map((row, index) => (
               <tr
                 key={row.id}
                 className={`border-b border-line last:border-b-0 hover:bg-page/80 ${
@@ -317,6 +326,13 @@ export default function AddonsManagement() {
             ))}
           </tbody>
         </table>
+        <PaginationControls
+          totalRecords={rows.length}
+          currentPage={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
       <p className="mt-3 text-sm text-muted">
         Note : <span className="font-medium text-primary">Drag row</span> to

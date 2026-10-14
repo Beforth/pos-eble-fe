@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileCog, FileText, Pencil, Plus, ScanLine, Trash2 } from 'lucide-react'
+import { ChevronDown, Eye, FileCog, FileText, Pencil, Plus, ScanLine, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ScanPurchaseModal } from '../../components/inventory/ScanPurchaseModal'
 import { PurchaseOrderSettingsDrawer } from '../../components/inventory/PurchaseOrderSettingsDrawer'
@@ -12,6 +12,7 @@ import {
   PrimaryButton,
   RowActionButton,
 } from '../../components/menu/MenuActionButtons'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import { useAuth } from '../../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
 import {
@@ -184,6 +185,17 @@ function PurchaseListPage({
   const [scanOpen, setScanOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<ListRow | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [applied, rows])
+
+  const pagedRows = useMemo(
+    () => rows.slice((page - 1) * pageSize, page * pageSize),
+    [rows, page, pageSize],
+  )
 
   useEffect(() => {
     if (!encryptedOutletId) {
@@ -481,7 +493,7 @@ function PurchaseListPage({
                   </td>
                 </tr>
               ) : (
-                rows.map((row, index) => (
+                pagedRows.map((row, index) => (
                   <tr
                     key={row.id}
                     className={`border-b border-line last:border-b-0 ${
@@ -494,6 +506,13 @@ function PurchaseListPage({
                     <td className="px-3 py-2.5 text-ink">{row.total}</td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-center gap-1.5">
+                        <RowActionButton
+                          boxed
+                          label="View Details"
+                          onClick={() => navigate(editPath(row.id).replace(/\/edit$/, '/view'))}
+                        >
+                          <Eye size={15} strokeWidth={1.75} />
+                        </RowActionButton>
                         {canWrite ? (
                           <RowActionButton
                             boxed
@@ -520,6 +539,13 @@ function PurchaseListPage({
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          totalRecords={rows.length}
+          currentPage={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       <ScanPurchaseModal

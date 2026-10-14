@@ -194,19 +194,47 @@ function CheckboxList({
   options,
   selected,
   onToggle,
+  onAddNew,
+  addNewLabel = '+ Add New',
 }: {
   label: string
   options: Array<{ id: string; label: string }>
   selected: string[]
   onToggle: (id: string) => void
+  onAddNew?: () => void
+  addNewLabel?: string
 }) {
   const selectedSet = useMemo(() => new Set(selected), [selected])
   return (
     <div>
-      <p className="mb-1.5 text-sm font-medium text-ink">{label}</p>
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="text-sm font-medium text-ink">{label}</p>
+        {onAddNew ? (
+          <button
+            type="button"
+            onClick={onAddNew}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer"
+          >
+            <Plus size={13} />
+            {addNewLabel}
+          </button>
+        ) : null}
+      </div>
       <div className="max-h-48 overflow-y-auto rounded-md border border-line p-2">
         {options.length === 0 ? (
-          <p className="px-2 py-1.5 text-sm text-muted">No options available</p>
+          <div className="flex flex-col items-start gap-1 px-2 py-1.5">
+            <p className="text-sm text-muted">No options available</p>
+            {onAddNew ? (
+              <button
+                type="button"
+                onClick={onAddNew}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer"
+              >
+                <Plus size={13} />
+                {addNewLabel}
+              </button>
+            ) : null}
+          </div>
         ) : (
           options.map((option) => {
             const checked = selectedSet.has(option.id)
@@ -610,11 +638,15 @@ export function MenuItemForm({
               options={categoryNames}
               placeholder="Select a category"
               searchPlaceholder="Search categories..."
-              dropdownPlacement="above"
+              dropdownPlacement="below"
               onChange={(nameValue) => {
                 const category = categories.find((item) => item.name === nameValue)
                 setCategoryId(category?.id ?? '')
               }}
+              onAddNew={() => {
+                window.location.href = '/menu/categories/new'
+              }}
+              addNewLabel="+ Add New Category"
             />
           </div>
           <div>
@@ -962,6 +994,10 @@ export function MenuItemForm({
             options={taxOptions}
             selected={taxIds}
             onToggle={(id) => toggleArray(setTaxIds, id)}
+            onAddNew={() => {
+              window.location.href = '/menu/taxes/new'
+            }}
+            addNewLabel="+ Add Tax"
           />
           <CheckboxList
             label="Variations"
@@ -971,6 +1007,10 @@ export function MenuItemForm({
               setVariationsTouched(true)
               toggleArray(setVariationIds, id)
             }}
+            onAddNew={() => {
+              window.location.href = '/menu/variants/new'
+            }}
+            addNewLabel="+ Add Variation"
           />
           <CheckboxList
             label="Addon Groups"
@@ -980,6 +1020,10 @@ export function MenuItemForm({
               setAddonsTouched(true)
               toggleArray(setAddonGroupIds, id)
             }}
+            onAddNew={() => {
+              window.location.href = '/menu/addons/new'
+            }}
+            addNewLabel="+ Add Addon Group"
           />
         </div>
         {mode === 'edit' && variationOptions.length > 0 ? (

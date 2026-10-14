@@ -4,7 +4,11 @@ import { useAuth } from '../../auth/AuthContext'
 import { useInventoryMasters } from '../../state/InventoryMastersContext'
 import { ApiError } from '../../services/apiClient'
 import {
+  INV_PRODUCTION_WRITE_PERMISSION,
+  INV_PURCHASE_WRITE_PERMISSION,
+  INV_SALES_WRITE_PERMISSION,
   INV_SUPPLIER_WRITE_PERMISSION,
+  INV_WASTAGE_WRITE_PERMISSION,
   INV_WRITE_PERMISSION,
   categoryIdByName,
   createCategoryApi,
@@ -64,8 +68,17 @@ export function useInventoryQuickAdd(options: UseInventoryQuickAddOptions = {}) 
   const [stack, setStack] = useState<Frame[]>([])
   const [saving, setSaving] = useState(false)
 
-  const canCreateSupplier = hasPermission(INV_SUPPLIER_WRITE_PERMISSION)
-  const canCreateMaster = hasPermission(INV_WRITE_PERMISSION)
+  const canCreateSupplier =
+    hasPermission(INV_SUPPLIER_WRITE_PERMISSION) ||
+    hasPermission(INV_WRITE_PERMISSION) ||
+    hasPermission(INV_PURCHASE_WRITE_PERMISSION)
+
+  const canCreateMaster =
+    hasPermission(INV_WRITE_PERMISSION) ||
+    hasPermission(INV_PRODUCTION_WRITE_PERMISSION) ||
+    hasPermission(INV_PURCHASE_WRITE_PERMISSION) ||
+    hasPermission(INV_SALES_WRITE_PERMISSION) ||
+    hasPermission(INV_WASTAGE_WRITE_PERMISSION)
 
   const canCreate = useCallback(
     (kind: InventoryQuickAddKind) =>
@@ -195,6 +208,7 @@ export function useInventoryQuickAdd(options: UseInventoryQuickAddOptions = {}) 
         consumption_unit_id: consumptionId,
         conversion_purchase_unit_id: purchaseIds[0],
         category_id: categoryIdByName(categories, values.category) ?? null,
+        purchase_price: values.purchasePrice || '0',
       })
       options.onRawMaterialCreated?.(row)
       current.onPicked?.(row)
@@ -232,12 +246,14 @@ export function useInventoryQuickAdd(options: UseInventoryQuickAddOptions = {}) 
         onClose={closeTop}
         saving={saving}
         onSave={saveUnit}
+        existingUnits={unitOptions}
       />
       <QuickAddCategoryModal
         open={current?.kind === 'category'}
         onClose={closeTop}
         saving={saving}
         onSave={saveCategory}
+        existingCategories={categoryOptions}
       />
       <QuickAddRawMaterialModal
         open={stack.some((frame) => frame.kind === 'raw-material')}

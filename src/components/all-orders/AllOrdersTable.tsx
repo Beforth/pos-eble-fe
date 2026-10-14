@@ -1,10 +1,20 @@
 import type { ReactNode, SVGProps } from 'react'
-import { Banknote, Eye, Pencil, ReceiptText, Search } from 'lucide-react'
-import type { AllOrderRow } from '../../mocks/allOrdersData'
+import { Banknote, Eye, Pencil, ReceiptText, Search, ShoppingCart } from 'lucide-react'
+import type { AllOrderRow, OrderStatus } from '../../mocks/allOrdersData'
 import { formatINR } from '../../utils/format'
-import { Badge } from '../common/Badge'
+import { Badge, type BadgeVariant } from '../common/Badge'
 import { useListQuery } from '../../hooks/useListQuery'
 import { Table, type Column } from '../common/Table'
+
+/** `accent` (orange) marks a bill nobody has printed yet — same convention as
+ *  `LiveOrdersDetailModal`'s `saved` chip. Exhaustive over `OrderStatus` so a
+ *  new status fails to compile instead of silently defaulting to green. */
+const STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
+  Saved: 'accent',
+  Printed: 'success',
+  Settled: 'success',
+  Cancelled: 'primary',
+}
 
 /** Credit card + edit mark — matches POS-Eble “Change Payment Type” action. */
 function ChangePaymentIcon(props: SVGProps<SVGSVGElement>) {
@@ -37,6 +47,7 @@ interface AllOrdersTableProps {
   onEdit?: (row: AllOrderRow) => void
   onChangePayment?: (row: AllOrderRow) => void
   onSettleDue?: (row: AllOrderRow) => void
+  onOpenInBilling?: (row: AllOrderRow) => void
 }
 
 function ActionButton({
@@ -71,6 +82,7 @@ export function AllOrdersTable({
   onEdit,
   onChangePayment,
   onSettleDue,
+  onOpenInBilling,
 }: AllOrdersTableProps) {
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
     rows,
@@ -217,10 +229,7 @@ export function AllOrdersTable({
       header: 'Status',
       sortable: true,
       render: (row) => (
-        <Badge
-          variant={row.status === 'Cancelled' ? 'primary' : 'success'}
-          size="sm"
-        >
+        <Badge variant={STATUS_VARIANT[row.status]} size="sm">
           {row.status}
         </Badge>
       ),
@@ -253,6 +262,14 @@ export function AllOrdersTable({
               <ReceiptText size={13} />
             </ActionButton>
           )}
+          {onOpenInBilling && (row.status === 'Printed' || row.status === 'Saved') ? (
+            <ActionButton
+              label="Open in billing"
+              onClick={() => onOpenInBilling(row)}
+            >
+              <ShoppingCart size={13} />
+            </ActionButton>
+          ) : null}
           {onEdit && (
             <ActionButton label="Edit" onClick={() => onEdit(row)}>
               <Pencil size={13} />

@@ -25,7 +25,6 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import { isCashierUser } from '../../auth/routePermissions'
 import { BrandLogo } from '../brand/BrandLogo'
 import { brand } from '../../theme/brand'
 import {
@@ -37,15 +36,21 @@ import {
   listDayEndClosuresApi,
   toDayEndSummaryRow,
 } from '../../services/orderService'
+import { useChrome } from '../../state/ChromeContext'
 
-const SIDEBAR_LINKS = [
-  { to: '/billing', label: 'Billing', icon: UtensilsCrossed },
-  { to: '/billing/live-orders', label: 'Live Orders', icon: Monitor },
-  { to: '/billing/all-orders', label: 'All Orders', icon: BookOpen },
-  { to: '/billing/kot', label: 'KOT', icon: ChefHat },
+const SIDEBAR_LINKS: readonly {
+  to: string
+  label: string
+  icon: typeof UtensilsCrossed
+  shortcut?: string
+}[] = [
+  { to: '/billing', label: 'Billing', icon: UtensilsCrossed, shortcut: 'Ctrl+B' },
+  { to: '/billing/live-orders', label: 'Live Orders', icon: Monitor, shortcut: 'Ctrl+L' },
+  { to: '/billing/all-orders', label: 'All Orders', icon: BookOpen, shortcut: 'Ctrl+A' },
+  { to: '/billing/kot', label: 'KOT', icon: ChefHat, shortcut: 'Ctrl+K' },
   { to: '/billing/day-end', label: 'Day End', icon: Sun },
   { to: '/logs', label: 'Logs', icon: ScrollText },
-] as const
+]
 
 interface BillingHeaderProps {
   billNo: string
@@ -62,13 +67,8 @@ export function BillingHeader({
 }: BillingHeaderProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { logout, user, encryptedOutletId, isAdmin, canAccess, homePath } = useAuth()
-  // The Home entry is a counter-role affordance: an admin (whose landing is the
-  // dashboard) and a cashier (whose landing is All Orders) get it, a plain
-  // biller and a captain do not. `isAdmin` implies `canSeeHome`, so the
-  // admin-only cross-links below keep rendering whenever this block does.
-  const canSeeHome = isAdmin || isCashierUser(user)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const { logout, user, encryptedOutletId, isAdmin, canAccess } = useAuth()
+  const { billingDrawerOpen, setBillingDrawerOpen } = useChrome()
   const [profileOpen, setProfileOpen] = useState(false)
 
   const [menuViewOpen, setMenuViewOpen] = useState(false)
@@ -94,13 +94,13 @@ export function BillingHeader({
   }, [encryptedOutletId])
 
   useEffect(() => {
-    if (!drawerOpen) return
+    if (!billingDrawerOpen) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDrawerOpen(false)
+      if (event.key === 'Escape') setBillingDrawerOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [drawerOpen])
+  }, [billingDrawerOpen, setBillingDrawerOpen])
 
   useEffect(() => {
     if (!profileOpen) return
@@ -158,7 +158,7 @@ export function BillingHeader({
   }
 
   function closeDrawer() {
-    setDrawerOpen(false)
+    setBillingDrawerOpen(false)
   }
 
   return (
@@ -166,9 +166,9 @@ export function BillingHeader({
       <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-line bg-card px-1.5 sm:gap-2 sm:px-3">
         <button
           type="button"
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open navigation"
-          data-tooltip="Open navigation"
+          onClick={() => setBillingDrawerOpen((prev) => !prev)}
+          aria-label="Open navigation ([)"
+          data-tooltip="Open navigation ([)"
           className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
         >
           <Menu size={20} />
@@ -210,30 +210,9 @@ export function BillingHeader({
             [
               { icon: BookOpen, label: 'Digital menu', onClick: () => setMenuViewOpen(true) },
               { icon: Store, label: 'Store', onClick: () => setStoreInfoOpen(true) },
-              // Navigating icons are gated exactly like UniversalSearchBar gates
-              // its results: `/customer-display` is unmapped (admin-only) and
-              // `/screens` resolves to `cfg_pos_configuration_details_read`,
-              // which no role template carries — rendering them for anyone else
-              // offered a screen ProtectedRoute refuses.
-              ...(canAccess('/customer-display')
-                ? [
-                    {
-                      icon: Monitor,
-                      label: 'Display',
-                      onClick: () => navigate('/customer-display'),
-                    },
-                  ]
-                : []),
+              { icon: Monitor, label: 'Display', onClick: () => navigate('/customer-display') },
               { icon: Grid2x2, label: 'View KOT', onClick: onViewKot },
-              ...(canAccess('/screens')
-                ? [
-                    {
-                      icon: CookingPot,
-                      label: 'Kitchen',
-                      onClick: () => navigate('/screens'),
-                    },
-                  ]
-                : []),
+              { icon: CookingPot, label: 'Kitchen', onClick: () => navigate('/screens') },
               { icon: LayoutDashboard, label: 'Reports', onClick: () => setQuickReportsOpen(true) },
               ...(isAdmin
                 ? [
@@ -242,19 +221,10 @@ export function BillingHeader({
                       label: 'Captain Orders',
                       onClick: () => navigate('/captain-orders'),
                     },
-                  ]
-                : []),
-              // It goes to *this* user's landing screen, so a cashier reaches
-              // All Orders exactly as login leaves them, while an admin keeps
-              // the dashboard. `/dashboard` itself is unmapped (admin-only), so
-              // hard-coding it here would bounce everyone else. A plain biller
-              // and a captain get no Home entry at all (`canSeeHome`).
-              ...(canSeeHome
-                ? [
                     {
                       icon: Home,
-                      label: isAdmin ? 'Admin Dashboard' : 'Home',
-                      onClick: () => navigate(homePath()),
+                      label: 'Admin Dashboard',
+                      onClick: () => navigate('/dashboard'),
                     },
                   ]
                 : []),
@@ -379,7 +349,7 @@ export function BillingHeader({
       </header>
 
       {/* ─── Side Drawer ─── */}
-      {drawerOpen ? (
+      {billingDrawerOpen ? (
         <div className="fixed inset-0 z-50 flex">
           <button
             type="button"
@@ -438,29 +408,27 @@ export function BillingHeader({
                   },
                 )}
 
-                {canSeeHome ? (
+                {isAdmin ? (
                   <>
                     <li className="my-2 border-t border-line" />
-                    {isAdmin ? (
-                      <li>
-                        <Link
-                          to="/captain-orders"
-                          onClick={closeDrawer}
-                          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
-                        >
-                          <ChefHat size={18} className="text-muted" />
-                          Captain Orders
-                        </Link>
-                      </li>
-                    ) : null}
                     <li>
                       <Link
-                        to={homePath()}
+                        to="/captain-orders"
+                        onClick={closeDrawer}
+                        className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
+                      >
+                        <ChefHat size={18} className="text-muted" />
+                        Captain Orders
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/dashboard"
                         onClick={closeDrawer}
                         className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-page"
                       >
                         <Home size={18} className="text-muted" />
-                        {isAdmin ? 'Admin Dashboard' : 'Home'}
+                        Admin Dashboard
                       </Link>
                     </li>
                   </>

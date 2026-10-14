@@ -35,6 +35,7 @@ import { UpdateAreaWisePriceModal } from '../components/menu/UpdateAreaWisePrice
 import { UpdateNutritionModal } from '../components/menu/UpdateNutritionModal'
 import { SelectRecordAlert } from '../components/menu/SelectRecordAlert'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
+import { ItemImageModal } from '../components/menu/ItemImageModal'
 import {
   MENU_CHANNELS,
   MENU_CHANNEL_SLUG,
@@ -56,6 +57,7 @@ import {
 import type {
   Category,
   Item,
+  ItemFlags,
   ItemPayload,
   ScheduledPublish,
   ScheduledPublishLineInput,
@@ -224,6 +226,7 @@ export default function BaseMenu({
   const [detailsItem, setDetailsItem] = useState<Item | null>(null)
   const [areaPriceItem, setAreaPriceItem] = useState<Item | null>(null)
   const [nutritionItem, setNutritionItem] = useState<Item | null>(null)
+  const [imageModalItem, setImageModalItem] = useState<Item | null>(null)
   const [changesName, setChangesName] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<RowItem | null>(null)
   const [bulkDeleteTargets, setBulkDeleteTargets] = useState<RowItem[]>([])
@@ -386,6 +389,109 @@ export default function BaseMenu({
         invalidateAndRefresh()
       } catch {
         showToast('Failed to update items')
+      }
+    })
+  }
+
+  function handleBulkAction(label: string) {
+    if (label === 'Available' || label === 'Mark In Stock') {
+      setSelectedAvailable(true)
+      return
+    }
+    if (label === 'Mark Out of Stock') {
+      setSelectedAvailable(false)
+      return
+    }
+    if (label === 'Remove Items') {
+      requireSelection(() => {
+        setBulkDeleteTargets(items.filter((i) => selected.has(i.id)))
+      })
+      return
+    }
+    if (label === 'Update Image') {
+      requireSelection(() => {
+        const firstId = Array.from(selected)[0]
+        const raw = rawItemsMap.get(firstId)
+        if (raw) setImageModalItem(raw)
+      })
+      return
+    }
+    if (label === 'Active/Inactive Areas' || label === 'Update Area Wise Price') {
+      requireSelection(() => {
+        const firstId = Array.from(selected)[0]
+        const raw = rawItemsMap.get(firstId)
+        if (raw) setAreaPriceItem(raw)
+      })
+      return
+    }
+    if (label === 'Update Nutrition Data') {
+      requireSelection(() => {
+        const firstId = Array.from(selected)[0]
+        const raw = rawItemsMap.get(firstId)
+        if (raw) setNutritionItem(raw)
+      })
+      return
+    }
+
+    requireSelection(async () => {
+      if (!encryptedOutletId) return
+      try {
+        const selectedRaw = Array.from(selected)
+          .map((id) => rawItemsMap.get(id))
+          .filter((item): item is Item => item != null)
+        if (selectedRaw.length === 0) return
+
+        let patch: Partial<ItemPayload> | null = null
+        if (label === 'Mark As Veg') patch = { choice: 'veg' }
+        else if (label === 'Mark As Non Veg') patch = { choice: 'non-veg' }
+        else if (label === 'Mark As Egg Item') patch = { choice: 'egg' }
+
+        if (patch) {
+          await Promise.all(
+            selectedRaw.map((raw) =>
+              updateItemApi(encryptedOutletId!, raw.id, patch!),
+            ),
+          )
+          showToast(`Updated ${selectedRaw.length} item(s)`)
+          setSelected(new Set())
+          invalidateAndRefresh()
+          return
+        }
+
+        const flagKeyMap: Record<string, keyof ItemFlags> = {
+          'Update Favorite Item': 'set_as_favorite',
+          'Update Ignore Tax': 'ignore_tax',
+          'Update Ignore Discount': 'ignore_discount',
+          'Update Quantity Popup': 'open_quantity_popup',
+          'Update Open Item': 'open_item',
+          'Create Self Item Recipe': 'create_self_recipe',
+        }
+
+        const flagKey = flagKeyMap[label]
+        if (flagKey) {
+          await Promise.all(
+            selectedRaw.map((raw) => {
+              const flags: ItemFlags = {
+                ignore_tax: raw.flags?.ignore_tax ?? false,
+                ignore_discount: raw.flags?.ignore_discount ?? false,
+                set_as_favorite: raw.flags?.set_as_favorite ?? false,
+                open_item: raw.flags?.open_item ?? false,
+                open_quantity_popup: raw.flags?.open_quantity_popup ?? false,
+                create_self_recipe: raw.flags?.create_self_recipe ?? false,
+                [flagKey]: !(raw.flags?.[flagKey] ?? false),
+              }
+              return updateItemApi(encryptedOutletId!, raw.id, { flags })
+            }),
+          )
+          showToast(`Updated ${label} for ${selectedRaw.length} item(s)`)
+          setSelected(new Set())
+          invalidateAndRefresh()
+          return
+        }
+
+        showToast(`Action "${label}" updated for selected items`)
+      } catch {
+        showToast('Failed to execute action')
       }
     })
   }
@@ -742,23 +848,7 @@ export default function BaseMenu({
           menuClassName="min-w-[280px]"
           options={ACTION_OPTIONS.map((label) => ({
             label,
-            onClick: () => {
-              if (label === 'Available' || label === 'Mark In Stock') {
-                setSelectedAvailable(true)
-                return
-              }
-              if (label === 'Mark Out of Stock') {
-                setSelectedAvailable(false)
-                return
-              }
-              if (label === 'Remove Items') {
-                requireSelection(() => {
-                  setBulkDeleteTargets(items.filter((i) => selected.has(i.id)))
-                })
-                return
-              }
-              requireSelection(() => {})
-            },
+            onClick: () => handleBulkAction(label),
           }))}
         />
 
@@ -1068,6 +1158,10 @@ export default function BaseMenu({
                       <td className="px-3 py-2.5">
                         <button
                           type="button"
+                          onClick={() => {
+                            const raw = rawItemsMap.get(row.id)
+                            if (raw) setImageModalItem(raw)
+                          }}
                           className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-success/40 bg-success/10 text-success hover:bg-success/20"
                           aria-label="Upload image"
                           data-tooltip={row.hasImage ? 'Manage image' : 'Upload image'}
@@ -1299,6 +1393,15 @@ export default function BaseMenu({
         open={Boolean(changesName)}
         name={changesName}
         onClose={() => setChangesName(null)}
+      />
+      <ItemImageModal
+        open={Boolean(imageModalItem)}
+        item={imageModalItem}
+        onClose={() => setImageModalItem(null)}
+        onSaved={() => {
+          setImageModalItem(null)
+          invalidateAndRefresh()
+        }}
       />
       <ConfirmDeleteModal
         open={Boolean(deleteTarget)}

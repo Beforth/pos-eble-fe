@@ -23,6 +23,7 @@ import {
 import { RecipeModificationLogModal } from '../../components/inventory/RecipeModificationLogModal'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import { SortableTh } from '../../components/common/SortableTh'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import { useListQuery } from '../../hooks/useListQuery'
 import {
   ActionDropdown,
@@ -300,6 +301,13 @@ export default function ItemRecipes() {
     })
   }, [rows, cardCategory, appliedCategory, appliedItem])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [rows, cardCategory, appliedCategory, appliedItem])
+
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
     filteredRows,
     (row) => [row.item_name, row.item_category_name],
@@ -307,7 +315,12 @@ export default function ItemRecipes() {
       key === 'category' ? row.item_category_name : row.item_name,
   )
 
-  const pageIds = visible.map((row) => row.id)
+  const pageRows = useMemo(
+    () => visible.slice((page - 1) * pageSize, page * pageSize),
+    [visible, page, pageSize],
+  )
+
+  const pageIds = pageRows.map((row) => row.id)
   const allSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
 
@@ -384,7 +397,7 @@ export default function ItemRecipes() {
               onClick={() => navigate('/inventory/item-recipes/new')}
             >
               <Plus size={15} />
-              Create New
+              Add Recipe
             </PrimaryButton>
           ) : null}
           <ActionDropdown
@@ -565,7 +578,7 @@ export default function ItemRecipes() {
                   </td>
                 </tr>
               ) : (
-                visible.map((row, index) => (
+                pageRows.map((row, index) => (
                   <tr
                     key={row.id}
                     className={`border-b border-line last:border-b-0 ${
@@ -635,13 +648,13 @@ export default function ItemRecipes() {
             </tbody>
           </table>
         </div>
-        <div className="border-t border-line px-4 py-3">
-          <p className="text-sm text-muted">
-            {visible.length === 0
-              ? 'Showing 0 records'
-              : `Showing 1 to ${visible.length} of ${visible.length} records`}
-          </p>
-        </div>
+        <PaginationControls
+          totalRecords={visible.length}
+          currentPage={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       <RecipeViewModal

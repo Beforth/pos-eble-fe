@@ -34,6 +34,7 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import { useAuth } from '../../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
 import {
@@ -294,6 +295,13 @@ const canWrite = hasAnyPermission(hasPermission, INV_STOCK_COUNT_WRITE_PERMISSIO
     [materials],
   )
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, category, favouritesOnly, enteredOnly, showZeroBook])
+
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return rows.filter((row) => {
@@ -311,6 +319,11 @@ const canWrite = hasAnyPermission(hasPermission, INV_STOCK_COUNT_WRITE_PERMISSIO
       )
     })
   }, [rows, query, category, favouritesOnly, enteredOnly, showZeroBook, values])
+
+  const pagedFilteredRows = useMemo(
+    () => filteredRows.slice((page - 1) * pageSize, page * pageSize),
+    [filteredRows, page, pageSize],
+  )
 
   const enteredRows = useMemo(
     () => rows.filter((row) => (values[row.id] || '').trim().length > 0),
@@ -757,7 +770,7 @@ const canWrite = hasAnyPermission(hasPermission, INV_STOCK_COUNT_WRITE_PERMISSIO
             <div className="min-w-0 flex-1">
               <div className="grid grid-cols-[minmax(0,1fr)_92px_120px_84px_76px] gap-2 border-b border-line bg-page px-4 py-2.5 text-xs font-semibold text-muted">
                 <span>Raw Material</span>
-                <span className="text-right">Book</span>
+                <span className="text-right">System Qty</span>
                 <span>{copy.title.split(' ')[0]} Qty</span>
                 <span className="text-right">Variance</span>
                 <span className="text-right">Action</span>
@@ -772,7 +785,7 @@ const canWrite = hasAnyPermission(hasPermission, INV_STOCK_COUNT_WRITE_PERMISSIO
                     No raw materials found
                   </li>
                 ) : (
-                  filteredRows.map((row) => {
+                  pagedFilteredRows.map((row) => {
                     const rawValue = values[row.id] ?? ''
                     const error = qtyError(rawValue)
                     const diff = varianceFor(row)
@@ -908,6 +921,13 @@ const canWrite = hasAnyPermission(hasPermission, INV_STOCK_COUNT_WRITE_PERMISSIO
                   })
                 )}
               </ul>
+              <PaginationControls
+                totalRecords={filteredRows.length}
+                currentPage={page}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
             </div>
           </div>
 

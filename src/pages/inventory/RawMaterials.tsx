@@ -27,6 +27,7 @@ import {
 import { RawMaterialModificationLogModal } from '../../components/inventory/RawMaterialModificationLogModal'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import { SortableTh } from '../../components/common/SortableTh'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import { useListQuery } from '../../hooks/useListQuery'
 import {
   ActionDropdown,
@@ -46,8 +47,6 @@ import {
   type RawMaterial,
 } from '../../services/inventoryService'
 
-const PAGE_SIZE = 100
-
 type ListRow = {
   id: string
   name: string
@@ -55,6 +54,8 @@ type ListRow = {
   categoryId: string | null
   favourite: boolean
   active: boolean
+  stockQty: number
+  unitName: string
   source: RawMaterial
 }
 
@@ -66,6 +67,8 @@ function toListRow(row: RawMaterial): ListRow {
     categoryId: row.category?.id ?? null,
     favourite: row.is_favourite,
     active: row.is_active,
+    stockQty: Number(row.stock_qty || '0'),
+    unitName: row.consumption_unit?.name ?? '',
     source: row,
   }
 }
@@ -284,9 +287,13 @@ export default function RawMaterials() {
   const [details, setDetails] = useState<RawMaterialDetails | null>(null)
   const [logMaterialName, setLogMaterialName] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState(false)
+  const [pageSize, setPageSize] = useState(25)
   const quickAdd = useInventoryQuickAdd({
     onRawMaterialCreated: (row) => {
       setRows((prev) => [toListRow(row), ...prev])
+      setCardCategory('all')
+      setCategoryFilter('All')
+      setAppliedCategory('All')
       setPage(1)
     },
   })
@@ -355,9 +362,10 @@ export default function RawMaterials() {
 
   const { sortKey, sortDir, toggleSort, visible } = useListQuery(
     filteredRows,
-    (row) => [row.name, row.category, row.favourite, row.active],
+    (row) => [row.name, row.category, row.stockQty, row.favourite, row.active],
     (row, key) => {
       if (key === 'category') return row.category
+      if (key === 'stockQty') return row.stockQty
       if (key === 'favourite') return row.favourite
       if (key === 'active') return row.active
       return row.name
@@ -365,11 +373,11 @@ export default function RawMaterials() {
   )
 
   const totalRecords = visible.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageRows = visible.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   )
   const pageIds = pageRows.map((row) => row.id)
   const allPageSelected =
@@ -685,6 +693,16 @@ export default function RawMaterials() {
                   Category
                 </SortableTh>
                 <SortableTh
+                  columnKey="stockQty"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="right"
+                  className="px-3 py-2.5"
+                >
+                  Current Stock
+                </SortableTh>
+                <SortableTh
                   columnKey="favourite"
                   sortKey={sortKey}
                   sortDir={sortDir}
@@ -711,7 +729,7 @@ export default function RawMaterials() {
               {pageRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-3 py-16 text-center text-sm text-muted"
                   >
                     {loading
@@ -773,6 +791,9 @@ export default function RawMaterials() {
                           }),
                         )}
                       />
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-ink">
+                      {row.stockQty} {row.unitName}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <input
@@ -838,50 +859,13 @@ export default function RawMaterials() {
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
-          <p className="text-sm text-muted">
-            {totalRecords === 0
-              ? 'Showing 0 records'
-              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1} to ${Math.min(
-                  currentPage * PAGE_SIZE,
-                  totalRecords,
-                )} of ${totalRecords} records`}
-          </p>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPage(n)}
-                className={`flex size-8 items-center justify-center rounded-lg border text-sm font-medium ${
-                  currentPage === n
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-line bg-card text-ink hover:bg-page'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() =>
-                setPage((prev) => Math.min(totalPages, prev + 1))
-              }
-              className="h-8 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            >
-              Next
-            </button>
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage(totalPages)}
-              className="h-8 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            >
-              Last
-            </button>
-          </div>
-        </div>
+        <PaginationControls
+          totalRecords={totalRecords}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       {quickAdd.host}

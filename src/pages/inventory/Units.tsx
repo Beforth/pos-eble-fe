@@ -7,6 +7,7 @@ import { FileText, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import { SortableTh } from '../../components/common/SortableTh'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
@@ -22,8 +23,6 @@ import {
   formatInventoryStamp,
   type InventoryUnit,
 } from '../../services/inventoryService'
-
-const PAGE_SIZE = 10
 
 function UnitNameModal({
   open,
@@ -99,6 +98,7 @@ export default function Units() {
   const [nameInput, setNameInput] = useState('')
   const [appliedName, setAppliedName] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [viewUnit, setViewUnit] = useState<InventoryUnit | null>(null)
   const [pendingDelete, setPendingDelete] = useState<InventoryUnit | null>(null)
 
@@ -123,11 +123,11 @@ export default function Units() {
   )
 
   const totalRecords = visible.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageRows = visible.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   )
 
   function handleSearch() {
@@ -289,52 +289,13 @@ export default function Units() {
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
-          <p className="text-sm text-muted">
-            {totalRecords === 0
-              ? 'Showing 0 records'
-              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1} to ${Math.min(
-                  currentPage * PAGE_SIZE,
-                  totalRecords,
-                )} of ${totalRecords} records`}
-          </p>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .slice(0, 8)
-              .map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPage(n)}
-                  className={`flex size-8 items-center justify-center rounded-lg border text-sm font-medium ${
-                    currentPage === n
-                      ? 'border-primary bg-primary text-white'
-                      : 'border-line bg-card text-ink hover:bg-page'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() =>
-                setPage((prev) => Math.min(totalPages, prev + 1))
-              }
-              className="h-8 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            >
-              Next
-            </button>
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage(totalPages)}
-              className="h-8 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            >
-              Last
-            </button>
-          </div>
-        </div>
+        <PaginationControls
+          totalRecords={totalRecords}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       <UnitNameModal

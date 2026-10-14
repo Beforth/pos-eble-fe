@@ -11,6 +11,7 @@ interface QuickAddUnitModalProps {
   onClose: () => void
   onSave: (name: string) => Promise<boolean>
   saving?: boolean
+  existingUnits?: string[]
 }
 
 export function QuickAddUnitModal({
@@ -18,10 +19,15 @@ export function QuickAddUnitModal({
   onClose,
   onSave,
   saving = false,
+  existingUnits = [],
 }: QuickAddUnitModalProps) {
   const titleId = useId()
   const [name, setName] = useState('')
   const [error, setError] = useState('')
+
+  const isDuplicate = existingUnits.some(
+    (u) => u.trim().toLowerCase() === name.trim().toLowerCase(),
+  )
 
   useEffect(() => {
     if (!open) return
@@ -87,6 +93,11 @@ export function QuickAddUnitModal({
               autoFocus
               className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
             />
+            {isDuplicate ? (
+              <p className="mt-1 text-xs font-semibold text-amber-600">
+                ⚠️ Unit &quot;{name.trim()}&quot; already exists
+              </p>
+            ) : null}
           </div>
           {error ? <p className="text-sm text-primary">{error}</p> : null}
         </div>

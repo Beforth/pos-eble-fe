@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   ClipboardList,
-  Eye,
   Pencil,
   Plus,
   Search,
@@ -19,9 +18,9 @@ import {
   RowActionButton,
 } from '../components/menu/MenuActionButtons'
 import { EditVariationModal, VariationModal } from '../components/menu/EditVariationModal'
-import { VariationGroupDetailsModal } from '../components/menu/VariationGroupDetailsModal'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
+import { PaginationControls } from '../components/common/PaginationControls'
 import { useAuth } from '../auth/AuthContext'
 import { updateVariationGroupApi } from '../services/menuService'
 import type { VariationGroup } from '../types/menu'
@@ -158,8 +157,9 @@ export default function VariantsManagement() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [changesName, setChangesName] = useState<string | null>(null)
   const [editing, setEditing] = useState<VariationGroup | null>(null)
-  const [viewing, setViewing] = useState<VariationGroup | null>(null)
   const [adding, setAdding] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   const { variationGroups: refVariationGroups, reload } = useMenuReference([
     'variationGroups',
@@ -196,8 +196,16 @@ export default function VariantsManagement() {
     })
   }, [appliedName, appliedSearchBy, variations])
 
+  const totalRecords = rows.length
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pageRows = useMemo(
+    () => rows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [rows, currentPage, pageSize],
+  )
+
   const allSelected =
-    rows.length > 0 && rows.every((row) => selected.has(row.id))
+    pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
 
   async function setSelectedStatus(status: 'Active' | 'Inactive') {
     if (selected.size === 0 || !encryptedOutletId) return
@@ -240,6 +248,7 @@ export default function VariantsManagement() {
   function handleSearch() {
     setAppliedName(nameQuery)
     setAppliedSearchBy(searchBy)
+    setPage(1)
   }
 
   function handleShowAll() {
@@ -247,6 +256,7 @@ export default function VariantsManagement() {
     setAppliedName('')
     setSearchBy('all')
     setAppliedSearchBy('all')
+    setPage(1)
     showToast('Filters cleared')
   }
 
@@ -326,7 +336,7 @@ export default function VariantsManagement() {
                   checked={allSelected}
                   onChange={() =>
                     setSelected(
-                      allSelected ? new Set() : new Set(rows.map((r) => r.id)),
+                      allSelected ? new Set() : new Set(pageRows.map((r) => r.id)),
                     )
                   }
                   className="cursor-pointer accent-primary"
@@ -340,68 +350,77 @@ export default function VariantsManagement() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.id}
-                className="border-b border-line last:border-b-0 hover:bg-page/80"
-              >
-                <td className="px-3 py-3.5">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(row.id)}
-                    onChange={() =>
-                      setSelected((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(row.id)) next.delete(row.id)
-                        else next.add(row.id)
-                        return next
-                      })
-                    }
-                    className="cursor-pointer accent-primary"
-                  />
-                </td>
-                <td className="px-3 py-3.5 font-medium text-ink">
-                  {row.department_name}
-                </td>
-                <td className="px-3 py-3.5 text-muted">
-                  {row.online_display_name || '—'}
-                </td>
-                <td className="px-3 py-3.5 text-ink">
-                  {row.variations.length}
-                </td>
-                <td
-                  className={`px-3 py-3.5 font-medium ${
-                    row.is_active ? 'text-success' : 'text-muted'
-                  }`}
-                >
-                  {row.is_active ? 'Active' : 'Inactive'}
-                </td>
-                <td className="px-3 py-3.5">
-                  <div className="flex items-center gap-1">
-                    <RowActionButton
-                      label="View"
-                      onClick={() => setViewing(row)}
-                    >
-                      <Eye size={16} />
-                    </RowActionButton>
-                    <RowActionButton
-                      label="Edit"
-                      onClick={() => setEditing(row)}
-                    >
-                      <Pencil size={16} />
-                    </RowActionButton>
-                    <RowActionButton
-                      label="Show Changes"
-                      onClick={() => setChangesName(row.department_name)}
-                    >
-                      <ClipboardList size={16} />
-                    </RowActionButton>
-                  </div>
+            {pageRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-12 text-center text-sm text-muted">
+                  No variations found
                 </td>
               </tr>
-            ))}
+            ) : (
+              pageRows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="border-b border-line last:border-b-0 hover:bg-page/80"
+                >
+                  <td className="px-3 py-3.5">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(row.id)}
+                      onChange={() =>
+                        setSelected((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(row.id)) next.delete(row.id)
+                          else next.add(row.id)
+                          return next
+                        })
+                      }
+                      className="cursor-pointer accent-primary"
+                    />
+                  </td>
+                  <td className="px-3 py-3.5 font-medium text-ink">
+                    {row.department_name}
+                  </td>
+                  <td className="px-3 py-3.5 text-muted">
+                    {row.online_display_name || '—'}
+                  </td>
+                  <td className="px-3 py-3.5 text-ink">
+                    {row.variations.length}
+                  </td>
+                  <td
+                    className={`px-3 py-3.5 font-medium ${
+                      row.is_active ? 'text-success' : 'text-muted'
+                    }`}
+                  >
+                    {row.is_active ? 'Active' : 'Inactive'}
+                  </td>
+                  <td className="px-3 py-3.5">
+                    <div className="flex items-center gap-1">
+                      <RowActionButton
+                        label="Edit"
+                        onClick={() => setEditing(row)}
+                      >
+                        <Pencil size={16} />
+                      </RowActionButton>
+                      <RowActionButton
+                        label="Show Changes"
+                        onClick={() => setChangesName(row.department_name)}
+                      >
+                        <ClipboardList size={16} />
+                      </RowActionButton>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
+        <PaginationControls
+          totalRecords={totalRecords}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       <VariationModal
@@ -431,12 +450,6 @@ export default function VariantsManagement() {
         open={Boolean(changesName)}
         name={changesName}
         onClose={() => setChangesName(null)}
-      />
-
-      <VariationGroupDetailsModal
-        open={Boolean(viewing)}
-        group={viewing}
-        onClose={() => setViewing(null)}
       />
     </MenuPageShell>
   )

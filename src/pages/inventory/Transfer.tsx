@@ -12,6 +12,7 @@ import {
   PrimaryButton,
   RowActionButton,
 } from '../../components/menu/MenuActionButtons'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import { useAuth } from '../../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
 import {
@@ -142,6 +143,14 @@ export default function Transfer() {
   const [loading, setLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<ListRow | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [applied, rows])
+
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
 
   useEffect(() => {
     if (!encryptedOutletId) {
@@ -389,7 +398,7 @@ export default function Transfer() {
                   </td>
                 </tr>
               ) : (
-                rows.map((row, index) => (
+                pagedRows.map((row, index) => (
                   <tr
                     key={row.id}
                     className={`border-b border-line last:border-b-0 ${
@@ -430,6 +439,13 @@ export default function Transfer() {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          totalRecords={rows.length}
+          currentPage={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       <TransferSettingsDrawer

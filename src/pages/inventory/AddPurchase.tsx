@@ -637,17 +637,36 @@ export default function AddPurchase() {
                     dropdownPlacement="auto"
                     onChange={(value) => {
                       const material = rawMaterials.find((m) => m.name === value)
+                      const defaultUnit =
+                        material?.conversion_purchase_unit?.name ||
+                        material?.purchase_units?.[0]?.name ||
+                        material?.consumption_unit.name ||
+                        line.unit
+                      const defaultPrice =
+                        material?.purchase_price && Number(material.purchase_price) > 0
+                          ? material.purchase_price
+                          : ''
                       updateLine(line.id, {
                         rawMaterial: value,
-                        unit: material?.consumption_unit.name ?? line.unit,
+                        unit: defaultUnit,
+                        ...(defaultPrice ? { price: defaultPrice } : {}),
                       })
                     }}
-                    onAddNew={quickAdd.handler('raw-material', (row) =>
+                    onAddNew={quickAdd.handler('raw-material', (row) => {
+                      const defaultUnit =
+                        row.conversion_purchase_unit?.name ||
+                        row.purchase_units?.[0]?.name ||
+                        row.consumption_unit.name
+                      const defaultPrice =
+                        row.purchase_price && Number(row.purchase_price) > 0
+                          ? row.purchase_price
+                          : ''
                       updateLine(line.id, {
                         rawMaterial: row.name,
-                        unit: row.consumption_unit.name,
-                      }),
-                    )}
+                        unit: defaultUnit,
+                        ...(defaultPrice ? { price: defaultPrice } : {}),
+                      })
+                    })}
                   />
                   {encryptedOutletId ? (
                     <StockAvailabilityButton
@@ -688,9 +707,32 @@ export default function AddPurchase() {
                 <td className="px-3 py-2.5">
                   <select
                     value={line.unit}
-                    onChange={(event) =>
-                      updateLine(line.id, { unit: event.target.value })
-                    }
+                    onChange={(event) => {
+                      const newUnit = event.target.value
+                      const material = rawMaterials.find((m) => m.name === line.rawMaterial)
+                      let newPrice = line.price
+                      if (material && material.purchase_price && Number(material.purchase_price) > 0) {
+                        const pPrice = Number(material.purchase_price)
+                        const convQty = Number(material.conversion_qty) || 1
+                        const pUnitName =
+                          material.conversion_purchase_unit?.name ||
+                          material.purchase_units?.[0]?.name
+                        const cUnitName = material.consumption_unit?.name
+
+                        if (
+                          newUnit === cUnitName &&
+                          pUnitName &&
+                          newUnit !== pUnitName &&
+                          convQty > 1
+                        ) {
+                          const pricePerConsumption = pPrice / convQty
+                          newPrice = String(Number(pricePerConsumption.toFixed(4)))
+                        } else if (newUnit === pUnitName && pPrice > 0) {
+                          newPrice = material.purchase_price
+                        }
+                      }
+                      updateLine(line.id, { unit: newUnit, price: newPrice })
+                    }}
                     className="h-9 w-24 rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
                   >
                     <option value="">Unit</option>

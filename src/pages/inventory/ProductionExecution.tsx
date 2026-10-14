@@ -3,13 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/downloadFile'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileText, Search } from 'lucide-react'
+import { ChevronDown, FileText, Search, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import { SelectRecordAlert } from '../../components/menu/SelectRecordAlert'
 import { useAuth } from '../../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
@@ -23,9 +25,13 @@ import {
 import {
   INV_PRODUCTION_WRITE_PERMISSION,
   createProductionRunApi,
+  deleteProductionRunApi,
+  formatInventoryStamp,
   listAllProductionProcessesApi,
   listAllRawMaterialsApi,
+  listProductionRunsApi,
   type ProductionProcess,
+  type ProductionRun,
   type RawMaterial,
 } from '../../services/inventoryService'
 
@@ -127,6 +133,10 @@ export default function ProductionExecution() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [runs, setRuns] = useState<ProductionRun[]>([])
+  const [loadingRuns, setLoadingRuns] = useState(false)
+  const [deleteRunId, setDeleteRunId] = useState<string | null>(null)
+
   const draft = useInventoryFormDraft(
     `rajubhai.inventory.production-execution.${
       encryptedOutletId ?? 'unknown'
@@ -157,9 +167,23 @@ export default function ProductionExecution() {
     }
   }, [encryptedOutletId])
 
+  const loadRuns = useCallback(async () => {
+    if (!encryptedOutletId) return
+    setLoadingRuns(true)
+    try {
+      const res = await listProductionRunsApi(encryptedOutletId)
+      setRuns(res.results)
+    } catch {
+      setRuns([])
+    } finally {
+      setLoadingRuns(false)
+    }
+  }, [encryptedOutletId])
+
   useEffect(() => {
     void load()
-  }, [load])
+    void loadRuns()
+  }, [load, loadRuns])
 
   useEffect(() => {
     if (!encryptedOutletId) return
@@ -168,11 +192,23 @@ export default function ProductionExecution() {
       .catch(() => setRawMaterials([]))
   }, [encryptedOutletId])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [processes, processQuery])
+
   const filtered = useMemo(() => {
     const q = processQuery.trim().toLowerCase()
     if (!q) return processes
     return processes.filter((row) => row.name.toLowerCase().includes(q))
   }, [processes, processQuery])
+
+  const pagedFiltered = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  )
 
   const selected = processes.find((row) => row.id === selectedId) ?? null
 
@@ -212,6 +248,7 @@ export default function ProductionExecution() {
       draft.clearDraft()
       showToast('Converted to production')
       setSelectedId(null)
+      void loadRuns()
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -220,6 +257,22 @@ export default function ProductionExecution() {
       )
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDeleteRun() {
+    if (!canWrite || !encryptedOutletId || !deleteRunId) return
+    try {
+      await deleteProductionRunApi(encryptedOutletId, deleteRunId)
+      showToast('Production run deleted')
+      setDeleteRunId(null)
+      void loadRuns()
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to delete production run',
+      )
     }
   }
 
@@ -326,32 +379,41 @@ export default function ProductionExecution() {
           ) : filtered.length === 0 ? (
             <EmptyPanel />
           ) : (
-            <ul className="flex-1 overflow-y-auto">
-              {filtered.map((row) => (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(row.id)}
-                    className={`flex w-full items-start justify-between gap-3 border-b border-line px-4 py-3 text-left hover:bg-page ${
-                      selectedId === row.id ? 'bg-primary/5' : ''
-                    }`}
-                  >
-                    <span>
-                      <span className="block text-sm font-medium text-ink">
-                        {row.name}
+            <>
+              <ul className="flex-1 overflow-y-auto">
+                {pagedFiltered.map((row) => (
+                  <li key={row.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(row.id)}
+                      className={`flex w-full items-start justify-between gap-3 border-b border-line px-4 py-3 text-left hover:bg-page ${
+                        selectedId === row.id ? 'bg-primary/5' : ''
+                      }`}
+                    >
+                      <span>
+                        <span className="block text-sm font-medium text-ink">
+                          {row.name}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted">
+                          To: {row.output_raw_material_name} · {row.lines.length}{' '}
+                          inputs
+                        </span>
                       </span>
-                      <span className="mt-0.5 block text-xs text-muted">
-                        To: {row.output_raw_material_name} · {row.lines.length}{' '}
-                        inputs
+                      <span className="text-xs text-muted">
+                        {row.output_qty} {row.output_unit_name}
                       </span>
-                    </span>
-                    <span className="text-xs text-muted">
-                      {row.output_qty} {row.output_unit_name}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <PaginationControls
+                totalRecords={filtered.length}
+                currentPage={page}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            </>
           )}
         </section>
 
@@ -410,6 +472,7 @@ export default function ProductionExecution() {
                     <tr>
                       <th className="px-3 py-2">From</th>
                       <th className="px-3 py-2">Base Qty</th>
+                      <th className="px-3 py-2">Required Qty</th>
                       <th className="px-3 py-2">Unit</th>
                     </tr>
                   </thead>
@@ -424,6 +487,10 @@ export default function ProductionExecution() {
                       const baseQty = Number(selected.output_qty) || 1
                       const scale =
                         (Number(outputQty) || baseQty) / baseQty
+                      const reqQtyVal = Number(line.qty) * scale
+                      const reqQtyFormatted = Number.isInteger(reqQtyVal)
+                        ? reqQtyVal.toString()
+                        : reqQtyVal.toFixed(3).replace(/\.?0+$/, '')
                       return (
                         <tr
                           key={`${line.raw_material_id}-${line.unit_id}`}
@@ -455,6 +522,9 @@ export default function ProductionExecution() {
                             ) : null}
                           </td>
                           <td className="px-3 py-2 text-ink">{line.qty}</td>
+                          <td className="px-3 py-2 font-medium text-ink">
+                            {reqQtyFormatted}
+                          </td>
                           <td className="px-3 py-2 text-ink">{line.unit_name}</td>
                         </tr>
                       )
@@ -469,7 +539,7 @@ export default function ProductionExecution() {
 
       {error ? (
         <p
-          className={`rounded-md px-3 py-2 text-xs font-medium ${
+          className={`mb-4 rounded-md px-3 py-2 text-xs font-medium ${
             getInsufficientStockMaterial(error)
               ? 'border border-red-200 bg-red-50 text-red-700'
               : 'text-primary'
@@ -497,10 +567,86 @@ export default function ProductionExecution() {
         ) : null}
       </div>
 
+      {/* Recent Executions Log */}
+      <section className="mt-8 rounded-xl border border-line bg-card overflow-hidden">
+        <div className="border-b border-line px-4 py-3">
+          <h2 className="text-sm font-semibold text-ink">Recent Executions Log</h2>
+        </div>
+        {loadingRuns ? (
+          <p className="p-4 text-sm text-muted">Loading executions…</p>
+        ) : runs.length === 0 ? (
+          <p className="p-4 text-sm text-muted">No recent production executions found.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
+                <tr>
+                  <th className="px-4 py-2.5">Date & Time</th>
+                  <th className="px-4 py-2.5">Recipe / Process</th>
+                  <th className="px-4 py-2.5">Produced Output</th>
+                  <th className="px-4 py-2.5">Type</th>
+                  <th className="px-4 py-2.5">With Price</th>
+                  {canWrite ? <th className="px-4 py-2.5 text-right">Actions</th> : null}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {runs.map((run) => (
+                  <tr key={run.id} className="hover:bg-page/50">
+                    <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">
+                      {formatInventoryStamp(run.created_at)}
+                    </td>
+                    <td className="px-4 py-2.5 font-medium text-ink">
+                      {run.process_name}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink">
+                      {run.output_qty} {run.output_unit_name} ({run.output_raw_material_name})
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-muted capitalize">
+                      {run.production_type === 'against_po' ? 'Against PO' : 'Direct'}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs">
+                      {run.with_price ? (
+                        <span className="rounded bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="rounded bg-gray-100 px-2 py-0.5 text-muted">
+                          No
+                        </span>
+                      )}
+                    </td>
+                    {canWrite ? (
+                      <td className="px-4 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setDeleteRunId(run.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded text-muted hover:bg-red-50 hover:text-red-600"
+                          title="Delete Run"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <SelectRecordAlert
         open={noRecordAlertOpen}
         message="No record found."
         onClose={() => setNoRecordAlertOpen(false)}
+      />
+
+      <ConfirmDeleteModal
+        open={Boolean(deleteRunId)}
+        title="Delete Production Run?"
+        message="Are you sure you want to delete this production run? This action cannot be undone."
+        onClose={() => setDeleteRunId(null)}
+        onConfirm={() => void handleDeleteRun()}
       />
     </InventoryPageShell>
   )

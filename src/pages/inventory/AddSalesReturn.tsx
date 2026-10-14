@@ -831,21 +831,17 @@ export default function AddSalesReturn() {
                     className="h-9 w-20 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
                   />
                 </td>
-                <td className="px-3 py-2.5">
-                  <select
+                <td className="min-w-[130px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                  <SearchableSelect
                     value={line.unit}
-                    onChange={(event) =>
-                      updateLine(line.id, { unit: event.target.value })
+                    options={unitNames}
+                    placeholder="Unit"
+                    searchPlaceholder="Search unit..."
+                    compact
+                    onChange={(value) =>
+                      updateLine(line.id, { unit: value })
                     }
-                    className="h-9 w-24 rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">Unit</option>
-                    {unitNames.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 <td className="px-3 py-2.5">
                   <input

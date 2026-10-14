@@ -15,6 +15,7 @@ import { InventoryMastersProvider } from './state/InventoryMastersContext'
 import { MenuChannelsProvider } from './state/MenuChannelsContext'
 import { MenuReferenceProvider } from './state/MenuReferenceContext'
 import { ChromeProvider } from './state/ChromeContext'
+import { GlobalNavigationShortcuts } from './components/layout/GlobalNavigationShortcuts'
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
 import EditProfile from './pages/EditProfile'
@@ -259,6 +260,7 @@ export default function App() {
           <MenuReferenceProvider>
           <BrowserRouter>
           <ChromeProvider>
+          <GlobalNavigationShortcuts />
           <TooltipHost />
           <ToastHost />
           <RouteErrorBoundary>
@@ -681,6 +683,14 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/purchase/:id/view"
+            element={
+              <ProtectedRoute>
+                <AddPurchase />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/purchase-order"
             element={
               <ProtectedRoute>
@@ -705,6 +715,14 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/purchase-order/:id/view"
+            element={
+              <ProtectedRoute>
+                <AddPurchaseOrder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/purchase-return"
             element={
               <ProtectedRoute>
@@ -722,6 +740,14 @@ export default function App() {
           />
           <Route
             path="/inventory/purchase-return/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddPurchaseReturn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/purchase-return/:id/view"
             element={
               <ProtectedRoute>
                 <AddPurchaseReturn />
@@ -850,6 +876,22 @@ export default function App() {
           />
           <Route
             path="/inventory/production-master/new"
+            element={
+              <ProtectedRoute>
+                <AddProduction />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/production-master/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddProduction />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/production-master/:id/view"
             element={
               <ProtectedRoute>
                 <AddProduction />

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/downloadFile'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileText, Info, Plus, Search, Trash2 } from 'lucide-react'
+import { ChevronDown, Eye, FilePenLine, FileText, Info, Plus, Search, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
@@ -11,6 +11,7 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import { useAuth } from '../../auth/AuthContext'
 import { useInventoryMasters } from '../../state/InventoryMastersContext'
 import { ApiError } from '../../services/apiClient'
@@ -111,6 +112,14 @@ export default function ProductionMaster() {
   const [rows, setRows] = useState<ProductionProcess[]>([])
   const [loading, setLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [appliedSearch, appliedCategory, rows])
+
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
 
   useEffect(() => {
     void loadMasters()
@@ -296,13 +305,21 @@ export default function ProductionMaster() {
                 <th className="px-3 py-2.5">Category</th>
                 <th className="px-3 py-2.5">Output Qty</th>
                 <th className="px-3 py-2.5">Inputs</th>
-                {canWrite ? <th className="px-3 py-2.5">Action</th> : null}
+                <th className="px-3 py-2.5 text-center">Action</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {pagedRows.map((row) => (
                 <tr key={row.id} className="border-b border-line last:border-b-0">
-                  <td className="px-3 py-2.5 text-ink">{row.name}</td>
+                  <td className="px-3 py-2.5 font-medium text-ink">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/inventory/production-master/${row.id}/view`)}
+                      className="text-left font-medium text-ink hover:text-primary hover:underline"
+                    >
+                      {row.name}
+                    </button>
+                  </td>
                   <td className="px-3 py-2.5 text-ink">
                     {row.output_raw_material_name}
                   </td>
@@ -313,22 +330,52 @@ export default function ProductionMaster() {
                     {row.output_qty} {row.output_unit_name}
                   </td>
                   <td className="px-3 py-2.5 text-ink">{row.lines.length}</td>
-                  {canWrite ? (
-                    <td className="px-3 py-2.5">
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center justify-center gap-1.5">
                       <button
                         type="button"
-                        aria-label="Delete"
-                        onClick={() => setDeleteId(row.id)}
+                        aria-label="View Process"
+                        title="View Details"
+                        onClick={() => navigate(`/inventory/production-master/${row.id}/view`)}
                         className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
                       >
-                        <Trash2 size={15} />
+                        <Eye size={15} />
                       </button>
-                    </td>
-                  ) : null}
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          aria-label="Edit Process"
+                          title="Edit Process"
+                          onClick={() => navigate(`/inventory/production-master/${row.id}/edit`)}
+                          className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
+                        >
+                          <FilePenLine size={15} />
+                        </button>
+                      ) : null}
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          aria-label="Delete Process"
+                          title="Delete Process"
+                          onClick={() => setDeleteId(row.id)}
+                          className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page hover:text-red-600"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <PaginationControls
+            totalRecords={rows.length}
+            currentPage={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

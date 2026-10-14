@@ -86,7 +86,12 @@ function filterNavEntry(
 const NAV: NavEntry[] = [
   {
     kind: 'link',
-    item: { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    item: {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      shortcut: 'Ctrl+D',
+    },
   },
   { kind: 'divider' },
   {
@@ -94,16 +99,42 @@ const NAV: NavEntry[] = [
     group: {
       title: 'Daily Operations',
       items: [
-        { id: 'billing', label: 'Billing', icon: UtensilsCrossed },
-        { id: 'captain-orders', label: 'Captain Orders', icon: ChefHat },
-        { id: 'live-orders', label: 'Live Orders', icon: Clock3 },
-        { id: 'all-orders', label: 'All Orders', icon: ShoppingBag },
-        { id: 'online-orders', label: 'Online Orders', icon: Globe },
-        { id: 'kot', label: 'KOT', icon: CookingPot },
+        {
+          id: 'billing',
+          label: 'Billing',
+          icon: UtensilsCrossed,
+          shortcut: 'Ctrl+B',
+        },
+        {
+          id: 'captain-orders',
+          label: 'Captain Orders',
+          icon: ChefHat,
+          shortcut: 'Ctrl+C',
+        },
+        {
+          id: 'live-orders',
+          label: 'Live Orders',
+          icon: Clock3,
+          shortcut: 'Ctrl+L',
+        },
+        {
+          id: 'all-orders',
+          label: 'All Orders',
+          icon: ShoppingBag,
+          shortcut: 'Ctrl+A',
+        },
+        {
+          id: 'online-orders',
+          label: 'Online Orders',
+          icon: Globe,
+          shortcut: 'Ctrl+O',
+        },
+        { id: 'kot', label: 'KOT', icon: CookingPot, shortcut: 'Ctrl+K' },
         {
           id: 'due-payments',
           label: 'Due Payment Settlement',
           icon: FileCheck,
+          shortcut: 'Ctrl+U',
         },
       ],
     },
@@ -115,6 +146,7 @@ const NAV: NavEntry[] = [
       id: 'menu',
       label: 'Menu',
       icon: BookOpen,
+      shortcut: 'Ctrl+M',
       chevron: true,
       children: [
         {
@@ -138,12 +170,22 @@ const NAV: NavEntry[] = [
   { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'inventory', label: 'Inventory', icon: Package },
+    item: {
+      id: 'inventory',
+      label: 'Inventory',
+      icon: Package,
+      shortcut: 'Ctrl+I',
+    },
   },
   { kind: 'divider' },
   {
     kind: 'link',
-    item: { id: 'finance', label: 'Finance', icon: IndianRupee },
+    item: {
+      id: 'finance',
+      label: 'Finance',
+      icon: IndianRupee,
+      shortcut: 'Ctrl+F',
+    },
   },
   { kind: 'divider' },
   {
@@ -152,6 +194,7 @@ const NAV: NavEntry[] = [
       id: 'reports',
       label: 'Reports',
       icon: BarChart3,
+      shortcut: 'Ctrl+R',
       chevron: true,
       children: [
         {
@@ -184,6 +227,7 @@ const NAV: NavEntry[] = [
       id: 'management',
       label: 'Management',
       icon: Settings,
+      shortcut: 'Ctrl+S',
       chevron: true,
       children: [
         {
@@ -577,7 +621,8 @@ export function Sidebar({
           <button
             type="button"
             onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'}
+            data-tooltip={collapsed ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'}
             className="m-2 cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             {collapsed ? (

@@ -594,17 +594,27 @@ export default function AddPurchaseReturn() {
                     dropdownPlacement="auto"
                     onChange={(value) => {
                       const material = rawMaterials.find((m) => m.name === value)
+                      const defaultPrice =
+                        material?.purchase_price && Number(material.purchase_price) > 0
+                          ? material.purchase_price
+                          : ''
                       updateLine(line.id, {
                         rawMaterial: value,
                         unit: material?.consumption_unit.name ?? line.unit,
+                        ...(defaultPrice ? { price: defaultPrice } : {}),
                       })
                     }}
-                    onAddNew={quickAdd.handler('raw-material', (row) =>
+                    onAddNew={quickAdd.handler('raw-material', (row) => {
+                      const defaultPrice =
+                        row.purchase_price && Number(row.purchase_price) > 0
+                          ? row.purchase_price
+                          : ''
                       updateLine(line.id, {
                         rawMaterial: row.name,
                         unit: row.consumption_unit.name,
-                      }),
-                    )}
+                        ...(defaultPrice ? { price: defaultPrice } : {}),
+                      })
+                    })}
                   />
                   {encryptedOutletId ? (
                     <StockAvailabilityButton
@@ -642,21 +652,17 @@ export default function AddPurchaseReturn() {
                     className="h-9 w-20 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
                   />
                 </td>
-                <td className="px-3 py-2.5">
-                  <select
+                <td className="min-w-[130px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                  <SearchableSelect
                     value={line.unit}
-                    onChange={(event) =>
-                      updateLine(line.id, { unit: event.target.value })
+                    options={unitNames}
+                    placeholder="Unit"
+                    searchPlaceholder="Search unit..."
+                    compact
+                    onChange={(value) =>
+                      updateLine(line.id, { unit: value })
                     }
-                    className="h-9 w-24 rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">Unit</option>
-                    {unitNames.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 <td className="px-3 py-2.5">
                   <input

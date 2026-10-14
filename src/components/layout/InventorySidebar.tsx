@@ -438,7 +438,8 @@ export function InventorySidebar({
           <button
             type="button"
             onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'}
+            data-tooltip={collapsed ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'}
             className="m-1.5 cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}

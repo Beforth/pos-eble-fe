@@ -504,21 +504,17 @@ export default function AddWastage() {
                 </td>
                 {!isItemMode ? (
                   <>
-                    <td className="px-3 py-2.5">
-                      <select
+                    <td className="min-w-[140px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                      <SearchableSelect
                         value={line.unit}
-                        onChange={(event) =>
-                          updateLine(line.id, { unit: event.target.value })
+                        options={unitNames}
+                        placeholder="Select Unit"
+                        searchPlaceholder="Search unit..."
+                        compact
+                        onChange={(value) =>
+                          updateLine(line.id, { unit: value })
                         }
-                        className="h-9 min-w-[120px] rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                      >
-                        <option value="">Select Unit</option>
-                        {unitNames.map((unit) => (
-                          <option key={unit} value={unit}>
-                            {unit}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </td>
                     <td className="px-3 py-2.5">
                       <input

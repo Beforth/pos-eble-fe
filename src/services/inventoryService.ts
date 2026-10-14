@@ -1817,6 +1817,7 @@ export type CurrentStockRow = {
   stock_qty: string
   min_stock: string | null
   at_par_stock: string | null
+  stock_level: 'negative' | 'minimum' | 'at_par' | 'ok'
 }
 
 export type MaterialPurchaseReportRow = {
@@ -2009,10 +2010,14 @@ export async function deleteProductionRunApi(
 
 export async function listCurrentStockReportApi(
   outletId: string,
-  params?: ReportListParams,
+  params?: ReportListParams & { stockLevel?: string },
 ): Promise<CurrentStockRow[]> {
+  const query = new URLSearchParams(reportQuery(params).replace(/^\?/, ''))
+  if (params?.stockLevel && params.stockLevel !== 'all') {
+    query.set('stock_level', params.stockLevel)
+  }
   return apiRequest<CurrentStockRow[]>(
-    `${reportPath(outletId, 'current-stock')}${reportQuery(params)}`,
+    `${reportPath(outletId, 'current-stock')}?${query.toString()}`,
     { method: 'GET', token: authToken() },
   )
 }

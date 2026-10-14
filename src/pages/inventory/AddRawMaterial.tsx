@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { showToast } from '../../utils/toast'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  AlertTriangle,
   Boxes,
   Check,
   ChevronDown,
@@ -32,10 +33,164 @@ import {
   categoryIdByName,
   createRawMaterialApi,
   getRawMaterialApi,
+  listAllRawMaterialsApi,
   unitIdByName,
   updateRawMaterialApi,
+  type RawMaterial,
   type RawMaterialPayload,
 } from '../../services/inventoryService'
+
+function getSuggestedConversionQty(purchaseUnit: string, consumptionUnit: string): string {
+  const p = purchaseUnit.trim().toLowerCase()
+  const c = consumptionUnit.trim().toLowerCase()
+  if (!p || !c) return '1'
+  if (p === c) return '1'
+  if (
+    (p === 'kg' || p === 'kilogram' || p === 'kilograms') &&
+    (c === 'gm' || c === 'gram' || c === 'grams' || c === 'g')
+  )
+    return '1000'
+  if (
+    (p === 'ltr' || p === 'liter' || p === 'litre' || p === 'liters' || p === 'litres' || p === 'lt') &&
+    (c === 'ml' || c === 'milliliter' || c === 'milliliters')
+  )
+    return '1000'
+  if (
+    (p === 'gm' || p === 'gram' || p === 'grams') &&
+    (c === 'mg' || c === 'milligram' || c === 'milligrams')
+  )
+    return '1000'
+  if (
+    (p === 'dozen' || p === 'dozens') &&
+    (c === 'pcs' || c === 'piece' || c === 'pieces' || c === 'pc')
+  )
+    return '12'
+  if (
+    (p === 'quintal' || p === 'quintals') &&
+    (c === 'kg' || c === 'kilogram' || c === 'kilograms')
+  )
+    return '100'
+  if (
+    (p === 'ton' || p === 'tonne' || p === 'tons' || p === 'tonnes') &&
+    (c === 'kg' || c === 'kilogram' || c === 'kilograms')
+  )
+    return '1000'
+  return '1'
+}
+
+type UnitDimension = 'mass' | 'volume' | 'count' | 'container'
+
+function getUnitDimension(unit: string): UnitDimension {
+  const u = unit.trim().toLowerCase()
+  if (!u) return 'count'
+
+  if (
+    [
+      'bag',
+      'bags',
+      'box',
+      'boxes',
+      'pack',
+      'packs',
+      'packet',
+      'packets',
+      'case',
+      'cases',
+      'crate',
+      'crates',
+      'jar',
+      'jars',
+      'bottle',
+      'bottles',
+      'can',
+      'cans',
+      'tin',
+      'tins',
+      'carton',
+      'cartons',
+      'bundle',
+      'bundles',
+      'container',
+      'containers',
+      'sachet',
+      'sachets',
+      'bucket',
+      'buckets',
+      'pouch',
+      'pouches',
+    ].includes(u)
+  ) {
+    return 'container'
+  }
+
+  if (
+    [
+      'kg',
+      'kilogram',
+      'kilograms',
+      'gm',
+      'gram',
+      'grams',
+      'g',
+      'mg',
+      'milligram',
+      'milligrams',
+      'quintal',
+      'quintals',
+      'ton',
+      'tonne',
+      'tons',
+      'tonnes',
+    ].includes(u)
+  ) {
+    return 'mass'
+  }
+
+  if (
+    [
+      'ltr',
+      'liter',
+      'litre',
+      'liters',
+      'litres',
+      'lt',
+      'l',
+      'ml',
+      'milliliter',
+      'milliliters',
+    ].includes(u)
+  ) {
+    return 'volume'
+  }
+
+  return 'count'
+}
+
+function getUnitConversionMeta(purchaseUnit: string, consumptionUnit: string) {
+  const p = purchaseUnit.trim()
+  const c = consumptionUnit.trim()
+  const pDim = getUnitDimension(p)
+  const cDim = getUnitDimension(c)
+
+  let phrasing: 'contains' | 'equivalent' = 'equivalent'
+  let warning: string | null = null
+
+  if (pDim === 'container') {
+    phrasing = 'contains'
+  }
+
+  if (pDim === 'mass' && cDim === 'volume') {
+    warning = `Cross-dimension notice: Converting Weight (${p}) to Liquid Volume (${c}) depends on liquid density (e.g. 1 Kg of water = 1000 ml, but oils or syrups differ).`
+  } else if (pDim === 'volume' && cDim === 'mass') {
+    warning = `Cross-dimension notice: Converting Liquid Volume (${p}) to Weight (${c}) depends on liquid density (e.g. 1 Litre of oil ≈ 910 Grams).`
+  } else if (pDim === 'count' && (cDim === 'mass' || cDim === 'volume')) {
+    warning = `Notice: Converting Pieces/Count (${p}) to ${cDim === 'mass' ? 'Weight' : 'Volume'} (${c}) requires specifying the average amount per piece.`
+  } else if ((pDim === 'mass' || pDim === 'volume') && cDim === 'count') {
+    warning = `Notice: Converting ${pDim === 'mass' ? 'Weight' : 'Volume'} (${p}) to Pieces (${c}) requires specifying how many pieces equal one ${p}.`
+  }
+
+  return { phrasing, warning }
+}
 
 const CLOSING_CYCLES = ['Daily', 'Weekly', 'Bi-Weekly', 'Monthly', 'Yearly']
 
@@ -329,7 +484,7 @@ export default function AddRawMaterial() {
   const [purchaseUnits, setPurchaseUnits] = useState<string[]>([])
   const [consumptionUnit, setConsumptionUnit] = useState('')
   const [conversionPurchaseUnit, setConversionPurchaseUnit] = useState('')
-  const [conversionQty, setConversionQty] = useState('1000')
+  const [conversionQty, setConversionQty] = useState('1')
   const [category, setCategory] = useState('')
   const [subCategory, setSubCategory] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('0')
@@ -362,6 +517,26 @@ export default function AddRawMaterial() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [loadingExisting, setLoadingExisting] = useState(isEdit)
+  const [allRawMaterials, setAllRawMaterials] = useState<RawMaterial[]>([])
+
+  const duplicateRawMaterial = useMemo(() => {
+    const trimmed = name.trim().toLowerCase()
+    if (!trimmed) return null
+    return (
+      allRawMaterials.find(
+        (item) =>
+          item.name.trim().toLowerCase() === trimmed &&
+          (!isEdit || item.id !== id),
+      ) ?? null
+    )
+  }, [name, allRawMaterials, isEdit, id])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    void listAllRawMaterialsApi(encryptedOutletId)
+      .then(setAllRawMaterials)
+      .catch(() => setAllRawMaterials([]))
+  }, [encryptedOutletId])
 
   const unitNames = useMemo(() => {
     const names = units.filter((row) => row.is_active).map((row) => row.name)
@@ -388,6 +563,11 @@ export default function AddRawMaterial() {
     purchaseUnits,
     maxStockRows,
   ])
+
+  const selectedItemUnits = useMemo(() => {
+    const list = Array.from(new Set([...purchaseUnits, consumptionUnit].filter(Boolean)))
+    return list.length > 0 ? list : unitNames
+  }, [purchaseUnits, consumptionUnit, unitNames])
 
   const categoryOptions = useMemo(
     () => [...categories.map((row) => row.name), 'No Category'],
@@ -488,10 +668,14 @@ export default function AddRawMaterial() {
   const levelsTitle = isEdit ? `${displayName} Levels` : 'Set levels'
   const codesTitle = isEdit ? `${displayName} Related Codes` : 'Related Codes'
 
-
   function addMaxStockRow() {
-    if (!maxStockQty.trim() || !maxStockUnit) {
-      setError('Enter maximum stock quantity and unit')
+    const unitToUse = maxStockUnit || selectedItemUnits[0] || ''
+    if (!maxStockQty.trim()) {
+      showToast('Enter maximum stock quantity')
+      return
+    }
+    if (!unitToUse) {
+      showToast('Select a maximum stock unit')
       return
     }
     setError('')
@@ -499,12 +683,13 @@ export default function AddRawMaterial() {
       ...prev,
       {
         id: `max-${Date.now()}`,
-        qty: maxStockQty,
-        unit: maxStockUnit,
+        qty: maxStockQty.trim(),
+        unit: unitToUse,
       },
     ])
     setMaxStockQty('')
     setMaxStockUnit('')
+    showToast(`Added max stock level: ${maxStockQty.trim()} ${unitToUse}`)
   }
 
   async function handleSave() {
@@ -515,6 +700,10 @@ export default function AddRawMaterial() {
     }
     if (!name.trim()) {
       setError('Name is required')
+      return
+    }
+    if (duplicateRawMaterial) {
+      setError(`A raw material named "${duplicateRawMaterial.name}" already exists`)
       return
     }
     if (purchaseUnits.length === 0) {
@@ -609,6 +798,24 @@ export default function AddRawMaterial() {
           <div>
             <FieldLabel required>Name</FieldLabel>
             <TextInput value={name} onChange={setName} placeholder="Name" />
+            {duplicateRawMaterial ? (
+              <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 shadow-sm">
+                <p className="font-semibold">
+                  ⚠️ A raw material named &quot;{duplicateRawMaterial.name}&quot; already exists!
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/inventory/raw-materials/edit/${duplicateRawMaterial.id}`,
+                    )
+                  }
+                  className="mt-1.5 inline-flex items-center gap-1 rounded border border-amber-400 bg-white px-2 py-1 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-100"
+                >
+                  Edit Existing Raw Material →
+                </button>
+              </div>
+            ) : null}
           </div>
           <MultiSelectTags
             label="Purchase Unit"
@@ -618,18 +825,25 @@ export default function AddRawMaterial() {
             placeholder="Select multiple unit"
             onChange={(values) => {
               setPurchaseUnits(values)
-              if (
-                values.length > 0 &&
-                !values.includes(conversionPurchaseUnit)
-              ) {
-                setConversionPurchaseUnit(values[0])
+              const primary = values[0] ?? ''
+              let newConvUnit = conversionPurchaseUnit
+              if (values.length > 0 && !values.includes(conversionPurchaseUnit)) {
+                newConvUnit = primary
+                setConversionPurchaseUnit(primary)
+              }
+              if (newConvUnit && consumptionUnit && !isEdit) {
+                setConversionQty(getSuggestedConversionQty(newConvUnit, consumptionUnit))
               }
             }}
             onAddNew={quickAdd.handler('unit', (row) => {
               setPurchaseUnits((prev) =>
                 prev.includes(row.name) ? prev : [...prev, row.name],
               )
+              const newConvUnit = conversionPurchaseUnit || row.name
               if (!conversionPurchaseUnit) setConversionPurchaseUnit(row.name)
+              if (newConvUnit && consumptionUnit && !isEdit) {
+                setConversionQty(getSuggestedConversionQty(newConvUnit, consumptionUnit))
+              }
             })}
           />
           <SearchableSelect
@@ -640,10 +854,20 @@ export default function AddRawMaterial() {
             placeholder="Select Unit"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
-            onChange={setConsumptionUnit}
-            onAddNew={quickAdd.handler('unit', (row) =>
-              setConsumptionUnit(row.name),
-            )}
+            onChange={(val) => {
+              setConsumptionUnit(val)
+              const pu = conversionPurchaseUnit || purchaseUnits[0] || ''
+              if (pu && val && !isEdit) {
+                setConversionQty(getSuggestedConversionQty(pu, val))
+              }
+            }}
+            onAddNew={quickAdd.handler('unit', (row) => {
+              setConsumptionUnit(row.name)
+              const pu = conversionPurchaseUnit || purchaseUnits[0] || ''
+              if (pu && row.name && !isEdit) {
+                setConversionQty(getSuggestedConversionQty(pu, row.name))
+              }
+            })}
           />
         </div>
         <p className="mt-3 flex items-start gap-1.5 text-xs text-muted">
@@ -652,32 +876,64 @@ export default function AddRawMaterial() {
           changed.
         </p>
 
-        {purchaseUnits.length > 0 && consumptionUnit ? (
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 py-3 text-sm text-ink">
-            <span>One</span>
-            <div className="min-w-[110px]">
-              <SearchableSelect
-                value={conversionPurchaseUnit || purchaseUnits[0]}
-                options={purchaseUnits}
-                placeholder="Unit"
-                searchPlaceholder="Search"
-                includePlaceholderOption={false}
-                compact
-                onChange={setConversionPurchaseUnit}
-              />
+        {(() => {
+          const activeConvUnit = conversionPurchaseUnit || purchaseUnits[0] || ''
+          if (
+            !purchaseUnits.length ||
+            !consumptionUnit ||
+            activeConvUnit.trim().toLowerCase() === consumptionUnit.trim().toLowerCase()
+          ) {
+            return null
+          }
+          const meta = getUnitConversionMeta(activeConvUnit, consumptionUnit)
+          return (
+            <div className="mt-4 space-y-2">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3.5 py-3 text-sm text-ink">
+                <span className="font-medium">One</span>
+                <div className="min-w-[120px]">
+                  {purchaseUnits.length > 1 ? (
+                    <SearchableSelect
+                      value={activeConvUnit}
+                      options={purchaseUnits}
+                      placeholder="Unit"
+                      searchPlaceholder="Search"
+                      includePlaceholderOption={false}
+                      compact
+                      onChange={(val) => {
+                        setConversionPurchaseUnit(val)
+                        const suggested = getSuggestedConversionQty(val, consumptionUnit)
+                        setConversionQty(suggested)
+                      }}
+                    />
+                  ) : (
+                    <span className="font-semibold text-primary">
+                      {purchaseUnits[0]}
+                    </span>
+                  )}
+                </div>
+                <span>
+                  (Purchase unit) of <strong className="font-semibold text-ink">{displayName}</strong> {meta.phrasing === 'contains' ? 'contains' : 'is equivalent to'}
+                </span>
+                <input
+                  type="text"
+                  value={conversionQty}
+                  onChange={(event) => setConversionQty(event.target.value)}
+                  className="h-9 w-24 rounded-md border border-line bg-card px-2.5 text-sm font-semibold text-ink outline-none focus:border-primary"
+                />
+                <span className="font-semibold text-primary">
+                  {consumptionUnit}
+                </span>
+                <span className="text-muted">(Consumption unit).</span>
+              </div>
+              {meta.warning ? (
+                <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
+                  <span>{meta.warning}</span>
+                </div>
+              ) : null}
             </div>
-            <span>(Purchase unit) of {displayName} is equivalent to</span>
-            <input
-              type="text"
-              value={conversionQty}
-              onChange={(event) => setConversionQty(event.target.value)}
-              className="h-9 w-24 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
-            />
-            <span>
-              {consumptionUnit} (consumption unit).
-            </span>
-          </div>
-        ) : null}
+          )
+        })()}
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <SearchableSelect
@@ -783,7 +1039,7 @@ export default function AddRawMaterial() {
           <SearchableSelect
             label="Minimum Stock Level Unit"
             value={minStockUnit}
-            options={unitNames}
+            options={selectedItemUnits}
             placeholder="Select Unit"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -799,7 +1055,7 @@ export default function AddRawMaterial() {
           <SearchableSelect
             label="At Par Stock Level Unit"
             value={atParUnit}
-            options={unitNames}
+            options={selectedItemUnits}
             placeholder="Select Unit"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -848,8 +1104,7 @@ export default function AddRawMaterial() {
               Add opening stock and Avg purchase price
               <span className="mt-1 block text-xs text-muted">
                 The &apos;Opening Stock&apos; and &apos;Average Purchase
-                Price&apos; fields are already added and therefore cannot be
-                edited.
+                Price&apos; fields are recorded upon initial stock intake.
               </span>
             </span>
           </label>
@@ -874,8 +1129,8 @@ export default function AddRawMaterial() {
             </div>
             <SearchableSelect
               label="Maximum Stock Unit"
-              value={maxStockUnit}
-              options={unitNames}
+              value={maxStockUnit || selectedItemUnits[0] || ''}
+              options={selectedItemUnits}
               placeholder="Select Unit"
               searchPlaceholder="Search"
               includePlaceholderOption={false}
