@@ -121,16 +121,6 @@ body {
   }
 }
 
-@keyframes category-active-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ink) 12%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-ink) 0%, transparent);
-  }
-}
-
 @keyframes category-shine {
   0% {
     transform: translateX(-120%);
@@ -185,9 +175,7 @@ body {
 }
 
 .category-rail-item-active {
-  animation:
-    category-rail-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
-    category-active-pulse 2.2s ease-in-out 0.35s 1;
+  animation: category-rail-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .category-rail-shine {

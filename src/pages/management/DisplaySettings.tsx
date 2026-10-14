@@ -53,6 +53,13 @@ const PAYMENT_OPTIONS = [
 
 const ORDER_TYPES = ['Delivery', 'Pick Up', 'Dine In'] as const
 
+/** Favorite Items slots: a whole number from 1 to 50 (16 when blank or invalid). */
+function clampFavoriteCount(raw: string): number {
+  const parsed = Math.round(Number(raw))
+  if (!Number.isFinite(parsed) || parsed < 1) return raw.trim() === '' ? 16 : 1
+  return Math.min(parsed, 50)
+}
+
 const TIP_CALC_CODES: Record<string, string> = {
   'Core (Sub Total)': 'Core',
   'Total (Total Bill Value)': 'Total',
@@ -194,6 +201,8 @@ export default function DisplaySettings() {
   const [displaySearch, setDisplaySearch] = useState(true)
   const [addonMinMax, setAddonMinMax] = useState(false)
   const [displayItemPrice, setDisplayItemPrice] = useState(true)
+  const [favoriteItemsCount, setFavoriteItemsCount] = useState('16')
+  const [favoriteItemsAuto, setFavoriteItemsAuto] = useState(true)
   const [displaySettleAmount, setDisplaySettleAmount] = useState(true)
   const [settleMandatory, setSettleMandatory] = useState(false)
   const [allowLowerSettle, setAllowLowerSettle] = useState(true)
@@ -314,6 +323,10 @@ export default function DisplaySettings() {
       setAddonMinMax(Boolean(value.addon_min_max_validation))
     if (value.display_item_price != null)
       setDisplayItemPrice(Boolean(value.display_item_price))
+    if (value.favorite_items_count != null)
+      setFavoriteItemsCount(String(value.favorite_items_count))
+    if (value.favorite_items_auto != null)
+      setFavoriteItemsAuto(Boolean(value.favorite_items_auto))
     if (value.display_settle_amount_box != null)
       setDisplaySettleAmount(Boolean(value.display_settle_amount_box))
     if (value.settle_amount_mandatory != null)
@@ -535,6 +548,8 @@ export default function DisplaySettings() {
       display_search_item: displaySearch,
       addon_min_max_validation: addonMinMax,
       display_item_price: displayItemPrice,
+      favorite_items_count: clampFavoriteCount(favoriteItemsCount),
+      favorite_items_auto: favoriteItemsAuto,
       display_settle_amount_box: displaySettleAmount,
       settle_amount_mandatory: settleMandatory,
       allow_lower_settlement: allowLowerSettle,
@@ -757,6 +772,33 @@ export default function DisplaySettings() {
             checked={displayItemPrice}
             onChange={setDisplayItemPrice}
             label="Display item price"
+          />
+          <ConfigFormRow label="Favorite items shown">
+            <input
+              type="number"
+              min={1}
+              max={50}
+              step={1}
+              inputMode="numeric"
+              value={favoriteItemsCount}
+              onChange={(e) => setFavoriteItemsCount(e.target.value)}
+              onBlur={() =>
+                setFavoriteItemsCount(String(clampFavoriteCount(favoriteItemsCount)))
+              }
+              className={`${inputClass} max-w-32`}
+              aria-label="Favorite items shown"
+            />
+            <MutedHelp>
+              Slots in the Favorite Items section of Billing and Captain
+              Orders (1 to 50). Items marked as favorite come first; your best
+              sellers fill the rest automatically.
+            </MutedHelp>
+          </ConfigFormRow>
+          <CheckRow
+            checked={favoriteItemsAuto}
+            onChange={setFavoriteItemsAuto}
+            label="Automatically add best sellers to Favorite Items"
+            help="On: items you mark as favorite come first and best sellers fill the remaining slots. Off: only items you mark by hand are shown."
           />
           <CheckRow
             checked={displaySettleAmount}

@@ -22,6 +22,9 @@ import {
 } from '../../components/management/ConfigSectionCard'
 import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useAuth } from '../../auth/AuthContext'
+import { listCategoriesApi } from '../../services/menuService'
+import type { Category } from '../../types/menu'
 import { useOutletSettings } from '../../services/useOutletSettings'
 import type { OutletSettingsRecord } from '../../services/outletService'
 import { brand } from '../../theme/brand'
@@ -141,6 +144,38 @@ function CheckGroup({
   )
 }
 
+function CategoryPicker({
+  categories,
+  selected,
+  onToggle,
+}: {
+  categories: readonly Category[]
+  selected: string[]
+  onToggle: (id: string) => void
+}) {
+  if (categories.length === 0) {
+    return <p className="text-sm text-muted">No menu categories yet.</p>
+  }
+  return (
+    <div className="flex flex-wrap gap-x-5 gap-y-2">
+      {categories.map((category) => (
+        <label
+          key={category.id}
+          className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(category.id)}
+            onChange={() => onToggle(category.id)}
+            className="size-4 cursor-pointer accent-primary"
+          />
+          {category.name}
+        </label>
+      ))}
+    </div>
+  )
+}
+
 export default function ConnectedServicesSettings() {
   const navigate = useNavigate()
 
@@ -178,6 +213,12 @@ export default function ConnectedServicesSettings() {
   const [multiItemBarcode, setMultiItemBarcode] = useState(false)
 
   const [restrictExpenseToday, setRestrictExpenseToday] = useState(false)
+
+  // Day End Excel report: which menu categories count as M.S / M.P sales.
+  const { encryptedOutletId } = useAuth()
+  const [categories, setCategories] = useState<Category[]>([])
+  const [reportMsCategories, setReportMsCategories] = useState<string[]>([])
+  const [reportMpCategories, setReportMpCategories] = useState<string[]>([])
 
   const { loading, data, save } = useOutletSettings('connected-services')
 
@@ -224,7 +265,26 @@ export default function ConnectedServicesSettings() {
       setMultiItemBarcode(Boolean(value.allow_multiple_items_barcode))
     if (value.restrict_expense_current_date != null)
       setRestrictExpenseToday(Boolean(value.restrict_expense_current_date))
+    if (Array.isArray(value.day_end_report_ms_categories))
+      setReportMsCategories(value.day_end_report_ms_categories as string[])
+    if (Array.isArray(value.day_end_report_mp_categories))
+      setReportMpCategories(value.day_end_report_mp_categories as string[])
   }, [data])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    listCategoriesApi(encryptedOutletId)
+      .then((rows) => {
+        if (!cancelled) setCategories(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
 
   function goBack() {
@@ -241,6 +301,20 @@ export default function ConnectedServicesSettings() {
         ? list.filter((item) => item !== value)
         : [...list, value],
     )
+  }
+
+  /** A category belongs to M.S or M.P, never both: ticking one clears the other. */
+  function toggleReportCategory(id: string, partner: 'ms' | 'mp') {
+    const [mine, setMine, other, setOther] =
+      partner === 'ms'
+        ? ([reportMsCategories, setReportMsCategories, reportMpCategories, setReportMpCategories] as const)
+        : ([reportMpCategories, setReportMpCategories, reportMsCategories, setReportMsCategories] as const)
+    if (mine.includes(id)) {
+      setMine(mine.filter((item) => item !== id))
+      return
+    }
+    setMine([...mine, id])
+    if (other.includes(id)) setOther(other.filter((item) => item !== id))
   }
 
   async function handleSave() {
@@ -267,6 +341,8 @@ export default function ConnectedServicesSettings() {
       barcode_weight_denominator: weightDenominator,
       allow_multiple_items_barcode: multiItemBarcode,
       restrict_expense_current_date: restrictExpenseToday,
+      day_end_report_ms_categories: reportMsCategories,
+      day_end_report_mp_categories: reportMpCategories,
     }
     try {
       await save(payload)
@@ -316,6 +392,33 @@ export default function ConnectedServicesSettings() {
             onChange={setRestrictEditAfterDayEnd}
             label="Restrict editing the order once the manual day end operation has been completed"
           />
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<ReceiptText size={16} />}
+        title="Day End Excel Report"
+        description="Choose which menu categories count towards each partner's sales (M.S and M.P columns) in the Day End Excel report."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="M.S categories">
+            <CategoryPicker
+              categories={categories}
+              selected={reportMsCategories}
+              onToggle={(id) => toggleReportCategory(id, 'ms')}
+            />
+          </ConfigFormRow>
+          <ConfigFormRow label="M.P categories">
+            <CategoryPicker
+              categories={categories}
+              selected={reportMpCategories}
+              onToggle={(id) => toggleReportCategory(id, 'mp')}
+            />
+          </ConfigFormRow>
+          <MutedHelp>
+            Sales are matched to categories by item name. Categories left
+            unticked are not counted for either partner.
+          </MutedHelp>
         </div>
       </ConfigSectionCard>
 

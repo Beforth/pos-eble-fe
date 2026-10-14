@@ -5,7 +5,7 @@ import {
   useMenuReference,
   type MenuReferenceStatus,
 } from '../state/MenuReferenceContext'
-import { fetchAllItemsCached } from '../state/menuItemsCache'
+import { fetchAllItemsCached, invalidateMenuItems } from '../state/menuItemsCache'
 import type { Category, Item, TaxSummary } from '../types/menu'
 
 /**
@@ -31,6 +31,8 @@ export interface MenuItemRow {
   hasImage: boolean
   rank?: number
   isFavorite?: boolean
+  /** Removed from Favorite Items on purpose; best sellers skip it. */
+  excludeFromAutoFavorites?: boolean
   /**
    * Active tax slabs assigned to this item. Drives `computeTax`. Optional so
    * locally-built rows (combo builder, demo fixtures) stay tax-free by default;
@@ -93,6 +95,7 @@ export function adaptItem(item: Item, channelId: string): MenuItemRow {
     hasImage: item.has_image,
     rank: item.rank,
     isFavorite: item.flags?.set_as_favorite ?? false,
+    excludeFromAutoFavorites: item.flags?.exclude_from_auto_favorites ?? false,
     taxes: item.taxes ?? [],
     ignoreTax: item.flags?.ignore_tax ?? false,
   }
@@ -116,6 +119,15 @@ export interface BillingMenuState {
   categoriesError: string | null
   /** Force-refetches items *and* categories. */
   reload: () => Promise<void>
+  /**
+   * Set an item's favorite flags in memory (and drop the shared items cache so
+   * the next screen refetches). The caller saves them with `updateItemApi`.
+   * `excluded` = removed from Favorite Items, so best sellers skip it.
+   */
+  setItemFavorite: (
+    itemId: string,
+    flags: { favorite: boolean; excluded: boolean },
+  ) => void
 }
 
 /**
@@ -175,6 +187,27 @@ export function useBillingMenu(): BillingMenuState {
     [rawItems, channelId],
   )
 
+  const setItemFavorite = useCallback(
+    (itemId: string, { favorite, excluded }: { favorite: boolean; excluded: boolean }) => {
+      setRawItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                flags: {
+                  ...item.flags,
+                  set_as_favorite: favorite,
+                  exclude_from_auto_favorites: excluded,
+                },
+              }
+            : item,
+        ),
+      )
+      if (encryptedOutletId) invalidateMenuItems(encryptedOutletId)
+    },
+    [encryptedOutletId],
+  )
+
   return {
     items,
     categories,
@@ -187,5 +220,6 @@ export function useBillingMenu(): BillingMenuState {
       // categories fetch could never be recovered from the Retry button.
       await Promise.all([load(true), reloadReference('categories', { force: true })])
     },
+    setItemFavorite,
   }
 }

@@ -10,13 +10,27 @@ import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
 import { formatNumber } from '../../utils/format'
 import {
   closeDayApi,
+  downloadDayEndReportApi,
   listDayEndClosuresApi,
+  liveOrdersApi,
   toDayEndSummaryRow,
 } from '../../services/orderService'
 import { DayEndSummaryModal } from '../../components/reports/DayEndSummaryModal'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { useAuth } from '../../auth/AuthContext'
 
 const PAGE_SIZE = 15
+
+/** What Day End will clear off the Live Orders boards. */
+interface LiveBoardsPreview {
+  running: number
+  kitchen: number
+  tables: number
+}
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? '' : 's'}`
+}
 
 export default function BillingDayEnd() {
   const navigate = useNavigate()
@@ -31,6 +45,8 @@ export default function BillingDayEnd() {
   const [rows, setRows] = useState<DayEndSummaryRow[]>([])
   const [viewRow, setViewRow] = useState<DayEndSummaryRow | null>(null)
   const [closing, setClosing] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [preview, setPreview] = useState<LiveBoardsPreview | null>(null)
 
   const loadRows = useCallback(() => {
     if (!encryptedOutletId) return
@@ -77,17 +93,33 @@ export default function BillingDayEnd() {
     showToast('Filters cleared')
   }
 
-  async function handleCloseDay() {
+  function openCloseDay() {
     if (!encryptedOutletId) {
       showToast('No outlet selected')
       return
     }
+    setPreview(null)
+    setConfirmOpen(true)
+    liveOrdersApi(encryptedOutletId)
+      .then((dto) =>
+        setPreview({
+          running: dto.running.totalOrders,
+          kitchen: dto.pending.totalOrders,
+          tables: dto.tables.activeTables,
+        }),
+      )
+      .catch(() => setPreview(null))
+  }
+
+  async function handleCloseDay() {
+    if (!encryptedOutletId) return
     setClosing(true)
     try {
       const result = await closeDayApi(encryptedOutletId)
       showToast(
         `Day closed · ${new Date(result.closed_at).toLocaleString()}`,
       )
+      setConfirmOpen(false)
       loadRows()
     } catch (error) {
       showToast(
@@ -95,6 +127,17 @@ export default function BillingDayEnd() {
       )
     } finally {
       setClosing(false)
+    }
+  }
+
+  async function handleDownloadReport(row: DayEndSummaryRow) {
+    if (!encryptedOutletId) return
+    try {
+      await downloadDayEndReportApi(encryptedOutletId, row.id, row.dateKey)
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to download the report',
+      )
     }
   }
 
@@ -150,7 +193,7 @@ export default function BillingDayEnd() {
             />
             <button
               type="button"
-              onClick={handleCloseDay}
+              onClick={openCloseDay}
               disabled={closing}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
             >
@@ -260,12 +303,10 @@ export default function BillingDayEnd() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              exportRows([row], row.dateKey)
-                            }
+                            onClick={() => handleDownloadReport(row)}
                             className="inline-flex size-7 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
-                            aria-label="Download"
-                            data-tooltip="Download"
+                            aria-label="Download Excel report"
+                            data-tooltip="Download Excel report"
                           >
                             <Download size={14} />
                           </button>
@@ -329,6 +370,27 @@ export default function BillingDayEnd() {
           ) : null}
         </div>
       </main>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Close the day?"
+        message="Day End saves today's summary and starts a new business day. Live Orders boards will start again from zero."
+        consequences={
+          preview
+            ? [
+                `Running Orders: ${plural(preview.running, 'unpaid order')} will be cleared`,
+                `Kitchen: ${plural(preview.kitchen, 'open ticket')} will be cleared`,
+                `Tables: ${plural(preview.tables, 'running table')} will be cleared`,
+              ]
+            : ['Checking Live Orders…']
+        }
+        note="Nothing is deleted. Unpaid bills stay in All Orders and Due Payments, and tickets stay in the KOT register."
+        confirmLabel="Close Day"
+        tone="primary"
+        loading={closing}
+        onConfirm={handleCloseDay}
+        onClose={() => setConfirmOpen(false)}
+      />
 
       <DayEndSummaryModal
         open={Boolean(viewRow)}

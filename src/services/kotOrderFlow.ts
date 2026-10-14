@@ -197,6 +197,11 @@ export async function settleKotOrder(options: SettleKotOrderOptions): Promise<vo
   const bill = kotItemsForOrder(tickets, options.tax)
   const money = {
     payment_type: paymentLabel,
+    // The settle screen collects the customer's name and mobile when a due is
+    // taken; they must ride on the settle so the backend can file the debt
+    // under a Customer (a due with no phone is invisible on the dues screen).
+    customer_name: customerName.trim(),
+    customer_phone: customerPhone.trim(),
     my_amount: bill.my_amount,
     tax: bill.tax,
     tax_breakdown: bill.tax_breakdown,

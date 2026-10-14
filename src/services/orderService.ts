@@ -1,4 +1,5 @@
 import { apiRequest } from './apiClient'
+import { downloadXlsx } from './menuService'
 import { AUTH_TOKEN_KEY } from '../auth/storage'
 import type { CurrentOrderRow, CurrentOrderItem } from '../mocks/currentOrdersData'
 import type { KotRow } from '../mocks/kotData'
@@ -297,6 +298,9 @@ export interface SettleOrderPayload {
   received_amount?: number
   settlement_by?: string
   settlement_counter?: string
+  /** Collected on the settle screen when a due is taken; omitted = unchanged. */
+  customer_name?: string
+  customer_phone?: string
 }
 
 export interface CreateKotPayload {
@@ -892,6 +896,21 @@ export async function closeDayApi(
     ordersPath(outletId, '/day-end/close/'),
     'POST',
     {},
+  )
+}
+
+/**
+ * Download the Day End Excel report (4 sheets) for one closed day.
+ * ``closureId`` is the encrypted id of the row; ``dayKey`` is ``YYYY-MM-DD``.
+ */
+export async function downloadDayEndReportApi(
+  outletId: string,
+  closureId: string,
+  dayKey: string,
+): Promise<void> {
+  await downloadXlsx(
+    ordersPath(outletId, `/day-end/${closureId}/export/`),
+    `day-end-summary-${dayKey}.xlsx`,
   )
 }
 
