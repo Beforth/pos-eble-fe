@@ -51,6 +51,7 @@ import { DeleteReasonModal } from './DeleteReasonModal'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { OTHER_PAYMENT_TYPES } from './OtherPaymentModal'
 import { PrimaryButton } from '../menu/MenuActionButtons'
+import { QtyInput } from '../common/QtyInput'
 
 const SEED_CUSTOMER_HISTORY: Record<string, CustomerHistoryOrder[]> = {
   '1234567899': [
@@ -1070,7 +1071,7 @@ export function BillPanel({
         <>
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-b border-line bg-page px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
             <span>Items</span>
-            <span className="w-16 text-center">Qty</span>
+            <span className="w-24 text-center">Qty</span>
             <span className="w-14 text-right">Price</span>
             <span className="w-7" />
           </div>
@@ -1233,7 +1234,7 @@ export function BillPanel({
                               </span>
                             ) : null}
                           </span>
-                          <div className="flex w-16 items-center justify-center gap-1">
+                          <div className="flex w-24 items-center justify-center gap-1">
                             <button
                               type="button"
                               aria-label="Decrease quantity"
@@ -1243,9 +1244,11 @@ export function BillPanel({
                             >
                               <Minus size={12} />
                             </button>
-                            <span className="w-5 text-center text-sm font-semibold text-ink">
-                              {line.qty}
-                            </span>
+                            <QtyInput
+                                value={line.qty}
+                                label={`Quantity for ${line.name}`}
+                                onCommit={(qty) => onQtyChange(line.id, qty)}
+                              />
                             <button
                               type="button"
                               aria-label="Increase quantity"

@@ -269,18 +269,28 @@ export interface AddonAreaPrice extends ChannelPriceInput {
   channel_slug: string
 }
 
+export type AddonChoice = 'veg' | 'non-veg' | 'egg'
+
+export type AddonSelectionMode = 'single' | 'multiple'
+
 export interface Addon {
   id: EncId
   name: string
   base_price: number | string
+  sap_code: string
+  choice: AddonChoice
   is_active: boolean
   position: number
   area_prices: AddonAreaPrice[]
 }
 
 export interface AddonInput {
+  /** Sent for an existing add-on so the edit updates it in place. */
+  id?: EncId
   name: string
   base_price?: number | string
+  sap_code?: string
+  choice?: AddonChoice
   is_active?: boolean
   area_prices?: ChannelPriceInput[]
 }
@@ -291,6 +301,16 @@ export interface AddonGroup {
   online_display_name: string
   is_active: boolean
   position: number
+  /** How many add-ons a guest must / may pick (max 0 = no limit). */
+  addon_min: number
+  addon_max: number
+  /** POS only. */
+  selection_mode: AddonSelectionMode
+  /** Zomato only: how many times the same add-on may be picked. */
+  max_selection_per_addon: number
+  show_in_online: boolean
+  show_in_dinein_qr: boolean
+  allow_open_quantity: boolean
   addons: Addon[]
 }
 
@@ -299,6 +319,13 @@ export interface AddonGroupPayload {
   online_display_name?: string
   is_active?: boolean
   position?: number
+  addon_min?: number
+  addon_max?: number
+  selection_mode?: AddonSelectionMode
+  max_selection_per_addon?: number
+  show_in_online?: boolean
+  show_in_dinein_qr?: boolean
+  allow_open_quantity?: boolean
   addons?: AddonInput[]
 }
 
