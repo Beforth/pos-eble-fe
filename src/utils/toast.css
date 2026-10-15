@@ -28,12 +28,19 @@
 .toast-container {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  top: 7.5rem;
   z-index: 300;
   display: flex;
   flex-direction: column;
   gap: 8px;
   pointer-events: none;
+}
+
+/* The desktop header is a single lg:h-14 (56px) bar; toasts clear it. */
+@media (min-width: 1024px) {
+  .toast-container {
+    top: 4.5rem;
+  }
 }
 
 /* ── Toasts ───────────────────────────────────────────────────────────────── */
