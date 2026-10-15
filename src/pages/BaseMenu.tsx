@@ -12,6 +12,7 @@ import {
   Plus,
   ReceiptText,
   Search,
+  Send,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ import { useAuth } from '../auth/AuthContext'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import {
   ActionDropdown,
+  OutlineButton,
   PrimaryButton,
   RowActionButton,
 } from '../components/menu/MenuActionButtons'
@@ -29,6 +31,7 @@ import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { AddNewItemsModal } from '../components/menu/AddNewItemsModal'
 import { AddItemsGridModal } from '../components/menu/AddItemsGridModal'
 import { ImportSheetCsvModal } from '../components/menu/ImportSheetCsvModal'
+import { PushMenuModal } from '../components/menu/PushMenuModal'
 import { MenuItemDetailsModal } from '../components/menu/MenuItemDetailsModal'
 import { PublishDateModal } from '../components/menu/PublishDateModal'
 import { UpdateAreaWisePriceModal } from '../components/menu/UpdateAreaWisePriceModal'
@@ -221,6 +224,10 @@ export default function BaseMenu({
   const [addItemsOpen, setAddItemsOpen] = useState(false)
   const [addGridOpen, setAddGridOpen] = useState(false)
   const [importSheetOpen, setImportSheetOpen] = useState(false)
+  const [pushOpen, setPushOpen] = useState(false)
+  // Zomato and Swiggy menus can be sent to the aggregator through Wera.
+  const pushPlatform =
+    channelId === 'zomato' || channelId === 'swiggy' ? channelId : null
   const [detailsItem, setDetailsItem] = useState<Item | null>(null)
   const [areaPriceItem, setAreaPriceItem] = useState<Item | null>(null)
   const [nutritionItem, setNutritionItem] = useState<Item | null>(null)
@@ -822,6 +829,13 @@ export default function BaseMenu({
           Add Items
         </PrimaryButton>
 
+        {pushPlatform && encryptedOutletId && (
+          <OutlineButton onClick={() => setPushOpen(true)}>
+            <Send size={15} />
+            Push to {pushPlatform === 'zomato' ? 'Zomato' : 'Swiggy'}
+          </OutlineButton>
+        )}
+
         <button
           type="button"
           role="switch"
@@ -1249,6 +1263,14 @@ export default function BaseMenu({
         onAddCombo={() => navigate('/menu/add-combo')}
         onSheet={() => setImportSheetOpen(true)}
       />
+      {pushPlatform && encryptedOutletId && (
+        <PushMenuModal
+          open={pushOpen}
+          platform={pushPlatform}
+          outletId={encryptedOutletId}
+          onClose={() => setPushOpen(false)}
+        />
+      )}
       <ImportSheetCsvModal
         open={importSheetOpen}
         onClose={() => setImportSheetOpen(false)}
