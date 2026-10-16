@@ -36,7 +36,34 @@ interface DocumentFile {
   previewUrl?: string
   /** Login-protected download path of a saved file; fetched when viewed. */
   secureUrl?: string
+  /** MIME type of the file (from the download, or from the file just picked). */
+  contentType?: string
   file?: File
+}
+
+/**
+ * How a document is shown. The file's real type wins (a saved document may have
+ * no extension in its name); the name is only the fallback. Only PDF, PNG and JPEG
+ * are shown inline - anything else is a download.
+ */
+function previewKind(file: DocumentFile): 'pdf' | 'image' | 'other' {
+  const type = (file.contentType ?? '').toLowerCase()
+  if (type === 'application/pdf') return 'pdf'
+  if (type === 'image/png' || type === 'image/jpeg') return 'image'
+  if (/\.pdf$/i.test(file.fileName)) return 'pdf'
+  if (/\.(png|jpe?g)$/i.test(file.fileName)) return 'image'
+  return 'other'
+}
+
+/** A download name that ends in the right extension even if the stored name has none. */
+function downloadName(file: DocumentFile): string {
+  if (/\.[a-z0-9]{2,5}$/i.test(file.fileName)) return file.fileName
+  const extension: Record<string, string> = {
+    'application/pdf': '.pdf',
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+  }
+  return `${file.fileName}${extension[(file.contentType ?? '').toLowerCase()] ?? ''}`
 }
 
 export default function OutletDocuments() {
@@ -66,7 +93,7 @@ export default function OutletDocuments() {
           if (doc.file) {
             nextFiles[doc.name] = {
               name: doc.name,
-              fileName: doc.file_name || doc.name,
+              fileName: doc.file_name || doc.file.split('/').filter(Boolean).pop() || doc.name,
               secureUrl: doc.file,
             }
           }
@@ -122,6 +149,7 @@ export default function OutletDocuments() {
       [doc]: {
         name: doc,
         fileName: file.name,
+        contentType: file.type,
         previewUrl: URL.createObjectURL(file),
         file,
       },
@@ -138,7 +166,9 @@ export default function OutletDocuments() {
         const blob = await fetchOutletDocumentFileApi(doc.secureUrl)
         const url = URL.createObjectURL(blob)
         setFiles((prev) =>
-          prev[docName] ? { ...prev, [docName]: { ...prev[docName], previewUrl: url } } : prev,
+          prev[docName]
+            ? { ...prev, [docName]: { ...prev[docName], previewUrl: url, contentType: blob.type } }
+            : prev,
         )
       } catch (error) {
         showToast(
@@ -157,7 +187,7 @@ export default function OutletDocuments() {
     if (!file.previewUrl) return
     const link = document.createElement('a')
     link.href = file.previewUrl
-    link.download = file.fileName
+    link.download = downloadName(file)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -182,9 +212,7 @@ export default function OutletDocuments() {
   }
 
   const previewFile = previewDoc ? files[previewDoc] : null
-  const canEmbed = previewFile
-    ? /\.(pdf|png|jpe?g)$/i.test(previewFile.fileName)
-    : false
+  const kind = previewFile ? previewKind(previewFile) : 'other'
 
   function addCustomDocument() {
     const name = customFileName.trim()
@@ -377,12 +405,20 @@ export default function OutletDocuments() {
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-auto bg-page/40">
-              {canEmbed ? (
+              {kind === 'pdf' ? (
                 <iframe
                   src={previewFile.previewUrl}
                   title={previewFile.name}
                   className="block h-[70vh] w-full border-0 bg-white"
                 />
+              ) : kind === 'image' ? (
+                <div className="flex max-h-[70vh] min-h-[240px] items-center justify-center bg-white p-3">
+                  <img
+                    src={previewFile.previewUrl}
+                    alt={previewFile.name}
+                    className="max-h-[66vh] max-w-full object-contain"
+                  />
+                </div>
               ) : (
                 <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
                   <FolderOpen size={40} className="text-muted/50" strokeWidth={1} />
