@@ -1,5 +1,6 @@
-import { apiRequest, multipartApiRequest } from './apiClient'
-import { AUTH_TOKEN_KEY } from '../auth/storage'
+import { ApiError, apiRequest, multipartApiRequest } from './apiClient'
+import { AUTH_TOKEN_KEY, clearAuthStorage } from '../auth/storage'
+import { API_BASE_URL } from '../config/api'
 
 export interface OutletMembershipSummary {
   outlet_id: number
@@ -294,10 +295,13 @@ export async function updateOutletSettingsMultipartApi(
 }
 
 export interface OutletDocumentRecord {
-  id: number
+  /** Encrypted id. */
+  id: string
   name: string
   is_custom: boolean
+  /** Login-protected download path (not a public link), or null. */
   file: string | null
+  file_name: string | null
 }
 
 export interface OutletDocumentInput {
@@ -313,6 +317,38 @@ export async function getOutletDocumentsApi(
     `/api/v1/outlets/${encryptedId}/documents/`,
     { method: 'GET', token: authToken() },
   )
+}
+
+/**
+ * Download one document's file. The route needs the login token, which a
+ * plain `<img>` / `<iframe>` / link cannot send, so it is fetched here and
+ * shown from a blob URL.
+ */
+export async function fetchOutletDocumentFileApi(path: string): Promise<Blob> {
+  const token = authToken()
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+  } catch {
+    throw new ApiError('Unable to reach the server. Check that the API is running.', 0)
+  }
+  if (response.status === 401) {
+    clearAuthStorage()
+    if (window.location.pathname !== '/login') window.location.replace('/login')
+  }
+  if (!response.ok) {
+    let message = `Could not open the document (${response.status})`
+    try {
+      const body = (await response.json()) as { message?: string }
+      if (body.message) message = body.message
+    } catch {
+      // not JSON - keep the generic message
+    }
+    throw new ApiError(message, response.status)
+  }
+  return response.blob()
 }
 
 export interface OutletDocumentsUploadPayload {
