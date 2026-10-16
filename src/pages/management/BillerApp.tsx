@@ -68,13 +68,13 @@ function StatusSwitch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
         checked ? 'bg-primary' : 'bg-line'
       }`}
     >
       <span
-        className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-[22px]' : 'translate-x-0.5'
+        className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${
+          checked ? 'translate-x-[18px]' : 'translate-x-0.5'
         }`}
       />
     </button>
@@ -83,7 +83,7 @@ function StatusSwitch({
 
 export default function BillerApp() {
   const navigate = useNavigate()
-  const { roles } = useRoles()
+  const { roles, loadRoles } = useRoles()
   const [activeTabId, setActiveTabId] = useState('all')
   const [users, setUsers] = useState<UserSummary[] | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -127,6 +127,10 @@ export default function BillerApp() {
     () => rows.length > 0 && selectedIds.size === rows.length,
     [rows, selectedIds],
   )
+
+  useEffect(() => {
+    void loadRoles()
+  }, [loadRoles])
 
   useEffect(() => {
     let cancelled = false
@@ -278,6 +282,16 @@ export default function BillerApp() {
                   ? 'There are no billing users yet.'
                   : `There are no users in the ${activeTab.label} filter.`}
               </p>
+              <div className="mt-5">
+                <PrimaryButton
+                  onClick={() =>
+                    navigate('/management/user-management/biller-app/add')
+                  }
+                >
+                  <Plus size={15} />
+                  Create
+                </PrimaryButton>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">

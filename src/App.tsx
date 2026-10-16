@@ -14,6 +14,8 @@ import { RoleProvider } from './state/RoleContext'
 import { MenuChannelsProvider } from './state/MenuChannelsContext'
 import { MenuReferenceProvider } from './state/MenuReferenceContext'
 import { ChromeProvider } from './state/ChromeContext'
+import { OnlineOrdersProvider } from './state/OnlineOrdersContext'
+import AcceptOnlineOrders from './pages/AcceptOnlineOrders'
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
 import EditProfile from './pages/EditProfile'
@@ -255,6 +257,7 @@ export default function App() {
           <MenuReferenceProvider>
           <BrowserRouter>
           <ChromeProvider>
+          <OnlineOrdersProvider>
           <TooltipHost />
           <ToastHost />
           <RouteErrorBoundary>
@@ -505,6 +508,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <OnlineOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/online-orders/accept"
+            element={
+              <ProtectedRoute>
+                <AcceptOnlineOrders />
               </ProtectedRoute>
             }
           />
@@ -2140,6 +2151,7 @@ export default function App() {
           <Route path="*" element={<HomeRedirect />} />
         </Routes>
         </RouteErrorBoundary>
+          </OnlineOrdersProvider>
           </ChromeProvider>
       </BrowserRouter>
           </MenuReferenceProvider>

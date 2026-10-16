@@ -19,7 +19,8 @@ import { ShowChangesModal } from '../components/menu/ShowChangesModal'
 import { AddTagDrawer } from '../components/menu/AddTagDrawer'
 import { RowActionButton } from '../components/menu/MenuActionButtons'
 import { useAuth } from '../auth/AuthContext'
-import { listParentCategoriesApi, deleteParentCategoryApi, listMenuGroupsApi, deleteMenuGroupApi } from '../services/menuService'
+import { listParentCategoriesApi, deleteParentCategoryApi, listMenuGroupsApi, deleteMenuGroupApi, deleteCategoryApi } from '../services/menuService'
+import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import type { Category, MenuGroup, ParentCategory } from '../types/menu'
 import { useMenuReference } from '../state/MenuReferenceContext'
 
@@ -114,6 +115,7 @@ export default function CategoryManagement() {
   const [groupDeleteTarget, setGroupDeleteTarget] = useState<MenuGroup | null>(null)
   const [addTagOpen, setAddTagOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [categoryDeleteTarget, setCategoryDeleteTarget] = useState<Category | null>(null)
   const [actionMenu, setActionMenu] = useState<'export' | 'action' | null>(null)
   const { encryptedOutletId } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
@@ -645,6 +647,12 @@ export default function CategoryManagement() {
                           >
                             <ClipboardList size={16} />
                           </RowActionButton>
+                          <RowActionButton
+                            label="Delete"
+                            onClick={() => setCategoryDeleteTarget(row)}
+                          >
+                            <Trash2 size={16} />
+                          </RowActionButton>
                         </div>
                       </td>
                     </tr>
@@ -814,6 +822,46 @@ export default function CategoryManagement() {
               )
             })
             .finally(() => setDeleting(false))
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(categoryDeleteTarget)}
+        title="Delete category"
+        target={categoryDeleteTarget?.name}
+        message="The category stops appearing in the menu and in Billing."
+        note="A category that still has items cannot be deleted. Move or delete its items first. The category is archived, not erased."
+        confirmLabel="Delete"
+        loading={deleting}
+        onClose={() => {
+          if (!deleting) setCategoryDeleteTarget(null)
+        }}
+        onConfirm={() => {
+          if (!categoryDeleteTarget || !encryptedOutletId || deleting) return
+          const target = categoryDeleteTarget
+          setDeleting(true)
+          deleteCategoryApi(encryptedOutletId, target.id)
+            .then(() => {
+              setCategories((prev) => prev.filter((row) => row.id !== target.id))
+              setSelected((prev) => {
+                const next = new Set(prev)
+                next.delete(target.id)
+                return next
+              })
+              // Billing and Add Item read the shared category list.
+              void reload('categories', { force: true })
+              showToast('Category deleted')
+            })
+            .catch((error: unknown) => {
+              showToast(
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to delete category',
+              )
+            })
+            .finally(() => {
+              setDeleting(false)
+              setCategoryDeleteTarget(null)
+            })
         }}
       />
       <AddTagDrawer

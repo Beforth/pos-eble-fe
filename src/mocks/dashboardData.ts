@@ -102,10 +102,10 @@ export const orderTypeSummaries: OrderTypeSummary[] = [
 ]
 
 export const onlineOrders: OnlineOrdersData = {
-  totalOrders: 2,
-  totalRevenue: 483,
-  prepaidOrders: 2,
-  prepaidRevenue: 483,
+  totalOrders: 1,
+  totalRevenue: 147,
+  prepaidOrders: 1,
+  prepaidRevenue: 147,
   codOrders: 0,
   codRevenue: 0,
   platforms: [
@@ -124,14 +124,6 @@ export const onlineOrders: OnlineOrdersData = {
       prepaidRevenue: 147,
       codRevenue: 0,
       revenue: 147,
-    },
-    {
-      platform: 'Toing',
-      brands: 0,
-      orders: 1,
-      prepaidRevenue: 336,
-      codRevenue: 0,
-      revenue: 336,
     },
     {
       platform: 'Other',

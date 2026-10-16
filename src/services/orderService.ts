@@ -571,7 +571,7 @@ export async function listOrdersApi(
   if (options.page_size) query.set('page_size', String(options.page_size))
   const qs = query.toString()
   return jsonRequest<OrdersPage>(
-    ordersPath(outletId, `/orders/${qs ? `?${qs}` : ''}/`),
+    ordersPath(outletId, `/orders/${qs ? `?${qs}` : ''}`),
     'GET',
   )
 }

@@ -235,7 +235,7 @@ export async function listItemsApi(outletId: string, params: ListItemsParams = {
   if (params.page) query.set('page', String(params.page))
   if (params.page_size) query.set('page_size', String(params.page_size))
   const qs = query.toString()
-  return paginatedApiRequest<Item>(menusPath(outletId, `/items/${qs ? `?${qs}` : ''}/`), {
+  return paginatedApiRequest<Item>(menusPath(outletId, `/items/${qs ? `?${qs}` : ''}`), {
     method: 'GET',
     token: authToken(),
   })
@@ -619,7 +619,7 @@ export async function listItemCommissionsApi(outletId: string, params: { page?: 
   if (params.page) query.set('page', String(params.page))
   if (params.page_size) query.set('page_size', String(params.page_size))
   const qs = query.toString()
-  return paginatedApiRequest<ItemCommission>(menusPath(outletId, `/item-commissions/${qs ? `?${qs}` : ''}/`), {
+  return paginatedApiRequest<ItemCommission>(menusPath(outletId, `/item-commissions/${qs ? `?${qs}` : ''}`), {
     method: 'GET',
     token: authToken(),
   })
@@ -698,7 +698,7 @@ export async function listTriggerLogsApi(outletId: string, params: { page?: numb
   if (params.page) query.set('page', String(params.page))
   if (params.page_size) query.set('page_size', String(params.page_size))
   const qs = query.toString()
-  return paginatedApiRequest<MenuTriggerLog>(menusPath(outletId, `/trigger-logs/${qs ? `?${qs}` : ''}/`), {
+  return paginatedApiRequest<MenuTriggerLog>(menusPath(outletId, `/trigger-logs/${qs ? `?${qs}` : ''}`), {
     method: 'GET',
     token: authToken(),
   })

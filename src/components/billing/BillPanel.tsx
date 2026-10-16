@@ -112,6 +112,8 @@ export interface CustomerDetails {
 
 interface BillPanelProps {
   lines: CartLine[]
+  /** Menu is on the right, so the divider line sits on the panel's right edge. */
+  menuOnRight?: boolean
   /** KOTs already sent for the selected table (merged into final bill). */
   tableKots?: {
     id: string
@@ -230,6 +232,7 @@ function sanitizeCustomerName(value: string): string {
 
 export function BillPanel({
   lines,
+  menuOnRight = false,
   tableKots = [],
   focusKotNo = null,
   hideSentKotRows = false,
@@ -566,7 +569,11 @@ export function BillPanel({
   }
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[440px] lg:border-l lg:border-t-0 xl:w-[480px]">
+    <aside
+      className={`flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[440px] lg:border-t-0 xl:w-[480px] ${
+        menuOnRight ? 'lg:border-r' : 'lg:border-l'
+      }`}
+    >
       <AppliedDiscountModal
         open={discountOpen}
         billTotal={total}

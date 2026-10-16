@@ -61,7 +61,9 @@ import {
   type KotEventData,
   type KotOrderType,
   type OrderDto,
+  updateKotApi,
 } from '../../services/orderService'
+import { isServerBackedKotId } from '../../utils/kotListStore'
 import {
   getItemInitials,
   itemNameMatchesQuery,
@@ -98,6 +100,7 @@ import {
 } from '../../utils/taxEngine'
 import { useOutletSettings } from '../../services/useOutletSettings'
 import { useFavoriteItems } from '../../state/useFavoriteItems'
+import { useMenuOnRight } from '../../state/useMenuOnRight'
 import { subscribeToRail } from '../../services/liveRailClient'
 
 const FAVORITES_ID = 'favorites'
@@ -721,6 +724,8 @@ export default function CaptainOrders() {
 
   // Manual favorites first, then best sellers fill the outlet's favorite slots.
   const { favoriteIds } = useFavoriteItems(menuItems)
+  // Display settings: menu on the right of the bill (Touch Screen layout only).
+  const menuOnRight = useMenuOnRight()
 
   const filteredItems = useMemo(() => {
     return menuItems.filter((item) => {
@@ -814,6 +819,26 @@ export default function CaptainOrders() {
     addItem(item)
     setShortCode('')
     showToast(`Added ${item.name}`)
+  }
+
+  async function cancelKot(id: string, reason: string) {
+    if (!encryptedOutletId) return
+  // Cancelling a KOT has to happen on the server too. Only hiding it here would
+  // leave it cooking on the kitchen screen and out of the dashboard's Leakage
+  // "Cancelled" count. A ticket the server never saw (a `kot-...` id) has
+  // nothing to cancel there.
+    try {
+      if (isServerBackedKotId(id)) {
+        await updateKotApi(encryptedOutletId, id, { status: 'Cancelled', reason })
+      }
+      removeKotTicket(id)
+      setKotTickets(loadAllKotTickets())
+      showToast('KOT cancelled')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Could not cancel the KOT',
+      )
+    }
   }
 
   function changeQty(lineId: string, qty: number) {
@@ -2030,6 +2055,7 @@ export default function CaptainOrders() {
               )
             }
           }}
+          onCancelKot={cancelKot}
           onDismiss={(id) => {
             setKotTickets((prev) => {
               const next = prev.filter((t) => t.id !== id)
@@ -2109,7 +2135,11 @@ export default function CaptainOrders() {
           }}
         />
       ) : (
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <div
+        className={`flex min-h-0 flex-1 flex-col ${
+          menuOnRight ? 'lg:flex-row-reverse' : 'lg:flex-row'
+        }`}
+      >
         {/* Mobile / tablet: Menu | Bill switcher */}
         <div className="flex shrink-0 gap-1 border-b border-line bg-card p-2 lg:hidden">
           <button
@@ -2276,6 +2306,7 @@ export default function CaptainOrders() {
           <BillPanel
               canSettle={hasPermission(SETTLE_CODENAME)}
             lines={lines}
+            menuOnRight={menuOnRight}
             tableKots={tableKotSummary}
             focusKotNo={focusKotNo}
             taxSource={taxSource}

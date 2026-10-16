@@ -9,7 +9,6 @@ interface PlatformOrdersTableProps {
 const platformDot: Record<string, string> = {
   Zomato: 'bg-primary',
   Swiggy: 'bg-accent',
-  Toing: 'bg-secondary',
   Other: 'bg-muted',
 }
 
