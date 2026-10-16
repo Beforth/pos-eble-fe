@@ -13,6 +13,7 @@ import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { brand } from '../../theme/brand'
 import { useAuth } from '../../auth/AuthContext'
 import {
+  fetchOutletDocumentFileApi,
   getOutletDocumentsApi,
   updateOutletDocumentsApi,
 } from '../../services/outletService'
@@ -31,7 +32,10 @@ const DEFAULT_DOCUMENTS: string[] = [
 interface DocumentFile {
   name: string
   fileName: string
+  /** A local object URL: a file just picked, or a saved one once fetched. */
   previewUrl?: string
+  /** Login-protected download path of a saved file; fetched when viewed. */
+  secureUrl?: string
   file?: File
 }
 
@@ -62,8 +66,8 @@ export default function OutletDocuments() {
           if (doc.file) {
             nextFiles[doc.name] = {
               name: doc.name,
-              fileName: doc.file.split('/').pop() || doc.name,
-              previewUrl: doc.file,
+              fileName: doc.file_name || doc.name,
+              secureUrl: doc.file,
             }
           }
         }
@@ -125,10 +129,38 @@ export default function OutletDocuments() {
     showToast(`${doc} uploaded`)
   }
 
-  function viewDocument(docName: string) {
+  async function viewDocument(docName: string) {
     const doc = files[docName]
-    if (!doc?.previewUrl) return
+    if (!doc) return
+    if (!doc.previewUrl && doc.secureUrl) {
+      // A saved file: fetch it with the login, then show it from a blob URL.
+      try {
+        const blob = await fetchOutletDocumentFileApi(doc.secureUrl)
+        const url = URL.createObjectURL(blob)
+        setFiles((prev) =>
+          prev[docName] ? { ...prev, [docName]: { ...prev[docName], previewUrl: url } } : prev,
+        )
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : 'Could not open the document',
+        )
+        return
+      }
+    } else if (!doc.previewUrl) {
+      return
+    }
     setPreviewDoc(docName)
+  }
+
+  /** Save a file the browser cannot show inline (Word, Excel) to disk. */
+  function downloadPreview(file: DocumentFile) {
+    if (!file.previewUrl) return
+    const link = document.createElement('a')
+    link.href = file.previewUrl
+    link.download = file.fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   function closePreview() {
@@ -358,15 +390,15 @@ export default function OutletDocuments() {
                     Preview not available for this file type
                   </p>
                   <p className="text-xs text-muted">
-                    {previewFile.fileName} · Use the button below to open it externally.
+                    {previewFile.fileName} · Use the button below to download it.
                   </p>
                   <button
                     type="button"
-                    onClick={() => window.open(previewFile.previewUrl!, '_blank')}
+                    onClick={() => downloadPreview(previewFile)}
                     className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-white hover:bg-primary-hover"
                   >
                     <Eye size={15} />
-                    Open Document
+                    Download Document
                   </button>
                 </div>
               )}
