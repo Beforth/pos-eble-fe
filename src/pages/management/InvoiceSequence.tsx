@@ -132,7 +132,7 @@ export default function InvoiceSequence() {
   function handleShowAll() {
     setNameQuery('')
     setAppliedQuery('')
-    showToast('Filters cleared')
+    showToast('Showing all sequences')
   }
 
   return (
@@ -173,7 +173,7 @@ export default function InvoiceSequence() {
             />
             <PrimaryButton onClick={handleSearch}>Search</PrimaryButton>
             <OutlineButton variant="gray" onClick={handleShowAll}>
-              Clear Filter
+              Show All
             </OutlineButton>
           </div>
         </div>

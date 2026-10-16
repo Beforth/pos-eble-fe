@@ -9,6 +9,11 @@ import {
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
 import { brand } from '../../theme/brand'
+import {
+  geocodeAddress,
+  getBrowserPosition,
+  reverseGeocodeArea,
+} from '../../services/geocode'
 import { useAuth } from '../../auth/AuthContext'
 import {
   getOutletApi,
@@ -146,6 +151,49 @@ export default function OutletDetails() {
   const [area, setArea] = useState('')
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
+  const [locating, setLocating] = useState(false)
+
+  async function findCurrentLocation() {
+    if (locating) return
+    setLocating(true)
+    try {
+      const point = await getBrowserPosition()
+      setLatitude(point.latitude)
+      setLongitude(point.longitude)
+      if (!area.trim()) {
+        const found = await reverseGeocodeArea(point).catch(() => '')
+        if (found) setArea(found)
+      }
+      showToast('Current location filled in')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not find location')
+    } finally {
+      setLocating(false)
+    }
+  }
+
+  async function findLocationFromAddress() {
+    if (locating) return
+    const query = [address, area, zipCode, city, state, country]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(', ')
+    if (!address.trim() && !area.trim()) {
+      showToast('Enter the address or area first')
+      return
+    }
+    setLocating(true)
+    try {
+      const point = await geocodeAddress(query)
+      setLatitude(point.latitude)
+      setLongitude(point.longitude)
+      showToast('Location found from address')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not find location')
+    } finally {
+      setLocating(false)
+    }
+  }
 
   const [additionalInfo, setAdditionalInfo] = useState('')
   const [cuisines, setCuisines] = useState<string[]>([])
@@ -488,13 +536,13 @@ export default function OutletDetails() {
               <div className="flex flex-wrap gap-2 lg:max-w-[280px] lg:flex-col">
                 <OutlineButton
                   variant="primary"
-                  onClick={() => showToast('Finding current location…')}
+                  onClick={() => void findCurrentLocation()}
                 >
                   Find Current Location
                 </OutlineButton>
                 <OutlineButton
                   variant="primary"
-                  onClick={() => showToast('Finding location from address…')}
+                  onClick={() => void findLocationFromAddress()}
                 >
                   Find Location From Address
                 </OutlineButton>

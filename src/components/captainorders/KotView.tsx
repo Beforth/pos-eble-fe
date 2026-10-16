@@ -30,6 +30,8 @@ interface KotViewProps {
   onBack: () => void
   onFoodReady: (id: string) => void
   onDismiss: (id: string) => void
+  /** Really cancel a ticket (server-side), with the reason the cashier typed. */
+  onCancelKot: (id: string, reason: string) => void
   /**
    * Price a ticket set with the page's tax engine. The settle modal must be
    * handed the same tax-inclusive `grand_total` the settle call will send — a
@@ -208,6 +210,7 @@ export function KotView({
   onBack,
   onFoodReady,
   onDismiss,
+  onCancelKot,
   priceTickets,
   onOpenInBilling,
   onSettleSave,
@@ -260,9 +263,9 @@ export function KotView({
         open={Boolean(cancelTicket)}
         kotNo={cancelTicket?.kotNo ?? 0}
         onClose={() => setCancelTicket(null)}
-        onConfirm={() => {
+        onConfirm={(reason) => {
           if (!cancelTicket) return
-          onDismiss(cancelTicket.id)
+          onCancelKot(cancelTicket.id, reason)
           setCancelTicket(null)
         }}
       />

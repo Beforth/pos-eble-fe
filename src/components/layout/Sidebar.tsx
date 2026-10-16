@@ -22,6 +22,7 @@ import {
   FileCheck,
   FileText,
   Globe,
+  PackageCheck,
   HandCoins,
   History,
   IndianRupee,
@@ -63,6 +64,10 @@ import { brand } from '../../theme/brand'
 import { BrandLogo } from '../brand/BrandLogo'
 import { SidebarNavItem, type NavItemDef } from './SidebarNavItem'
 import { useChrome } from '../../state/ChromeContext'
+import {
+  ACCEPT_ORDERS_PATH,
+  useOnlineOrders,
+} from '../../state/OnlineOrdersContext'
 
 interface NavGroupDef {
   title: string
@@ -129,6 +134,7 @@ const NAV: NavEntry[] = [
         { id: 'live-orders', label: 'Live Orders', icon: Clock3 },
         { id: 'all-orders', label: 'All Orders', icon: ShoppingBag },
         { id: 'online-orders', label: 'Online Orders', icon: Globe },
+        { id: 'accept-orders', label: 'Accept Orders', icon: PackageCheck },
         { id: 'kot', label: 'KOT', icon: CookingPot },
         {
           id: 'due-payments',
@@ -414,6 +420,7 @@ const ROUTES: Record<string, string> = {
   'live-orders': '/live-orders',
   'all-orders': '/all-orders',
   'online-orders': '/online-orders',
+  'accept-orders': ACCEPT_ORDERS_PATH,
   kot: '/kot',
   'due-payments': '/due-payments',
   'menu-discounts': '/menu',
@@ -530,6 +537,7 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate()
   const { logout, canAccess, user } = useAuth()
+  const { pending: pendingOnlineOrders } = useOnlineOrders()
   const {
     expanded,
     toggleExpanded: toggleExpandedInStore,
@@ -711,7 +719,18 @@ export function Sidebar({
                     </p>
                   )}
                   <ul className="space-y-0.5">
-                    {group.items.map((item) => (
+                    {group.items.map((entryItem) => {
+                      // A quiet count of orders waiting to be answered; the page
+                      // itself never pops up.
+                      const item =
+                        entryItem.id === 'accept-orders' && pendingOnlineOrders.length > 0
+                          ? {
+                              ...entryItem,
+                              badge: String(pendingOnlineOrders.length),
+                              badgeTone: 'alert' as const,
+                            }
+                          : entryItem
+                      return (
                       <SidebarNavItem
                         key={item.id}
                         item={item}
@@ -721,7 +740,8 @@ export function Sidebar({
                         nested
                         onClick={handleNavigate}
                       />
-                    ))}
+                      )
+                    })}
                   </ul>
                 </li>
               )
