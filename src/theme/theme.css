@@ -504,45 +504,68 @@ body {
   background: var(--color-page);
 }
 
-.menu-on-off-platform-stat {
+.menu-on-off-col-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.45rem;
   border-radius: 999px;
   border: 1px solid var(--color-line);
-  background: var(--color-page);
-  padding: 0.2rem 0.55rem;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  background: var(--color-card);
+  padding: 0.3rem 0.45rem 0.3rem 0.8rem;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.menu-on-off-platform-stat strong {
+.menu-on-off-col-chip:hover {
+  border-color: var(--color-primary);
   color: var(--color-ink);
 }
 
-.menu-on-off-bulk-on {
-  border: 1px solid color-mix(in srgb, var(--color-success) 35%, var(--color-line));
-  background: color-mix(in srgb, var(--color-success) 8%, var(--color-card));
-  color: var(--color-success);
-  cursor: pointer;
+.menu-on-off-col-chip.is-active {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-card));
+  color: var(--color-primary);
 }
 
-.menu-on-off-bulk-on:hover {
-  background: color-mix(in srgb, var(--color-success) 14%, var(--color-card));
+.menu-on-off-col-chip strong {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-ink);
+  opacity: 0.75;
 }
 
-.menu-on-off-bulk-off {
-  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-line));
-  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-card));
-  color: var(--color-danger);
-  cursor: pointer;
+.menu-on-off-col-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 2rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--color-muted);
+  transition: background-color 0.2s ease;
 }
 
-.menu-on-off-bulk-off:hover {
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-card));
+.menu-on-off-col-switch-knob {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: var(--color-card);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-ink) 20%, transparent);
+  transform: translateX(0.15rem);
+  transition: transform 0.2s ease;
+}
+
+.menu-on-off-col-chip.is-active .menu-on-off-col-switch {
+  background: var(--color-success);
+}
+
+.menu-on-off-col-chip.is-active .menu-on-off-col-switch-knob {
+  transform: translateX(1.05rem);
 }
 
 .menu-on-off-toggle {

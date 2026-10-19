@@ -53,6 +53,7 @@ import {
   cancelScheduledPublishApi,
 } from '../services/menuService'
 import {
+  fetchAllItemsCached,
   fetchCategoryItemsCached,
   invalidateMenuItems,
 } from '../state/menuItemsCache'
@@ -66,6 +67,7 @@ import type {
 import { showToast } from '../utils/toast'
 
 const PAGE_SIZE = 11
+const ALL_CATEGORY_ID = '__all__'
 
 const ACTION_OPTIONS = [
   'Available',
@@ -208,7 +210,8 @@ export default function BaseMenu({
   }
 
   const [categoriesApi, setCategoriesApi] = useState<Category[]>([])
-  const [categoryId, setCategoryId] = useState('')
+  const [categoryId, setCategoryId] = useState(ALL_CATEGORY_ID)
+  const isAllCategories = categoryId === ALL_CATEGORY_ID
   const [query, setQuery] = useState('')
   const [rankWise, setRankWise] = useState(false)
   const [hideEmpty, setHideEmpty] = useState(false)
@@ -273,10 +276,10 @@ export default function BaseMenu({
   useEffect(() => {
     if (
       categoriesApi.length > 0 &&
-      (categoryId === '' ||
-        !categoriesApi.some((c) => c.id === categoryId))
+      categoryId !== ALL_CATEGORY_ID &&
+      !categoriesApi.some((c) => c.id === categoryId)
     ) {
-      setCategoryId(categoriesApi[0].id)
+      setCategoryId(ALL_CATEGORY_ID)
     }
   }, [categoriesApi, categoryId])
 
@@ -287,11 +290,10 @@ export default function BaseMenu({
 
     async function loadItems() {
       try {
-        const allItems = await fetchCategoryItemsCached(
-          outletId,
-          categoryId,
-          { force: refreshKey > 0 },
-        )
+        const force = { force: refreshKey > 0 }
+        const allItems = isAllCategories
+          ? await fetchAllItemsCached(outletId, force)
+          : await fetchCategoryItemsCached(outletId, categoryId, force)
         if (cancelled) return
         setItems(allItems.map((item) => adaptItem(item, currentChannelId)))
         setRawItemsMap(
@@ -299,7 +301,11 @@ export default function BaseMenu({
         )
         setCategoryHasItems((prev) => {
           const next = new Set(prev)
-          if (allItems.length > 0) next.add(categoryId)
+          if (isAllCategories) {
+            for (const item of allItems) {
+              if (item.category_id) next.add(item.category_id)
+            }
+          } else if (allItems.length > 0) next.add(categoryId)
           else next.delete(categoryId)
           return next
         })
@@ -312,12 +318,15 @@ export default function BaseMenu({
     return () => {
       cancelled = true
     }
-  }, [encryptedOutletId, categoryId, refreshKey, currentChannelId])
+  }, [encryptedOutletId, categoryId, isAllCategories, refreshKey, currentChannelId])
 
   const invalidateAndRefresh = useCallback(() => {
-    invalidateMenuItems(encryptedOutletId ?? '', categoryId)
+    invalidateMenuItems(
+      encryptedOutletId ?? '',
+      isAllCategories ? undefined : categoryId,
+    )
     setRefreshKey((k) => k + 1)
-  }, [encryptedOutletId, categoryId])
+  }, [encryptedOutletId, categoryId, isAllCategories])
 
   const categories = useMemo(() => {
     if (!hideEmpty) return categoriesApi
@@ -329,7 +338,7 @@ export default function BaseMenu({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     const result = items.filter((item) => {
-      if (item.categoryId !== categoryId) return false
+      if (!isAllCategories && item.categoryId !== categoryId) return false
       if (!q) return true
       return (
         item.name.toLowerCase().includes(q) ||
@@ -345,7 +354,7 @@ export default function BaseMenu({
       })
     }
     return result
-  }, [categoryId, items, query, rankWise])
+  }, [categoryId, isAllCategories, items, query, rankWise])
 
   const totalRecords = filtered.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
@@ -875,6 +884,18 @@ export default function BaseMenu({
               </button>
             </label>
             <ul className="menu-panel-categories-list space-y-0.5">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryId(ALL_CATEGORY_ID)
+                    setSelected(new Set())
+                  }}
+                  className={`menu-panel-category-btn cursor-pointer ${isAllCategories ? 'is-active' : ''}`}
+                >
+                  All categories
+                </button>
+              </li>
               {categories.map((category) => {
                 const active = category.id === categoryId
                 return (
@@ -905,6 +926,7 @@ export default function BaseMenu({
                 }}
                 className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
               >
+                <option value={ALL_CATEGORY_ID}>All categories</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
@@ -1275,7 +1297,7 @@ export default function BaseMenu({
         open={importSheetOpen}
         onClose={() => setImportSheetOpen(false)}
         categories={categoriesApi}
-        initialCategoryId={categoryId}
+        initialCategoryId={isAllCategories ? (categoriesApi[0]?.id ?? '') : categoryId}
         onSaved={() => {
           setPage(1)
           invalidateAndRefresh()
@@ -1284,7 +1306,7 @@ export default function BaseMenu({
       <AddItemsGridModal
         open={addGridOpen}
         categories={categoriesApi}
-        initialCategoryId={categoryId}
+        initialCategoryId={isAllCategories ? (categoriesApi[0]?.id ?? '') : categoryId}
         onClose={() => setAddGridOpen(false)}
         onSaved={() => {
           setPage(1)
