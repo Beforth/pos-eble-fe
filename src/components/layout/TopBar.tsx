@@ -17,10 +17,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import {
-  CAPTAIN_TABLE_VIEW_PATH,
-  isCaptainOnly,
-} from '../../auth/routePermissions'
+import { useNewOrder } from '../../state/useNewOrder'
 import {
   listOutletsApi,
   type OutletMembershipSummary,
@@ -44,7 +41,8 @@ export function TopBar({
   outletName,
 }: TopBarProps) {
   const navigate = useNavigate()
-  const { logout, user, outletId, encryptedOutletId, switchOutlet, permissions, canAccess } =
+  const { startNewOrder } = useNewOrder()
+  const { logout, user, outletId, encryptedOutletId, switchOutlet, canAccess } =
     useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
@@ -254,11 +252,7 @@ export function TopBar({
 
         <button
           type="button"
-          onClick={() =>
-            navigate(
-              isCaptainOnly(permissions) ? CAPTAIN_TABLE_VIEW_PATH : '/table-view',
-            )
-          }
+          onClick={() => startNewOrder()}
           className="inline-flex h-9 max-lg:shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
         >
           <Plus size={16} strokeWidth={2.5} />

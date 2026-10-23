@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
   ClipboardList,
+  Eye,
   Pencil,
   Plus,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ import {
   type SearchByFilterValue,
 } from '../components/menu/MenuActionButtons'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
+import { AddonGroupDetailsModal } from '../components/menu/AddonGroupDetailsModal'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
 import type { AddonGroup } from '../types/menu'
 import { useMenuReference } from '../state/MenuReferenceContext'
@@ -36,6 +38,7 @@ export default function AddonsManagement() {
   const [appliedSearchBy, setAppliedSearchBy] =
     useState<SearchByFilterValue>('all')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [viewing, setViewing] = useState<AddonGroup | null>(null)
   const [changesName, setChangesName] = useState<string | null>(null)
 
   const { addonGroups: refAddonGroups, reload } = useMenuReference([
@@ -300,6 +303,12 @@ export default function AddonsManagement() {
                 <td className="px-3 py-3.5">
                   <div className="flex items-center gap-1">
                     <RowActionButton
+                      label="View addon prices"
+                      onClick={() => setViewing(row)}
+                    >
+                      <Eye size={16} />
+                    </RowActionButton>
+                    <RowActionButton
                       label="Edit"
                       onClick={() => navigate(`/menu/addons/${row.id}/edit`)}
                     >
@@ -323,6 +332,11 @@ export default function AddonsManagement() {
         change order/rank.
       </p>
 
+      <AddonGroupDetailsModal
+        open={Boolean(viewing)}
+        group={viewing}
+        onClose={() => setViewing(null)}
+      />
       <ShowChangesModal
         open={Boolean(changesName)}
         name={changesName}

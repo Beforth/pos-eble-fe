@@ -7,9 +7,11 @@ import {
   coverSizeReportGeneratedLabel,
   loadCoverSizeEntries,
 } from '../../utils/coverSizeStore'
+import { useNewOrder } from '../../state/useNewOrder'
 
 export default function CoverSizeReport() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const [billNo, setBillNo] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [fromDate, setFromDate] = useState('')
@@ -69,7 +71,7 @@ export default function CoverSizeReport() {
       <BillingHeader
         billNo={billNo}
         onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view')}
+        onNewOrder={() => startNewOrder()}
         onViewKot={() => navigate('/billing?kot=1')}
       />
 

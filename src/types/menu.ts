@@ -185,6 +185,22 @@ export interface Item {
   availability: ItemAvailability[]
   images: ItemImage[]
   taxes: TaxSummary[]
+  /** Variations linked to the item (active only), grouped, with per-menu prices. */
+  variation_groups?: ItemVariationGroup[]
+  /** Add-on groups linked to the item (active only), with rules and per-menu prices. */
+  addon_groups?: ItemAddonGroupRead[]
+}
+
+export interface ItemVariationGroup {
+  id: EncId
+  department_name: string
+  online_display_name: string
+  variations: Variation[]
+}
+
+export interface ItemAddonGroupRead extends AddonGroup {
+  /** The item makes picking from this group compulsory. */
+  is_required: boolean
 }
 
 export interface ItemPayload {

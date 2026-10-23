@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { showToast } from '../../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNewOrder } from '../../state/useNewOrder'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import {
   BillPanel,
@@ -20,6 +21,8 @@ import { FinalBillCustomerModal } from '../../components/billing/FinalBillCustom
 import { DummyBillModal, type DummyBillData } from '../../components/billing/DummyBillModal'
 
 import { OpenItemModal } from '../../components/billing/OpenItemModal'
+import { ItemOptionsModal } from '../../components/billing/ItemOptionsModal'
+import { matchMenuItemId, type PricedSelection } from '../../utils/itemOptions'
 import { OtherPaymentModal, type OtherPaymentDetails } from '../../components/billing/OtherPaymentModal'
 import { OrderNotesModal } from '../../components/billing/OrderNotesModal'
 import { DraftBillsModal } from '../../components/billing/DraftBillsModal'
@@ -221,6 +224,7 @@ function findBySearchQuery(
 
 export default function Billing() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { user, encryptedOutletId, token } = useAuth()
   const billerName = user?.name?.trim() || user?.identifier?.trim() || ''
   const [searchParams] = useSearchParams()
@@ -671,6 +675,18 @@ export default function Billing() {
       }
       if (cancelled || !ticket) return
 
+      // A ticket on a paid bill is finished business here: the KOT view hides it
+      // and the bill leaves it out, so opening it would show an empty cart.
+      if (ticket.billed) {
+        if (toastedOpenKotRef.current !== id) {
+          toastedOpenKotRef.current = id
+          showToast(`KOT ${ticket.kotNo} is on a paid bill, so there is nothing to open`)
+        }
+        setKotViewOpen(false)
+        navigate('/billing', { replace: true })
+        return
+      }
+
       setOrderType(ticket.orderType)
       let nextTableId = ''
       if (ticket.tableId && ticket.tableId !== 'no-table') {
@@ -756,13 +772,10 @@ export default function Billing() {
       // Order items are a name/qty/price snapshot with no menu FK, so the menu
       // row is matched by name to recover the tax slabs the bill panel prices
       // lines with. An unmatched item still bills, just untaxed.
-      const menuIdByName = new Map(
-        menuItems.map((item) => [item.name.trim().toLowerCase(), item.id]),
-      )
       setLines(
         order.items.map((item, index) => ({
           id: `order-${order.id}-${index}`,
-          itemId: menuIdByName.get(item.name.trim().toLowerCase()) ?? '',
+          itemId: matchMenuItemId(item.name, menuItems),
           name: item.name,
           price: Number(item.unit_price || 0),
           qty: Number(item.qty || 0),
@@ -876,10 +889,45 @@ export default function Billing() {
   }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds, menuItems])
 
 
+  // An item with variations / add-ons waits here for the cashier's choices.
+  const [optionsItem, setOptionsItem] = useState<MenuItemRow | null>(null)
+
+  function addConfiguredItem(item: MenuItemRow, priced: PricedSelection) {
+    setLines((prev) => {
+      const existing = prev.find(
+        (line) => line.itemId === item.id && line.optionKey === priced.key,
+      )
+      if (existing) {
+        return prev.map((line) =>
+          line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
+        )
+      }
+      return [
+        ...prev,
+        {
+          id: `line-${item.id}-${Date.now()}`,
+          itemId: item.id,
+          name: priced.name,
+          price: priced.price,
+          qty: 1,
+          optionKey: priced.key,
+        },
+      ]
+    })
+    setOptionsItem(null)
+    showToast(`Added ${priced.name}`)
+  }
+
   function addItem(item: MenuItemRow) {
     if (!item.available) return
+    if (item.options) {
+      setOptionsItem(item)
+      return
+    }
     setLines((prev) => {
-      const existing = prev.find((line) => line.itemId === item.id)
+      const existing = prev.find(
+        (line) => line.itemId === item.id && !line.optionKey,
+      )
       if (existing) {
         return prev.map((line) =>
           line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
@@ -1162,11 +1210,10 @@ export default function Billing() {
   }
 
   function newOrder() {
-    setPinnedKotId(null)
-    setFocusKotNo(null)
-    clearWalkInKotSession()
-    setResumeOrderId(null)
-    navigate('/table-view')
+    // The cart is cleared only once a destination is chosen (the No Table /
+    // Table popup can be dismissed), and by hand because going to No Table
+    // lands on this same screen, which would otherwise keep the old bill.
+    startNewOrder({ onNavigate: clearBillForNextCustomer })
   }
 
   const tableKotTickets = useMemo(
@@ -1856,7 +1903,6 @@ export default function Billing() {
     showToast(
       `Settled ₹${amount} · sent to kitchen${due > 0 ? ` · Due ₹${due}` : ''}`,
     )
-    navigate('/billing/all-orders')
   }
 
   async function startFinalBill(action: 'Save' | 'Save & Print' | 'Save & eBill') {
@@ -2119,6 +2165,14 @@ export default function Billing() {
           )
         }}
       />
+
+      {optionsItem ? (
+        <ItemOptionsModal
+          item={optionsItem}
+          onClose={() => setOptionsItem(null)}
+          onConfirm={(priced) => addConfiguredItem(optionsItem, priced)}
+        />
+      ) : null}
 
       <OpenItemModal
         open={openItemModalOpen}
@@ -2426,7 +2480,6 @@ export default function Billing() {
                   : ''
               }${result.due > 0 ? ` · Due ₹${result.due}` : ''}`,
             )
-            navigate('/billing/all-orders')
           }}
         />
       ) : (

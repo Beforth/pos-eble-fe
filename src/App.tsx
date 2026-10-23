@@ -63,6 +63,12 @@ import ParcelMenu from './pages/ParcelMenu'
 import Configuration from './pages/Configuration'
 import CurrentOrders from './pages/configuration/CurrentOrders'
 import Customers from './pages/customer-screen/Customers'
+import Feedback from './pages/Feedback'
+import ReportsHub from './pages/reports/ReportsHub'
+import NotificationListing from './pages/billing/NotificationListing'
+import BillerProfiles from './pages/billing/BillerProfiles'
+import InventoryManagement from './pages/configuration/InventoryManagement'
+import BillingLedDisplay from './pages/billing/BillingLedDisplay'
 import CustomerDisplay from './pages/customer-screen/CustomerDisplay'
 import CoverSizeReport from './pages/reports/CoverSizeReport'
 import TableView from './pages/TableView'
@@ -231,6 +237,25 @@ import BillingAllOrders from './pages/billing/BillingAllOrders'
 import BillingLiveOrders from './pages/billing/BillingLiveOrders'
 import BillingKot from './pages/billing/BillingKot'
 import BillingDayEnd from './pages/billing/BillingDayEnd'
+import BillingPrinters from './pages/billing/BillingPrinters'
+import BillingExpenses from './pages/billing/BillingExpenses'
+import BillingExpenseDate from './pages/billing/BillingExpenseDate'
+import BillingExpenseDetails from './pages/billing/BillingExpenseDetails'
+import BillingWithdrawals from './pages/billing/BillingWithdrawals'
+import BillingWithdrawalDetails from './pages/billing/BillingWithdrawalDetails'
+import BillingTaxes from './pages/billing/BillingTaxes'
+import BillingDiscounts from './pages/billing/BillingDiscounts'
+import BillingDuePayments from './pages/billing/BillingDuePayments'
+import BillingOnlineOrders from './pages/billing/BillingOnlineOrders'
+import BillingAdvanceOrders from './pages/billing/BillingAdvanceOrders'
+import BillingCustomOrderStatus from './pages/billing/BillingCustomOrderStatus'
+import BillingDeliveryBoys from './pages/billing/BillingDeliveryBoys'
+import BillingDeliveryBoyForm from './pages/billing/BillingDeliveryBoyForm'
+import BillingCurrencyConversion from './pages/billing/BillingCurrencyConversion'
+import BillingComingSoon from './pages/billing/BillingComingSoon'
+import BillingOperations from './pages/billing/BillingOperations'
+import BillingLiveView from './pages/billing/BillingLiveView'
+import BillingReports from './pages/billing/BillingReports'
 import ZomatoMenu from './pages/ZomatoMenu'
 import TablesAreasManagement from './pages/TablesAreasManagement'
 import TaxesManagement from './pages/TaxesManagement'
@@ -560,10 +585,98 @@ export default function App() {
             }
           />
           <Route
+            path="/billing/printers"
+            element={
+              <ProtectedRoute>
+                <BillingPrinters />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/expenses"
+            element={
+              <ProtectedRoute>
+                <BillingExpenses />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/expenses/add"
+            element={
+              <ProtectedRoute>
+                <BillingExpenseDate />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/expenses/:date"
+            element={
+              <ProtectedRoute>
+                <BillingExpenseDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/withdrawals"
+            element={
+              <ProtectedRoute>
+                <BillingWithdrawals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/withdrawals/:date"
+            element={
+              <ProtectedRoute>
+                <BillingWithdrawalDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/taxes"
+            element={
+              <ProtectedRoute>
+                <BillingTaxes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/discounts"
+            element={
+              <ProtectedRoute>
+                <BillingDiscounts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/due-payments"
+            element={
+              <ProtectedRoute>
+                <BillingDuePayments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/online-orders"
+            element={
+              <ProtectedRoute>
+                <BillingOnlineOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/advance-orders"
+            element={
+              <ProtectedRoute>
+                <BillingAdvanceOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/billing/live-orders"
             element={
               <ProtectedRoute>
-                <BillingLiveOrders />
+                <BillingLiveView />
               </ProtectedRoute>
             }
           />
@@ -576,10 +689,158 @@ export default function App() {
             }
           />
           <Route
+            path="/billing/live-summary"
+            element={
+              <ProtectedRoute>
+                <BillingLiveOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/operations"
+            element={
+              <ProtectedRoute>
+                <BillingOperations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/custom-order-status"
+            element={
+              <ProtectedRoute>
+                <BillingCustomOrderStatus />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/delivery-boys"
+            element={
+              <ProtectedRoute>
+                <BillingDeliveryBoys />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/delivery-boys/new"
+            element={
+              <ProtectedRoute>
+                <BillingDeliveryBoyForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/delivery-boys/:id/edit"
+            element={
+              <ProtectedRoute>
+                <BillingDeliveryBoyForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/cash-top-up"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon title="Cash Top-Up" description="Add cash to the till." />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/currency-conversion"
+            element={
+              <ProtectedRoute>
+                <BillingCurrencyConversion />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/feedback"
+            element={
+              <ProtectedRoute>
+                <Feedback />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/biller-profiles"
+            element={
+              <ProtectedRoute>
+                <BillerProfiles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/led-display"
+            element={
+              <ProtectedRoute>
+                <BillingLedDisplay />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/manual-sync"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon
+                  title="Manual Sync"
+                  description="Pull the latest menu and settings now."
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/alerts"
+            element={
+              <ProtectedRoute>
+                <NotificationListing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/service-renewal"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon
+                  title="Service Renewal"
+                  description="Plan status and renewal dates."
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/shortcuts"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon
+                  title="Shortcuts"
+                  description="Keyboard shortcuts for the billing screen."
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/language-profiles"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon
+                  title="Language Profiles"
+                  description="Choose the language used on bills and screens."
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/billing/day-end"
             element={
               <ProtectedRoute>
                 <BillingDayEnd />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/reports/:slug"
+            element={
+              <ProtectedRoute>
+                <BillingReports />
               </ProtectedRoute>
             }
           />
@@ -1451,6 +1712,14 @@ export default function App() {
             }
           />
           <Route
+            path="/configuration/inventory"
+            element={
+              <ProtectedRoute>
+                <InventoryManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/configuration/customers"
             element={
               <ProtectedRoute>
@@ -1479,6 +1748,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <LogsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <ReportsHub />
               </ProtectedRoute>
             }
           />

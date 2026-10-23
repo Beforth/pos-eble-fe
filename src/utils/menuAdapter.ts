@@ -7,6 +7,7 @@ import {
 } from '../state/MenuReferenceContext'
 import { fetchAllItemsCached, invalidateMenuItems } from '../state/menuItemsCache'
 import type { Category, Item, TaxSummary } from '../types/menu'
+import { buildItemOptions, type ItemOptions } from './itemOptions'
 
 /**
  * Billing menu row shape — the single grid row contract shared by Billing,
@@ -41,6 +42,11 @@ export interface MenuItemRow {
   taxes?: TaxSummary[]
   /** Item's "ignore tax" flag — when true the item is priced tax-free. */
   ignoreTax?: boolean
+  /**
+   * Variations and add-ons the cashier is asked about when the item is added,
+   * priced for the billing menu. Undefined when the item has none.
+   */
+  options?: ItemOptions
 }
 
 /** Channel whose per-channel price/availability drives POS billing. */
@@ -98,6 +104,7 @@ export function adaptItem(item: Item, channelId: string): MenuItemRow {
     excludeFromAutoFavorites: item.flags?.exclude_from_auto_favorites ?? false,
     taxes: item.taxes ?? [],
     ignoreTax: item.flags?.ignore_tax ?? false,
+    options: buildItemOptions(item, channelId),
   }
 }
 

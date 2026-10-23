@@ -9,6 +9,7 @@ import {
   type ActivityLogDto,
   type ActivityLogSource,
 } from '../services/orderService'
+import { useNewOrder } from '../state/useNewOrder'
 
 const ACTION_COLORS: Record<string, string> = {
   'Order Created': 'bg-success/10 text-success',
@@ -44,16 +45,14 @@ function formatLogTimestamp(value: string): string {
 interface ActivityLogsViewProps {
   source: ActivityLogSource
   header: ReactNode
-  newOrderPath: string
 }
 
 export function ActivityLogsView({
   source,
   header,
-  newOrderPath,
 }: ActivityLogsViewProps) {
   const { encryptedOutletId } = useAuth()
-  const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -158,7 +157,7 @@ export function ActivityLogsView({
             </button>
             <button
               type="button"
-              onClick={() => navigate(newOrderPath)}
+              onClick={() => startNewOrder()}
               className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
             >
               New Order
@@ -303,17 +302,17 @@ export function ActivityLogsView({
 
 export default function LogsPage() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const [billNo, setBillNo] = useState('')
 
   return (
     <ActivityLogsView
       source="billing"
-      newOrderPath="/table-view"
       header={
         <BillingHeader
           billNo={billNo}
           onBillNoChange={setBillNo}
-          onNewOrder={() => navigate('/table-view')}
+          onNewOrder={() => startNewOrder()}
           onViewKot={() => navigate('/billing?kot=1')}
         />
       }

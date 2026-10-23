@@ -50,6 +50,8 @@ export interface OrderDto {
   print_count: number
   settlement_by: string
   settlement_counter: string
+  /** Table of the order's first KOT that names one; blank for a counter order. */
+  table_no?: string
   created_at: string
   settled_at: string | null
   items: OrderItemDto[]
@@ -94,9 +96,18 @@ export interface LiveOrdersSummary {
   rows: LiveOrderChannelRow[]
 }
 
+export interface RunningTableRow {
+  tableNo: string
+  orders: number
+  kots: number
+  amount: number
+  openedAt: string | null
+}
+
 export interface RunningTablesSummary {
   activeTables: number
   revenueEstimated: number
+  list: RunningTableRow[]
 }
 
 export interface LiveOrderChannelDto {
@@ -115,6 +126,13 @@ export interface LiveOrdersRunningDto {
 export interface RunningTablesDto {
   activeTables: number
   revenueEstimated: string
+  list: Array<{
+    tableNo: string
+    orders: number
+    kots: number
+    amount: string
+    openedAt: string | null
+  }>
 }
 
 export interface LiveOrdersDto {
@@ -138,11 +156,14 @@ export interface KotItemDto {
   qty?: number
   quantity?: number
   unit_price?: number
+  note?: string
 }
 
 export interface KotDto {
   id: string
   kot_no: number
+  /** The bill this ticket is on (blank when it has no order). */
+  bill_no?: string
   order_type: KotOrderType
   source: KotSource
   table_id: string
@@ -442,6 +463,14 @@ export async function liveOrdersApi(outletId: string): Promise<LiveOrdersDto> {
   return jsonRequest<LiveOrdersDto>(ordersPath(outletId, '/live/'), 'GET')
 }
 
+export function toRunningTables(dto: RunningTablesDto): RunningTablesSummary {
+  return {
+    activeTables: dto.activeTables,
+    revenueEstimated: Number(dto.revenueEstimated),
+    list: (dto.list ?? []).map((row) => ({ ...row, amount: Number(row.amount) })),
+  }
+}
+
 export function toLiveOrdersBoard(dto: LiveOrdersRunningDto): LiveOrdersSummary {
   return {
     totalOrders: dto.totalOrders,
@@ -488,6 +517,8 @@ export interface LiveBoardKotRecord {
   itemCount: number
   total: number
   items: LiveBoardOrderItemDto[]
+  /** The ticket's bill is already paid (the kitchen may still be cooking it). */
+  billed: boolean
 }
 
 export type LiveBoardRecord = LiveBoardOrderRecord | LiveBoardKotRecord
@@ -520,6 +551,7 @@ export function toLiveBoardKotRecord(kot: KotDto): LiveBoardKotRecord {
       0,
     ),
     items: kot.items as LiveBoardOrderItemDto[],
+    billed: Boolean(kot.billed),
   }
 }
 
@@ -1117,19 +1149,15 @@ function kotTableNoFallback(orderType: KotOrderType | undefined): string {
 
 function parseKotCreated(value: string | undefined): number {
   if (!value) return Date.now()
+  // The server sends `created` as a UTC wall clock with no zone marker
+  // (`2026-10-21 06:53:00`). Read as local time it put every server-sourced
+  // ticket hours in the past (5:30 already elapsed on a new KOT in IST).
   const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/.exec(
     value.trim(),
   )
   if (match) {
     const [, y, mo, d, h, mi, s] = match
-    return new Date(
-      Number(y),
-      Number(mo) - 1,
-      Number(d),
-      Number(h),
-      Number(mi),
-      Number(s),
-    ).getTime()
+    return Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s))
   }
   const parsed = new Date(value).getTime()
   return Number.isFinite(parsed) ? parsed : Date.now()
@@ -1143,6 +1171,9 @@ function kotEventItems(dto: KotDto | KotEventData): KotViewItem[] {
     name: entry.name ?? entry.item_name ?? 'Item',
     qty: entry.qty ?? entry.quantity ?? 1,
     price: Number(entry.unit_price) || 0,
+    // The kitchen needs the cook's note ("Extra spicy"); it was dropped here,
+    // so a ticket that arrived from the server lost it.
+    ...(entry.note ? { note: entry.note } : {}),
   }))
 }
 
@@ -1166,6 +1197,7 @@ export function kotEventToTicket(dto: KotDto | KotEventData): KotTicket {
     status: dto.status === 'Ready' ? 'ready' : 'active',
     customerName: dto.customer_name?.trim() || undefined,
     billed: Boolean(dto.billed),
+    billNo: dto.bill_no?.trim() || undefined,
   }
 }
 
@@ -1240,6 +1272,7 @@ export function toAllOrderRow(dto: OrderDto | OrderEventData): AllOrderRow {
     orderNo: dto.order_no ?? '',
     orderType: ALL_ORDER_TYPES[dto.order_type as OrderType] ?? 'DINE IN',
     customerName: dto.customer_name ?? '',
+    customerPhone: ('customer_phone' in dto ? dto.customer_phone : '') ?? '',
     assignTo: '',
     items: allOrderItemsText(dto.items),
     myAmount: Number(dto.my_amount ?? 0),
@@ -1252,5 +1285,9 @@ export function toAllOrderRow(dto: OrderDto | OrderEventData): AllOrderRow {
       ? formatOrderListTimestamp(dto.created_at)
       : formatOrderListTimestamp(new Date().toISOString()),
     balanceDue: Number(dto.balance_due ?? 0),
+    createdAt: dto.created_at ? new Date(dto.created_at).getTime() : Date.now(),
+    paymentType: (dto.payment_type ?? '').trim(),
+    source: (dto.source ?? '').trim().toLowerCase(),
+    tableNo: (dto.table_no ?? '').trim(),
   }
 }

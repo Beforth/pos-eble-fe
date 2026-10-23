@@ -4,6 +4,7 @@ import {
   Bell,
   BookOpen,
   ChefHat,
+  Armchair,
   Grid2x2,
   Home,
   LayoutDashboard,
@@ -218,6 +219,15 @@ export function CaptainOrdersHeader({
                       icon: Monitor,
                       label: 'Display',
                       onClick: () => navigate('/customer-display'),
+                    },
+                  ]
+                : []),
+              ...(canAccess('/table-view')
+                ? [
+                    {
+                      icon: Armchair,
+                      label: 'Table View',
+                      onClick: () => navigate('/table-view?from=captain'),
                     },
                   ]
                 : []),

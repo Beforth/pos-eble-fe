@@ -31,7 +31,7 @@ export function SettledBillPanel({
   onReprint,
 }: SettledBillPanelProps) {
   return (
-    <aside className="flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[440px] lg:border-l lg:border-t-0 xl:w-[480px]">
+    <aside className="flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[520px] lg:border-l lg:border-t-0 xl:w-[600px]">
       <div className="flex items-start justify-between gap-3 border-b border-line px-3 py-2.5">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">

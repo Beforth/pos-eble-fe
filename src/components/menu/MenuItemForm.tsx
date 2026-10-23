@@ -194,15 +194,25 @@ function CheckboxList({
   options,
   selected,
   onToggle,
+  id,
+  highlight = false,
 }: {
   label: string
   options: Array<{ id: string; label: string }>
   selected: string[]
   onToggle: (id: string) => void
+  /** DOM id, so a tag can scroll to this list. */
+  id?: string
+  highlight?: boolean
 }) {
   const selectedSet = useMemo(() => new Set(selected), [selected])
   return (
-    <div>
+    <div
+      id={id}
+      className={`rounded-lg transition-shadow ${
+        highlight ? 'ring-2 ring-primary ring-offset-4 ring-offset-card' : ''
+      }`}
+    >
       <p className="mb-1.5 text-sm font-medium text-ink">{label}</p>
       <div className="max-h-48 overflow-y-auto rounded-md border border-line p-2">
         {options.length === 0 ? (
@@ -313,8 +323,18 @@ export function MenuItemForm({
   const [taxIds, setTaxIds] = useState<string[]>(
     item?.taxes?.map((tax) => tax.id) ?? [],
   )
-  const [variationIds, setVariationIds] = useState<string[]>([])
-  const [addonGroupIds, setAddonGroupIds] = useState<string[]>([])
+  // The item API returns the linked variations and add-on groups, so an edit
+  // starts with them ticked (inactive ones are not returned).
+  const [variationIds, setVariationIds] = useState<string[]>(
+    () =>
+      item?.variation_groups?.flatMap((group) =>
+        group.variations.map((variation) => variation.id),
+      ) ?? [],
+  )
+  const [flashList, setFlashList] = useState<'variations' | 'addons' | null>(null)
+  const [addonGroupIds, setAddonGroupIds] = useState<string[]>(
+    () => item?.addon_groups?.map((group) => group.id) ?? [],
+  )
   const [variationsTouched, setVariationsTouched] = useState(false)
   const [addonsTouched, setAddonsTouched] = useState(false)
   const [channelPrices, setChannelPrices] = useState(() =>
@@ -491,6 +511,26 @@ export function MenuItemForm({
   function toggleFoodTypeTag(tag: 'NV' | 'E') {
     const target = tag === 'NV' ? 'non-veg' : 'egg'
     setChoice((prev) => (prev === target ? 'veg' : target))
+  }
+
+  /** V+ / A: take the user to the picker that adds variations / add-ons. */
+  function jumpToPicker(kind: 'variations' | 'addons') {
+    const options = kind === 'variations' ? variationOptions : addonOptions
+    if (options.length === 0) {
+      showError(
+        kind === 'variations'
+          ? 'No variations yet. Create them under Menu > Variants first.'
+          : 'No add-on groups yet. Create them under Menu > Addons first.',
+      )
+      return
+    }
+    const box = document.getElementById(`item-form-${kind}`)
+    box?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    box?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus({
+      preventScroll: true,
+    })
+    setFlashList(kind)
+    window.setTimeout(() => setFlashList(null), 1800)
   }
 
   function toggleBehaviorTag(tag: string) {
@@ -827,6 +867,22 @@ export function MenuItemForm({
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-line bg-card text-muted'
               }`
+              if (tag === 'V+' || tag === 'A') {
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-label={`${TAG_META[tag]} - jump to the list`}
+                    data-tooltip={`${TAG_META[tag]} (click to choose)`}
+                    onClick={() =>
+                      jumpToPicker(tag === 'V+' ? 'variations' : 'addons')
+                    }
+                    className={`${baseClasses} cursor-pointer hover:border-muted`}
+                  >
+                    {tag}
+                  </button>
+                )
+              }
               if (reflect) {
                 return (
                   <span
@@ -854,8 +910,9 @@ export function MenuItemForm({
           </div>
           <p className="mt-2 max-w-md text-xs text-muted">
             F favourites, D dine-in QR, O online order, NV non-veg and E egg
-            switch the saved flag and channel availability. V+, V and A reflect
-            the variations and add-ons assigned below.
+            switch the saved flag and channel availability. Click V+ to choose
+            variations and A to choose add-ons; V shows that the item has
+            variations.
           </p>
         </div>
       </Section>
@@ -964,6 +1021,8 @@ export function MenuItemForm({
             onToggle={(id) => toggleArray(setTaxIds, id)}
           />
           <CheckboxList
+            id="item-form-variations"
+            highlight={flashList === 'variations'}
             label="Variations"
             options={variationOptions}
             selected={variationIds}
@@ -973,6 +1032,8 @@ export function MenuItemForm({
             }}
           />
           <CheckboxList
+            id="item-form-addons"
+            highlight={flashList === 'addons'}
             label="Addon Groups"
             options={addonOptions}
             selected={addonGroupIds}
@@ -982,13 +1043,6 @@ export function MenuItemForm({
             }}
           />
         </div>
-        {mode === 'edit' && variationOptions.length > 0 ? (
-          <p className="mt-3 text-xs text-muted">
-            Variation and addon selections are not returned by the item detail
-            endpoint, so they start unselected. Changes to these lists are only
-            sent to the API after you toggle them here.
-          </p>
-        ) : null}
       </Section>
 
       {/* ── Channel Pricing & Availability ── */}

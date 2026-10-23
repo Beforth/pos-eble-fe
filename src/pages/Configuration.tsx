@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { BillingHeader } from '../components/billing/BillingHeader'
 import { brand } from '../theme/brand'
+import { useNewOrder } from '../state/useNewOrder'
 
 interface ConfigTile {
   id: string
@@ -91,6 +92,7 @@ const CONFIG_TILES: ConfigTile[] = [
   {
     id: 'inventory',
     label: 'Inventory',
+    to: '/configuration/inventory',
     icon: <ClipboardList size={28} strokeWidth={1.5} />,
   },
   {
@@ -159,12 +161,14 @@ const CONFIG_TILES: ConfigTile[] = [
   {
     id: 'feedback',
     label: 'Feedback',
+    to: '/billing/feedback',
     icon: <Mail size={28} strokeWidth={1.5} />,
   },
 ]
 
 export default function Configuration() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const [billNo, setBillNo] = useState('')
   const [activeId, setActiveId] = useState('orders')
 
@@ -184,7 +188,7 @@ export default function Configuration() {
       <BillingHeader
         billNo={billNo}
         onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view')}
+        onNewOrder={() => startNewOrder()}
         onViewKot={() => navigate('/billing?kot=1')}
       />
 

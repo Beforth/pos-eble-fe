@@ -18,6 +18,7 @@ import {
 import { DayEndSummaryModal } from '../../components/reports/DayEndSummaryModal'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { useAuth } from '../../auth/AuthContext'
+import { useNewOrder } from '../../state/useNewOrder'
 
 const PAGE_SIZE = 15
 
@@ -34,6 +35,7 @@ function plural(count: number, word: string): string {
 
 export default function BillingDayEnd() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -178,7 +180,7 @@ export default function BillingDayEnd() {
       <BillingHeader
         billNo={billNo}
         onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view')}
+        onNewOrder={() => startNewOrder()}
         onViewKot={() => navigate('/billing?kot=1')}
       />
 
@@ -378,9 +380,9 @@ export default function BillingDayEnd() {
         consequences={
           preview
             ? [
-                `Running Orders: ${plural(preview.running, 'unpaid order')} will be cleared`,
-                `Kitchen: ${plural(preview.kitchen, 'open ticket')} will be cleared`,
-                `Tables: ${plural(preview.tables, 'running table')} will be cleared`,
+                `Bills waiting for payment: ${plural(preview.running, 'unpaid order')} will be cleared`,
+                `Food in the kitchen: ${plural(preview.kitchen, 'open ticket')} will be cleared`,
+                `Tables in use: ${plural(preview.tables, 'running table')} will be cleared`,
               ]
             : ['Checking Live Orders…']
         }

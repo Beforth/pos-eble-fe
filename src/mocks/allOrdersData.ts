@@ -13,6 +13,7 @@ export interface AllOrderRow {
   orderNo: string
   orderType: OrderChannel
   customerName: string
+  customerPhone?: string
   assignTo: string
   items: string
   myAmount: number
@@ -22,6 +23,14 @@ export interface AllOrderRow {
   payment: string
   status: OrderStatus
   created: string
+  /** Created time in ms - what the date and time filters compare. */
+  createdAt?: number
+  /** Raw payment type (Cash / Card / UPI / Due ...), without the due suffix. */
+  paymentType?: string
+  /** `billing` or `captain`. */
+  source?: string
+  /** Table the order was taken at (from its KOTs); blank for a counter order. */
+  tableNo?: string
   /** Outstanding balance_due — populated by toAllOrderRow; >0 enables Settle Due. */
   balanceDue?: number
 }

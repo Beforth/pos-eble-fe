@@ -57,13 +57,17 @@ export async function syncKotStoreFromServer(outletId: string): Promise<boolean>
         openIds.add(dto.id)
         const existing = known.get(dto.id)
         if (existing) {
-          // Known ticket: refresh only the settled (`billed`) flag so a bill
-          // paid on another terminal drops off this KOT view, while local
-          // display state (prices, ready progress) is left untouched.
-          if (Boolean(dto.billed) !== Boolean(existing.billed)) {
+          // Known ticket: refresh only the settled (`billed`) flag and the bill
+          // number, so a bill paid on another terminal drops off this KOT view,
+          // while local display state (prices, ready progress) is left untouched.
+          const mappedBill = dto.bill_no?.trim() || undefined
+          if (
+            Boolean(dto.billed) !== Boolean(existing.billed) ||
+            (mappedBill !== undefined && mappedBill !== existing.billNo)
+          ) {
             const mapped = kotEventToTicket(dto)
             upsertKotTicketFromServer(mapped)
-            known.set(dto.id, { ...existing, billed: mapped.billed })
+            known.set(dto.id, { ...existing, billed: mapped.billed, billNo: mapped.billNo })
             changed = true
           }
           continue

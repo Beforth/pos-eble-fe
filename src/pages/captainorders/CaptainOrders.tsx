@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { SETTLE_CODENAME } from '../../auth/routePermissions'
 import { showToast } from '../../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNewOrder } from '../../state/useNewOrder'
 import { CaptainOrdersHeader } from '../../components/captainorders/CaptainOrdersHeader'
 import {
   BillPanel,
@@ -21,6 +22,8 @@ import { FinalBillCustomerModal } from '../../components/captainorders/FinalBill
 import { DummyBillModal, type DummyBillData } from '../../components/captainorders/DummyBillModal'
 
 import { OpenItemModal } from '../../components/captainorders/OpenItemModal'
+import { ItemOptionsModal } from '../../components/billing/ItemOptionsModal'
+import { matchMenuItemId, type PricedSelection } from '../../utils/itemOptions'
 import { OtherPaymentModal, type OtherPaymentDetails } from '../../components/captainorders/OtherPaymentModal'
 import { OrderNotesModal } from '../../components/captainorders/OrderNotesModal'
 import { DraftBillsModal } from '../../components/captainorders/DraftBillsModal'
@@ -200,6 +203,7 @@ function findBySearchQuery(
 
 export default function CaptainOrders() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { user, encryptedOutletId, token, hasPermission } = useAuth()
   const billerName = user?.name?.trim() || user?.identifier?.trim() || ''
   const [searchParams] = useSearchParams()
@@ -594,6 +598,18 @@ export default function CaptainOrders() {
       }
       if (cancelled || !ticket) return
 
+      // A ticket on a paid bill is finished business here: the KOT view hides it
+      // and the bill leaves it out, so opening it would show an empty cart.
+      if (ticket.billed) {
+        if (toastedOpenKotRef.current !== id) {
+          toastedOpenKotRef.current = id
+          showToast(`KOT ${ticket.kotNo} is on a paid bill, so there is nothing to open`)
+        }
+        setKotViewOpen(false)
+        navigate('/captain-orders', { replace: true })
+        return
+      }
+
       setOrderType(ticket.orderType)
       let nextTableId = ''
       if (ticket.tableId && ticket.tableId !== 'no-table') {
@@ -676,13 +692,10 @@ export default function CaptainOrders() {
       // Order items are a name/qty/price snapshot with no menu FK, so the menu
       // row is matched by name to recover the tax slabs the bill panel prices
       // lines with. An unmatched item still bills, just untaxed.
-      const menuIdByName = new Map(
-        menuItems.map((item) => [item.name.trim().toLowerCase(), item.id]),
-      )
       setLines(
         order.items.map((item, index) => ({
           id: `order-${order.id}-${index}`,
-          itemId: menuIdByName.get(item.name.trim().toLowerCase()) ?? '',
+          itemId: matchMenuItemId(item.name, menuItems),
           name: item.name,
           price: Number(item.unit_price || 0),
           qty: Number(item.qty || 0),
@@ -750,10 +763,45 @@ export default function CaptainOrders() {
   }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds, menuItems])
 
 
+  // An item with variations / add-ons waits here for the cashier's choices.
+  const [optionsItem, setOptionsItem] = useState<MenuItemRow | null>(null)
+
+  function addConfiguredItem(item: MenuItemRow, priced: PricedSelection) {
+    setLines((prev) => {
+      const existing = prev.find(
+        (line) => line.itemId === item.id && line.optionKey === priced.key,
+      )
+      if (existing) {
+        return prev.map((line) =>
+          line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
+        )
+      }
+      return [
+        ...prev,
+        {
+          id: `line-${item.id}-${Date.now()}`,
+          itemId: item.id,
+          name: priced.name,
+          price: priced.price,
+          qty: 1,
+          optionKey: priced.key,
+        },
+      ]
+    })
+    setOptionsItem(null)
+    showToast(`Added ${priced.name}`)
+  }
+
   function addItem(item: MenuItemRow) {
     if (!item.available) return
+    if (item.options) {
+      setOptionsItem(item)
+      return
+    }
     setLines((prev) => {
-      const existing = prev.find((line) => line.itemId === item.id)
+      const existing = prev.find(
+        (line) => line.itemId === item.id && !line.optionKey,
+      )
       if (existing) {
         return prev.map((line) =>
           line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
@@ -1015,10 +1063,15 @@ export default function CaptainOrders() {
   }
 
   function newOrder() {
-    setPinnedKotId(null)
-    setFocusKotNo(null)
-    setResumeOrderId(null)
-    navigate('/table-view?from=captain')
+    startNewOrder({
+      captain: true,
+      onNavigate: () => {
+        setPinnedKotId(null)
+        setFocusKotNo(null)
+        setResumeOrderId(null)
+        clearBillForNextCustomer()
+      },
+    })
   }
 
   const tableKotTickets = useMemo(
@@ -1863,6 +1916,14 @@ export default function CaptainOrders() {
           )
         }}
       />
+
+      {optionsItem ? (
+        <ItemOptionsModal
+          item={optionsItem}
+          onClose={() => setOptionsItem(null)}
+          onConfirm={(priced) => addConfiguredItem(optionsItem, priced)}
+        />
+      ) : null}
 
       <OpenItemModal
         open={openItemModalOpen}
