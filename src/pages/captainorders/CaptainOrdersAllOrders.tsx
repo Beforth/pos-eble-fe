@@ -17,11 +17,13 @@ import { SettleDueModal } from '../../components/all-orders/SettleDueModal'
 import { useAllOrdersData } from '../../services/useAllOrdersData'
 import { type AllOrderRow } from '../../mocks/allOrdersData'
 import { formatINR } from '../../utils/format'
+import { useNewOrder } from '../../state/useNewOrder'
 
 const PAGE_SIZE = 10
 
 export default function CaptainOrdersAllOrders() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId, token, hasPermission } = useAuth()
   // A Captain reaches this board on `kot_kot_management_read` (the backend opens
   // GET order-list for it) but holds no billing right, so the billing-gated
@@ -125,7 +127,7 @@ export default function CaptainOrdersAllOrders() {
       <CaptainOrdersHeader
         billNo={billNo}
         onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view?from=captain')}
+        onNewOrder={() => startNewOrder({ captain: true })}
         onViewKot={() => navigate('/captain-orders?kot=1')}
       />
 

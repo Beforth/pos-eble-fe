@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Info, Plus, Trash2 } from 'lucide-react'
 import { showToast } from '../../utils/toast'
+import { useMenuChannels } from '../../state/MenuChannelsContext'
 import type {
   AddonChoice,
   AddonGroup,
@@ -17,11 +18,14 @@ const CHOICES: Array<{ value: AddonChoice; label: string }> = [
   { value: 'egg', label: 'Egg' },
 ]
 
+const BASE_SLUG = 'base'
+
 interface AddonRow {
   key: number
   id?: string
   name: string
-  price: string
+  /** Price typed per menu, keyed by the outlet channel id. Blank = not sold there. */
+  prices: Record<string, string>
   sapCode: string
   choice: AddonChoice
   active: boolean
@@ -43,17 +47,47 @@ function wholeNumber(value: string): number {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : Number.NaN
 }
 
-export function AddonGroupForm({
+/**
+ * The rows are built once from the menus (channels) the outlet has, so the form
+ * waits for them: building it first would leave the price columns empty.
+ */
+export function AddonGroupForm(props: AddonGroupFormProps) {
+  const { status } = useMenuChannels()
+  if (status === 'idle' || status === 'loading') {
+    return <p className="p-6 text-sm text-muted">Loading menus…</p>
+  }
+  return <AddonGroupFormBody {...props} />
+}
+
+function AddonGroupFormBody({
   initial,
   saving,
   onSubmit,
   onCancel,
 }: AddonGroupFormProps) {
+  const { channels } = useMenuChannels()
+  // One price column per menu (Base, Dine In, Parcel, Home Delivery, Zomato,
+  // Swiggy ...), Base first because it is the add-on's main price.
+  const priceChannels = useMemo(
+    () =>
+      [...channels]
+        .filter((channel) => channel.is_active)
+        .sort((a, b) => {
+          if (a.channel_slug === BASE_SLUG) return -1
+          if (b.channel_slug === BASE_SLUG) return 1
+          return a.position - b.position
+        }),
+    [channels],
+  )
+  const baseChannel =
+    priceChannels.find((channel) => channel.channel_slug === BASE_SLUG) ??
+    priceChannels[0]
+
   const nextKey = useRef(0)
   const newRow = (): AddonRow => ({
     key: nextKey.current++,
     name: '',
-    price: '0',
+    prices: baseChannel ? { [baseChannel.id]: '0' } : {},
     sapCode: '',
     choice: 'veg',
     active: true,
@@ -83,13 +117,25 @@ export function AddonGroupForm({
     initial?.allow_open_quantity ?? false,
   )
   const [status, setStatus] = useState(initial?.is_active ?? true)
+  /** The add-on's saved prices as text per menu; Base falls back to `base_price`. */
+  function pricesOf(addon: NonNullable<AddonGroup['addons']>[number]) {
+    const out: Record<string, string> = {}
+    for (const price of addon.area_prices ?? []) {
+      out[price.outlet_channel_id] = String(Number(price.price))
+    }
+    if (baseChannel && out[baseChannel.id] === undefined) {
+      out[baseChannel.id] = String(Number(addon.base_price))
+    }
+    return out
+  }
+
   const [rows, setRows] = useState<AddonRow[]>(() => {
     const existing = (initial?.addons ?? []).map(
       (addon): AddonRow => ({
         key: nextKey.current++,
         id: addon.id,
         name: addon.name,
-        price: String(Number(addon.base_price)),
+        prices: pricesOf(addon),
         sapCode: addon.sap_code ?? '',
         choice: addon.choice ?? 'veg',
         active: addon.is_active,
@@ -98,20 +144,38 @@ export function AddonGroupForm({
     const blanks = Math.max(DEFAULT_ROWS - existing.length, 0)
     return [
       ...existing,
-      ...Array.from({ length: blanks }, () => ({
-        key: nextKey.current++,
-        name: '',
-        price: '0',
-        sapCode: '',
-        choice: 'veg' as AddonChoice,
-        active: true,
-      })),
+      ...Array.from({ length: blanks }, () => newRow()),
     ]
   })
 
   function patchRow(key: number, patch: Partial<AddonRow>) {
     setRows((prev) =>
       prev.map((row) => (row.key === key ? { ...row, ...patch } : row)),
+    )
+  }
+
+  /**
+   * Typing a price. Changing Base carries the new value to every other menu that
+   * is still blank or equal to the old Base, so the common "same price
+   * everywhere" case is one entry; a price set apart on purpose is left alone.
+   */
+  function setPrice(key: number, channelId: string, value: string) {
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row
+        const prices = { ...row.prices, [channelId]: value }
+        if (baseChannel && channelId === baseChannel.id) {
+          const oldBase = row.prices[baseChannel.id] ?? ''
+          for (const channel of priceChannels) {
+            if (channel.id === baseChannel.id) continue
+            const current = prices[channel.id] ?? ''
+            if (current === '' || current === oldBase) {
+              prices[channel.id] = value
+            }
+          }
+        }
+        return { ...row, prices }
+      }),
     )
   }
 
@@ -143,25 +207,50 @@ export function AddonGroupForm({
     const addons: AddonInput[] = []
     for (const row of rows) {
       const name = row.name.trim()
-      const price = Number(row.price)
+      const typed = priceChannels
+        .map((channel) => ({
+          channel,
+          text: (row.prices[channel.id] ?? '').trim(),
+        }))
+        .filter((entry) => entry.text !== '')
       const untouched =
-        !name && !row.sapCode.trim() && (row.price === '' || price === 0)
+        !name &&
+        !row.sapCode.trim() &&
+        typed.every((entry) => Number(entry.text) === 0)
       if (untouched) continue
       if (!name) {
         showToast('Enter a name for every addon row that has a price or code')
         return
       }
-      if (row.price.trim() === '' || !Number.isFinite(price) || price < 0) {
-        showToast(`Enter a valid price for ${name}`)
+      const baseText = baseChannel ? (row.prices[baseChannel.id] ?? '').trim() : ''
+      const basePrice = Number(baseText)
+      if (baseText === '' || !Number.isFinite(basePrice) || basePrice < 0) {
+        showToast(`Enter a valid Base price for ${name}`)
         return
+      }
+      const area_prices: NonNullable<AddonInput['area_prices']> = []
+      for (const entry of typed) {
+        const value = Number(entry.text)
+        if (!Number.isFinite(value) || value < 0) {
+          showToast(
+            `Enter a valid ${entry.channel.channel_label} price for ${name}`,
+          )
+          return
+        }
+        area_prices.push({
+          outlet_channel_id: entry.channel.id,
+          price: value,
+          is_active: true,
+        })
       }
       addons.push({
         ...(row.id ? { id: row.id } : {}),
         name,
-        base_price: price,
+        base_price: basePrice,
         sap_code: row.sapCode.trim(),
         choice: row.choice,
         is_active: row.active,
+        area_prices,
       })
     }
 
@@ -310,15 +399,20 @@ export function AddonGroupForm({
         </h2>
 
         <div className="overflow-x-auto rounded-md border border-line">
-          <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
             <thead>
               <tr className="bg-primary/5 text-sm font-semibold text-ink">
                 <th className="px-3 py-3">
                   Addon Name <span className="text-primary">*</span>
                 </th>
-                <th className="w-36 px-3 py-3">
-                  Price <span className="text-primary">*</span>
-                </th>
+                {priceChannels.map((channel) => (
+                  <th key={channel.id} className="w-28 px-3 py-3">
+                    {channel.channel_label}
+                    {channel.id === baseChannel?.id ? (
+                      <span className="text-primary"> *</span>
+                    ) : null}
+                  </th>
+                ))}
                 <th className="w-56 px-3 py-3">Sap Code</th>
                 <th className="w-72 px-3 py-3">
                   Attributes <span className="text-primary">*</span>
@@ -341,19 +435,22 @@ export function AddonGroupForm({
                       className={inputClass}
                     />
                   </td>
-                  <td className="px-3 py-2.5">
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      aria-label={`Addon price ${index + 1}`}
-                      value={row.price}
-                      onChange={(event) =>
-                        patchRow(row.key, { price: event.target.value })
-                      }
-                      className={inputClass}
-                    />
-                  </td>
+                  {priceChannels.map((channel) => (
+                    <td key={channel.id} className="px-3 py-2.5">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="—"
+                        aria-label={`${channel.channel_label} price, addon ${index + 1}`}
+                        value={row.prices[channel.id] ?? ''}
+                        onChange={(event) =>
+                          setPrice(row.key, channel.id, event.target.value)
+                        }
+                        className={inputClass}
+                      />
+                    </td>
+                  ))}
                   <td className="px-3 py-2.5">
                     <input
                       type="text"

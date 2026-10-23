@@ -17,6 +17,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { useMenuReference } from '../state/MenuReferenceContext'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import {
   ActionDropdown,
@@ -143,6 +144,8 @@ interface RowItem {
   shortCode: string
   onlineDisplayName: string
   price: number
+  /** What the price box shows while typing, so "60." and "60.0" are not eaten. */
+  priceDraft?: string
   description: string
   available: boolean
   tags: string[]
@@ -319,6 +322,17 @@ export default function BaseMenu({
       cancelled = true
     }
   }, [encryptedOutletId, categoryId, isAllCategories, refreshKey, currentChannelId])
+
+  // New categories created by an import / bulk add must show up without a
+  // page refresh: reload this page's list and the shared one (Billing etc.).
+  const { reload: reloadMenuReference } = useMenuReference(['categories'])
+  const reloadCategories = useCallback(() => {
+    if (!encryptedOutletId) return
+    listCategoriesApi(encryptedOutletId)
+      .then(setCategoriesApi)
+      .catch(() => showToast('Failed to load categories'))
+    void reloadMenuReference('categories', { force: true })
+  }, [encryptedOutletId, reloadMenuReference])
 
   const invalidateAndRefresh = useCallback(() => {
     invalidateMenuItems(
@@ -1076,14 +1090,18 @@ export default function BaseMenu({
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={row.price}
-                          onChange={(event) =>
+                          value={row.priceDraft ?? String(row.price)}
+                          onChange={(event) => {
+                            const text = event.target.value
+                            // Digits with at most two decimals, as the API stores.
+                            if (!/^\d*\.?\d{0,2}$/.test(text)) return
                             setItems((prev) =>
                               updateRow(prev, row.id, {
-                                price: Number(event.target.value) || 0,
+                                price: Number(text) || 0,
+                                priceDraft: text,
                               }),
                             )
-                          }
+                          }}
                           className="h-8 w-20 rounded border border-line px-2 text-sm outline-none focus:border-primary"
                         />
                       </td>
@@ -1300,6 +1318,7 @@ export default function BaseMenu({
         initialCategoryId={isAllCategories ? (categoriesApi[0]?.id ?? '') : categoryId}
         onSaved={() => {
           setPage(1)
+          reloadCategories()
           invalidateAndRefresh()
         }}
       />
@@ -1310,6 +1329,7 @@ export default function BaseMenu({
         onClose={() => setAddGridOpen(false)}
         onSaved={() => {
           setPage(1)
+          reloadCategories()
           invalidateAndRefresh()
         }}
       />

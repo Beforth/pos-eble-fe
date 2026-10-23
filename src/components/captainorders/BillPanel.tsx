@@ -19,6 +19,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
+import { KOT_STORE_EVENT, loadTableStatuses } from '../../utils/tableStatusStore'
 import type { BillingTableRow } from '../../utils/diningTables'
 import { roundSettlementAmount } from '../../utils/settlementRound'
 import {
@@ -100,6 +101,8 @@ export interface CartLine {
   price: number
   qty: number
   note?: string
+  /** The variation / add-ons chosen for this line; lines merge only when equal. */
+  optionKey?: string
 }
 
 export interface CustomerDetails {
@@ -275,6 +278,19 @@ export function BillPanel({
   const [clearAllOpen, setClearAllOpen] = useState(false)
   const [clearCustomerOpen, setClearCustomerOpen] = useState(false)
   const selectedTable = tables.find((t) => t.id === tableId)
+  // Occupied = anything but a blank table on the floor plan. Re-read when the
+  // picker opens and whenever tickets change, so it matches the table view.
+  const [tableStatuses, setTableStatuses] = useState(loadTableStatuses)
+  useEffect(() => {
+    const refresh = () => setTableStatuses(loadTableStatuses())
+    refresh()
+    window.addEventListener(KOT_STORE_EVENT, refresh)
+    window.addEventListener('storage', refresh)
+    return () => {
+      window.removeEventListener(KOT_STORE_EVENT, refresh)
+      window.removeEventListener('storage', refresh)
+    }
+  }, [tablePickerOpen])
   const dineInFieldsLocked = orderType === 'delivery'
   const previousOrderType = useRef(orderType)
 
@@ -883,11 +899,11 @@ export function BillPanel({
         ) : null}
 
         {tablePickerOpen ? (
-          <div className="absolute left-2 top-12 z-20 w-56 overflow-hidden rounded-lg border border-line bg-card shadow-lg">
-            <p className="border-b border-line px-3 py-2 text-xs font-semibold text-muted">
+          <div className="absolute left-2 top-12 z-20 w-72 overflow-hidden rounded-xl border border-line bg-card shadow-lg">
+            <p className="border-b border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
               Select table
             </p>
-            <ul className="max-h-48 overflow-y-auto py-1">
+            <ul className="max-h-72 overflow-y-auto py-1">
               <li>
                 <button
                   type="button"
@@ -896,9 +912,9 @@ export function BillPanel({
                     onGuestsChange(0)
                     setTablePickerOpen(false)
                   }}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-page ${
+                  className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-page ${
                     !tableId
-                      ? 'font-semibold text-primary'
+                      ? 'bg-primary/5 font-semibold text-primary'
                       : 'text-ink'
                   }`}
                 >
@@ -914,14 +930,26 @@ export function BillPanel({
                       onGuestsChange(table.persons)
                       setTablePickerOpen(false)
                     }}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-page ${
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-page ${
                       table.id === tableId
-                        ? 'font-semibold text-primary'
+                        ? 'bg-primary/5 text-primary'
                         : 'text-ink'
                     }`}
                   >
-                    <span>Table {table.tableNo}</span>
-                    <span className="text-xs text-muted">{table.areaName}</span>
+                    <span className="min-w-0">
+                      <span className="block whitespace-nowrap text-sm font-semibold">
+                        Table {table.tableNo}
+                      </span>
+                      <span className="block truncate text-xs text-muted">
+                        {table.areaName}
+                      </span>
+                    </span>
+                    {(tableStatuses[table.id] ?? 'blank') !== 'blank' &&
+                    table.id !== tableId ? (
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-secondary/40 px-2 py-0.5 text-[11px] font-semibold text-deep">
+                        Occupied
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))}

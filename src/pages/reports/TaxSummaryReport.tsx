@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { Download, Printer } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { INVOICE_REPORT_ROWS, summarizeInvoiceReport } from '../../mocks/invoiceReportData'
+import { useNewOrder } from '../../state/useNewOrder'
 
 export default function TaxSummaryReport() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const [billNo, setBillNo] = useState('')
 
   const stats = useMemo(() => summarizeInvoiceReport(INVOICE_REPORT_ROWS), [])
@@ -22,7 +24,7 @@ export default function TaxSummaryReport() {
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader billNo={billNo} onBillNoChange={setBillNo} onNewOrder={() => navigate('/table-view')} onViewKot={() => navigate('/billing?kot=1')} />
+      <BillingHeader billNo={billNo} onBillNoChange={setBillNo} onNewOrder={() => startNewOrder()} onViewKot={() => navigate('/billing?kot=1')} />
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-bold text-ink">Tax Summary</h1>

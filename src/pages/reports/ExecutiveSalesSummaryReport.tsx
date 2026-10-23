@@ -1,79 +1,227 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Printer } from 'lucide-react'
+import { ChevronLeft, Download, Printer } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
 import { BillingHeader } from '../../components/billing/BillingHeader'
-import { PAX_SALES_ROWS, summarizePaxSales } from '../../mocks/paxSalesReportData'
+import {
+  fetchOrderSummaryApi,
+  type OrderSummaryResult,
+} from '../../services/reportService'
+import { useNewOrder } from '../../state/useNewOrder'
+import { downloadCsv } from '../../utils/exportCsv'
+import { showToast } from '../../utils/toast'
+
+/** Local calendar day as YYYY-MM-DD, `offset` days from today. */
+function dayIso(offset = 0): string {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function displayDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return y && m && d ? `${d}-${m}-${y}` : iso
+}
+
+function money(value: string | number): string {
+  const n = Number(value)
+  return Number.isFinite(n)
+    ? `₹ ${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : String(value)
+}
+
+const BUTTON_CLASS =
+  'inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
+
+interface Pair {
+  label: string
+  value: string
+  bold?: boolean
+}
+
+function Section({ title, rows }: { title: string; rows: Pair[] }): ReactNode {
+  return (
+    <section>
+      <h2 className="px-3 pb-2 pt-5 text-sm font-bold text-ink">{title}</h2>
+      <table className="w-full border-collapse text-sm">
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <td className={`w-1/2 border border-line px-3 py-4 text-ink ${row.bold ? 'font-bold' : ''}`}>
+                {row.label} :
+              </td>
+              <td className={`border border-line px-3 py-4 text-right tabular-nums text-ink ${row.bold ? 'font-bold' : ''}`}>
+                {row.value}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}
 
 export default function ExecutiveSalesSummaryReport() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
+  const { encryptedOutletId } = useAuth()
   const [billNo, setBillNo] = useState('')
+  const [from, setFrom] = useState(() => dayIso())
+  const [to, setTo] = useState(() => dayIso())
+  const [data, setData] = useState<OrderSummaryResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const stats = useMemo(() => summarizePaxSales(PAX_SALES_ROWS), [])
+  useEffect(() => {
+    if (!encryptedOutletId || !from || !to) return
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    fetchOrderSummaryApi(encryptedOutletId, { from, to })
+      .then((result) => {
+        if (!cancelled) setData(result)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setData(null)
+        setError(err instanceof Error ? err.message : 'Could not load the report')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, from, to])
 
-  function handleExport() {
-    const header = 'Executive,Pax,Sales,APC'
-    const lines = [header, ...PAX_SALES_ROWS.map((r) => `${r.name},${r.totalPax},${r.totalSales},${r.apc}`)]
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'executive-sales-summary.csv'; a.click()
-    URL.revokeObjectURL(url)
+  function pickDay(offset: number) {
+    setFrom(dayIso(offset))
+    setTo(dayIso(offset))
+  }
+
+  const successRows: Pair[] = data
+    ? [
+        { label: 'Count', value: String(data.success.orders) },
+        {
+          label: 'Invoice Nos.',
+          value:
+            data.success.invoice_from || data.success.invoice_to
+              ? `${data.success.invoice_from} - ${data.success.invoice_to}`
+              : '-',
+        },
+        ...data.success.lines.map((line) => ({
+          label: line.label,
+          value: money(line.amount),
+          bold: line.label === 'Grand Total',
+        })),
+      ]
+    : []
+  const cancelledRows: Pair[] = data
+    ? [
+        { label: 'Count', value: String(data.cancelled.count) },
+        { label: 'Amount', value: money(data.cancelled.amount) },
+      ]
+    : []
+  const performanceRows: Pair[] = data
+    ? [
+        { label: 'Average Per Bill', value: money(data.performance.avg_per_bill) },
+        {
+          label: 'Average Discount Per Order',
+          value: money(data.performance.avg_discount_per_order),
+        },
+      ]
+    : []
+
+  function exportCsv() {
+    if (!data) {
+      showToast('Nothing to export')
+      return
+    }
+    const rows = [
+      ...successRows.map((r) => ['Success Orders', r.label, r.value]),
+      ...cancelledRows.map((r) => ['Cancelled Orders', r.label, r.value]),
+      ...performanceRows.map((r) => ['Performance Indicator', r.label, r.value]),
+    ]
+    downloadCsv(`executive-sales_${from}_${to}.csv`, ['Section', 'Label', 'Value'], rows)
   }
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader billNo={billNo} onBillNoChange={setBillNo} onNewOrder={() => navigate('/table-view')} onViewKot={() => navigate('/billing?kot=1')} />
-      <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-ink">Executive Sales Summary</h1>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={handleExport} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Download size={14} className="text-muted" /> Export CSV
+      <BillingHeader
+        billNo={billNo}
+        onBillNoChange={setBillNo}
+        onNewOrder={() => startNewOrder()}
+        onViewKot={() => navigate('/billing?kot=1')}
+      />
+
+      <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
+        <h1 className="text-lg font-bold text-ink">Executive Sales Summary</h1>
+        <button
+          type="button"
+          onClick={() => navigate('/reports')}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
+        >
+          <ChevronLeft size={14} />
+          Back
+        </button>
+      </div>
+
+      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-muted">
+            From
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(event) => setFrom(event.target.value)}
+              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            To
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(event) => setTo(event.target.value)}
+              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            />
+          </label>
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => pickDay(-1)} className={BUTTON_CLASS}>
+              Yesterday Sales
             </button>
-            <button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Printer size={14} className="text-muted" /> Print
+            <button type="button" onClick={() => pickDay(0)} className={BUTTON_CLASS}>
+              Today Sales
+            </button>
+            <button type="button" onClick={() => window.print()} className={BUTTON_CLASS}>
+              <Printer size={16} />
+              Print
+            </button>
+            <button type="button" onClick={exportCsv} className={BUTTON_CLASS}>
+              <Download size={16} />
+              Export CSV
             </button>
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Pax</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{stats?.totalPax ?? 0}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Sales</p>
-            <p className="mt-1 text-xl font-extrabold text-accent">₹{(stats?.totalSales ?? 0).toLocaleString('en-IN')}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Avg. Cost / Pax</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">₹{(stats?.apc ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-line bg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px] border-collapse text-sm">
-              <thead>
-                <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Executive</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Total Pax</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Total Sales</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">APC</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {PAX_SALES_ROWS.map((r) => (
-                  <tr key={r.id} className="hover:bg-page/40">
-                    <td className="px-4 py-2.5 font-medium text-ink">{r.name}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink">{r.totalPax}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-accent">₹{r.totalSales.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink">₹{r.apc.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-line bg-card shadow-sm">
+          <p className="bg-primary/5 px-4 py-3 text-sm text-muted">
+            Executive Sales Report : From {displayDate(from)} to {displayDate(to)}
+          </p>
+          {loading && !data ? (
+            <p className="p-10 text-center text-sm text-muted">Loading…</p>
+          ) : error ? (
+            <p className="p-10 text-center text-sm text-danger">{error}</p>
+          ) : data ? (
+            <div className="pb-4">
+              <Section title="Success Orders" rows={successRows} />
+              <Section title="Cancelled Orders" rows={cancelledRows} />
+              <Section title="Performance Indicator" rows={performanceRows} />
+            </div>
+          ) : null}
         </div>
       </main>
     </div>

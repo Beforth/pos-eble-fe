@@ -16,6 +16,8 @@ interface TableProps<T> {
   footer?: ReactNode
   emptyMessage?: string
   dense?: boolean
+  /** Extra classes for a row, e.g. a status tint. */
+  rowClassName?: (row: T) => string
 }
 
 const alignClasses = {
@@ -31,6 +33,7 @@ export function Table<T>({
   footer,
   emptyMessage = 'No records to show',
   dense = false,
+  rowClassName,
 }: TableProps<T>) {
   return (
     <div className="w-full overflow-x-auto">
@@ -52,7 +55,7 @@ export function Table<T>({
           {rows.map((row) => (
             <tr
               key={rowKey(row)}
-              className="border-b border-line last:border-0 hover:bg-page/60"
+              className={`border-b border-line last:border-0 hover:bg-page/60 ${rowClassName?.(row) ?? ''}`}
             >
               {columns.map((column) => (
                 <td

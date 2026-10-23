@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Bell,
   BookOpen,
   ChefHat,
+  ChevronDown,
   CookingPot,
+  Armchair,
   Grid2x2,
   Home,
   LayoutDashboard,
@@ -14,17 +16,19 @@ import {
   Monitor,
   Phone,
   Plus,
+  RefreshCw,
   ScrollText,
   Search,
   Settings,
+  SlidersHorizontal,
   Store,
   Sun,
-  TrendingUp,
   User,
   UtensilsCrossed,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
+import { ChangelogModal } from '../layout/ChangelogModal'
 import { isCashierUser } from '../../auth/routePermissions'
 import { BrandLogo } from '../brand/BrandLogo'
 import { brand } from '../../theme/brand'
@@ -32,11 +36,10 @@ import {
   useBillingMenu,
   type MenuItemRow,
 } from '../../utils/menuAdapter'
-import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
 import {
-  listDayEndClosuresApi,
-  toDayEndSummaryRow,
-} from '../../services/orderService'
+  BILLING_REPORTS,
+  BILLING_REPORTS_PATH,
+} from '../../config/billingReports'
 
 const SIDEBAR_LINKS = [
   { to: '/billing', label: 'Billing', icon: UtensilsCrossed },
@@ -62,7 +65,7 @@ export function BillingHeader({
 }: BillingHeaderProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { logout, user, encryptedOutletId, isAdmin, canAccess, homePath } = useAuth()
+  const { logout, user, isAdmin, canAccess, homePath, outletId } = useAuth()
   // The Home entry is a counter-role affordance: an admin (whose landing is the
   // dashboard) and a cashier (whose landing is All Orders) get it, a plain
   // biller and a captain do not. `isAdmin` implies `canSeeHome`, so the
@@ -73,25 +76,12 @@ export function BillingHeader({
 
   const [menuViewOpen, setMenuViewOpen] = useState(false)
   const [storeInfoOpen, setStoreInfoOpen] = useState(false)
-  const [quickReportsOpen, setQuickReportsOpen] = useState(false)
+  const [reportsOpen, setReportsOpen] = useState(() =>
+    pathname.startsWith(BILLING_REPORTS_PATH),
+  )
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
+  const [changelogOpen, setChangelogOpen] = useState(false)
   const [menuSearch, setMenuSearch] = useState('')
-  const [recentDayEnd, setRecentDayEnd] = useState<DayEndSummaryRow[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-    if (!encryptedOutletId) return
-    listDayEndClosuresApi(encryptedOutletId)
-      .then((dtos) => {
-        if (!cancelled) setRecentDayEnd(dtos.map(toDayEndSummaryRow).slice(0, 7))
-      })
-      .catch(() => {
-        if (!cancelled) setRecentDayEnd([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [encryptedOutletId])
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -143,14 +133,6 @@ export function BillingHeader({
     }
     return groups
   }, [menuSearch, menuItems, menuReferenceCategories])
-
-  const recentSummary = useMemo(() => {
-    const rows = recentDayEnd.slice(0, 7)
-    const today = rows[0]
-    const weekOrders = rows.reduce((s, r) => s + r.orders, 0)
-    const weekTotal = rows.reduce((s, r) => s + r.total, 0)
-    return { today, weekOrders, weekTotal, rows }
-  }, [recentDayEnd])
 
   function handleLogout() {
     logout()
@@ -224,6 +206,15 @@ export function BillingHeader({
                     },
                   ]
                 : []),
+              ...(canAccess('/table-view')
+                ? [
+                    {
+                      icon: Armchair,
+                      label: 'Table View',
+                      onClick: () => navigate('/table-view'),
+                    },
+                  ]
+                : []),
               { icon: Grid2x2, label: 'View KOT', onClick: onViewKot },
               ...(canAccess('/screens')
                 ? [
@@ -234,7 +225,6 @@ export function BillingHeader({
                     },
                   ]
                 : []),
-              { icon: LayoutDashboard, label: 'Reports', onClick: () => setQuickReportsOpen(true) },
               ...(isAdmin
                 ? [
                     {
@@ -414,7 +404,71 @@ export function BillingHeader({
                         ? pathname === '/billing'
                         : pathname.startsWith(to)
                     return (
-                      <li key={to}>
+                      <Fragment key={to}>
+                      {to === '/logs' ? (
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (canAccess('/reports')) {
+                                closeDrawer()
+                                navigate('/reports')
+                                return
+                              }
+                              setReportsOpen((open) => !open)
+                            }}
+                            aria-expanded={reportsOpen}
+                            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium ${
+                              (pathname.startsWith(BILLING_REPORTS_PATH) || pathname === '/reports')
+                                ? 'font-semibold text-primary'
+                                : 'text-ink hover:bg-page'
+                            }`}
+                          >
+                            <LayoutDashboard
+                              size={18}
+                              className={
+                                (pathname.startsWith(BILLING_REPORTS_PATH) || pathname === '/reports')
+                                  ? 'text-primary'
+                                  : 'text-muted'
+                              }
+                            />
+                            <span className="flex-1">Reports</span>
+                            {canAccess('/reports') ? null : (
+                              <ChevronDown
+                                size={16}
+                                className={`text-muted transition-transform ${
+                                  reportsOpen ? 'rotate-180' : ''
+                                }`}
+                              />
+                            )}
+                          </button>
+                          {reportsOpen ? (
+                            <ul className="mt-0.5 space-y-0.5 pl-5">
+                              {BILLING_REPORTS.map((report) => {
+                                const reportPath = `${BILLING_REPORTS_PATH}/${report.slug}`
+                                const reportActive = pathname === reportPath
+                                return (
+                                  <li key={report.slug}>
+                                    <Link
+                                      to={reportPath}
+                                      onClick={closeDrawer}
+                                      aria-current={reportActive ? 'page' : undefined}
+                                      className={`block rounded-lg px-3 py-2 text-sm ${
+                                        reportActive
+                                          ? 'bg-primary/10 font-semibold text-primary'
+                                          : 'text-ink hover:bg-page'
+                                      }`}
+                                    >
+                                      {report.label}
+                                    </Link>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          ) : null}
+                        </li>
+                      ) : null}
+                      <li>
                         <Link
                           to={to}
                           onClick={closeDrawer}
@@ -434,9 +488,64 @@ export function BillingHeader({
                           {label}
                         </Link>
                       </li>
+                      {to === '/billing' && canAccess('/billing/operations') ? (
+                        <li>
+                          <Link
+                            to="/billing/operations"
+                            onClick={closeDrawer}
+                            aria-current={
+                              pathname.startsWith('/billing/operations') ? 'page' : undefined
+                            }
+                            className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                              pathname.startsWith('/billing/operations')
+                                ? 'bg-primary/10 font-semibold text-primary'
+                                : 'text-ink hover:bg-page'
+                            }`}
+                          >
+                            <SlidersHorizontal
+                              size={18}
+                              className={
+                                pathname.startsWith('/billing/operations')
+                                  ? 'text-primary'
+                                  : 'text-muted'
+                              }
+                            />
+                            Operations
+                          </Link>
+                        </li>
+                      ) : null}
+                      </Fragment>
                     )
                   },
                 )}
+
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeDrawer()
+                      setBillingSettingsOpen(true)
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-ink hover:bg-page"
+                  >
+                    <Settings size={18} className="text-muted" />
+                    Settings
+                  </button>
+                </li>
+
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeDrawer()
+                      setChangelogOpen(true)
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-ink hover:bg-page"
+                  >
+                    <RefreshCw size={18} className="text-muted" />
+                    Check Updates
+                  </button>
+                </li>
 
                 {canSeeHome ? (
                   <>
@@ -483,6 +592,23 @@ export function BillingHeader({
                 </li>
               </ul>
             </nav>
+
+            <div className="space-y-1.5 border-t border-line bg-page/60 px-4 py-3 text-xs">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted">Outlet ID</span>
+                <span className="font-semibold text-ink">{outletId ?? '—'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted">Version</span>
+                <span className="font-semibold text-ink">{brand.appVersion}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted">Biller</span>
+                <span className="max-w-[160px] truncate font-semibold text-ink">
+                  {user?.name ?? '—'}
+                </span>
+              </div>
+            </div>
           </aside>
         </div>
       ) : null}
@@ -716,117 +842,9 @@ export function BillingHeader({
         </div>
       ) : null}
 
-      {/* ─── MODAL: Quick Reports ─── */}
-      {quickReportsOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close reports"
-            onClick={() => setQuickReportsOpen(false)}
-            className="absolute inset-0 bg-black/45"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Quick Reports"
-            className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-line bg-card shadow-2xl"
-          >
-            <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-              <div className="flex items-center gap-2.5">
-                <LayoutDashboard size={18} className="text-primary" />
-                <h2 className="text-base font-bold text-ink">
-                  Daily Summary
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setQuickReportsOpen(false)}
-                aria-label="Close"
-                data-tooltip="Close"
-                className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
-              >
-                <X size={18} />
-              </button>
-            </header>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              <div className="mb-5 grid grid-cols-3 gap-3">
-                <div className="rounded-lg border border-line bg-page/60 p-3 text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
-                    Today&apos;s Orders
-                  </p>
-                  <p className="mt-1 text-xl font-extrabold text-ink">
-                    {recentSummary.today?.orders ?? 0}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-line bg-page/60 p-3 text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
-                    Today&apos;s Revenue
-                  </p>
-                  <p className="mt-1 text-xl font-extrabold text-accent">
-                    ₹
-                    {(recentSummary.today?.total ?? 0).toLocaleString(
-                      'en-IN',
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-line bg-page/60 p-3 text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
-                    7-Day Revenue
-                  </p>
-                  <p className="mt-1 text-xl font-extrabold text-ink">
-                    ₹
-                    {recentSummary.weekTotal.toLocaleString('en-IN')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-line">
-                <div className="grid grid-cols-3 border-b border-line bg-page/60 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted">
-                  <span>Date</span>
-                  <span className="text-center">Orders</span>
-                  <span className="text-right">Revenue</span>
-                </div>
-                <div className="divide-y divide-line">
-                  {recentSummary.rows.map((row) => (
-                    <div
-                      key={row.id}
-                      className="grid grid-cols-3 items-center px-3 py-2.5 text-sm"
-                    >
-                      <span className="font-medium text-ink">
-                        {row.createdDate}
-                      </span>
-                      <span className="text-center tabular-nums text-ink">
-                        {row.orders}
-                      </span>
-                      <span className="text-right font-semibold tabular-nums text-accent">
-                        ₹{row.total.toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 rounded-lg border border-line bg-page/60 p-3">
-                <TrendingUp size={16} className="shrink-0 text-success" />
-                <p className="text-xs font-medium text-muted">
-                  Average daily revenue:{' '}
-                  <span className="font-bold text-ink">
-                    ₹
-                    {Math.round(
-                      recentSummary.rows.length > 0
-                        ? recentSummary.weekTotal / recentSummary.rows.length
-                        : 0,
-                    ).toLocaleString('en-IN')}
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {/* ─── MODAL: Billing Settings ─── */}
+      <ChangelogModal open={changelogOpen} onClose={() => setChangelogOpen(false)} />
+
       {billingSettingsOpen ? (
         <BillingSettingsModal onClose={() => setBillingSettingsOpen(false)} />
       ) : null}

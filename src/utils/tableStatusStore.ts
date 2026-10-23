@@ -218,11 +218,15 @@ export function upsertKotTicketFromServer(ticket: KotTicket): KotTicket[] {
     customerName: ticket.customerName ?? existing.customerName,
     status: ticket.status === 'ready' ? 'ready' : existing.status,
     billed: ticket.billed ?? existing.billed,
+    billNo: ticket.billNo ?? existing.billNo,
     items:
       ticket.items.length > 0
         ? ticket.items.map((item, i) => ({
             ...existing.items[i],
             ...item,
+            // Ready progress is keyed by item id; a server update must not swap
+            // the ids the screens already hold, or a finished station reappears.
+            id: existing.items[i]?.id ?? item.id,
           }))
         : existing.items,
   }

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { formatINR, formatNumber } from '../../utils/format'
 import type { LiveOrderChannelRow } from '../../services/orderService'
 
@@ -18,11 +19,15 @@ export function LiveOrderRow({ row, icon, onClick }: LiveOrderRowProps) {
         <p className="truncate text-sm font-semibold text-ink">{row.label}</p>
         <p className="text-xs text-muted">
           {formatNumber(row.orders)} order{row.orders === 1 ? '' : 's'}
+          {onClick ? ' · tap to see them' : ''}
         </p>
       </div>
       <p className="shrink-0 text-sm font-bold text-ink tabular-nums">
         {formatINR(row.amount, 2)}
       </p>
+      {onClick ? (
+        <ChevronRight size={16} className="shrink-0 text-muted" aria-hidden="true" />
+      ) : null}
     </>
   )
 

@@ -30,6 +30,7 @@ import {
   type OrderStatus,
 } from '../../services/orderService'
 import { subscribeToRail } from '../../services/liveRailClient'
+import { useNewOrder } from '../../state/useNewOrder'
 
 type TypeFilter = 'all' | CurrentOrderType
 
@@ -71,6 +72,7 @@ const PAGE_SIZE = 50
 
 export default function CurrentOrders() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId, token } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [mainTab, setMainTab] = useState<OrdersMainTab>('current')
@@ -247,7 +249,7 @@ export default function CurrentOrders() {
       <BillingHeader
         billNo={billNo}
         onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view')}
+        onNewOrder={() => startNewOrder()}
         onViewKot={() => navigate('/billing?kot=1')}
       />
 

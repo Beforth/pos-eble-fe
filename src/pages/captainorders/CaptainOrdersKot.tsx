@@ -24,6 +24,7 @@ import {
   type KotEventData,
   type KotRowStatus,
 } from '../../services/orderService'
+import { useNewOrder } from '../../state/useNewOrder'
 
 const PAGE_SIZE = 15
 
@@ -46,6 +47,7 @@ const STATUS_OPTIONS = [
 
 export default function CaptainOrdersKot() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId, token } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [rows, setRows] = useState<KotRow[]>([])
@@ -271,7 +273,7 @@ export default function CaptainOrdersKot() {
       <CaptainOrdersHeader
         billNo={billNo}
         onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view?from=captain')}
+        onNewOrder={() => startNewOrder({ captain: true })}
         onViewKot={() => navigate('/captain-orders?kot=1')}
       />
 

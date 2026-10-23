@@ -553,7 +553,7 @@ export default function MenuOnOff() {
                         label={`Toggle ${item.name} on ${tab.label}`}
                       />
                       <span className="text-[11px] text-muted">
-                        ₹{item.prices[tab.id].toFixed(1)}
+                        ₹{Number(item.prices[tab.id].toFixed(2))}
                       </span>
                     </div>
                   ))}

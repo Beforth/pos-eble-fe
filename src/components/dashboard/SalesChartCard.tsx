@@ -230,6 +230,8 @@ export function SalesChartCard({
   className = '',
 }: SalesChartCardProps) {
   const [chartKind, setChartKind] = useState<ChartKind>('line')
+  // A line/area needs two points to draw; with one bucket show dots instead.
+  const singlePoint = series.length < 2
 
   const sharedAxis = [
     <CartesianGrid
@@ -326,7 +328,7 @@ export function SalesChartCard({
                   dataKey={channel.key}
                   stroke={channel.color}
                   strokeWidth={2}
-                  dot={false}
+                  dot={singlePoint ? { r: 4 } : false}
                   activeDot={{ r: 4 }}
                 />
               ))}
@@ -365,6 +367,7 @@ export function SalesChartCard({
                   fill={channel.color}
                   fillOpacity={0.75}
                   strokeWidth={1.5}
+                  dot={singlePoint ? { r: 4 } : false}
                 />
               ))}
             </AreaChart>
