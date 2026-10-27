@@ -153,6 +153,45 @@ interface RowItem {
   rank?: number
 }
 
+/**
+ * Whether the item is on sale on this one menu: in stock overall and not
+ * switched off for `channelId`. Each menu (Base, Zomato, Swiggy ...) keeps its
+ * own switch, so turning an item off on one never touches the others.
+ */
+function isAvailableOnChannel(item: Item, channelId: string): boolean {
+  if (!item.is_active) return false
+  if (!channelId) return true
+  const entry = item.availability?.find(
+    (a) => a.outlet_channel_id === channelId,
+  )
+  return entry ? entry.is_available : true
+}
+
+/**
+ * Patch that sets this menu's availability only. The server replaces the whole
+ * availability list, so the other menus' rows are sent back unchanged. Turning
+ * a menu on also lifts a global out-of-stock flag; turning it off never sets one.
+ */
+function availabilityPatch(
+  item: Item,
+  channelId: string,
+  available: boolean,
+): Partial<ItemPayload> {
+  const others = (item.availability ?? [])
+    .filter((a) => a.outlet_channel_id !== channelId)
+    .map((a) => ({
+      outlet_channel_id: a.outlet_channel_id,
+      is_available: a.is_available,
+    }))
+  return {
+    availability: [
+      ...others,
+      { outlet_channel_id: channelId, is_available: available },
+    ],
+    ...(available && !item.is_active ? { is_active: true } : {}),
+  }
+}
+
 function adaptItem(item: Item, currentChannelId: string): RowItem {
   const area = item.area_prices?.find(
     (price) => price.outlet_channel_id === currentChannelId,
@@ -171,7 +210,7 @@ function adaptItem(item: Item, currentChannelId: string): RowItem {
         ? Number(item.base_price) || 0
         : item.base_price),
     description: item.description,
-    available: item.is_active,
+    available: isAvailableOnChannel(item, currentChannelId),
     tags: item.tags ?? [],
     hasImage: item.has_image,
     rank: item.rank,
@@ -403,39 +442,59 @@ export default function BaseMenu({
   function setSelectedAvailable(available: boolean) {
     requireSelection(async () => {
       if (!encryptedOutletId) return
+      if (!currentChannelId) {
+        showToast('Channels are still loading, try again')
+        return
+      }
       try {
-        await Promise.all(
-          [...selected].map((id) =>
-            updateItemApi(encryptedOutletId!, id, {
-              is_active: available,
-            }),
-          ),
-        )
+        // Sequential on purpose: parallel PATCHes lock the SQLite database and
+        // leave only some of the items updated.
+        for (const id of selected) {
+          const raw = rawItemsMap.get(id)
+          if (!raw) continue
+          await updateItemApi(
+            encryptedOutletId!,
+            id,
+            availabilityPatch(raw, currentChannelId, available),
+          )
+        }
         showToast(available ? 'Marked in stock' : 'Marked out of stock')
         setSelected(new Set())
         invalidateAndRefresh()
       } catch {
         showToast('Failed to update items')
+        invalidateAndRefresh()
       }
     })
   }
 
   async function toggleCategoryAvailable() {
     if (!encryptedOutletId) return
+    if (!currentChannelId) {
+      showToast('Channels are still loading, try again')
+      return
+    }
     const next = !categoryAvailable
     const ids = filtered.map((row) => row.id)
     try {
-      await Promise.all(
-        ids.map((id) =>
-          updateItemApi(encryptedOutletId!, id, { is_active: next }),
-        ),
-      )
+      // Sequential on purpose: parallel PATCHes lock the SQLite database and
+      // leave only some of the items updated.
+      for (const id of ids) {
+        const raw = rawItemsMap.get(id)
+        if (!raw) continue
+        await updateItemApi(
+          encryptedOutletId!,
+          id,
+          availabilityPatch(raw, currentChannelId, next),
+        )
+      }
       showToast(
         next ? 'Category marked available' : 'Category marked unavailable',
       )
       invalidateAndRefresh()
     } catch {
       showToast('Failed to update category availability')
+      invalidateAndRefresh()
     }
   }
 
@@ -455,7 +514,7 @@ export default function BaseMenu({
         rawPrice !== row.price ||
         raw.description !== row.description ||
         raw.rank !== row.rank ||
-        raw.is_active !== row.available
+        isAvailableOnChannel(raw, currentChannelId) !== row.available
       )
     })
     if (changed.length === 0) {
@@ -491,8 +550,10 @@ export default function BaseMenu({
             online_display_name: row.onlineDisplayName,
             description: row.description,
             rank: row.rank,
-            is_active: row.available,
             area_prices,
+            ...(isAvailableOnChannel(raw, currentChannelId) !== row.available
+              ? availabilityPatch(raw, currentChannelId, row.available)
+              : {}),
           }
           return updateItemApi(encryptedOutletId!, row.id, patch)
         }),
@@ -512,7 +573,8 @@ export default function BaseMenu({
       if (!raw) continue
       const rawPrice = resolveChannelPrice(raw)
       const priceChanged = rawPrice !== row.price
-      const availabilityChanged = raw.is_active !== row.available
+      const availabilityChanged =
+        isAvailableOnChannel(raw, currentChannelId) !== row.available
       if (!priceChanged && !availabilityChanged) continue
       lines.push({
         item_id: row.id,
