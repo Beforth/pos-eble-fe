@@ -4,7 +4,17 @@ import type { Item } from '../types/menu'
 const PAGE_SIZE = 100
 const ALL_SCOPE = '__all__'
 
+// Items change from other devices, imports and the backend, none of which can
+// invalidate this in-memory cache, so a hit is only trusted for a short while.
+const CACHE_TTL_MS = 30_000
+
 const cache = new Map<string, { items: Item[]; loadedAt: number }>()
+
+function freshHit(key: string, force?: boolean): Item[] | null {
+  const hit = cache.get(key)
+  if (!hit || force || Date.now() - hit.loadedAt > CACHE_TTL_MS) return null
+  return hit.items
+}
 
 function keyFor(outletId: string, scope: string): string {
   return `${outletId}:${scope}`
@@ -35,8 +45,8 @@ export async function fetchCategoryItemsCached(
   options: { force?: boolean } = {},
 ): Promise<Item[]> {
   const key = keyFor(outletId, categoryId)
-  const hit = cache.get(key)
-  if (!options.force && hit) return hit.items
+  const hit = freshHit(key, options.force)
+  if (hit) return hit
   const items = await loadAllPages(outletId, categoryId)
   cache.set(key, { items, loadedAt: Date.now() })
   return items
@@ -47,8 +57,8 @@ export async function fetchAllItemsCached(
   options: { force?: boolean } = {},
 ): Promise<Item[]> {
   const key = keyFor(outletId, ALL_SCOPE)
-  const hit = cache.get(key)
-  if (!options.force && hit) return hit.items
+  const hit = freshHit(key, options.force)
+  if (hit) return hit
   const items = await loadAllPages(outletId)
   cache.set(key, { items, loadedAt: Date.now() })
   return items
