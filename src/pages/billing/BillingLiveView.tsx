@@ -288,7 +288,7 @@ export default function BillingLiveView() {
               const waited = now - ticket.createdAt
               const TypeIcon = style.icon
               return (
-                <div key={ticket.id} className="relative pt-4">
+                <div key={ticket.id} className="relative h-[400px] pt-4">
                   <button
                     type="button"
                     onClick={() => navigate(billingUrlForKotId(ticket.id))}
@@ -346,7 +346,7 @@ export default function BillingLiveView() {
                     ) : null}
                   </div>
 
-                  <ul className="mx-4 flex-1 divide-y divide-line/70 border-y border-line/70 py-1">
+                  <ul className="mx-4 min-h-0 flex-1 divide-y divide-line/70 overflow-y-auto border-y border-line/70 py-1">
                     {ticket.items.map((item, index) => (
                       <li key={`${ticket.id}-${index}`} className="flex items-start gap-2.5 py-2">
                         <span className="mt-0.5 inline-flex min-w-7 shrink-0 items-center justify-center rounded-md bg-page px-1.5 py-0.5 text-xs font-bold tabular-nums text-ink">

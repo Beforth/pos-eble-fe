@@ -17,13 +17,16 @@ import { AlertDialog } from '../../components/billing/AlertDialog'
 import { CategoryRail } from '../../components/billing/CategoryRail'
 import { ItemGrid } from '../../components/billing/ItemGrid'
 import { KotView } from '../../components/billing/KotView'
-import { FinalBillCustomerModal } from '../../components/billing/FinalBillCustomerModal'
 import { DummyBillModal, type DummyBillData } from '../../components/billing/DummyBillModal'
 
 import { OpenItemModal } from '../../components/billing/OpenItemModal'
 import { ItemOptionsModal } from '../../components/billing/ItemOptionsModal'
 import { matchMenuItemId, type PricedSelection } from '../../utils/itemOptions'
-import { OtherPaymentModal, type OtherPaymentDetails } from '../../components/billing/OtherPaymentModal'
+import {
+  OTHER_PAYMENT_TYPES,
+  type OtherPaymentDetails,
+  type OtherPaymentType,
+} from '../../components/billing/OtherPaymentModal'
 import { OrderNotesModal } from '../../components/billing/OrderNotesModal'
 import { DraftBillsModal } from '../../components/billing/DraftBillsModal'
 import { SaveDraftNameModal } from '../../components/billing/SaveDraftNameModal'
@@ -77,6 +80,7 @@ import {
 import { recordCoverSize } from '../../utils/coverSizeStore'
 import { randomDisplayToken } from '../customer-screen/customerDisplayData'
 import {
+  toDraftBill,
   toDraftBillPayload,
   type DraftBill,
 } from '../../utils/draftBillStore'
@@ -176,20 +180,18 @@ function normalizeCustomerMobile(value: string): string {
   return digits.slice(0, 10)
 }
 
+// Name and mobile are optional; when given they must still be well-formed.
 function isCustomerComplete(customer: CustomerDetails) {
-  const nameLen = customer.name.trim().length
-  return (
-    normalizeCustomerMobile(customer.mobile).length === 10 &&
-    nameLen >= 3 &&
-    nameLen <= 12
-  )
+  const errors = customerFieldErrors(customer)
+  return !errors.mobile && !errors.name
 }
 
 function customerFieldErrors(customer: CustomerDetails) {
   const nameLen = customer.name.trim().length
+  const mobileLen = normalizeCustomerMobile(customer.mobile).length
   return {
-    mobile: normalizeCustomerMobile(customer.mobile).length !== 10,
-    name: nameLen < 3 || nameLen > 12,
+    mobile: mobileLen !== 0 && mobileLen !== 10,
+    name: nameLen !== 0 && (nameLen < 3 || nameLen > 12),
   }
 }
 
@@ -389,6 +391,7 @@ export default function Billing() {
     grandTotal: number
     /** Tendered cash (may be lower than grandTotal → the balance books as due). */
     receivedAmount: number
+    tip?: number
     customerName: string
     customerPhone: string
     paymentLabel: string
@@ -432,6 +435,7 @@ export default function Billing() {
       discount: params.discount,
       grand_total: params.grandTotal,
       received_amount: params.receivedAmount,
+      tip: params.tip && params.tip > 0 ? params.tip : undefined,
       settlement_by: billerName || undefined,
     })
     return order
@@ -457,7 +461,7 @@ export default function Billing() {
   const [lines, setLines] = useState<CartLine[]>([])
   const [orderType, setOrderType] = useState<OrderType>(() => {
     const ot = searchParams.get('orderType')
-    if (ot === 'delivery' || ot === 'pick-up' || ot === 'dine-in' || ot === 'other') {
+    if (ot === 'pick-up' || ot === 'dine-in') {
       return ot
     }
     return 'dine-in'
@@ -532,12 +536,9 @@ export default function Billing() {
    * cleared once the money step closes it (print-then-settle, §21).
    */
   const [resumeOrderId, setResumeOrderId] = useState<string | null>(null)
-  const [otherPaymentOpen, setOtherPaymentOpen] = useState(false)
   const [otherPayment, setOtherPayment] = useState<OtherPaymentDetails | null>(
     null,
   )
-  const [paymentBeforeOther, setPaymentBeforeOther] =
-    useState<PaymentMethod>('cash')
   const [settlementAmount, setSettlementAmount] = useState<number | null>(null)
   /** Delivery extras captured when Save & Print / eBill is clicked. */
   const [pendingCharges, setPendingCharges] =
@@ -633,7 +634,7 @@ export default function Billing() {
       }
     }
     const ot = searchParams.get('orderType')
-    if (ot === 'delivery' || ot === 'pick-up' || ot === 'dine-in' || ot === 'other') {
+    if (ot === 'pick-up' || ot === 'dine-in') {
       setOrderType(ot)
     }
     if (searchParams.get('kot') === '1') {
@@ -675,12 +676,28 @@ export default function Billing() {
       }
       if (cancelled || !ticket) return
 
-      // A ticket on a paid bill is finished business here: the KOT view hides it
-      // and the bill leaves it out, so opening it would show an empty cart.
+      // A ticket on a paid bill is not pinned (it would be billed twice); its
+      // items are loaded into the cart so the cashier can see — and re-order —
+      // what was served.
       if (ticket.billed) {
-        if (toastedOpenKotRef.current !== id) {
-          toastedOpenKotRef.current = id
-          showToast(`KOT ${ticket.kotNo} is on a paid bill, so there is nothing to open`)
+        const paidTicket = ticket
+        setOrderType(paidTicket.orderType)
+        setLines(
+          paidTicket.items.map((item, index) => ({
+            id: `paid-${paidTicket.id}-${index}`,
+            itemId: item.itemId ?? matchMenuItemId(item.name, menuItems),
+            name: item.name,
+            price: item.price,
+            qty: item.qty,
+            note: item.note || undefined,
+          })),
+        )
+        if (paidTicket.customerName) {
+          setCustomer((prev) =>
+            prev.name.trim()
+              ? prev
+              : { ...prev, name: paidTicket.customerName ?? '' },
+          )
         }
         setKotViewOpen(false)
         navigate('/billing', { replace: true })
@@ -738,8 +755,33 @@ export default function Billing() {
     openKotTableIdFromUrl,
     encryptedOutletId,
     tablesById,
+    menuItems,
     navigate,
   ])
+
+  /** Deep-link from the header's On Hold drawer -> resume that held (draft) bill. */
+  const resumeDraftId = searchParams.get('resumeDraft')
+  useEffect(() => {
+    if (!resumeDraftId || !encryptedOutletId) return
+    let cancelled = false
+    listDraftBillsApi(encryptedOutletId)
+      .then((rows) => {
+        if (cancelled) return
+        const draft = rows.map(toDraftBill).find((row) => row.id === resumeDraftId)
+        if (draft) resumeDraft(draft)
+        else showToast('That held bill is no longer available')
+      })
+      .catch(() => {
+        if (!cancelled) showToast('Could not open the held bill')
+      })
+      .finally(() => {
+        if (!cancelled) navigate('/billing', { replace: true })
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeDraftId, encryptedOutletId])
 
   /** Deep-link from Live Orders → load that order into the cart to settle it. */
   const openOrderId = searchParams.get('openOrder')
@@ -867,7 +909,14 @@ export default function Billing() {
   }
 
   const filteredItems = useMemo(() => {
+    // A typed short code looks across the whole menu, not just the open category.
+    const codeLookup = shortCode.trim() !== ''
     return menuItems.filter((item) => {
+      if (codeLookup) {
+        if (!matchesShortCode(item, shortCode)) return false
+        if (search.trim() && !itemNameMatchesQuery(item.name, search)) return false
+        return true
+      }
       if (railCategoryId === FAVORITES_ID) {
         if (!favoriteIds.has(item.id)) return false
       } else if (railCategoryId === ALL_CATEGORIES_ID) {
@@ -880,9 +929,6 @@ export default function Billing() {
       }
       if (search.trim()) {
         if (!itemNameMatchesQuery(item.name, search)) return false
-      }
-      if (shortCode.trim()) {
-        if (!matchesShortCode(item, shortCode)) return false
       }
       return true
     })
@@ -1067,8 +1113,10 @@ export default function Billing() {
       return
     }
     if (method === 'other') {
-      setPaymentBeforeOther(payment === 'other' ? 'cash' : payment)
-      setOtherPaymentOpen(true)
+      // No popup: the platform is picked from the dropdown under the bar.
+      setPayment('other')
+      setPartPaymentOpen(false)
+      setOtherPayment((prev) => prev ?? { type: OTHER_PAYMENT_TYPES[0], note: '' })
       return
     }
     if (method === 'due') {
@@ -1130,6 +1178,24 @@ export default function Billing() {
     setResumeOrderId(null)
   }
 
+  // Emptying the cart of a resumed held bill (Delete All, or removing the last item)
+  // discards it: drop the held copy and the customer / note it carried, so the next
+  // hold starts clean and the held list no longer shows it.
+  useEffect(() => {
+    if (lines.length > 0 || !activeDraftId) return
+    if (encryptedOutletId) {
+      deleteDraftBillApi(encryptedOutletId, activeDraftId)
+        .catch(() => undefined)
+        .finally(() => void refreshDraftCount())
+    }
+    setActiveDraftId(null)
+    setCustomer(EMPTY_CUSTOMER)
+    setCustomerErrors({})
+    setShowCustomerErrors(false)
+    setOrderNote('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines.length, activeDraftId])
+
   async function refreshDraftCount() {
     if (!encryptedOutletId) return
     try {
@@ -1142,7 +1208,7 @@ export default function Billing() {
 
   async function saveCurrentAsDraft(customerName: string) {
     if (lines.length === 0) {
-      showToast('Add items before saving a draft')
+      showToast('Add items before putting a bill on hold')
       return
     }
     if (!encryptedOutletId) {
@@ -1162,28 +1228,40 @@ export default function Billing() {
         name: customerName,
       },
     })
+    const createDraft = () =>
+      saveDraftBillApi(encryptedOutletId, {
+        ...payload,
+        client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      })
     try {
-      const saved = activeDraftId
-        ? await updateDraftBillApi(encryptedOutletId, activeDraftId, payload)
-        : await saveDraftBillApi(encryptedOutletId, {
-            ...payload,
-            client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          })
+      let saved
+      if (activeDraftId) {
+        try {
+          saved = await updateDraftBillApi(encryptedOutletId, activeDraftId, payload)
+        } catch (error) {
+          // The held bill this cart came from is gone (deleted from the Held Bills
+          // list, or resumed and billed elsewhere): hold it again as a new one.
+          if (!(error instanceof Error) || !/not found/i.test(error.message)) throw error
+          saved = await createDraft()
+        }
+      } else {
+        saved = await createDraft()
+      }
       setActiveDraftId(saved.id)
       await refreshDraftCount()
       setSaveDraftOpen(false)
       clearBillForNextCustomer()
-      showToast(`Draft saved for ${customerName}`)
+      showToast(`Bill put on hold for ${customerName}`)
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : 'Failed to save the draft',
+        error instanceof Error ? error.message : 'Failed to put the bill on hold',
       )
     }
   }
 
   function startSaveDraft() {
     if (lines.length === 0) {
-      showToast('Add items before saving a draft')
+      showToast('Add items before putting a bill on hold')
       return
     }
     setSaveDraftOpen(true)
@@ -1204,16 +1282,36 @@ export default function Billing() {
     setResumeOrderId(null)
     showToast(
       draft.tableNo !== 'No table'
-        ? `Draft resumed · Table ${draft.tableNo}`
-        : 'Draft resumed',
+        ? `Held bill resumed · Table ${draft.tableNo}`
+        : 'Held bill resumed',
     )
   }
+
+  // The bill is saved with the customer details already on the panel — no
+  // extra name/phone prompt. `finalBillOpen` is only the trigger now, set after
+  // the charges snapshot has been committed to state.
+  useEffect(() => {
+    if (!finalBillOpen) return
+    setFinalBillOpen(false)
+    void settleTableBill(finalBillAction, {
+      name: customer.name,
+      phone: customer.mobile,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per trigger
+  }, [finalBillOpen])
 
   function newOrder() {
     // The cart is cleared only once a destination is chosen (the No Table /
     // Table popup can be dismissed), and by hand because going to No Table
     // lands on this same screen, which would otherwise keep the old bill.
-    startNewOrder({ onNavigate: clearBillForNextCustomer })
+    // From the KOT view the destination is this same route, so the view is
+    // closed by hand or the button would appear to do nothing.
+    startNewOrder({
+      onNavigate: () => {
+        clearBillForNextCustomer()
+        setKotViewOpen(false)
+      },
+    })
   }
 
   const tableKotTickets = useMemo(
@@ -1378,6 +1476,11 @@ export default function Billing() {
     const kotKey = tableId || 'no-table'
     let printedOrderId: string | null = null
     let printedBillNo: number | null = null
+    // True once Save & eBill has handed the whole cart to the kitchen: the
+    // screen starts fresh, so this bill must not stay "open" for a reprint.
+    let cartHandedOff = false
+    // True once "It's Paid" closed the order on the server.
+    let paidNow = false
 
     let items: {
       name: string
@@ -1537,6 +1640,60 @@ export default function Billing() {
         if (action === 'Save & Print' || action === 'Save & eBill') {
           await reprintOrderApi(outletId, order.id)
         }
+        // Save & eBill also sends the cart to the kitchen and empties it. The
+        // ticket joins this bill's KOT session, so the later settle still
+        // bills it (the cart no longer holds those lines).
+        if (action === 'Save & eBill' && lines.length > 0) {
+          const ticket = createKotFromLines(lines, orderNote)
+          if (ticket) {
+            try {
+              const saved = await sendKotViaApi(ticket)
+              setKotTickets(appendKotTicket(saved))
+              appendWalkInKotId(saved.id)
+              if (!saved.id.startsWith('kot-')) {
+                await adoptOrderKotsApi(outletId, order.id, [saved.id])
+              }
+              setLines([])
+              setOrderNote('')
+              cartHandedOff = true
+              // Test output: the kitchen ticket is what prints on eBill.
+              setPrintTicket({
+                ...saved,
+                customerName: customerInfo.name.trim() || saved.customerName,
+              })
+            } catch (kotError) {
+              showToast(
+                kotError instanceof Error
+                  ? `Bill saved, but the KOT failed: ${kotError.message}`
+                  : 'Bill saved, but the KOT failed',
+              )
+            }
+          }
+        }
+        // "It's Paid": close the order as paid in full with the chosen method.
+        if (itsPaid) {
+          try {
+            await settleOrderApi(outletId, order.id, {
+              payment_type: paymentTypeLabel(payment, otherPayment?.type),
+              my_amount: subtotal,
+              tax,
+              tax_breakdown: taxBreakdown,
+              round_off: roundOffAmt,
+              discount: discountAmt,
+              grand_total: computedTotal,
+              received_amount: computedTotal,
+              settlement_by: billerName || undefined,
+            })
+            paidNow = true
+            setItsPaid(false)
+          } catch (payError) {
+            showToast(
+              payError instanceof Error
+                ? `Bill saved, but marking it paid failed: ${payError.message}`
+                : 'Bill saved, but marking it paid failed',
+            )
+          }
+        }
       } catch (error) {
         showToast(
           error instanceof Error ? error.message : 'Failed to save the bill',
@@ -1562,7 +1719,18 @@ export default function Billing() {
       refreshDraftCount()
     }
 
-    if (printedOrderId) setResumeOrderId(printedOrderId)
+    if (cartHandedOff) {
+      clearWalkInKotSession()
+      setPinnedKotId(null)
+      setFocusKotNo(null)
+      setCustomer(EMPTY_CUSTOMER)
+    } else if (paidNow) {
+      // Paid and closed — nothing left to resume, so the cart starts over.
+      setLines([])
+      setOrderNote('')
+    } else if (printedOrderId) {
+      setResumeOrderId(printedOrderId)
+    }
 
     if (action === 'Save & Print' || action === 'Save & eBill') {
       let billNoValue = String(bill)
@@ -1605,8 +1773,11 @@ export default function Billing() {
         customerPaid: customerPaidAmt,
         tip: tipAmt,
       }
-      setDummyBill(nextBill)
-      setDummyBillOpen(true)
+      // The eBill goes out silently; only a print shows the receipt preview.
+      if (action !== 'Save & eBill') {
+        setDummyBill(nextBill)
+        setDummyBillOpen(true)
+      }
       showToast(
         action === 'Save & eBill'
           ? `eBill #${billNoValue} generated · table printed`
@@ -1710,6 +1881,7 @@ export default function Billing() {
           discount: discountAmt,
           grand_total: billTotal,
           received_amount: amount,
+          tip: money?.tip && money.tip > 0 ? money.tip : undefined,
           settlement_by: billerName || undefined,
         })
       } catch (error) {
@@ -1804,6 +1976,7 @@ export default function Billing() {
           // due the API never booked.
           grandTotal: Math.round((amount + due) * 100) / 100,
           receivedAmount: amount,
+          tip: money?.tip,
           customerName: customer.name,
           customerPhone: customer.mobile,
           paymentLabel: paymentTypeLabel(payment, otherPayment?.type),
@@ -1879,6 +2052,7 @@ export default function Billing() {
         customerName: customer.name,
         customerPhone: customer.mobile,
         settlementBy: billerName || undefined,
+        tip: pendingCharges?.tip,
         grandTotal: amount,
       })
     } catch (error) {
@@ -1915,7 +2089,7 @@ export default function Billing() {
         setCustomerFormOpen(true)
         setShowCustomerErrors(true)
         setCustomerErrors(customerFieldErrors(customer))
-        showToast('Customer details are compulsory for Due payment')
+        showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
         return
       }
       setFinalBillAction(action)
@@ -1932,7 +2106,7 @@ export default function Billing() {
       setCustomerFormOpen(true)
       setShowCustomerErrors(true)
       setCustomerErrors(customerFieldErrors(customer))
-      showToast('Customer details are compulsory for Due payment')
+      showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
       return
     }
 
@@ -2013,7 +2187,7 @@ export default function Billing() {
         setCustomerFormOpen(true)
         setShowCustomerErrors(true)
         setCustomerErrors(customerFieldErrors(customer))
-        showToast('Customer details are compulsory for Due payment')
+        showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
         return
       }
 
@@ -2046,6 +2220,8 @@ export default function Billing() {
           clearWalkInKotSession()
           setPinnedKotId(null)
           setFocusKotNo(null)
+          // The name belonged to that order — the next one starts blank.
+          setCustomer(EMPTY_CUSTOMER)
         }
       }
       // A printed counter bill already owns an order: write the KOT session
@@ -2105,7 +2281,7 @@ export default function Billing() {
         setCustomerFormOpen(true)
         setShowCustomerErrors(true)
         setCustomerErrors(customerFieldErrors(customer))
-        showToast('Customer details are compulsory for Due payment')
+        showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
         return
       }
 
@@ -2122,7 +2298,7 @@ export default function Billing() {
       return
     }
 
-    if (action === 'Draft') {
+    if (action === 'Hold') {
       startSaveDraft()
       return
     }
@@ -2180,44 +2356,6 @@ export default function Billing() {
         onSave={addOpenItem}
       />
 
-      <OtherPaymentModal
-        open={otherPaymentOpen}
-        initial={otherPayment ?? undefined}
-        onNo={() => {
-          setOtherPaymentOpen(false)
-          if (payment !== 'other') {
-            setPayment(paymentBeforeOther)
-          }
-        }}
-        onYes={(details) => {
-          setOtherPayment(details)
-          setPayment('other')
-          setOtherPaymentOpen(false)
-          setPartPaymentOpen(false)
-          showToast(`Other payment · ${details.type}`)
-        }}
-      />
-
-      <FinalBillCustomerModal
-        open={finalBillOpen}
-          kotCount={tableKotSummary.length}
-        total={payableTotal}
-        tableNo={selectedTableNo}
-        confirmLabel={
-          finalBillAction === 'Save & eBill'
-            ? 'Generate eBill'
-            : finalBillAction === 'Save'
-              ? 'Save Bill'
-              : 'Generate Bill'
-        }
-        initial={{ name: customer.name, phone: customer.mobile }}
-        onClose={() => {
-          setFinalBillOpen(false)
-          setPendingCharges(null)
-        }}
-        onConfirm={(info) => settleTableBill(finalBillAction, info)}
-      />
-
       {dummyBillOpen && dummyBill ? (
         dummyBill.mode === 'print' ? (
           <BillReceipt
@@ -2234,6 +2372,7 @@ export default function Billing() {
                   ? `${labelForOrderType(orderType)} · ${selectedTableNo}`
                   : labelForOrderType(orderType),
               cashier: billerName,
+              customerName: dummyBill.customerName,
             }}
             items={dummyBill.items.map((item) => ({
               name: item.name,
@@ -2451,6 +2590,7 @@ export default function Billing() {
                 customerName: result.customerName || settled[0]?.customerName || '',
                 customerPhone: result.customerPhone,
                 settlementBy: billerName || undefined,
+                tip: result.tip,
                 grandTotal: result.settlementAmount,
               })
             } catch (error) {
@@ -2569,6 +2709,10 @@ export default function Billing() {
           customerErrors={showCustomerErrors ? customerErrors : undefined}
           onOrderTypeChange={setOrderType}
           onPaymentChange={handlePaymentChange}
+          otherPaymentType={otherPayment?.type}
+          onOtherPaymentTypeChange={(type: OtherPaymentType) =>
+            setOtherPayment({ type, note: otherPayment?.note ?? '' })
+          }
           onTableIdChange={(id) => {
             setTableId(id)
             setPinnedKotId(null)
@@ -2621,7 +2765,9 @@ export default function Billing() {
             refreshDraftCount()
             setDraftsOpen(true)
           }}
-          draftCount={draftCount}
+          // A held bill that is open in the cart has been taken off hold, so it
+          // is not counted until it is put back on hold.
+          draftCount={Math.max(0, draftCount - (activeDraftId ? 1 : 0))}
         />
       </div>
       )}

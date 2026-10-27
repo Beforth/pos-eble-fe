@@ -405,7 +405,7 @@ const GROUPS: SearchGroupDef[] = [
       ['Variation Summary', '/reports/variation-summary', ['variation summary']],
       ['Tax Summary', '/reports/tax-summary', ['tax summary']],
       ['Counter Summary', '/reports/counter-summary', ['counter summary']],
-      ['Logs', '/logs', ['logs', 'activity log']],
+      ['Logs', '/billing/logs', ['logs', 'activity log']],
     ],
   },
   {

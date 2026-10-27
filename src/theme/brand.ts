@@ -7,5 +7,5 @@ export const brand = {
   address: 'Shop 01, Sunrich Apartment, Satpur, College Road, Nashik',
   panNumber: '-',
   currency: '₹',
-  appVersion: '1.0.0',
+  appVersion: '1.0.1',
 } as const

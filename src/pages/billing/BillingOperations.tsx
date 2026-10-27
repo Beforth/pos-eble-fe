@@ -23,7 +23,6 @@ import {
   QrCode,
   Receipt,
   RefreshCw,
-  RotateCw,
   ScrollText,
   Settings,
   Sun,
@@ -119,7 +118,7 @@ const SECTIONS: OperationSection[] = [
         icon: Sun,
       },
       {
-        to: '/logs',
+        to: '/billing/logs',
         label: 'Logs',
         description: 'A trail of who did what at the counter.',
         icon: ScrollText,
@@ -130,7 +129,7 @@ const SECTIONS: OperationSection[] = [
     title: 'Payments & Finance',
     tiles: [
       {
-        to: '/finance/transactions',
+        to: '/billing/cashflow',
         label: 'Cash Flow',
         description: 'Money coming in and going out.',
         icon: Banknote,
@@ -165,13 +164,13 @@ const SECTIONS: OperationSection[] = [
     title: 'Menu & Inventory',
     tiles: [
       {
-        to: '/menu',
+        to: '/billing/menu',
         label: 'Menu',
         description: 'Items, categories, variants and add-ons.',
         icon: ClipboardList,
       },
       {
-        to: '/menu/menu-on-off',
+        to: '/billing/menu-on-off',
         label: 'Menu Item On Off',
         description: 'Switch items on or off when they run out.',
         icon: ToggleRight,
@@ -207,7 +206,7 @@ const SECTIONS: OperationSection[] = [
         icon: Tv,
       },
       {
-        to: '/configuration/inventory',
+        to: '/billing/inventory',
         label: 'Inventory',
         description: 'Stock, purchases, suppliers and recipes.',
         icon: Boxes,
@@ -243,12 +242,6 @@ const SECTIONS: OperationSection[] = [
         icon: BellRing,
       },
       {
-        to: '/billing/service-renewal',
-        label: 'Service Renewal',
-        description: 'Plan status and renewal dates.',
-        icon: RotateCw,
-      },
-      {
         to: '/billing/shortcuts',
         label: 'Shortcuts',
         description: 'Keyboard shortcuts for the billing screen.',
@@ -261,7 +254,7 @@ const SECTIONS: OperationSection[] = [
         icon: Languages,
       },
       {
-        to: '/management/configuration',
+        to: '/billing/settings',
         label: 'Settings',
         description: 'Outlet, billing, printing and display settings.',
         icon: Settings,

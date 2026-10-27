@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { GripVertical, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'

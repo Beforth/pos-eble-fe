@@ -89,6 +89,7 @@ const REPORTS: ReportCard[] = [
     label: 'Tip Summary',
     description: 'Employee-wise as well as table-wise tips collected.',
     icon: <ReceiptIndianRupee {...ICON_PROPS} />,
+    to: '/reports/tip-summary',
   },
   {
     label: 'Counter Summary',
@@ -100,27 +101,31 @@ const REPORTS: ReportCard[] = [
     label: 'Locality Wise Summary',
     description: 'Locality-wise order count as well as total.',
     icon: <Users {...ICON_PROPS} />,
-    to: '/reports/other-reports/locality-wise',
+    to: '/reports/locality-summary',
   },
   {
     label: 'Captain Wise Summary',
     description: 'Total sales made by each captain.',
     icon: <ReceiptIndianRupee {...ICON_PROPS} />,
+    to: '/reports/captain-wise-summary',
   },
   {
     label: 'Settlement Summary',
     description: 'Counterwise billing user-wise order settlement report.',
     icon: <UserRound {...ICON_PROPS} />,
+    to: '/reports/settlement-summary',
   },
   {
     label: 'NC Item Summary',
     description: 'List of items whose price was changed before billing.',
     icon: <FileText {...ICON_PROPS} />,
+    to: '/reports/nc-item-summary',
   },
   {
     label: 'Assignee Wise Summary',
     description: 'Assignee-wise collection as well as summary report.',
     icon: <Network {...ICON_PROPS} />,
+    to: '/reports/assignee-wise-summary',
   },
   {
     label: 'Tax Summary',

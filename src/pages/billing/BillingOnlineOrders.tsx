@@ -16,6 +16,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { AggregatorLogo, type AggregatorName } from '../../components/common/AggregatorLogo'
 import { AggregatorHelpCenterModal } from '../../components/online-orders/AggregatorHelpCenterModal'
+import { subscribeToRail } from '../../services/liveRailClient'
 import { listOnlineOrdersApi, type OnlineOrder } from '../../services/onlineOrderApi'
 import { brand } from '../../theme/brand'
 import { formatINR } from '../../utils/format'
@@ -27,6 +28,7 @@ type SortKey = 'latest' | 'oldest'
 type Panel = 'details' | 'delivery'
 
 const POLL_MS = 30_000
+const RAIL_EVENTS = new Set(['online_order.received', 'online_order.updated'])
 
 const PLATFORM_TABS: { value: string; label: string }[] = [
   { value: '', label: 'All' },
@@ -92,7 +94,7 @@ function titleCase(value: string): string {
 export default function BillingOnlineOrders() {
   const navigate = useNavigate()
   const { startNewOrder } = useNewOrder()
-  const { encryptedOutletId } = useAuth()
+  const { encryptedOutletId, token } = useAuth()
   const [billNo, setBillNo] = useState('')
 
   const [orders, setOrders] = useState<OnlineOrder[]>([])
@@ -128,6 +130,19 @@ export default function BillingOnlineOrders() {
     const timer = window.setInterval(() => void load(true), POLL_MS)
     return () => window.clearInterval(timer)
   }, [load])
+
+  // New orders and status changes arrive over the live rail; the poll above is
+  // the fallback for a dropped connection.
+  useEffect(() => {
+    if (!encryptedOutletId || !token) return
+    return subscribeToRail({
+      outletId: encryptedOutletId,
+      token,
+      onEvent: (event) => {
+        if (RAIL_EVENTS.has(event)) void load(true)
+      },
+    })
+  }, [encryptedOutletId, token, load])
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()

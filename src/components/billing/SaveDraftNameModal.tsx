@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { FilePenLine, X } from 'lucide-react'
+import { X } from 'lucide-react'
+import { HoldIcon } from '../icons/HoldIcon'
 
 interface SaveDraftNameModalProps {
   open: boolean
@@ -60,20 +61,20 @@ export function SaveDraftNameModal({
     <div className="fixed inset-0 z-[85] flex items-center justify-center p-4">
       <button
         type="button"
-        aria-label="Close save draft"
+        aria-label="Close put on hold"
         onClick={onClose}
         className="absolute inset-0 bg-black/45"
       />
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Save draft"
+        aria-label="Put on hold"
         className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-xl border border-line bg-card shadow-2xl"
       >
         <header className="flex items-center justify-between border-b border-line px-5 py-3">
           <div className="flex items-center gap-2">
-            <FilePenLine size={18} className="text-primary" />
-            <h2 className="text-base font-semibold text-ink">Save as Draft</h2>
+            <HoldIcon size={18} className="text-primary" />
+            <h2 className="text-base font-semibold text-ink">Put on Hold</h2>
           </div>
           <button
             type="button"
@@ -114,7 +115,7 @@ export function SaveDraftNameModal({
             <p className="mt-1.5 text-xs text-primary">{error}</p>
           ) : (
             <p className="mt-1.5 text-xs text-muted">
-              This name will be shown on the draft list for easy search later.
+              This name will be shown on the held bills list for easy search later.
             </p>
           )}
         </div>
@@ -132,7 +133,7 @@ export function SaveDraftNameModal({
             onClick={handleSave}
             className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
           >
-            Save Draft
+            Hold
           </button>
         </footer>
       </div>

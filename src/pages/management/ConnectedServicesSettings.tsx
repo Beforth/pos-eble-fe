@@ -21,6 +21,7 @@ import {
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
 import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
+import { BillingSettingsShell } from '../../components/billing/BillingSettingsShell'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { useAuth } from '../../auth/AuthContext'
 import { listCategoriesApi } from '../../services/menuService'
@@ -176,7 +177,12 @@ function CategoryPicker({
   )
 }
 
-export default function ConnectedServicesSettings() {
+/**
+ * Connected Services. `standalone` puts the very same screen on a billing page
+ * (`/billing/settings/<name>`) under the billing header; Back / Cancel / Save then
+ * return to Outlet Settings in billing instead of the admin configuration.
+ */
+export default function ConnectedServicesSettings({ standalone = false }: { standalone?: boolean }) {
   const navigate = useNavigate()
 
   const [manualDayEnd, setManualDayEnd] = useState(false)
@@ -288,7 +294,7 @@ export default function ConnectedServicesSettings() {
 
 
   function goBack() {
-    navigate('/management/configuration/outlet')
+    navigate(standalone ? '/billing/settings' : '/management/configuration/outlet')
   }
 
   function toggleIn(
@@ -355,11 +361,17 @@ export default function ConnectedServicesSettings() {
   }
 
   if (loading && !data) {
-    return <SettingsPageLoading />
+    return standalone ? (
+      <BillingSettingsShell current="Connected Services">
+        <div className="py-12 text-center text-sm text-muted">Loading settings…</div>
+      </BillingSettingsShell>
+    ) : (
+      <SettingsPageLoading />
+    )
   }
 
-  return (
-    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Connected Services" />} activeItem="config-outlet">
+  const content = (
+    <>
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         The Following Settings Can Be Used To Configure All The Connected
@@ -660,6 +672,16 @@ export default function ConnectedServicesSettings() {
       </ConfigSectionCard>
 
       <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
+    </>
+  )
+
+  if (standalone) {
+    return <BillingSettingsShell current="Connected Services">{content}</BillingSettingsShell>
+  }
+
+  return (
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Connected Services" />} activeItem="config-outlet">
+      {content}
     </ReportsPageShell>
   )
 }

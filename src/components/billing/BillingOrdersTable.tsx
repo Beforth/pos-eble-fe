@@ -9,7 +9,11 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { AllOrderRow } from '../../mocks/allOrdersData'
-import { STATUS_ROW_TINT } from '../../utils/billingOrderStatus'
+import {
+  STATUS_DOT,
+  STATUS_LEGEND_LABEL,
+  STATUS_PILL,
+} from '../../utils/billingOrderStatus'
 import { formatINR } from '../../utils/format'
 import { isUnpaid } from '../../utils/orderStatus'
 import { Table, type Column } from '../common/Table'
@@ -38,26 +42,34 @@ function IconAction({
 }) {
   const toneClass =
     tone === 'primary'
-      ? 'bg-primary text-white hover:bg-primary-hover'
+      ? 'border-primary bg-primary text-white hover:bg-primary-hover'
       : tone === 'danger'
-        ? 'bg-danger text-white hover:opacity-90'
-        : 'bg-card text-ink hover:bg-page'
+        ? 'border-danger bg-danger text-white hover:opacity-90'
+        : 'border-line bg-card text-muted hover:border-primary/40 hover:bg-page hover:text-primary'
   return (
     <button
       type="button"
       aria-label={label}
       data-tooltip={label}
       onClick={onClick}
-      className={`inline-flex size-8 items-center justify-center rounded-lg ${toneClass}`}
+      className={`inline-flex size-8 items-center justify-center rounded-lg border transition-colors ${toneClass}`}
     >
       {children}
     </button>
   )
 }
 
+/** "DINE IN" → "Dine In" for display. */
+function titleCase(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 /**
- * The current-orders table: one tinted row per order (tint = bill status), the
- * grand total as an editable link, and the actions as icon buttons.
+ * The current-orders table: white rows, a status pill instead of a tinted row,
+ * customer name and phone in one cell, the grand total as an editable link and
+ * the actions as ghost icon buttons.
  */
 export function BillingOrdersTable({
   rows,
@@ -72,62 +84,95 @@ export function BillingOrdersTable({
   const columns: Column<AllOrderRow>[] = [
     {
       key: 'orderNo',
-      header: 'Order No.',
+      header: 'Order',
       render: (row) => (
         <button
           type="button"
           onClick={() => onView(row)}
-          className="rounded-md bg-card px-2 py-0.5 font-semibold text-primary underline hover:bg-page"
+          className="rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary hover:bg-primary/15"
         >
-          {row.orderNo}
+          #{row.orderNo}
         </button>
       ),
     },
     {
       key: 'orderType',
-      header: 'Order Type',
+      header: 'Type',
       render: (row) => (
         <div className="whitespace-nowrap">
-          <p>{row.orderType}</p>
-          <p className="font-bold italic">({row.orderType})</p>
+          <p className="font-medium text-ink">{titleCase(row.orderType)}</p>
+          {row.tableNo ? (
+            <p className="text-xs text-muted">Table {row.tableNo}</p>
+          ) : null}
         </div>
       ),
     },
     {
-      key: 'customerPhone',
-      header: 'Customer Phone',
-      render: (row) => row.customerPhone || '',
+      key: 'customer',
+      header: 'Customer',
+      render: (row) => {
+        const name = row.customerName === 'Walk-in' ? '' : row.customerName
+        if (!name && !row.customerPhone) {
+          return <span className="text-muted">Walk-in</span>
+        }
+        return (
+          <div>
+            {name ? <p className="font-medium text-ink">{name}</p> : null}
+            {row.customerPhone ? (
+              <p className="text-xs tabular-nums text-muted">{row.customerPhone}</p>
+            ) : null}
+          </div>
+        )
+      },
     },
     {
-      key: 'customerName',
-      header: 'Customer Name',
-      render: (row) => (row.customerName === 'Walk-in' ? '' : row.customerName),
+      key: 'status',
+      header: 'Status',
+      render: (row) => (
+        <span
+          className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_PILL[row.status]}`}
+        >
+          <span className={`size-1.5 rounded-full ${STATUS_DOT[row.status]}`} />
+          {STATUS_LEGEND_LABEL[row.status]}
+        </span>
+      ),
     },
     {
       key: 'payment',
-      header: 'Payment Type',
-      render: (row) => row.payment || '',
+      header: 'Payment',
+      render: (row) =>
+        row.payment ? (
+          <span className="whitespace-nowrap rounded-md bg-page px-2 py-1 text-xs font-medium text-ink">
+            {row.payment}
+          </span>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
     },
     {
       key: 'myAmount',
-      header: 'My Amount (₹)',
+      header: 'Amount (₹)',
+      align: 'right',
       render: (row) => <span className="tabular-nums">{row.myAmount.toFixed(2)}</span>,
     },
     {
       key: 'tax',
       header: 'Tax (₹)',
+      align: 'right',
       render: (row) => <span className="tabular-nums">{row.tax.toFixed(2)}</span>,
     },
     {
       key: 'discount',
       header: 'Discount (₹)',
+      align: 'right',
       render: (row) => (
-        <span className="tabular-nums">({row.discount.toFixed(2)})</span>
+        <span className="tabular-nums text-muted">{row.discount.toFixed(2)}</span>
       ),
     },
     {
       key: 'grandTotal',
-      header: 'Grand Total (₹)',
+      header: 'Total (₹)',
+      align: 'right',
       render: (row) => {
         const due = row.balanceDue ?? 0
         return (
@@ -137,10 +182,10 @@ export function BillingOrdersTable({
               onClick={() => onEdit(row)}
               aria-label={`Edit order ${row.orderNo}`}
               data-tooltip="Edit order"
-              className="inline-flex items-center gap-1 rounded-lg bg-card px-2 py-1 font-semibold tabular-nums text-primary underline hover:bg-page"
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-base font-bold tabular-nums text-ink hover:bg-page hover:text-primary"
             >
               {row.grandTotal.toFixed(2)}
-              <Pencil size={12} />
+              <Pencil size={12} className="text-muted" />
             </button>
             {due > 0 ? (
               <p className="mt-0.5 text-xs font-semibold text-danger">
@@ -154,7 +199,9 @@ export function BillingOrdersTable({
     {
       key: 'created',
       header: 'Created',
-      render: (row) => <span className="whitespace-nowrap">{row.created}</span>,
+      render: (row) => (
+        <span className="whitespace-nowrap text-xs text-muted">{row.created}</span>
+      ),
     },
     {
       key: 'actions',
@@ -205,12 +252,5 @@ export function BillingOrdersTable({
     },
   ]
 
-  return (
-    <Table
-      columns={columns}
-      rows={rows}
-      rowKey={(row) => row.id}
-      rowClassName={(row) => STATUS_ROW_TINT[row.status]}
-    />
-  )
+  return <Table columns={columns} rows={rows} rowKey={(row) => row.id} />
 }

@@ -41,33 +41,21 @@ interface ItemGridProps {
 
 type DietType = 'veg' | 'non-veg' | 'egg'
 
-const DietMark = ({ type }: { type: DietType }) => {
-  const styles =
-    type === 'egg'
-      ? {
-          box: 'border-secondary',
-          dot: 'bg-secondary',
-          label: 'Egg',
-        }
-      : type === 'non-veg'
-        ? {
-            box: 'border-primary',
-            dot: 'bg-primary',
-            label: 'Non-veg',
-          }
-        : {
-            box: 'border-success',
-            dot: 'bg-success',
-            label: 'Veg',
-          }
+const DIET_DOT: Record<DietType, { box: string; dot: string; label: string }> = {
+  veg: { box: 'border-success', dot: 'bg-success', label: 'Veg' },
+  'non-veg': { box: 'border-primary', dot: 'bg-primary', label: 'Non-veg' },
+  egg: { box: 'border-secondary', dot: 'bg-secondary', label: 'Egg' },
+}
 
+function DietMark({ type }: { type: DietType }) {
+  const d = DIET_DOT[type]
   return (
     <span
-      title={styles.label}
-      aria-label={styles.label}
-      className={`inline-flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border ${styles.box}`}
+      aria-label={d.label}
+      data-tooltip={d.label}
+      className={`inline-flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border ${d.box}`}
     >
-      <span className={`size-1.5 rounded-full ${styles.dot}`} />
+      <span className={`size-1.5 rounded-full ${d.dot}`} />
     </span>
   )
 }
@@ -175,7 +163,7 @@ export function ItemGrid({
             No items match your filters
           </div>
         ) : (
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 xl:grid-cols-4 2xl:grid-cols-5">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
             {items.map((item) => {
               const diet = getDietType(item.tags, item.name)
               const selectedQty = selectedQtyByItemId[item.id] ?? 0
@@ -186,18 +174,16 @@ export function ItemGrid({
                 ? favoriteIds.has(item.id)
                 : Boolean(item.isFavorite)
               return (
-                <li key={item.id} className="relative">
+                <li key={item.id} className="group relative flex">
                   <button
                     type="button"
                     disabled={!item.available}
                     onClick={() => handleItemClick(item)}
                     aria-pressed={selected}
-                    className={`billing-item-card relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border pl-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-                      onToggleFavorite ? 'pr-10' : 'pr-8'
-                    } ${
+                    className={`billing-item-card relative flex min-h-[92px] w-full flex-col justify-between gap-2 overflow-hidden rounded-xl border p-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
                       selected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                        : 'border-line bg-card hover:border-primary/40'
+                        : 'border-line bg-card hover:-translate-y-px hover:border-primary/40 hover:shadow-md'
                     }`}
                   >
                     {tapFlash?.id === item.id ? (
@@ -207,41 +193,34 @@ export function ItemGrid({
                         aria-hidden
                       />
                     ) : null}
-                    <span className="relative flex min-w-0 flex-1 items-center gap-2">
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={`line-clamp-2 text-sm font-semibold leading-snug ${
-                            selected ? 'text-primary' : 'text-ink'
-                          }`}
-                        >
-                          {item.name}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-muted">
-                          ₹{item.price}
-                          {item.shortCode ? ` · ${item.shortCode}` : ''}
-                        </span>
+                    <span className="relative flex items-start justify-between gap-2">
+                      <span
+                        className={`min-w-0 break-words text-[13px] font-semibold leading-snug ${
+                          selected ? 'text-primary' : 'text-ink'
+                        }`}
+                      >
+                        {item.name}
                       </span>
-                      <span className="flex shrink-0 flex-col items-center justify-center gap-1">
-                        {showFavoriteHeart && !onToggleFavorite ? (
-                          <span aria-hidden className="text-primary">
-                            <Heart
-                              size={14}
-                              className="fill-primary text-primary"
-                              strokeWidth={1.5}
-                            />
-                          </span>
-                        ) : null}
-                        {selected ? (
-                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-white">
-                            {selectedQty}
-                          </span>
-                        ) : null}
+                      <span className="mt-0.5">
+                        <DietMark type={diet} />
                       </span>
                     </span>
+                    <span className="relative flex items-center gap-1.5 pr-7">
+                      <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-xs font-bold tabular-nums text-accent">
+                        ₹{item.price}
+                      </span>
+                      {item.shortCode ? (
+                        <span className="rounded-md bg-page px-1.5 py-0.5 text-[11px] font-medium text-muted">
+                          {item.shortCode}
+                        </span>
+                      ) : null}
+                    </span>
                   </button>
-                  <span className="pointer-events-none absolute right-2.5 top-2.5 z-10">
-                    <DietMark type={diet} />
-                  </span>
+                  {selected ? (
+                    <span className="pointer-events-none absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold leading-none text-white shadow">
+                      {selectedQty}
+                    </span>
+                  ) : null}
                   {onToggleFavorite ? (
                     <button
                       type="button"
@@ -257,45 +236,39 @@ export function ItemGrid({
                           ? 'Remove from Favorite Items'
                           : 'Add to Favorite Items'
                       }
-                      className={`absolute bottom-1 right-1.5 z-10 flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-page focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                      className={`absolute bottom-1.5 right-1.5 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-page focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
                         inFavorites ? 'text-primary' : 'text-muted hover:text-primary'
                       }`}
                     >
                       <Heart
-                        size={16}
+                        size={15}
                         strokeWidth={1.75}
                         className={inFavorites ? 'fill-primary' : 'fill-transparent'}
                       />
                     </button>
+                  ) : showFavoriteHeart ? (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute bottom-2 right-2 text-primary"
+                    >
+                      <Heart size={13} className="fill-primary" strokeWidth={1.5} />
+                    </span>
                   ) : null}
                 </li>
               )
             })}
 
             {showOpenItem ? (
-              <li>
+              <li className="flex">
                 <button
                   type="button"
                   onClick={onOpenItemClick}
-                  className="relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border border-line bg-card px-3 text-left"
+                  className="relative flex min-h-[92px] w-full flex-col justify-between gap-2 overflow-hidden rounded-xl border border-line bg-card p-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all hover:-translate-y-px hover:border-primary/40 hover:shadow-md"
                 >
-                  <span className="relative flex min-w-0 flex-1 items-center gap-2">
-                    <span className="min-w-0 flex-1">
-                      <span className="text-sm font-semibold text-ink">
-                        Open Item
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted">
-                        00
-                      </span>
-                    </span>
-                    <span aria-hidden className="shrink-0 text-primary">
-                      <Heart
-                        size={14}
-                        className="fill-primary text-primary"
-                        strokeWidth={1.5}
-                      />
-                    </span>
+                  <span className="text-[13px] font-semibold leading-snug text-ink">
+                    Open Item
                   </span>
+                  <span className="text-[11px] text-muted">Custom name &amp; price</span>
                 </button>
               </li>
             ) : null}

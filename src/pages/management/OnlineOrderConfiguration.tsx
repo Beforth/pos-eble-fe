@@ -17,6 +17,7 @@ import {
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
 import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
+import { BillingSettingsShell } from '../../components/billing/BillingSettingsShell'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { useOutletSettings } from '../../services/useOutletSettings'
 import type { OutletSettingsRecord } from '../../services/outletService'
@@ -88,7 +89,12 @@ function RadioGroup({
   )
 }
 
-export default function OnlineOrderConfiguration() {
+/**
+ * Online / Advance Order Configuration. `standalone` puts the very same screen on a billing page
+ * (`/billing/settings/<name>`) under the billing header; Back / Cancel / Save then
+ * return to Outlet Settings in billing instead of the admin configuration.
+ */
+export default function OnlineOrderConfiguration({ standalone = false }: { standalone?: boolean }) {
   const navigate = useNavigate()
 
   const [kotAfterAutoAccept, setKotAfterAutoAccept] = useState(true)
@@ -167,7 +173,7 @@ export default function OnlineOrderConfiguration() {
 
 
   function goBack() {
-    navigate('/management/configuration/outlet')
+    navigate(standalone ? '/billing/settings' : '/management/configuration/outlet')
   }
 
   async function handleSave() {
@@ -203,19 +209,17 @@ export default function OnlineOrderConfiguration() {
   }
 
   if (loading && !data) {
-    return <SettingsPageLoading />
+    return standalone ? (
+      <BillingSettingsShell current="Online / Advance Order Configuration">
+        <div className="py-12 text-center text-sm text-muted">Loading settings…</div>
+      </BillingSettingsShell>
+    ) : (
+      <SettingsPageLoading />
+    )
   }
 
-  return (
-    <ReportsPageShell
-      title={
-        <ConfigBreadcrumb
-          onNavigate={goBack}
-          current="Online / Advance Order Configuration"
-        />
-      }
-      activeItem="config-outlet"
-    >
+  const content = (
+    <>
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         Configuration System Level Parameters Such As Auto Accept, Cancellation
@@ -443,6 +447,24 @@ export default function OnlineOrderConfiguration() {
       </ConfigSectionCard>
 
       <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
+    </>
+  )
+
+  if (standalone) {
+    return <BillingSettingsShell current="Online / Advance Order Configuration">{content}</BillingSettingsShell>
+  }
+
+  return (
+    <ReportsPageShell
+      title={
+        <ConfigBreadcrumb
+          onNavigate={goBack}
+          current="Online / Advance Order Configuration"
+        />
+      }
+      activeItem="config-outlet"
+    >
+      {content}
     </ReportsPageShell>
   )
 }

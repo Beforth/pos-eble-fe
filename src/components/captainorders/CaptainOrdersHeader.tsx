@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
+  ToggleRight,
   Bell,
   BookOpen,
   ChefHat,
@@ -9,10 +10,8 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
-  MapPin,
   Menu,
   Monitor,
-  Phone,
   Plus,
   Search,
   Settings,
@@ -25,11 +24,8 @@ import {
 import { useAuth } from '../../auth/AuthContext'
 import { isCashierUser } from '../../auth/routePermissions'
 import { BrandLogo } from '../brand/BrandLogo'
+import { StoreStatusDrawer } from '../billing/StoreStatusDrawer'
 import { brand } from '../../theme/brand'
-import {
-  useBillingMenu,
-  type MenuItemRow,
-} from '../../utils/menuAdapter'
 import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
 import {
   listDayEndClosuresApi,
@@ -69,11 +65,9 @@ export function CaptainOrdersHeader({
   const canSeeHome = isAdmin || isCashierUser(user)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [menuViewOpen, setMenuViewOpen] = useState(false)
   const [storeInfoOpen, setStoreInfoOpen] = useState(false)
   const [quickReportsOpen, setQuickReportsOpen] = useState(false)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
-  const [menuSearch, setMenuSearch] = useState('')
   const [recentDayEnd, setRecentDayEnd] = useState<DayEndSummaryRow[]>([])
 
   useEffect(() => {
@@ -114,33 +108,6 @@ export function CaptainOrdersHeader({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [profileOpen])
-
-  const {
-    items: menuItems,
-    categories: menuReferenceCategories,
-  } = useBillingMenu()
-
-  const menuGrouped = useMemo(() => {
-    const q = menuSearch.trim().toLowerCase()
-    const filtered = q
-      ? menuItems.filter(
-          (item) =>
-            item.available &&
-            (item.name.toLowerCase().includes(q) ||
-              item.shortCode.includes(q)),
-        )
-      : menuItems.filter((item) => item.available)
-    const groups: Record<string, MenuItemRow[]> = {}
-    for (const item of filtered) {
-      const cat = menuReferenceCategories.find(
-        (c) => c.id === item.categoryId,
-      )
-      const catName = cat?.name ?? 'Other'
-      if (!groups[catName]) groups[catName] = []
-      groups[catName].push(item)
-    }
-    return groups
-  }, [menuSearch, menuItems, menuReferenceCategories])
 
   const recentSummary = useMemo(() => {
     const rows = recentDayEnd.slice(0, 7)
@@ -206,7 +173,15 @@ export function CaptainOrdersHeader({
         <div className="ml-auto flex items-center gap-0.5 sm:gap-1">
           {(
             [
-              { icon: BookOpen, label: 'Digital menu', onClick: () => setMenuViewOpen(true) },
+              ...(canAccess('/billing/menu-on-off')
+                ? [
+                    {
+                      icon: ToggleRight,
+                      label: 'Menu On/Off',
+                      onClick: () => navigate('/billing/menu-on-off'),
+                    },
+                  ]
+                : []),
               { icon: Store, label: 'Store', onClick: () => setStoreInfoOpen(true) },
               // Navigating icons are gated exactly like UniversalSearchBar gates
               // its results: `/customer-display` is unmapped (admin-only) and
@@ -489,225 +464,7 @@ export function CaptainOrdersHeader({
         </div>
       ) : null}
 
-      {/* ─── MODAL: Digital Menu ─── */}
-      {menuViewOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close digital menu"
-            onClick={() => {
-              setMenuViewOpen(false)
-              setMenuSearch('')
-            }}
-            className="absolute inset-0 bg-black/45"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Digital Menu"
-            className="relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-line bg-card shadow-2xl"
-          >
-            <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-              <div className="flex items-center gap-2.5">
-                <BookOpen size={18} className="text-primary" />
-                <h2 className="text-base font-bold text-ink">
-                  Digital Menu
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuViewOpen(false)
-                  setMenuSearch('')
-                }}
-                aria-label="Close"
-                data-tooltip="Close"
-                className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
-              >
-                <X size={18} />
-              </button>
-            </header>
-
-            <div className="border-b border-line px-5 py-3">
-              <div className="relative">
-                <Search
-                  size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-                />
-                <input
-                  type="text"
-                  value={menuSearch}
-                  onChange={(e) => setMenuSearch(e.target.value)}
-                  placeholder="Search items or short codes..."
-                  className="h-9 w-full rounded-lg border border-line bg-page pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              {Object.keys(menuGrouped).length === 0 ? (
-                <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 text-center">
-                  <UtensilsCrossed size={32} className="text-line" />
-                  <p className="text-sm text-muted">No items found</p>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {Object.entries(menuGrouped).map(([catName, items]) => (
-                    <div key={catName}>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted">
-                        {catName}
-                      </h3>
-                      <div className="divide-y divide-line rounded-lg border border-line">
-                        {items.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center justify-between px-3 py-2.5"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-ink">
-                                {item.name}
-                              </p>
-                              <span className="mr-2 inline-block rounded bg-page px-1.5 py-0.5 text-[10px] font-bold text-muted">
-                                {item.shortCode}
-                              </span>
-                            </div>
-                            <span className="shrink-0 pl-3 text-sm font-semibold text-accent">
-                              ₹
-                              {item.price.toLocaleString('en-IN', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* ─── MODAL: Store Info ─── */}
-      {storeInfoOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="Close store info"
-            onClick={() => setStoreInfoOpen(false)}
-            className="absolute inset-0 bg-black/45"
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Store Info"
-            className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-line bg-card shadow-2xl"
-          >
-            <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-              <div className="flex items-center gap-2.5">
-                <Store size={18} className="text-primary" />
-                <h2 className="text-base font-bold text-ink">Store Info</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStoreInfoOpen(false)}
-                aria-label="Close"
-                data-tooltip="Close"
-                className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
-              >
-                <X size={18} />
-              </button>
-            </header>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              <div className="space-y-4">
-                <div className="rounded-lg border border-line bg-page/60 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                    Shop Name
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-ink">
-                    {brand.shopName}
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-line bg-page/60 p-4">
-                  <div className="flex items-start gap-2.5">
-                    <Store size={14} className="mt-0.5 shrink-0 text-muted" />
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                        Outlet
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-ink">
-                        {brand.outletName}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-line bg-page/60 p-4">
-                  <div className="flex items-start gap-2.5">
-                    <MapPin size={14} className="mt-0.5 shrink-0 text-muted" />
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                        Address
-                      </p>
-                      <p className="mt-1 text-sm font-medium text-ink">
-                        {brand.address}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-line bg-page/60 p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                      PAN
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-ink">
-                      {brand.panNumber}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-line bg-page/60 p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                      Currency
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-ink">
-                      {brand.currency}
-                    </p>
-                  </div>
-                </div>
-
-                {user?.phone ? (
-                  <div className="rounded-lg border border-line bg-page/60 p-4">
-                    <div className="flex items-start gap-2.5">
-                      <Phone size={14} className="mt-0.5 shrink-0 text-muted" />
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                          Contact
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-ink">
-                          {user.phone}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="rounded-lg border border-line bg-page/60 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted">
-                    App Version
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-ink">
-                    {brand.appVersion}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <StoreStatusDrawer open={storeInfoOpen} onClose={() => setStoreInfoOpen(false)} />
 
       {/* ─── MODAL: Quick Reports ─── */}
       {quickReportsOpen ? (

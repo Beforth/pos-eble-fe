@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { showToast } from '../utils/toast'
-import { Search } from 'lucide-react'
+import { ChevronLeft, Search } from 'lucide-react'
 import { Badge } from '../components/common/Badge'
+import { BillingHeader } from '../components/billing/BillingHeader'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { useAuth } from '../auth/AuthContext'
 import { useMenuChannels } from '../state/MenuChannelsContext'
+import { useNewOrder } from '../state/useNewOrder'
 import { listCategoriesApi, updateItemApi } from '../services/menuService'
 import { fetchCategoryItemsCached, invalidateMenuItems } from '../state/menuItemsCache'
 import type { Category, Item, ItemAvailability } from '../types/menu'
@@ -101,7 +104,15 @@ function toRow(item: Item): MenuItemRow {
   }
 }
 
-export default function MenuOnOff() {
+/**
+ * Menu On/Off. In the Menu section it sits inside the menu shell; `standalone`
+ * puts the very same screen on a billing page (`/billing/menu-on-off`), so the
+ * counter can use it without ever entering the Menu section.
+ */
+export default function MenuOnOff({ standalone = false }: { standalone?: boolean }) {
+  const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
+  const [billNo, setBillNo] = useState('')
   const { encryptedOutletId } = useAuth()
   const { channels } = useMenuChannels()
 
@@ -347,10 +358,8 @@ export default function MenuOnOff() {
 
   const gridCols = `minmax(0,1fr) ${activePlatforms.map(() => '6.5rem').join(' ')}`
 
-  return (
-    <MenuPageShell activeItem="menu-on-off" title="Menu on / off" fillViewport>
-
-      <div className="menu-panel-viewport-fill is-fixed-height">
+  const content = (
+      <div className={standalone ? 'h-full' : 'menu-panel-viewport-fill is-fixed-height'}>
         <div className="menu-on-off-shell">
         {/* Category rail */}
         <aside className="menu-on-off-categories hidden md:flex">
@@ -564,6 +573,36 @@ export default function MenuOnOff() {
         </div>
       </div>
       </div>
+  )
+
+  if (standalone) {
+    return (
+      <div className="flex h-dvh flex-col overflow-hidden bg-page">
+        <BillingHeader
+          billNo={billNo}
+          onBillNoChange={setBillNo}
+          onNewOrder={() => startNewOrder()}
+          onViewKot={() => navigate('/billing?kot=1')}
+        />
+        <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
+          <h1 className="text-lg font-bold text-ink">Menu on / off</h1>
+          <button
+            type="button"
+            onClick={() => navigate('/billing/operations')}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
+          >
+            <ChevronLeft size={14} />
+            Back
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 sm:px-5">{content}</div>
+      </div>
+    )
+  }
+
+  return (
+    <MenuPageShell activeItem="menu-on-off" title="Menu on / off" fillViewport>
+      {content}
     </MenuPageShell>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { FileText, Pencil, Plus, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'

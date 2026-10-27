@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  ChevronLeft,
   CreditCard,
   MapPin,
   MonitorSmartphone,
@@ -10,19 +11,27 @@ import {
   Trash2,
   UtensilsCrossed,
 } from 'lucide-react'
+import { BillingHeader } from '../components/billing/BillingHeader'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import {
   OutlineButton,
   PrimaryButton,
 } from '../components/menu/MenuActionButtons'
 import { deleteOutlet, getOutlets, type OutletData } from '../mocks/outletStore'
+import { useNewOrder } from '../state/useNewOrder'
 
 const TONE_PRIMARY = 'bg-primary/10 text-primary'
 const TONE_ACCENT = 'bg-accent/15 text-accent'
 const TONE_GREEN = 'bg-emerald-50 text-emerald-600'
 
-export default function MenuManagement() {
+/**
+ * Menu Management. `standalone` puts the very same screen on a billing page
+ * (`/billing/menu`) under the billing header instead of the Menu section's shell.
+ */
+export default function MenuManagement({ standalone = false }: { standalone?: boolean }) {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
+  const [billNo, setBillNo] = useState('')
   const [outlets, setOutlets] = useState<OutletData[]>([])
 
   const refresh = useCallback(() => {
@@ -54,11 +63,8 @@ export default function MenuManagement() {
     refresh()
   }
 
-  return (
-    <MenuPageShell
-      title={<span className="text-primary">Menu Management</span>}
-      backTo="/dashboard"
-    >
+  const content = (
+    <>
       {/* ── Header ── */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -211,6 +217,40 @@ export default function MenuManagement() {
           </div>
         )}
       </section>
+    </>
+  )
+
+  if (standalone) {
+    return (
+      <div className="flex h-dvh flex-col overflow-hidden bg-page">
+        <BillingHeader
+          billNo={billNo}
+          onBillNoChange={setBillNo}
+          onNewOrder={() => startNewOrder()}
+          onViewKot={() => navigate('/billing?kot=1')}
+        />
+        <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
+          <h1 className="text-lg font-bold text-primary">Menu Management</h1>
+          <button
+            type="button"
+            onClick={() => navigate('/billing/operations')}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
+          >
+            <ChevronLeft size={14} />
+            Back
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{content}</div>
+      </div>
+    )
+  }
+
+  return (
+    <MenuPageShell
+      title={<span className="text-primary">Menu Management</span>}
+      backTo="/dashboard"
+    >
+      {content}
     </MenuPageShell>
   )
 }

@@ -73,6 +73,7 @@ const CONFIG_TILES: ConfigTile[] = [
     id: 'cash-flow',
     label: 'Cash Flow',
     icon: <Banknote size={28} strokeWidth={1.5} />,
+    to: '/billing/cashflow',
   },
   {
     id: 'expense',
@@ -92,7 +93,7 @@ const CONFIG_TILES: ConfigTile[] = [
   {
     id: 'inventory',
     label: 'Inventory',
-    to: '/configuration/inventory',
+    to: '/billing/inventory',
     icon: <ClipboardList size={28} strokeWidth={1.5} />,
   },
   {

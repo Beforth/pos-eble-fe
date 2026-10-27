@@ -119,3 +119,31 @@ export function rejectOnlineOrderApi(
     token: authToken(),
   })
 }
+
+// ─── store open / closed at Swiggy and Zomato ────────────────────────────────
+
+export type StorePlatform = 'swiggy' | 'zomato'
+
+export interface StoreStatusRow {
+  platform: StorePlatform
+  name: string
+  /** `null` when Wera's answer could not be read for this platform. */
+  open: boolean | null
+}
+
+export function getStoreStatusApi(outletId: string): Promise<{ stores: StoreStatusRow[] }> {
+  return apiRequest<{ stores: StoreStatusRow[] }>(
+    `/api/v1/integrations/${outletId}/store-status/`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export function setStoreStatusApi(
+  outletId: string,
+  body: { platform: StorePlatform | 'all'; open: boolean; reason?: string },
+): Promise<{ platforms: StorePlatform[]; open: boolean }> {
+  return apiRequest<{ platforms: StorePlatform[]; open: boolean }>(
+    `/api/v1/integrations/${outletId}/store-status/`,
+    { method: 'POST', body: JSON.stringify(body), token: authToken() },
+  )
+}

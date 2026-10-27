@@ -154,12 +154,6 @@ const inputClass =
 
 const REQUIRED_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'short_code', label: 'Short Code' },
-  { key: 'short_code_2', label: 'Short Code 2' },
-  { key: 'item_unit', label: 'Item Unit' },
-  { key: 'description', label: 'Description' },
-  { key: 'long_description', label: 'Long Description' },
-  { key: 'sap_code', label: 'SAP Code' },
-  { key: 'fsn_code', label: 'FSN Code' },
 ]
 
 function FieldError({ message }: { message?: string }) {
@@ -405,12 +399,6 @@ export function MenuItemForm({
 
   const requiredFieldValues: Record<string, string> = {
     short_code: shortCode,
-    short_code_2: shortCode2,
-    item_unit: itemUnit,
-    description,
-    long_description: longDescription,
-    sap_code: sapCode,
-    fsn_code: fsnCode,
   }
 
   function hasFieldError(key: string) {
@@ -637,7 +625,13 @@ export function MenuItemForm({
             <input
               type="text"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                const next = event.target.value
+                if (onlineDisplayName === '' || onlineDisplayName === name) {
+                  setOnlineDisplayName(next)
+                }
+                setName(next)
+              }}
               placeholder="e.g. Masala Dabeli"
               className={inputClass}
             />
@@ -672,7 +666,7 @@ export function MenuItemForm({
             <FieldError message={serverErrors.short_code} />
           </div>
           <div>
-            <FieldLabel required>Short Code 2</FieldLabel>
+            <FieldLabel>Short Code 2</FieldLabel>
             <input
               type="text"
               value={shortCode2}
@@ -691,11 +685,11 @@ export function MenuItemForm({
               type="text"
               value={onlineDisplayName}
               onChange={(event) => setOnlineDisplayName(event.target.value)}
-              placeholder="Defaults to item name"
+              placeholder="Same as item name"
               className={inputClass}
             />
             <p className="mt-1 text-xs text-muted">
-              If left blank, the item name will be used.
+              Follows the item name until you change it.
             </p>
           </div>
           <div>
@@ -710,7 +704,7 @@ export function MenuItemForm({
             />
           </div>
           <div>
-            <FieldLabel required>Item Unit</FieldLabel>
+            <FieldLabel>Item Unit</FieldLabel>
             <input
               type="text"
               value={itemUnit}
@@ -737,7 +731,7 @@ export function MenuItemForm({
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <FieldLabel required>Description</FieldLabel>
+            <FieldLabel>Description</FieldLabel>
             <textarea
               value={description}
               onChange={(event) => {
@@ -753,7 +747,7 @@ export function MenuItemForm({
             <FieldError message={serverErrors.description} />
           </div>
           <div>
-            <FieldLabel required>Long Description</FieldLabel>
+            <FieldLabel>Long Description</FieldLabel>
             <textarea
               value={longDescription}
               onChange={(event) => {
@@ -948,7 +942,7 @@ export function MenuItemForm({
       <Section icon={<span className="text-xs font-bold">§</span>} title="Codes & Margins">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div>
-            <FieldLabel required>SAP Code</FieldLabel>
+            <FieldLabel>SAP Code</FieldLabel>
             <input
               type="text"
               value={sapCode}
@@ -974,7 +968,7 @@ export function MenuItemForm({
             <FieldError message={serverErrors.hsn_code} />
           </div>
           <div>
-            <FieldLabel required>FSN Code</FieldLabel>
+            <FieldLabel>FSN Code</FieldLabel>
             <input
               type="text"
               value={fsnCode}

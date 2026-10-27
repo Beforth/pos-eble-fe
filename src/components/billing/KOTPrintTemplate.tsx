@@ -102,22 +102,26 @@ export function KOTPrintTemplate({ ticket, onClose }: KOTPrintTemplateProps) {
           <span>Order Type:</span>
           <span style={boldStyle}>{orderTypeLabel}</span>
         </div>
-        {ticket.orderType === 'dine-in' && (
-          <div style={rowStyle}>
-            <span>Table:</span>
-            <span style={boldStyle}>{ticket.tableNo}</span>
-          </div>
-        )}
+        {ticket.orderType === 'dine-in' &&
+          ticket.tableId &&
+          ticket.tableId !== 'no-table' && (
+            <div style={rowStyle}>
+              <span>Table:</span>
+              <span style={boldStyle}>{ticket.tableNo}</span>
+            </div>
+          )}
         {ticket.persons > 0 && (
           <div style={rowStyle}>
             <span>Covers:</span>
             <span>{ticket.persons}</span>
           </div>
         )}
-        <div style={rowStyle}>
-          <span>Server:</span>
-          <span>{ticket.biller}</span>
-        </div>
+        {ticket.customerName?.trim() ? (
+          <div style={rowStyle}>
+            <span>Customer:</span>
+            <span style={boldStyle}>{ticket.customerName.trim()}</span>
+          </div>
+        ) : null}
         <div style={rowStyle}>
           <span>Date/Time:</span>
           <span>{formatDateTime(new Date(ticket.createdAt))}</span>
