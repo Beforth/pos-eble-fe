@@ -172,6 +172,8 @@ export interface SettleKotOrderOptions {
   customerName: string
   customerPhone: string
   settlementBy?: string
+  /** Tip given on the settle screen; saved with the order, not added to the bill. */
+  tip?: number
   /** Optional amount override (scan/settle input); defaults to computed total. */
   grandTotal?: number
 }
@@ -192,6 +194,7 @@ export async function settleKotOrder(options: SettleKotOrderOptions): Promise<vo
     customerName,
     customerPhone,
     settlementBy,
+    tip,
     grandTotal,
   } = options
   const bill = kotItemsForOrder(tickets, options.tax)
@@ -214,6 +217,7 @@ export async function settleKotOrder(options: SettleKotOrderOptions): Promise<vo
     grand_total: bill.grand_total,
     received_amount: grandTotal ?? bill.grand_total,
     settlement_by: settlementBy || undefined,
+    tip: tip && tip > 0 ? tip : undefined,
   }
 
   if (orderId) {

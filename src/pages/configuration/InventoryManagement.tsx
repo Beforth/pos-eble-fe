@@ -39,14 +39,14 @@ const SECTIONS: InventorySection[] = [
         description:
           'Keep a clear record of all raw material purchases and inward entries to maintain accurate inventory tracking.',
         icon: <ShoppingCart {...ICON_PROPS} />,
-        to: '/inventory/purchase',
+        to: '/billing/inventory/purchase',
       },
       {
         label: 'Purchase Order',
         description:
           'Easily create and track purchase orders (POs) for better procurement management.',
         icon: <Receipt {...ICON_PROPS} />,
-        to: '/inventory/purchase-order',
+        to: '/billing/inventory/purchase-order',
       },
     ],
   },
@@ -58,14 +58,14 @@ const SECTIONS: InventorySection[] = [
         description:
           'Record and track raw material or item wastage for accurate inventory management.',
         icon: <Trash2 {...ICON_PROPS} />,
-        to: '/inventory/wastage',
+        to: '/billing/inventory/wastage',
       },
       {
         label: 'Production Execution',
         description:
           'Production of raw materials into cooked or semi-cooked products.',
         icon: <UtensilsCrossed {...ICON_PROPS} />,
-        to: '/inventory/production-execution',
+        to: '/billing/inventory/production-execution',
       },
     ],
   },
@@ -76,13 +76,13 @@ const SECTIONS: InventorySection[] = [
         label: 'Current Stock',
         description: 'The report shows the current stock of your ingredients.',
         icon: <BarChart3 {...ICON_PROPS} />,
-        to: '/inventory/current-stock',
+        to: '/billing/inventory/current-stock',
       },
       {
         label: 'Opening - Closing Report',
         description: 'Displays the opening and closing stock of your ingredients.',
         icon: <FileBarChart {...ICON_PROPS} />,
-        to: '/inventory/other-reports/opening-closing',
+        to: '/billing/inventory/other-reports/opening-closing',
       },
       {
         label: 'Indent Management',
@@ -120,7 +120,7 @@ export default function InventoryManagement() {
         <h1 className="text-lg font-bold text-ink">Inventory Management</h1>
         <button
           type="button"
-          onClick={() => navigate('/configuration')}
+          onClick={() => navigate('/billing/operations')}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
         >
           <ChevronLeft size={14} />

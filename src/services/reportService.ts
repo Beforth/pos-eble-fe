@@ -4,6 +4,16 @@ import { AUTH_TOKEN_KEY } from '../auth/storage'
 export type ReportSlug =
   | 'sales-summary'
   | 'sales-report'
+  | 'group-wise'
+  | 'variation-wise'
+  | 'cover-size'
+  | 'tip-summary'
+  | 'counter-summary'
+  | 'locality-wise'
+  | 'captain-wise'
+  | 'settlement-summary'
+  | 'nc-item-summary'
+  | 'assignee-wise'
   | 'item-wise'
   | 'category-wise'
   | 'payment-mode'
@@ -80,6 +90,60 @@ export function fetchOrderSummaryApi(
   const query = new URLSearchParams({ from: range.from, to: range.to })
   return apiRequest<OrderSummaryResult>(
     `/api/v1/orders/${outletId}/reports/order-summary/?${query.toString()}`,
+    { method: 'GET', token: localStorage.getItem(AUTH_TOKEN_KEY) ?? undefined },
+  )
+}
+
+export interface EmployeeSummaryResult {
+  slug: 'employee-summary'
+  title: string
+  from: string
+  to: string
+  billers: {
+    name: string
+    punched: number
+    success: number
+    cancelled: number
+    discounted: number
+    modified: number
+    reprinted: number
+    payments: { mode: string; total: string }[]
+    total: string
+  }[]
+  totals: Record<string, number>
+  grand_total: string
+}
+
+/** `GET /api/v1/orders/{outlet}/reports/employee-summary/` — per billing user blocks. */
+export function fetchEmployeeSummaryApi(
+  outletId: string,
+  range: { from: string; to: string },
+): Promise<EmployeeSummaryResult> {
+  const query = new URLSearchParams({ from: range.from, to: range.to })
+  return apiRequest<EmployeeSummaryResult>(
+    `/api/v1/orders/${outletId}/reports/employee-summary/?${query.toString()}`,
+    { method: 'GET', token: localStorage.getItem(AUTH_TOKEN_KEY) ?? undefined },
+  )
+}
+
+export interface TipSummaryResult {
+  slug: 'tip-summary'
+  title: string
+  from: string
+  to: string
+  total_tip: string
+  employees: { employee: string; amount: string }[]
+  tables: { table: string; amount: string }[]
+}
+
+/** `GET /api/v1/orders/{outlet}/reports/tip-summary/` — tips by employee and by table. */
+export function fetchTipSummaryApi(
+  outletId: string,
+  range: { from: string; to: string },
+): Promise<TipSummaryResult> {
+  const query = new URLSearchParams({ from: range.from, to: range.to })
+  return apiRequest<TipSummaryResult>(
+    `/api/v1/orders/${outletId}/reports/tip-summary/?${query.toString()}`,
     { method: 'GET', token: localStorage.getItem(AUTH_TOKEN_KEY) ?? undefined },
   )
 }

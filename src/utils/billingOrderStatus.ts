@@ -1,24 +1,24 @@
 import type { OrderStatus } from '../mocks/allOrdersData'
 
-/** Row tint per status, matching the legend above the orders table. */
-export const STATUS_ROW_TINT: Record<OrderStatus, string> = {
-  Saved: 'bg-card',
-  Printed: 'bg-emerald-50',
-  Settled: 'bg-orange-100',
-  Cancelled: 'bg-red-100',
+/** Status pill classes (tinted background + text), from the app's own palette. */
+export const STATUS_PILL: Record<OrderStatus, string> = {
+  Saved: 'bg-page text-muted ring-1 ring-inset ring-line',
+  Printed: 'bg-accent/10 text-accent',
+  Settled: 'bg-success/10 text-success',
+  Cancelled: 'bg-danger/10 text-danger',
 }
 
-/** Legend dot per status. */
+/** Status dot per status (legend chips and pills). */
 export const STATUS_DOT: Record<OrderStatus, string> = {
-  Saved: 'border border-line bg-card',
-  Printed: 'bg-emerald-400',
-  Settled: 'bg-orange-300',
-  Cancelled: 'bg-red-400',
+  Saved: 'bg-muted',
+  Printed: 'bg-accent',
+  Settled: 'bg-success',
+  Cancelled: 'bg-danger',
 }
 
 export const STATUS_LEGEND_LABEL: Record<OrderStatus, string> = {
-  Saved: 'Saved Bill',
-  Printed: 'Printed Bill',
-  Cancelled: 'Cancelled Bill',
+  Saved: 'Saved',
+  Printed: 'Printed',
+  Cancelled: 'Cancelled',
   Settled: 'Paid',
 }

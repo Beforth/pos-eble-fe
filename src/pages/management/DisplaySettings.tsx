@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
 import {
@@ -30,9 +30,11 @@ import {
   ConfigSectionCard,
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
+import { BillingHeader } from '../../components/billing/BillingHeader'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { useOutletSettings } from '../../services/useOutletSettings'
+import { useNewOrder } from '../../state/useNewOrder'
 import type { OutletSettingsRecord } from '../../services/outletService'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
 import { brand } from '../../theme/brand'
@@ -182,8 +184,15 @@ function ReasonFields({
   )
 }
 
-export default function DisplaySettings() {
+/**
+ * Display settings. `standalone` puts the very same screen on a billing page
+ * (`/billing/settings/display`) under the billing header, with its Back / Cancel /
+ * Save going back to Outlet Settings in billing instead of the admin configuration.
+ */
+export default function DisplaySettings({ standalone = false }: { standalone?: boolean }) {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
+  const [billNo, setBillNo] = useState('')
 
   const [layout, setLayout] = useState('Touch Screen')
   const [menuSide, setMenuSide] = useState('On the Left')
@@ -471,7 +480,24 @@ export default function DisplaySettings() {
 
 
   function goBack() {
-    navigate('/management/configuration/outlet')
+    navigate(standalone ? '/billing/settings' : '/management/configuration/outlet')
+  }
+
+  function billingShell(body: ReactNode) {
+    return (
+      <div className="flex h-dvh flex-col overflow-hidden bg-page">
+        <BillingHeader
+          billNo={billNo}
+          onBillNoChange={setBillNo}
+          onNewOrder={() => startNewOrder()}
+          onViewKot={() => navigate('/billing?kot=1')}
+        />
+        <div className="border-b border-line bg-card px-5 py-3">
+          <ConfigBreadcrumb onNavigate={goBack} parent="Outlet Settings" current="Display" />
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{body}</div>
+      </div>
+    )
   }
 
   function toggleList(
@@ -623,11 +649,17 @@ export default function DisplaySettings() {
   }
 
   if (loading && !data) {
-    return <SettingsPageLoading />
+    return standalone ? (
+      billingShell(
+        <div className="py-12 text-center text-sm text-muted">Loading settings…</div>,
+      )
+    ) : (
+      <SettingsPageLoading />
+    )
   }
 
-  return (
-    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Display" />} activeItem="config-outlet">
+  const content = (
+    <>
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         The following settings can be used to configure the billing screen and
@@ -1531,6 +1563,14 @@ export default function DisplaySettings() {
       </ConfigSectionCard>
 
       <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
+    </>
+  )
+
+  if (standalone) return billingShell(content)
+
+  return (
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Display" />} activeItem="config-outlet">
+      {content}
     </ReportsPageShell>
   )
 }

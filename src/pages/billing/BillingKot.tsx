@@ -301,7 +301,12 @@ export default function BillingKot() {
 
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-ink">Kot Listing</h1>
+          <div>
+            <h1 className="text-xl font-bold text-ink">KOT Listing</h1>
+            <p className="mt-0.5 text-sm text-muted">
+              Every kitchen ticket and where it stands.
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <ExportExcelMenu
               onExportPage={() => exportRows(rows, "page")}
@@ -323,16 +328,16 @@ export default function BillingKot() {
             type="button"
             onClick={() => setSearchOpen((open) => !open)}
             aria-expanded={searchOpen}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-3.5 text-sm font-medium text-ink hover:bg-page"
           >
             <Search size={14} />
             Search
             <ChevronDown size={14} className={searchOpen ? "rotate-180" : ""} />
           </button>
-          <div className="flex flex-wrap items-center gap-4 rounded-lg bg-card px-4 py-2 text-sm text-ink">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
             {KOT_LEGEND.map((entry) => (
               <span key={entry.label} className="inline-flex items-center gap-1.5">
-                <span className={`size-3.5 rounded-full ${entry.dot}`} />
+                <span className={`size-2.5 rounded-full ${entry.dot}`} />
                 {entry.label}
               </span>
             ))}

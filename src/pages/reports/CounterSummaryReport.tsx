@@ -1,99 +1,272 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Printer } from 'lucide-react'
+import { ChevronDown, ChevronLeft, Columns3, Download, Printer } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
 import { BillingHeader } from '../../components/billing/BillingHeader'
-import { INVOICE_REPORT_ROWS, summarizeInvoiceReport } from '../../mocks/invoiceReportData'
+import { fetchReportApi, type ReportResult } from '../../services/reportService'
 import { useNewOrder } from '../../state/useNewOrder'
+import { downloadCsv } from '../../utils/exportCsv'
+import { showToast } from '../../utils/toast'
+
+/** Local calendar day as YYYY-MM-DD, `offset` days from today. */
+function dayIso(offset = 0): string {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function displayDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return y && m && d ? `${d}-${m}-${y}` : iso
+}
+
+function formatCell(value: string | number | undefined, type: string): string {
+  if (value === undefined || value === '') return ''
+  if (type === 'money') {
+    const n = Number(value)
+    return Number.isFinite(n)
+      ? n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : String(value)
+  }
+  return String(value)
+}
+
+const BUTTON_CLASS =
+  'inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
 
 export default function CounterSummaryReport() {
   const navigate = useNavigate()
   const { startNewOrder } = useNewOrder()
+  const { encryptedOutletId } = useAuth()
   const [billNo, setBillNo] = useState('')
+  const [from, setFrom] = useState(() => dayIso())
+  const [to, setTo] = useState(() => dayIso())
+  const [data, setData] = useState<ReportResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const columnsRef = useRef<HTMLDivElement>(null)
 
-  const stats = useMemo(() => summarizeInvoiceReport(INVOICE_REPORT_ROWS), [])
+  useEffect(() => {
+    if (!encryptedOutletId || !from || !to) return
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    fetchReportApi(encryptedOutletId, 'counter-summary', { from, to })
+      .then((result) => {
+        if (!cancelled) setData(result)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setData(null)
+        setError(err instanceof Error ? err.message : 'Could not load the report')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, from, to])
 
-  function handleExport() {
-    const header = 'Counter,Bills,Sales Amount,Avg Bill Value'
-    const lines = [
-      header,
-      ...INVOICE_REPORT_ROWS.map((r) =>
-        `${r.restaurant},${r.totalBills},${r.salesBillAmount},${r.totalBills > 0 ? (r.salesBillAmount / r.totalBills).toFixed(2) : '0'}`,
-      ),
-    ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'counter-summary.csv'; a.click()
-    URL.revokeObjectURL(url)
+  useEffect(() => {
+    if (!columnsOpen) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (!columnsRef.current?.contains(event.target as Node)) setColumnsOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [columnsOpen])
+
+  const columns = useMemo(
+    () => (data?.columns ?? []).filter((col) => !hidden.has(col.key)),
+    [data, hidden],
+  )
+  const rows = data?.rows ?? []
+  const hasTotals = data != null && Object.keys(data.totals).length > 0
+
+  function toggleColumn(key: string) {
+    setHidden((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
-  const rows = INVOICE_REPORT_ROWS.map((r) => ({
-    ...r,
-    avgBill: r.totalBills > 0 ? r.salesBillAmount / r.totalBills : 0,
-  }))
+  function pickDay(offset: number) {
+    setFrom(dayIso(offset))
+    setTo(dayIso(offset))
+  }
+
+  function exportCsv() {
+    if (rows.length === 0 || !data) {
+      showToast('Nothing to export')
+      return
+    }
+    const body = rows.map((row) => columns.map((col) => row[col.key] ?? ''))
+    if (hasTotals) body.push(columns.map((col) => data.totals[col.key] ?? ''))
+    downloadCsv(
+      `counter-summary_${from}_${to}.csv`,
+      columns.map((col) => col.label),
+      body,
+    )
+  }
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader billNo={billNo} onBillNoChange={setBillNo} onNewOrder={() => startNewOrder()} onViewKot={() => navigate('/billing?kot=1')} />
-      <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-ink">Counter Summary</h1>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={handleExport} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Download size={14} className="text-muted" /> Export CSV
+      <BillingHeader
+        billNo={billNo}
+        onBillNoChange={setBillNo}
+        onNewOrder={() => startNewOrder()}
+        onViewKot={() => navigate('/billing?kot=1')}
+      />
+
+      <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
+        <h1 className="text-lg font-bold text-ink">Counter Summary</h1>
+        <button
+          type="button"
+          onClick={() => navigate('/reports')}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
+        >
+          <ChevronLeft size={14} />
+          Back
+        </button>
+      </div>
+
+      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div ref={columnsRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setColumnsOpen((open) => !open)}
+              aria-expanded={columnsOpen}
+              className={BUTTON_CLASS}
+            >
+              <Columns3 size={16} />
+              Configure Column
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${columnsOpen ? 'rotate-180' : ''}`}
+              />
             </button>
-            <button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Printer size={14} className="text-muted" /> Print
+            {columnsOpen && (
+              <div className="absolute left-0 top-12 z-20 max-h-80 w-72 overflow-y-auto rounded-lg border border-line bg-card shadow-lg">
+                {(data?.columns ?? [])
+                  .filter((col) => col.key !== 'counter')
+                  .map((col) => (
+                    <label
+                      key={col.key}
+                      className="flex cursor-pointer items-center gap-2 border-b border-line px-4 py-3 text-sm text-ink last:border-b-0 hover:bg-page"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!hidden.has(col.key)}
+                        onChange={() => toggleColumn(col.key)}
+                        className="size-4 accent-primary"
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-muted">
+            From
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(event) => setFrom(event.target.value)}
+              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            To
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(event) => setTo(event.target.value)}
+              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            />
+          </label>
+
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => pickDay(-1)} className={BUTTON_CLASS}>
+              Yesterday
+            </button>
+            <button type="button" onClick={() => pickDay(0)} className={BUTTON_CLASS}>
+              Today
+            </button>
+            <button type="button" onClick={() => window.print()} className={BUTTON_CLASS}>
+              <Printer size={16} />
+              Print
+            </button>
+            <button type="button" onClick={exportCsv} className={BUTTON_CLASS}>
+              <Download size={16} />
+              Export CSV
             </button>
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Counters</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{rows.length}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Bills</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{stats?.totalBills ?? 0}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Sales</p>
-            <p className="mt-1 text-xl font-extrabold text-accent">₹{(stats?.salesBillAmount ?? 0).toLocaleString('en-IN')}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Avg Bill Value</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">
-              ₹{((stats?.totalBills ?? 0) > 0 ? ((stats?.salesBillAmount ?? 0) / (stats?.totalBills ?? 1)).toFixed(2) : '0.00')}
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-line bg-card shadow-sm">
+          <p className="bg-primary/5 px-4 py-3 text-sm text-muted">
+            Counter Summary : From {displayDate(from)} to {displayDate(to)}
+          </p>
+          {loading && !data ? (
+            <p className="p-10 text-center text-sm text-muted">Loading…</p>
+          ) : error ? (
+            <p className="p-10 text-center text-sm text-danger">{error}</p>
+          ) : rows.length === 0 ? (
+            <p className="p-10 text-center text-sm text-muted">
+              No sales found for this date range.
             </p>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-line bg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] border-collapse text-sm">
+          ) : (
+            <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Counter</th>
-                  <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-muted">Bill Range</th>
-                  <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-muted">Total Bills</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Sales Amount</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Avg Bill Value</th>
+                <tr className="bg-page text-ink">
+                  {columns.map((col) => (
+                    <th
+                      key={col.key}
+                      className={`whitespace-nowrap px-3 py-4 font-medium ${col.type === 'text' ? 'text-left' : 'text-center'}`}
+                    >
+                      {col.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-line">
-                {rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-page/40">
-                    <td className="px-4 py-2.5 font-medium text-ink">{r.restaurant}</td>
-                    <td className="px-4 py-2.5 text-center text-muted">{r.billStarting} – {r.billEnding}</td>
-                    <td className="px-4 py-2.5 text-center tabular-nums text-ink">{r.totalBills}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-accent">₹{r.salesBillAmount.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink">₹{r.avgBill.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={index} className="hover:bg-page/60">
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
+                        className={`whitespace-nowrap border border-line px-3 py-4 text-ink ${col.type === 'text' ? '' : 'text-center tabular-nums'}`}
+                      >
+                        {formatCell(row[col.key], col.type)}
+                      </td>
+                    ))}
                   </tr>
                 ))}
+                {hasTotals && data && rows.length > 1 && (
+                  <tr className="bg-page font-bold text-ink">
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
+                        className={`whitespace-nowrap border border-line px-3 py-4 ${col.type === 'text' ? '' : 'text-center tabular-nums'}`}
+                      >
+                        {formatCell(data.totals[col.key], col.type)}
+                      </td>
+                    ))}
+                  </tr>
+                )}
               </tbody>
             </table>
-          </div>
+          )}
         </div>
       </main>
     </div>

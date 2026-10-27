@@ -16,13 +16,17 @@ import {
 import { useAuth } from '../../auth/AuthContext'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { BillingOrdersTable } from '../../components/billing/BillingOrdersTable'
-import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { CancelOrderReasonModal } from '../../components/billing/CancelOrderReasonModal'
+import { BillReceipt } from '../../components/billing/BillReceipt'
+import { SelectDropdown } from '../../components/common/SelectDropdown'
 import { OrderDetailsDrawer } from '../../components/all-orders/OrderDetailsDrawer'
 import { KotDetailsModal } from '../../components/all-orders/KotDetailsModal'
 import { EditOrderModal } from '../../components/all-orders/EditOrderModal'
 import { ChangePaymentModal } from '../../components/all-orders/ChangePaymentModal'
 import { SettleDueModal } from '../../components/all-orders/SettleDueModal'
 import { useAllOrdersData } from '../../services/useAllOrdersData'
+import type { OrderDto } from '../../services/orderService'
+import type { TaxBreakdownLine } from '../../utils/taxEngine'
 import { type AllOrderRow, type OrderStatus } from '../../mocks/allOrdersData'
 import { billingUrlForOrder } from '../../utils/billingLinks'
 import { STATUS_DOT, STATUS_LEGEND_LABEL } from '../../utils/billingOrderStatus'
@@ -67,6 +71,49 @@ const TYPE_TABS: {
 
 const LEGEND_ORDER: OrderStatus[] = ['Saved', 'Printed', 'Cancelled', 'Settled']
 
+/**
+ * Builds the printable cancelled bill from the server order. The order stores
+ * one tax total, so it is shown as a single line — forward when it was added on
+ * top of the amount, backward (included) otherwise; round-off is whatever makes
+ * the printed total match the order's grand total.
+ */
+function cancelledReceipt(order: OrderDto) {
+  const mine = Number(order.my_amount || 0)
+  const tax = Number(order.tax || 0)
+  const discount = Number(order.discount || 0)
+  const grand = Number(order.grand_total || 0)
+  const forward = tax > 0 && Math.abs(grand - (mine - discount + tax)) < 1
+  const taxBreakdown: TaxBreakdownLine[] =
+    tax > 0
+      ? [{ label: 'Tax', amount: tax, mode: forward ? 'forward' : 'backward', rate: 0 }]
+      : []
+  const roundOff =
+    Math.round((grand - (mine - discount + (forward ? tax : 0))) * 100) / 100
+  const created = new Date(order.created_at)
+  return {
+    meta: {
+      billNo: order.bill_no || order.order_no,
+      date: created.toLocaleDateString('en-IN'),
+      time: created.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }),
+      orderType: order.order_type_label || order.order_type,
+      cashier: order.settlement_by,
+      customerName: order.customer_name,
+    },
+    items: order.items.map((item) => ({
+      name: item.name,
+      note: item.note || undefined,
+      qty: Number(item.qty || 0),
+      rate: Number(item.unit_price || 0),
+    })),
+    charges: { taxBreakdown, roundOff, discount },
+    paymentMode: order.payment_type || '—',
+  }
+}
+
 export default function BillingAllOrders() {
   const navigate = useNavigate()
   const { startNewOrder } = useNewOrder()
@@ -75,6 +122,10 @@ export default function BillingAllOrders() {
     useAllOrdersData(encryptedOutletId, token)
   const [cancelTarget, setCancelTarget] = useState<AllOrderRow | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [cancelledBill, setCancelledBill] = useState<{
+    order: OrderDto
+    reason: string
+  } | null>(null)
   const [billNo, setBillNo] = useState('')
   const [shown, setShown] = useState(PAGE_SIZE)
 
@@ -211,24 +262,37 @@ export default function BillingAllOrders() {
         onSave={saveDueCollect}
       />
 
-      <ConfirmDialog
+      <CancelOrderReasonModal
         open={Boolean(cancelTarget)}
-        title="Cancel this order?"
-        target={cancelTarget ? `Order ${cancelTarget.orderNo}` : undefined}
-        message="The order is marked Cancelled and stays in the list."
-        note="Its kitchen tickets are not recalled."
-        confirmLabel="Cancel order"
-        cancelLabel="Keep order"
+        orderNo={cancelTarget?.orderNo ?? ''}
         loading={cancelling}
         onClose={() => setCancelTarget(null)}
-        onConfirm={async () => {
+        onConfirm={async (reason) => {
           if (!cancelTarget) return
           setCancelling(true)
-          await cancelOrder(cancelTarget.id)
+          const cancelled = await cancelOrder(cancelTarget.id, reason)
           setCancelling(false)
           setCancelTarget(null)
+          // The cancelled bill prints right after the cancellation.
+          if (cancelled) setCancelledBill({ order: cancelled, reason })
         }}
       />
+
+      {cancelledBill
+        ? (() => {
+            const receipt = cancelledReceipt(cancelledBill.order)
+            return (
+              <BillReceipt
+                meta={receipt.meta}
+                items={receipt.items}
+                charges={receipt.charges}
+                paymentMode={receipt.paymentMode}
+                cancelled={{ reason: cancelledBill.reason }}
+                onClose={() => setCancelledBill(null)}
+              />
+            )
+          })()
+        : null}
 
       <div className="flex items-center justify-between border-b border-line bg-card px-4 sm:px-6">
         <nav className="flex" aria-label="Order lists">
@@ -261,8 +325,12 @@ export default function BillingAllOrders() {
         </button>
       </div>
 
-      <div className="flex items-stretch justify-between border-b border-line bg-card px-4 sm:px-6">
-        <div className="flex overflow-x-auto" role="tablist" aria-label="Order type">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-card px-4 py-3 sm:px-6">
+        <div
+          className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-page p-1"
+          role="tablist"
+          aria-label="Order type"
+        >
           {TYPE_TABS.map((tab) => {
             const active = type === tab.value
             const Icon = tab.icon
@@ -276,24 +344,26 @@ export default function BillingAllOrders() {
                   setType(tab.value)
                   setShown(PAGE_SIZE)
                 }}
-                className={`flex min-w-[84px] flex-col items-center gap-1 border-b-2 px-4 py-3 text-xs font-medium transition-colors ${
+                className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3.5 text-sm font-semibold transition-colors ${
                   active
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-transparent text-ink hover:bg-page'
+                    ? 'bg-card text-primary shadow-sm'
+                    : 'text-muted hover:text-ink'
                 }`}
               >
-                <Icon size={22} />
-                <span className="whitespace-nowrap">
-                  {tab.label}
-                  <span className="ml-1 tabular-nums text-muted">
-                    {typeCounts[tab.value] ?? 0}
-                  </span>
+                <Icon size={16} />
+                <span className="whitespace-nowrap">{tab.label}</span>
+                <span
+                  className={`rounded-full px-1.5 text-xs tabular-nums ${
+                    active ? 'bg-primary/10 text-primary' : 'bg-card text-muted'
+                  }`}
+                >
+                  {typeCounts[tab.value] ?? 0}
                 </span>
               </button>
             )
           })}
         </div>
-        <div className="flex items-center gap-2 py-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleExport}
@@ -307,7 +377,7 @@ export default function BillingAllOrders() {
             type="button"
             onClick={() => setPastOpen((open) => !open)}
             aria-pressed={pastOpen}
-            className={`inline-flex h-9 items-center rounded-lg border px-3 text-sm font-medium ${
+            className={`inline-flex h-9 items-center rounded-lg border px-3 text-sm font-semibold ${
               pastOpen
                 ? 'border-primary bg-primary text-white'
                 : 'border-primary text-primary hover:bg-primary/5'
@@ -438,7 +508,7 @@ export default function BillingAllOrders() {
               }}
               placeholder="Search order no., name, phone or item"
               aria-label="Search orders"
-              className="h-9 w-full rounded-lg border border-line bg-card pl-9 pr-9 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+              className="h-10 w-full rounded-lg border border-line bg-card pl-9 pr-9 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
             />
             {search ? (
               <button
@@ -454,22 +524,20 @@ export default function BillingAllOrders() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-muted">
-              Sort By
-              <select
+            <div className="flex items-center gap-2 text-sm text-muted">
+              Sort by
+              <SelectDropdown
                 value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                className="h-9 rounded-lg border border-line bg-primary/10 px-2.5 text-sm text-ink outline-none focus:border-primary"
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={SORT_OPTIONS}
+                onChange={(value) => setSort(value as SortKey)}
+                caption="Sort orders"
+                searchable={false}
+                align="right"
+                triggerClassName="h-9 w-[190px]"
+              />
+            </div>
             <div
-              className="flex flex-wrap items-center gap-3 rounded-lg bg-card px-3 py-2 text-sm text-ink"
+              className="flex flex-wrap items-center gap-2"
               role="group"
               aria-label="Filter by bill status"
             >
@@ -484,11 +552,13 @@ export default function BillingAllOrders() {
                       setStatus(active ? 'all' : key)
                       setShown(PAGE_SIZE)
                     }}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 ${
-                      active ? 'bg-ink/10 font-semibold' : 'hover:bg-page'
+                    className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors ${
+                      active
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-line bg-card text-ink hover:bg-page'
                     }`}
                   >
-                    <span className={`size-3.5 rounded-full ${STATUS_DOT[key]}`} />
+                    <span className={`size-2.5 rounded-full ${STATUS_DOT[key]}`} />
                     {STATUS_LEGEND_LABEL[key]}
                   </button>
                 )

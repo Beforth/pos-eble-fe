@@ -367,6 +367,7 @@ export default function CaptainOrders() {
     grandTotal: number
     /** Tendered cash (may be lower than grandTotal → the balance books as due). */
     receivedAmount: number
+    tip?: number
     customerName: string
     customerPhone: string
     paymentLabel: string
@@ -410,6 +411,7 @@ export default function CaptainOrders() {
       discount: params.discount,
       grand_total: params.grandTotal,
       received_amount: params.receivedAmount,
+      tip: params.tip && params.tip > 0 ? params.tip : undefined,
       settlement_by: billerName || undefined,
     })
     return order
@@ -741,7 +743,14 @@ export default function CaptainOrders() {
   const menuOnRight = useMenuOnRight()
 
   const filteredItems = useMemo(() => {
+    // A typed short code looks across the whole menu, not just the open category.
+    const codeLookup = shortCode.trim() !== ''
     return menuItems.filter((item) => {
+      if (codeLookup) {
+        if (!matchesShortCode(item, shortCode)) return false
+        if (search.trim() && !itemNameMatchesQuery(item.name, search)) return false
+        return true
+      }
       if (railCategoryId === FAVORITES_ID) {
         if (!favoriteIds.has(item.id)) return false
       } else if (railCategoryId === ALL_CATEGORIES_ID) {
@@ -754,9 +763,6 @@ export default function CaptainOrders() {
       }
       if (search.trim()) {
         if (!itemNameMatchesQuery(item.name, search)) return false
-      }
-      if (shortCode.trim()) {
-        if (!matchesShortCode(item, shortCode)) return false
       }
       return true
     })
@@ -983,6 +989,24 @@ export default function CaptainOrders() {
     setResumeOrderId(null)
   }
 
+  // Emptying the cart of a resumed held bill (Delete All, or removing the last item)
+  // discards it: drop the held copy and the customer / note it carried, so the next
+  // hold starts clean and the held list no longer shows it.
+  useEffect(() => {
+    if (lines.length > 0 || !activeDraftId) return
+    if (encryptedOutletId) {
+      deleteDraftBillApi(encryptedOutletId, activeDraftId)
+        .catch(() => undefined)
+        .finally(() => void refreshDraftCount())
+    }
+    setActiveDraftId(null)
+    setCustomer(EMPTY_CUSTOMER)
+    setCustomerErrors({})
+    setShowCustomerErrors(false)
+    setOrderNote('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines.length, activeDraftId])
+
   async function refreshDraftCount() {
     if (!encryptedOutletId) return
     try {
@@ -995,7 +1019,7 @@ export default function CaptainOrders() {
 
   async function saveCurrentAsDraft(customerName: string) {
     if (lines.length === 0) {
-      showToast('Add items before saving a draft')
+      showToast('Add items before putting a bill on hold')
       return
     }
     if (!encryptedOutletId) {
@@ -1015,28 +1039,39 @@ export default function CaptainOrders() {
         name: customerName,
       },
     })
+    const createDraft = () =>
+      saveDraftBillApi(encryptedOutletId, {
+        ...payload,
+        client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      })
     try {
-      const saved = activeDraftId
-        ? await updateDraftBillApi(encryptedOutletId, activeDraftId, payload)
-        : await saveDraftBillApi(encryptedOutletId, {
-            ...payload,
-            client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          })
+      let saved
+      if (activeDraftId) {
+        try {
+          saved = await updateDraftBillApi(encryptedOutletId, activeDraftId, payload)
+        } catch (error) {
+          // The held bill this cart came from is gone: hold it again as a new one.
+          if (!(error instanceof Error) || !/not found/i.test(error.message)) throw error
+          saved = await createDraft()
+        }
+      } else {
+        saved = await createDraft()
+      }
       setActiveDraftId(saved.id)
       await refreshDraftCount()
       setSaveDraftOpen(false)
       clearBillForNextCustomer()
-      showToast(`Draft saved for ${customerName}`)
+      showToast(`Bill put on hold for ${customerName}`)
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : 'Failed to save the draft',
+        error instanceof Error ? error.message : 'Failed to put the bill on hold',
       )
     }
   }
 
   function startSaveDraft() {
     if (lines.length === 0) {
-      showToast('Add items before saving a draft')
+      showToast('Add items before putting a bill on hold')
       return
     }
     setSaveDraftOpen(true)
@@ -1057,8 +1092,8 @@ export default function CaptainOrders() {
     setResumeOrderId(null)
     showToast(
       draft.tableNo !== 'No table'
-        ? `Draft resumed · Table ${draft.tableNo}`
-        : 'Draft resumed',
+        ? `Held bill resumed · Table ${draft.tableNo}`
+        : 'Held bill resumed',
     )
   }
 
@@ -1534,6 +1569,7 @@ export default function CaptainOrders() {
           discount: discountAmt,
           grand_total: billTotal,
           received_amount: amount,
+          tip: money?.tip && money.tip > 0 ? money.tip : undefined,
           settlement_by: billerName || undefined,
         })
       } catch (error) {
@@ -1627,6 +1663,7 @@ export default function CaptainOrders() {
           // due the API never booked.
           grandTotal: Math.round((amount + due) * 100) / 100,
           receivedAmount: amount,
+          tip: money?.tip,
           customerName: customer.name,
           customerPhone: customer.mobile,
           paymentLabel: paymentTypeLabel(payment, otherPayment?.type),
@@ -1873,7 +1910,7 @@ export default function CaptainOrders() {
       return
     }
 
-    if (action === 'Draft') {
+    if (action === 'Hold') {
       startSaveDraft()
       return
     }
@@ -2163,6 +2200,7 @@ export default function CaptainOrders() {
                 customerName: result.customerName || settled[0]?.customerName || '',
                 customerPhone: result.customerPhone,
                 settlementBy: billerName || undefined,
+                tip: result.tip,
                 grandTotal: result.settlementAmount,
               })
             } catch (error) {
@@ -2435,7 +2473,9 @@ export default function CaptainOrders() {
               refreshDraftCount()
               setDraftsOpen(true)
             }}
-            draftCount={draftCount}
+            // A held bill that is open in the cart has been taken off hold, so it
+          // is not counted until it is put back on hold.
+          draftCount={Math.max(0, draftCount - (activeDraftId ? 1 : 0))}
           />
         </div>
       </div>

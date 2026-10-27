@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { ArrowLeft, ChevronLeft, ChevronRight, LayoutGrid, X } from 'lucide-react'
 import {
   getTemplate,

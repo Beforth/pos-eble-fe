@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { Package, Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ProductionMoreOptionsDrawer } from '../../components/inventory/ProductionMoreOptionsDrawer'

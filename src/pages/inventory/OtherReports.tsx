@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,

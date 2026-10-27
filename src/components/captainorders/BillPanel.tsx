@@ -842,8 +842,8 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          data-tooltip="Draft bills"
-          aria-label="Draft bills"
+          data-tooltip="Held bills"
+          aria-label="Held bills"
           onClick={() => {
             setTablePickerOpen(false)
             setGuestsPickerOpen(false)
@@ -1661,30 +1661,29 @@ export function BillPanel({
                 // { id: 'Save & eBill', label: 'Save & eBill' },
                 { id: 'KOT', label: 'KOT' },
                 { id: 'KOT & Print', label: 'KOT & Print' },
-                { id: 'Draft', label: 'Draft', icon: true },
+                { id: 'Hold', label: 'Hold' },
               ] as const
             ).map((action) => (
               <button
                 key={action.id}
                 type="button"
                 aria-label={
-                  action.id === 'Draft'
-                    ? 'Save current order as draft'
+                  action.id === 'Hold'
+                    ? 'Put current order on hold'
                     : action.label
                 }
                 data-tooltip={
-                  action.id === 'Draft'
-                    ? 'Save current order as draft'
+                  action.id === 'Hold'
+                    ? 'Put current order on hold'
                     : action.label
                 }
                 onClick={() => onAction(action.id, chargesSnapshot())}
                 className={`inline-flex h-10 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[11px] font-semibold leading-tight sm:text-xs ${
-                  action.id === 'Draft'
+                  action.id === 'Hold'
                     ? 'border border-primary bg-card text-primary hover:bg-primary/5'
                     : 'bg-primary text-white hover:bg-primary-hover'
                 }`}
               >
-                {action.id === 'Draft' ? <FilePenLine size={13} /> : null}
                 {action.label}
               </button>
             ))}

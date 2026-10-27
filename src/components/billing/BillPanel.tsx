@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import {
+  Banknote,
+  Ellipsis,
   ChevronDown,
+  CircleCheck,
+  CreditCard,
+  HandCoins,
   ChevronUp,
   Clock3,
   FilePenLine,
@@ -32,6 +37,8 @@ import {
 import type { SpecialNote, TaxSummary } from '../../types/menu'
 import { useAuth } from '../../auth/AuthContext'
 import { listSpecialNotesApi } from '../../services/menuService'
+import { BillingAdvanceOrderModal } from './BillingAdvanceOrderModal'
+import { MorePaymentDrawer } from './MorePaymentDrawer'
 import { SelectDropdown } from '../common/SelectDropdown'
 import { TooltipWrapper } from '../common/TooltipWrapper'
 import {
@@ -50,7 +57,7 @@ import {
 import { CustomerGstModal } from './CustomerGstModal'
 import { DeleteReasonModal } from './DeleteReasonModal'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { OTHER_PAYMENT_TYPES } from './OtherPaymentModal'
+import { OTHER_PAYMENT_TYPES, type OtherPaymentType } from './OtherPaymentModal'
 import { PrimaryButton } from '../menu/MenuActionButtons'
 import { QtyInput } from '../common/QtyInput'
 
@@ -166,6 +173,9 @@ interface BillPanelProps {
   customerErrors?: Partial<Record<keyof CustomerDetails, boolean>>
   onOrderTypeChange: (type: OrderType) => void
   onPaymentChange: (method: PaymentMethod) => void
+  /** Platform chosen when the payment method is Other. */
+  otherPaymentType?: string
+  onOtherPaymentTypeChange?: (type: OtherPaymentType) => void
   onTableIdChange: (id: string) => void
   onGuestsChange: (n: number) => void
   onComplimentaryChange: (value: boolean) => void
@@ -197,21 +207,15 @@ interface BillPanelProps {
 
 const ORDER_TYPES: { id: OrderType; label: string }[] = [
   { id: 'dine-in', label: 'Dine In' },
-  { id: 'delivery', label: 'Delivery' },
-  { id: 'pick-up', label: 'Pick Up' },
+  { id: 'pick-up', label: 'Parcel' },
 ]
 
-const PAYMENTS: { id: PaymentMethod; label: string }[] = [
-  { id: 'cash', label: 'Cash' },
-  { id: 'card', label: 'Card' },
-  { id: 'due', label: 'Due' },
-  { id: 'other', label: 'Other' },
-  { id: 'part', label: 'Part' },
+const PAYMENTS: { id: PaymentMethod; label: string; icon: typeof Banknote }[] = [
+  { id: 'cash', label: 'Cash', icon: Banknote },
+  { id: 'card', label: 'Card', icon: CreditCard },
+  { id: 'due', label: 'Due', icon: HandCoins },
+  { id: 'other', label: 'Other', icon: Wallet },
 ]
-
-function RequiredMark() {
-  return <span className="ml-0.5 text-primary">*</span>
-}
 
 function fieldClass(error?: boolean) {
   return `h-9 w-full rounded-lg border bg-card px-3 text-sm text-ink outline-none transition-colors placeholder:text-muted ${
@@ -247,7 +251,6 @@ export function BillPanel({
   tableId,
   tables,
   guests,
-  complimentary,
   itsPaid,
   loyalty,
   feedbackSms,
@@ -256,9 +259,10 @@ export function BillPanel({
   customerErrors,
   onOrderTypeChange,
   onPaymentChange,
+  otherPaymentType,
+  onOtherPaymentTypeChange,
   onTableIdChange,
   onGuestsChange,
-  onComplimentaryChange,
   onItsPaidChange,
   onLoyaltyChange,
   onFeedbackSmsChange,
@@ -327,7 +331,8 @@ export function BillPanel({
     ? tableKots.filter((kot) => kot.kotNo === focusKotNo)
     : tableKots
   const [settlementInput, setSettlementInput] = useState('')
-  const [settlementError, setSettlementError] = useState<string | null>(null)
+  const [advanceOpen, setAdvanceOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
@@ -374,7 +379,6 @@ export function BillPanel({
   const [containerCharge, setContainerCharge] = useState('0')
   const [customerPaid, setCustomerPaid] = useState('0')
   const [tip, setTip] = useState('0')
-  const [otherPlatform, setOtherPlatform] = useState<string>(OTHER_PAYMENT_TYPES[0])
 
   const itemCount =
     lines.reduce((sum, line) => sum + line.qty, 0) +
@@ -446,7 +450,6 @@ export function BillPanel({
   useEffect(() => {
     if (!hasAnyItems) {
       setSettlementInput('')
-      setSettlementError(null)
       setCustomerPaid('0')
       setTip('0')
       setDeliveryCharge('0')
@@ -458,7 +461,6 @@ export function BillPanel({
       return
     }
     setSettlementInput(String(roundSettlementAmount(taxableBase)))
-    setSettlementError(null)
   }, [taxableBase, hasAnyItems])
 
   useEffect(() => {
@@ -516,41 +518,6 @@ export function BillPanel({
     value: CustomerDetails[K],
   ) {
     onCustomerChange({ ...customer, [key]: value })
-  }
-
-  function handleSettlementBlur() {
-    const raw = Number(settlementInput)
-    if (settlementInput.trim() === '' || Number.isNaN(raw) || raw < 0) {
-      setSettlementError('Enter a valid amount')
-      return
-    }
-    const rounded = roundSettlementAmount(raw)
-    setSettlementInput(String(rounded))
-    setSettlementError(null)
-  }
-
-  function handleSettleSave() {
-    const raw = Number(settlementInput)
-    if (settlementInput.trim() === '' || Number.isNaN(raw) || raw < 0) {
-      setSettlementError('Enter a valid amount')
-      return
-    }
-    if (!hasAnyItems) {
-      setSettlementError('Add items before settling')
-      return
-    }
-    const rounded = roundSettlementAmount(raw)
-    setSettlementInput(String(rounded))
-    const due = Math.max(0, Math.round((roundedTotal - rounded) * 100) / 100)
-    // A short settlement books a due balance, which is tracked per customer —
-    // so the customer name is mandatory before it can be saved.
-    if (due > 0 && !customer.name.trim()) {
-      setSettlementError('Customer name is required when a due balance remains')
-      onCustomerFormOpenChange(true)
-      return
-    }
-    setSettlementError(null)
-    onSettleSave?.(rounded, due, chargesSnapshot())
   }
 
   function money(n: number) {
@@ -749,7 +716,7 @@ export function BillPanel({
       />
 
       {/* Order type */}
-      <div className="grid grid-cols-3 gap-1 border-b border-line p-2">
+      <div className="grid grid-cols-2 gap-1 border-b border-line p-2">
         {ORDER_TYPES.map((type) => {
           const active = orderType === type.id
           return (
@@ -868,8 +835,8 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          data-tooltip="Draft bills"
-          aria-label="Draft bills"
+          data-tooltip="Held bills"
+          aria-label="Held bills"
           onClick={() => {
             setTablePickerOpen(false)
             setGuestsPickerOpen(false)
@@ -986,8 +953,7 @@ export function BillPanel({
               <div>
                 <p className="text-sm font-semibold text-ink">Customer details</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-                  Required for Due payment — mobile and name marked with * are
-                  compulsory
+                  Name and mobile are optional
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-page p-0.5">
@@ -1048,8 +1014,24 @@ export function BillPanel({
             <div className="space-y-3">
               <label className="block">
                 <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  Name
+                </span>
+                <input
+                  type="text"
+                  value={customer.name}
+                  onChange={(e) =>
+                    updateCustomer('name', sanitizeCustomerName(e.target.value))
+                  }
+                  maxLength={12}
+                  placeholder="Customer name"
+                  className={fieldClass(customerErrors?.name)}
+                  autoFocus
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">
                   Mobile
-                  <RequiredMark />
                 </span>
                 <div
                   className={`flex h-9 overflow-hidden rounded-lg border bg-card focus-within:border-primary ${
@@ -1071,28 +1053,8 @@ export function BillPanel({
                     maxLength={10}
                     placeholder="10-digit mobile"
                     className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-ink outline-none placeholder:text-muted"
-                    aria-required
-                    autoFocus
                   />
                 </div>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  Name
-                  <RequiredMark />
-                </span>
-                <input
-                  type="text"
-                  value={customer.name}
-                  onChange={(e) =>
-                    updateCustomer('name', sanitizeCustomerName(e.target.value))
-                  }
-                  maxLength={12}
-                  placeholder="Customer name"
-                  className={fieldClass(customerErrors?.name)}
-                  aria-required
-                />
               </label>
 
               <label className="block">
@@ -1518,13 +1480,6 @@ export function BillPanel({
               >
                 Bogo Offer
               </button>
-              <button
-                type="button"
-                onClick={() => onAction('Split')}
-                className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-              >
-                Split
-              </button>
             </div>
               </div>
             </div>
@@ -1532,51 +1487,27 @@ export function BillPanel({
         ) : null}
 
         <div className="space-y-3 bg-white p-3">
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-ink">
-                Settlement Amount
-              </span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={settlementInput}
-                onChange={(e) => {
-                  setSettlementInput(e.target.value)
-                  if (settlementError) setSettlementError(null)
-                }}
-                onBlur={handleSettlementBlur}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleSettleSave()
-                  }
-                }}
-                className={`h-9 w-[110px] rounded-md border bg-white px-2.5 text-sm text-ink outline-none focus:border-primary ${
-                  settlementError ? 'border-primary' : 'border-line'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={handleSettleSave}
-                className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-              >
-                Settle & Save
-              </button>
-              <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
-                <input
-                  type="checkbox"
-                  checked={complimentary}
-                  onChange={(event) => onComplimentaryChange(event.target.checked)}
-                  className="size-3.5 accent-primary"
-                />
-                Complimentary
-              </label>
-            </div>
-            {settlementError ? (
-              <p className="text-xs text-primary">{settlementError}</p>
-            ) : null}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onAction('Split')}
+              className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            >
+              Split
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (lines.length === 0) {
+                  showToast('Add items to the bill first')
+                  return
+                }
+                setAdvanceOpen(true)
+              }}
+              className="h-9 rounded-lg border border-primary bg-white px-4 text-sm font-semibold text-primary hover:bg-page"
+            >
+              Advance Order
+            </button>
           </div>
 
           <div className="flex items-end justify-between">
@@ -1601,39 +1532,92 @@ export function BillPanel({
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-            {PAYMENTS.map((method) => (
-              <label
-                key={method.id}
-                className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-ink"
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={payment === method.id}
-                  onChange={() => onPaymentChange(method.id)}
-                  className="size-3.5 accent-primary"
-                />
-                {method.label}
-              </label>
-            ))}
+          <div
+            role="radiogroup"
+            aria-label="Payment method"
+            className="grid grid-cols-5 overflow-hidden rounded-lg border border-line"
+          >
+            {PAYMENTS.map((method) => {
+              const selected = payment === method.id
+              const Icon = method.icon
+              return (
+                <button
+                  key={method.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => onPaymentChange(method.id)}
+                  className={`flex h-11 select-none items-center justify-center gap-1.5 border-r border-line px-1 text-sm font-semibold transition-colors last:border-r-0 ${
+                    selected
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-card text-ink hover:bg-page'
+                  }`}
+                >
+                  <Icon
+                    size={16}
+                    className={`shrink-0 ${selected ? 'text-primary' : 'text-muted'}`}
+                  />
+                  {method.label}
+                  <CircleCheck
+                    size={14}
+                    className={`shrink-0 ${selected ? 'text-primary' : 'text-line'}`}
+                  />
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              aria-haspopup="dialog"
+              className={`flex h-11 select-none items-center justify-center gap-1.5 px-1 text-sm font-semibold transition-colors ${
+                payment === 'part'
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-card text-ink hover:bg-page'
+              }`}
+            >
+              <Ellipsis
+                size={16}
+                className={`shrink-0 ${payment === 'part' ? 'text-primary' : 'text-muted'}`}
+              />
+              More
+              <CircleCheck
+                size={14}
+                className={`shrink-0 ${payment === 'part' ? 'text-primary' : 'text-line'}`}
+              />
+            </button>
           </div>
 
+          <MorePaymentDrawer
+            open={moreOpen}
+            payment={payment}
+            otherType={otherPaymentType}
+            onSelectMethod={onPaymentChange}
+            onSelectOther={(type) => {
+              onPaymentChange('other')
+              onOtherPaymentTypeChange?.(type)
+            }}
+            onClose={() => setMoreOpen(false)}
+          />
+
           {payment === 'other' ? (
-            <label className="block text-sm font-semibold text-ink">
-              Other Payment Type
-              <select
-                value={otherPlatform}
-                onChange={(e) => setOtherPlatform(e.target.value)}
-                className="mt-1.5 h-10 w-full rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
-              >
-                {OTHER_PAYMENT_TYPES.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div>
+              <span className="mb-1.5 block text-sm font-semibold text-ink">
+                Other Payment Type
+              </span>
+              <SelectDropdown
+                value={otherPaymentType ?? OTHER_PAYMENT_TYPES[0]}
+                options={OTHER_PAYMENT_TYPES.map((option) => ({
+                  value: option,
+                  label: option,
+                }))}
+                onChange={(value) =>
+                  onOtherPaymentTypeChange?.(value as OtherPaymentType)
+                }
+                caption="Payment platform"
+                searchable={false}
+                triggerClassName="h-10 w-full bg-white"
+              />
+            </div>
           ) : null}
 
           {payment === 'due' ? (
@@ -1681,36 +1665,54 @@ export function BillPanel({
                 { id: 'Save & eBill', label: 'Save & eBill' },
                 { id: 'KOT', label: 'KOT' },
                 { id: 'KOT & Print', label: 'KOT & Print' },
-                { id: 'Draft', label: 'Draft', icon: true },
+                { id: 'Hold', label: 'Hold' },
               ] as const
             ).map((action) => (
               <button
                 key={action.id}
                 type="button"
                 aria-label={
-                  action.id === 'Draft'
-                    ? 'Save current order as draft'
+                  action.id === 'Hold'
+                    ? 'Put current order on hold'
                     : action.label
                 }
                 data-tooltip={
-                  action.id === 'Draft'
-                    ? 'Save current order as draft'
+                  action.id === 'Hold'
+                    ? 'Put current order on hold'
                     : action.label
                 }
-                onClick={() => onAction(action.id, chargesSnapshot())}
+                onClick={() => {
+                  // "It's Paid" + Save books the bill as paid in full.
+                  if (itsPaid && action.id === 'Save' && onSettleSave) {
+                    onSettleSave(roundedTotal, 0, chargesSnapshot())
+                    onItsPaidChange(false)
+                    return
+                  }
+                  onAction(action.id, chargesSnapshot())
+                }}
                 className={`inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[10px] font-semibold leading-tight sm:text-xs ${
-                  action.id === 'Draft'
+                  action.id === 'Hold'
                     ? 'border border-primary bg-card text-primary hover:bg-primary/5'
                     : 'bg-primary text-white hover:bg-primary-hover'
                 }`}
               >
-                {action.id === 'Draft' ? <FilePenLine size={13} /> : null}
                 {action.label}
               </button>
             ))}
           </div>
         </div>
       </div>
+      <BillingAdvanceOrderModal
+        open={advanceOpen}
+        outletId={encryptedOutletId}
+        lines={lines}
+        total={roundedTotal}
+        orderType={orderType}
+        customerName={customer.name}
+        customerPhone={customer.mobile}
+        onClose={() => setAdvanceOpen(false)}
+        onSaved={() => onClearItems?.()}
+      />
     </aside>
   )
 }

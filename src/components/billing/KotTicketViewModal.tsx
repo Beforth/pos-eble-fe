@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Printer, X } from 'lucide-react'
+import { Printer, UserRound, Users, X } from 'lucide-react'
 import {
-  headerClassForOrderType,
   kotTicketAmount,
   labelForOrderType,
   type KotTicket,
@@ -63,84 +62,91 @@ export function KotTicketViewModal({
         role="dialog"
         aria-modal="true"
         aria-label="KOT view"
-        className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-xl border border-line bg-white shadow-2xl"
+        className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-2xl"
       >
-        <header
-          className={`flex items-center justify-between px-5 py-3 ${headerClassForOrderType(ticket.orderType)}`}
-        >
-          <div>
-            <h2 className="text-base font-bold">
-              {ticket.tableNo} {labelForOrderType(ticket.orderType)}
-            </h2>
-            <p className="text-sm opacity-90">KOT {ticket.kotNo}</p>
+        <header className="flex items-start justify-between gap-3 border-b border-line px-6 py-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-bold text-ink">KOT {ticket.kotNo}</h2>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+                {labelForOrderType(ticket.orderType)}
+              </span>
+            </div>
+            <p className="mt-0.5 text-sm text-muted">{ticket.tableNo}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
             data-tooltip="Close"
-            className="rounded-lg p-1.5 hover:bg-black/10"
+            className="rounded-lg p-1.5 text-muted hover:bg-page hover:text-ink"
           >
             <X size={18} />
           </button>
         </header>
 
-        <div className="space-y-3 px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-            <p>Biller: {ticket.biller}</p>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-page px-6 py-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 font-medium text-ink">
+              <UserRound size={13} className="text-muted" />
+              {ticket.biller}
+            </span>
             {ticket.persons > 0 ? (
-              <p className="font-medium text-ink">
-                No. of Persons: {ticket.persons}
-              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 font-medium text-ink">
+                <Users size={13} className="text-muted" />
+                {ticket.persons} {ticket.persons === 1 ? 'person' : 'persons'}
+              </span>
+            ) : null}
+            {ticket.customerName?.trim() ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 font-medium text-ink">
+                {ticket.customerName.trim()}
+              </span>
             ) : null}
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-line">
-            <div className="grid grid-cols-[1fr_48px_72px] gap-2 border-b border-line bg-page px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              <span>Item</span>
-              <span className="text-center">Qty</span>
-              <span className="text-right">Amt</span>
-            </div>
-            <ul className="divide-y divide-line">
-              {ticket.items.map((item) => (
-                <li
-                  key={item.id}
-                  className="grid grid-cols-[1fr_48px_72px] gap-2 px-3 py-2.5 text-sm text-ink"
-                >
-                  <span>
-                    {item.name}
-                    {item.note ? (
-                      <span className="mt-0.5 block text-xs italic text-muted">
-                        [Note] {item.note}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="text-center tabular-nums">{item.qty}</span>
-                  <span className="text-right font-semibold tabular-nums">
-                    ₹{money(item.price * item.qty)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
           {ticket.note ? (
-            <div className="rounded border border-line bg-page px-3 py-2 text-xs text-ink">
-              {ticket.note}
-            </div>
+            <p className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-ink">
+              <span className="font-semibold">Special Note:</span> {ticket.note}
+            </p>
           ) : null}
 
-          <div className="flex items-center justify-between border-t border-line pt-3">
-            <span className="text-sm font-semibold text-ink">Total</span>
-            <span className="text-lg font-bold text-accent">₹{money(amount)}</span>
-          </div>
+          <ul className="space-y-2">
+            {ticket.items.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-start gap-3 rounded-xl border border-line bg-card px-3 py-2.5"
+              >
+                <span className="mt-0.5 inline-flex min-w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 px-2 py-1 text-xs font-bold tabular-nums text-primary">
+                  {item.qty}×
+                </span>
+                <span className="min-w-0 flex-1 text-sm font-medium text-ink">
+                  {item.name}
+                  {item.note ? (
+                    <span className="mt-0.5 block text-xs font-normal italic text-muted">
+                      {item.note}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-ink">
+                  ₹{money(item.price * item.qty)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <footer className="flex justify-end gap-3 border-t border-line px-5 py-3">
+        <div className="flex items-center justify-between border-t border-line bg-card px-6 py-3">
+          <span className="text-sm font-semibold text-ink">Total</span>
+          <span className="text-xl font-bold tabular-nums text-accent">
+            ₹{money(amount)}
+          </span>
+        </div>
+
+        <footer className="flex justify-end gap-2 border-t border-line px-6 py-3">
           <button
             type="button"
             onClick={() => setPrintTicket(ticket)}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-white px-4 text-sm font-semibold text-ink hover:bg-page"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-ink hover:bg-page"
           >
             <Printer size={15} />
             Print KOT
@@ -148,7 +154,7 @@ export function KotTicketViewModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            className="h-10 rounded-lg bg-primary px-5 text-sm font-semibold text-white hover:bg-primary-hover"
           >
             Close
           </button>

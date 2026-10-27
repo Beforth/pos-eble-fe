@@ -28,6 +28,7 @@ export interface ReceiptMeta {
   time?: string
   orderType?: string
   cashier?: string
+  customerName?: string
 }
 
 export interface ReceiptCharges {
@@ -63,6 +64,8 @@ interface BillReceiptProps {
   charges?: ReceiptCharges
   paymentMode?: string
   footerThanks?: string
+  /** Prints the bill as CANCELLED, with the reason the cashier gave. */
+  cancelled?: { reason?: string }
   onClose?: () => void
 }
 
@@ -114,6 +117,7 @@ export function BillReceipt({
   charges,
   paymentMode = 'UPI',
   footerThanks = 'Thank you, visit again!',
+  cancelled,
   onClose,
 }: BillReceiptProps) {
   const s = { ...shopDefaults, ...shop }
@@ -190,7 +194,7 @@ export function BillReceipt({
           <div style={smallStyle}>
             Ph: {s.phone} &nbsp;|&nbsp; GSTIN: {s.gstin}
           </div>
-          <div style={billTypeStyle}>{s.billLabel}</div>
+          <div style={billTypeStyle}>{cancelled ? 'CANCELLED BILL' : s.billLabel}</div>
         </div>
 
         <div style={solidDividerStyle} />
@@ -209,6 +213,17 @@ export function BillReceipt({
           <span>Order: {m.orderType}</span>
           <span>Cashier: {m.cashier}</span>
         </div>
+        {m.customerName?.trim() ? (
+          <div style={rowStyle}>
+            <span>Customer: {m.customerName.trim()}</span>
+          </div>
+        ) : null}
+
+        {cancelled?.reason?.trim() ? (
+          <div style={rowStyle}>
+            <span>Cancel reason: {cancelled.reason.trim()}</span>
+          </div>
+        ) : null}
 
         <div style={dashedDividerStyle} />
 

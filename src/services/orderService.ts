@@ -299,6 +299,8 @@ export interface CreateOrderPayload {
   tax?: number
   tax_breakdown?: TaxBreakdownLine[]
   round_off?: number
+  /** Guest tip on top of the bill; saved on settle, never part of grand_total. */
+  tip?: number
   discount?: number
   grand_total?: number
   sub_order_type?: string
@@ -314,6 +316,8 @@ export interface SettleOrderPayload {
   tax?: number
   tax_breakdown?: TaxBreakdownLine[]
   round_off?: number
+  /** Guest tip on top of the bill; saved on settle, never part of grand_total. */
+  tip?: number
   discount?: number
   grand_total?: number
   received_amount?: number
@@ -362,6 +366,8 @@ export interface UpdateOrderPayload {
   tax?: number
   tax_breakdown?: TaxBreakdownLine[]
   round_off?: number
+  /** Guest tip on top of the bill; saved on settle, never part of grand_total. */
+  tip?: number
   discount?: number
   grand_total?: number
   received_amount?: number
@@ -631,11 +637,15 @@ export async function settleOrderApi(
   )
 }
 
-export async function cancelOrderApi(outletId: string, id: string): Promise<OrderDto> {
+export async function cancelOrderApi(
+  outletId: string,
+  id: string,
+  reason = '',
+): Promise<OrderDto> {
   return jsonRequest<OrderDto>(
     ordersPath(outletId, `/orders/${id}/cancel/`),
     'POST',
-    {},
+    reason ? { reason } : {},
   )
 }
 

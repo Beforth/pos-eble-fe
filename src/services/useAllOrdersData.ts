@@ -182,16 +182,22 @@ export function useAllOrdersData(
     }
   }
 
-  async function cancelOrder(orderId: string) {
-    if (!encryptedOutletId) return
+  /** Cancels the order with a reason; resolves to the cancelled order (or null on failure). */
+  async function cancelOrder(
+    orderId: string,
+    reason: string,
+  ): Promise<OrderDto | null> {
+    if (!encryptedOutletId) return null
     try {
-      const updated = await cancelOrderApi(encryptedOutletId, orderId)
+      const updated = await cancelOrderApi(encryptedOutletId, orderId, reason)
       setOrders((prev) =>
         prev.map((row) => (row.id === orderId ? toAllOrderRow(updated) : row)),
       )
       showToast('Order cancelled')
+      return updated
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to cancel order')
+      return null
     }
   }
 
