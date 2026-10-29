@@ -57,7 +57,11 @@ import {
 import { CustomerGstModal } from './CustomerGstModal'
 import { DeleteReasonModal } from './DeleteReasonModal'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { OTHER_PAYMENT_TYPES, type OtherPaymentType } from './OtherPaymentModal'
+import { type OtherPaymentType } from './OtherPaymentModal'
+import {
+  usePaymentCardOptions,
+  usePaymentTypeOptions,
+} from '../../services/usePaymentTypeOptions'
 import { PrimaryButton } from '../menu/MenuActionButtons'
 import { QtyInput } from '../common/QtyInput'
 
@@ -98,6 +102,8 @@ export interface BillChargesSnapshot {
   /** Settlement rounding only (not tax / discount residuals). */
   roundOff: number
   settlementTotal: number
+  /** The rounded amount payable for the whole bill. */
+  billTotal: number
 }
 export type PaymentMethod = 'cash' | 'card' | 'due' | 'other' | 'part'
 
@@ -166,6 +172,9 @@ interface BillPanelProps {
   guests: number
   complimentary: boolean
   itsPaid: boolean
+  /** Advance already paid on an advance booking opened in Billing (0 otherwise). */
+  advancePaid?: number
+  advanceNo?: string
   loyalty: boolean
   feedbackSms: boolean
   customer: CustomerDetails
@@ -175,6 +184,9 @@ interface BillPanelProps {
   onPaymentChange: (method: PaymentMethod) => void
   /** Platform chosen when the payment method is Other. */
   otherPaymentType?: string
+  /** The card option (bank / card type) picked for a Card payment. */
+  cardOption?: string
+  onCardOptionChange?: (option: string) => void
   onOtherPaymentTypeChange?: (type: OtherPaymentType) => void
   onTableIdChange: (id: string) => void
   onGuestsChange: (n: number) => void
@@ -252,20 +264,20 @@ export function BillPanel({
   tables,
   guests,
   itsPaid,
-  loyalty,
-  feedbackSms,
+  advancePaid = 0,
+  advanceNo,
   customer,
   customerFormOpen,
   customerErrors,
   onOrderTypeChange,
   onPaymentChange,
   otherPaymentType,
+  cardOption = '',
+  onCardOptionChange,
   onOtherPaymentTypeChange,
   onTableIdChange,
   onGuestsChange,
   onItsPaidChange,
-  onLoyaltyChange,
-  onFeedbackSmsChange,
   onQtyChange,
   onRemoveLine,
   onLineNoteChange,
@@ -280,6 +292,8 @@ export function BillPanel({
   onOpenDrafts,
   draftCount = 0,
 }: BillPanelProps) {
+  const paymentTypeOptions = usePaymentTypeOptions()
+  const cardOptions = usePaymentCardOptions()
   const { encryptedOutletId } = useAuth()
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
   const [guestsPickerOpen, setGuestsPickerOpen] = useState(false)
@@ -333,6 +347,11 @@ export function BillPanel({
   const [settlementInput, setSettlementInput] = useState('')
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  /** Cash handed over now when the bill is booked on Due; the rest stays due. */
+  const [duePaid, setDuePaid] = useState('')
+  useEffect(() => {
+    if (payment !== 'due') setDuePaid('')
+  }, [payment])
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
@@ -438,6 +457,10 @@ export function BillPanel({
   )
   const roundedTotal = roundSettlementAmount(taxableBase)
   const roundOff = Math.round((roundedTotal - taxableBase) * 100) / 100
+  // An advance booking has already collected part of the bill: only the
+  // balance is taken now.
+  const advanceApplied = Math.min(Math.max(0, advancePaid), roundedTotal)
+  const payableNow = Math.round((roundedTotal - advanceApplied) * 100) / 100
   const settlementValue =
     settlementInput.trim() === '' || Number.isNaN(Number(settlementInput))
       ? roundedTotal
@@ -510,6 +533,7 @@ export function BillPanel({
       taxBreakdown: tax.breakdown,
       roundOff,
       settlementTotal: settlementValue,
+      billTotal: roundedTotal,
     }
   }
 
@@ -1490,7 +1514,7 @@ export function BillPanel({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onAction('Split')}
+              onClick={() => onAction('Split', chargesSnapshot())}
               className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
             >
               Split
@@ -1531,6 +1555,26 @@ export function BillPanel({
               })}
             </span>
           </div>
+
+          {advanceApplied > 0 ? (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+              <p className="flex justify-between text-ink">
+                <span>Advance paid{advanceNo ? ` (#${advanceNo})` : ''}</span>
+                <span className="font-semibold tabular-nums">
+                  − {money(advanceApplied)}
+                </span>
+              </p>
+              <p className="mt-1 flex justify-between text-sm font-bold text-ink">
+                <span>Balance to collect</span>
+                <span className="tabular-nums">{money(payableNow)}</span>
+              </p>
+              <p className="mt-1 text-[11px] text-muted">
+                Save, Save &amp; Print or eBill books the bill with the advance
+                counted as paid; tick It&apos;s Paid and press Save to collect the
+                balance now.
+              </p>
+            </div>
+          ) : null}
 
           <div
             role="radiogroup"
@@ -1599,19 +1643,38 @@ export function BillPanel({
             onClose={() => setMoreOpen(false)}
           />
 
+          {payment === 'card' && cardOptions.length > 0 ? (
+            <div>
+              <span className="mb-1.5 block text-sm font-semibold text-ink">
+                Card
+              </span>
+              <SelectDropdown
+                value={cardOption}
+                options={[
+                  { value: '', label: 'Any card' },
+                  ...cardOptions.map((option) => ({ value: option, label: option })),
+                ]}
+                onChange={(value) => onCardOptionChange?.(value)}
+                caption="Card"
+                searchable={false}
+                triggerClassName="h-10 w-full bg-white"
+              />
+            </div>
+          ) : null}
+
           {payment === 'other' ? (
             <div>
               <span className="mb-1.5 block text-sm font-semibold text-ink">
                 Other Payment Type
               </span>
               <SelectDropdown
-                value={otherPaymentType ?? OTHER_PAYMENT_TYPES[0]}
-                options={OTHER_PAYMENT_TYPES.map((option) => ({
+                value={otherPaymentType ?? paymentTypeOptions[0]}
+                options={paymentTypeOptions.map((option) => ({
                   value: option,
                   label: option,
                 }))}
                 onChange={(value) =>
-                  onOtherPaymentTypeChange?.(value as OtherPaymentType)
+                  onOtherPaymentTypeChange?.(value)
                 }
                 caption="Payment platform"
                 searchable={false}
@@ -1621,13 +1684,41 @@ export function BillPanel({
           ) : null}
 
           {payment === 'due' ? (
-            <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
-              <Clock3 size={13} />
-              Due payment — customer details required
-            </p>
+            <div className="space-y-2">
+              <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                <Clock3 size={13} />
+                Due payment — customer details required
+              </p>
+              <label className="grid grid-cols-[1fr_auto] items-center gap-3 text-sm font-semibold text-ink">
+                Amount paid now
+                <input
+                  type="number"
+                  min={0}
+                  max={payableNow}
+                  step="0.01"
+                  inputMode="decimal"
+                  value={duePaid}
+                  placeholder="0"
+                  onChange={(event) => setDuePaid(event.target.value)}
+                  className="h-10 w-36 rounded-md border border-line bg-white px-3 text-right text-sm font-normal text-ink outline-none focus:border-primary"
+                />
+              </label>
+              {(() => {
+                const paid = Math.min(payableNow, Math.max(0, Number(duePaid) || 0))
+                return (
+                  <p className="text-xs text-muted">
+                    Balance due{' '}
+                    <span className="font-semibold text-amber-600">
+                      {money(Math.round((payableNow - paid) * 100) / 100)}
+                    </span>
+                    {paid > 0 ? ' — press Save to record the payment' : ''}
+                  </p>
+                )
+              })()}
+            </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
               <input
                 type="checkbox"
@@ -1637,6 +1728,7 @@ export function BillPanel({
               />
               It&apos;s Paid
             </label>
+            {/* Loyalty and Send Feedback SMS are switched off for now:
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
               <input
                 type="checkbox"
@@ -1655,6 +1747,7 @@ export function BillPanel({
               />
               Send Feedback SMS
             </label>
+            */}
           </div>
 
           <div className="flex gap-1.5">
@@ -1682,9 +1775,28 @@ export function BillPanel({
                     : action.label
                 }
                 onClick={() => {
-                  // "It's Paid" + Save books the bill as paid in full.
-                  if (itsPaid && action.id === 'Save' && onSettleSave) {
-                    onSettleSave(roundedTotal, 0, chargesSnapshot())
+                  // On Due, an amount typed in "Amount paid now" is settled now and
+                  // the rest is booked as due.
+                  const duePaidNow =
+                    payment === 'due'
+                      ? Math.min(payableNow, Math.max(0, Number(duePaid) || 0))
+                      : 0
+                  if (
+                    (itsPaid || duePaidNow > 0) &&
+                    action.id === 'Save' &&
+                    onSettleSave
+                  ) {
+                    if (payment === 'due') {
+                      onSettleSave(
+                        duePaidNow,
+                        Math.round((payableNow - duePaidNow) * 100) / 100,
+                        chargesSnapshot(),
+                      )
+                      setDuePaid('')
+                    } else {
+                      // "It's Paid" + Save books the bill as paid in full.
+                      onSettleSave(payableNow, 0, chargesSnapshot())
+                    }
                     onItsPaidChange(false)
                     return
                   }

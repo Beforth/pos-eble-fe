@@ -6,7 +6,8 @@ import {
   type SelectDropdownOption,
 } from '../common/SelectDropdown'
 import type { PaymentMethod } from './BillPanel'
-import { OTHER_PAYMENT_TYPES, type OtherPaymentType } from './OtherPaymentModal'
+import { type OtherPaymentType } from './OtherPaymentModal'
+import { usePaymentTypeOptions } from '../../services/usePaymentTypeOptions'
 import { showToast } from '../../utils/toast'
 import { isValidMobile, normalizeMobileDigits } from '../../utils/phone'
 
@@ -17,10 +18,6 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string }[] = [
   { id: 'other', label: 'Other' },
   { id: 'part', label: 'Part' },
 ]
-
-const OTHER_PAYMENT_OPTIONS: SelectDropdownOption[] = OTHER_PAYMENT_TYPES.map(
-  (type) => ({ value: type, label: type }),
-)
 
 type PartMethod = 'cash' | 'card' | 'upi' | 'other' | 'due'
 
@@ -98,15 +95,22 @@ export function SettleSaveModal({
   const [nameError, setNameError] = useState('')
   const [phone, setPhone] = useState('')
   const [phoneError, setPhoneError] = useState('')
+  const paymentTypeOptions = usePaymentTypeOptions()
+  // The popup resets to the first choice each time it opens, without re-running on every load.
+  const defaultOtherType = useRef(paymentTypeOptions[0])
+  defaultOtherType.current = paymentTypeOptions[0]
+  const otherPaymentOptions: SelectDropdownOption[] = paymentTypeOptions.map(
+    (type) => ({ value: type, label: type }),
+  )
   const [otherType, setOtherType] = useState<OtherPaymentType>(
-    OTHER_PAYMENT_TYPES[0],
+    paymentTypeOptions[0],
   )
   const [partEntries, setPartEntries] = useState<PartEntry[]>([])
   const [pendingPart, setPendingPart] = useState<PartEntry | null>(null)
   const [partMethod, setPartMethod] = useState<PartMethod>('cash')
   const [partAmount, setPartAmount] = useState('')
   const [partOtherType, setPartOtherType] = useState<string>(
-    OTHER_PAYMENT_TYPES[0],
+    paymentTypeOptions[0],
   )
   const nameInputRef = useRef<HTMLInputElement>(null)
   const phoneInputRef = useRef<HTMLInputElement>(null)
@@ -122,11 +126,11 @@ export function SettleSaveModal({
       setNameError('')
       setPhone(normalizeMobileDigits(customerPhone ?? ''))
       setPhoneError('')
-      setOtherType(OTHER_PAYMENT_TYPES[0])
+      setOtherType(defaultOtherType.current)
       setPartEntries([])
       setPartMethod('cash')
       setPartAmount(String(exactBill || ''))
-      setPartOtherType(OTHER_PAYMENT_TYPES[0])
+      setPartOtherType(defaultOtherType.current)
       customerPaidTouched.current = false
     }
     wasOpen.current = open
@@ -399,8 +403,8 @@ const onKey = (event: KeyboardEvent) => {
                 <span className="text-sm font-semibold text-ink">Paid via</span>
                 <SelectDropdown
                   value={otherType}
-                  options={OTHER_PAYMENT_OPTIONS}
-                  onChange={(next) => setOtherType(next as OtherPaymentType)}
+                  options={otherPaymentOptions}
+                  onChange={(next) => setOtherType(next)}
                   caption="Paid via"
                   searchable={false}
                   triggerClassName="w-full"
@@ -503,7 +507,7 @@ const onKey = (event: KeyboardEvent) => {
                   onChange={(e) => setPartOtherType(e.target.value)}
                   className="h-9 w-full rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-primary"
                 >
-                  {OTHER_PAYMENT_TYPES.map((option) => (
+                  {paymentTypeOptions.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { showToast } from '../../utils/toast'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Loader, RefreshCw, X } from 'lucide-react'
@@ -7,6 +8,7 @@ import {
   listKotsApi,
   listOrdersApi,
   type KotDto,
+  type KotItemDto,
   type OrderDto,
   type OrderStatus,
 } from '../../services/orderService'
@@ -19,14 +21,21 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'kot', label: 'KOT' },
 ]
 
-/** Paid bills are peach, bills not yet paid (saved or printed) are green. */
+/** Paid bills are peach, bills not yet paid (saved or printed) are green, cancelled are grey. */
 const PAID_ROW = 'bg-[#fbdcae]'
 const UNPAID_ROW = 'bg-emerald-200'
+const CANCELLED_ROW = 'bg-ink/10'
 
 function rowClass(status: OrderStatus | string): string {
   if (status === 'paid') return PAID_ROW
-  if (status === 'cancelled') return 'bg-red-100'
+  if (status === 'cancelled') return CANCELLED_ROW
   return UNPAID_ROW
+}
+
+function kotItemLabel(item: KotItemDto): string {
+  const name = item.name ?? item.item_name ?? ''
+  const qty = item.qty ?? item.quantity ?? 1
+  return `${name} x${qty}`
 }
 
 function amount(value: string | number): string {
@@ -173,11 +182,18 @@ export function RecentOrdersDrawer({ open, onClose }: RecentOrdersDrawerProps) {
                       }`,
                     )
                   }
-                  className="flex w-full items-center justify-between border-b border-line bg-gray-100 px-5 py-3 text-left text-sm text-ink hover:brightness-95"
+                  className="flex w-full items-start justify-between gap-3 border-b border-line bg-gray-100 px-5 py-3 text-left text-sm text-ink hover:brightness-95"
                 >
-                  <span>
-                    KOT {kot.kot_no}
-                    {kot.table_no ? ` · Table ${kot.table_no}` : ''}
+                  <span className="min-w-0">
+                    <span className="block">
+                      KOT {kot.kot_no}
+                      {kot.table_no ? ` · Table ${kot.table_no}` : ''}
+                    </span>
+                    {kot.items.length > 0 && (
+                      <span className="mt-0.5 block text-xs text-muted">
+                        {kot.items.map(kotItemLabel).join(', ')}
+                      </span>
+                    )}
                   </span>
                   <span className="tabular-nums">{kot.item_count}</span>
                 </button>
@@ -190,7 +206,14 @@ export function RecentOrdersDrawer({ open, onClose }: RecentOrdersDrawerProps) {
               <button
                 key={order.id}
                 type="button"
-                onClick={() => openInBilling(`openOrder=${encodeURIComponent(order.id)}`)}
+                onClick={() => {
+                  // A cancelled bill is closed for good: it is not reopened.
+                  if (order.status === 'cancelled') {
+                    showToast(`Bill ${order.bill_no || order.order_no} is cancelled`)
+                    return
+                  }
+                  openInBilling(`openOrder=${encodeURIComponent(order.id)}`)
+                }}
                 className={`flex w-full items-center justify-between border-b border-line px-5 py-3 text-left text-sm text-ink hover:brightness-95 ${rowClass(order.status)}`}
               >
                 <span className="font-medium text-primary underline decoration-primary/30">
@@ -224,6 +247,10 @@ export function RecentOrdersDrawer({ open, onClose }: RecentOrdersDrawerProps) {
             <span className="inline-flex items-center gap-2">
               <span className="size-4 rounded-sm bg-emerald-200" />
               Not paid
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="size-4 rounded-sm bg-ink/10" />
+              Cancelled
             </span>
           </div>
         </footer>

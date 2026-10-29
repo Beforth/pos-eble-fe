@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { AddonGroupForm } from '../components/menu/AddonGroupForm'
 import { useAuth } from '../auth/AuthContext'
@@ -53,17 +52,6 @@ export default function AddAddonGroup() {
         </span>
       }
     >
-      <div className="mb-4 flex justify-end">
-        <button
-          type="button"
-          onClick={goBack}
-          className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
-        >
-          <ArrowLeft size={14} />
-          Back
-        </button>
-      </div>
-
       <AddonGroupForm saving={saving} onSubmit={handleSave} onCancel={goBack} />
     </MenuPageShell>
   )

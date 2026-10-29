@@ -54,7 +54,8 @@ export function SplitBillModal({
 }: SplitBillModalProps) {
   const [tab, setTab] = useState<SplitTab>('portion')
   const [portionInput, setPortionInput] = useState('')
-  const [percentFields, setPercentFields] = useState<string[]>(['', ''])
+  // Only what the cashier typed; the last share is always the auto remainder.
+  const [percentEntries, setPercentEntries] = useState<string[]>([''])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [parts, setParts] = useState<string[][]>([[], []])
 
@@ -62,7 +63,7 @@ export function SplitBillModal({
     if (!open) return
     setTab('portion')
     setPortionInput('')
-    setPercentFields(['', ''])
+    setPercentEntries([''])
     setSelectedIds(new Set())
     setParts([[], []])
   }, [open, lines])
@@ -96,12 +97,28 @@ export function SplitBillModal({
     return amounts
   }, [portionCount, total])
 
-  const percentages = useMemo(
+  const enteredPercents = useMemo(
     () =>
-      percentFields
-        .map((v) => Number(v.trim()))
-        .filter((n) => Number.isFinite(n) && n > 0),
-    [percentFields],
+      percentEntries.map((v) => {
+        const n = Number(v.trim())
+        return Number.isFinite(n) && n > 0 ? n : 0
+      }),
+    [percentEntries],
+  )
+  const enteredSum = enteredPercents.reduce((a, b) => a + b, 0)
+  const remainingPercent = Math.round((100 - enteredSum) * 100) / 100
+  // 80 typed -> the remaining 20 is listed as its own share; Add on that row
+  // opens a box to split it further, until the shares reach 100.
+  const hasAutoShare = enteredSum > 0 && remainingPercent > 0.01
+  const lastEntryFilled =
+    enteredPercents.length > 0 && enteredPercents[enteredPercents.length - 1] > 0
+
+  const percentages = useMemo(
+    () => [
+      ...enteredPercents.filter((n) => n > 0),
+      ...(hasAutoShare ? [remainingPercent] : []),
+    ],
+    [enteredPercents, hasAutoShare, remainingPercent],
   )
 
   const percentSum = percentages.reduce((a, b) => a + b, 0)
@@ -308,47 +325,78 @@ export function SplitBillModal({
 
           {tab === 'percentage' ? (
             <div className="space-y-4">
-              <p className="text-sm text-ink">Please provide only number</p>
-              {percentFields.map((value, index) => (
-                <label key={index} className="block text-sm text-ink">
-                  Percentage Number:
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={value}
-                    onChange={(e) =>
-                      setPercentFields((prev) =>
-                        prev.map((v, i) => (i === index ? e.target.value : v)),
-                      )
-                    }
-                    placeholder={
-                      index === 0
-                        ? 'Enter percentage here like 80'
-                        : index === 1
-                          ? 'Enter percentage here like 20'
-                          : 'Enter percentage here'
-                    }
-                    className="mt-1.5 h-10 w-full rounded-md border border-line bg-white px-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
-                  />
-                </label>
-              ))}
-              <button
-                type="button"
-                onClick={() => setPercentFields((prev) => [...prev, ''])}
-                className="h-8 rounded bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-              >
-                Add More
-              </button>
+              <p className="text-sm text-ink">
+                Enter a percentage — the remaining share is worked out for you.
+              </p>
+              <div className="max-h-[200px] space-y-4 overflow-y-auto pr-1">
+                {percentEntries.map((value, index) => (
+                  <label key={index} className="block text-sm text-ink">
+                    Share {index + 1} %:
+                    <span className="mt-1.5 flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={value}
+                        autoFocus={index > 0 && index === percentEntries.length - 1}
+                        onChange={(e) => {
+                          const next = e.target.value
+                          setPercentEntries((prev) =>
+                            prev.map((v, i) => (i === index ? next : v)),
+                          )
+                        }}
+                        placeholder="Enter percentage here like 80"
+                        className="h-10 w-full rounded-md border border-line bg-white px-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+                      />
+                      {index > 0 ? (
+                        <button
+                          type="button"
+                          aria-label={`Remove share ${index + 1}`}
+                          data-tooltip={`Remove share ${index + 1}`}
+                          onClick={() =>
+                            setPercentEntries((prev) =>
+                              prev.filter((_, i) => i !== index),
+                            )
+                          }
+                          className="flex size-8 shrink-0 items-center justify-center rounded text-muted hover:bg-page hover:text-primary"
+                        >
+                          <X size={16} />
+                        </button>
+                      ) : null}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {hasAutoShare && lastEntryFilled ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setPercentEntries((prev) => [...prev, ''])}
+                    className="h-8 rounded bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
+                  >
+                    Add
+                  </button>
+                </div>
+              ) : null}
+              {enteredSum > 100.01 ? (
+                <p className="text-xs font-medium text-primary">
+                  Shares add up to more than 100%.
+                </p>
+              ) : null}
               {percentages.length > 0 ? (
-                <ul className="space-y-1.5 rounded-lg border border-line bg-page/60 p-3 text-sm">
+                <ul className="sticky bottom-0 space-y-1.5 rounded-lg border border-line bg-page p-3 text-sm">
                   {percentageAmounts.map((amount, index) => (
-                    <li key={index} className="flex justify-between text-ink">
+                    <li
+                      key={index}
+                      className="flex items-center justify-between text-ink"
+                    >
                       <span>
                         Share {index + 1} ({percentages[index]}%)
                       </span>
-                      <span className="font-semibold tabular-nums">
-                        ₹{amount.toFixed(2)}
+                      <span className="flex items-center gap-2">
+                        <span className="font-semibold tabular-nums">
+                          ₹{amount.toFixed(2)}
+                        </span>
                       </span>
                     </li>
                   ))}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Heart } from 'lucide-react'
+import { Heart, Plus } from 'lucide-react'
 import type { MenuItemRow } from '../../utils/menuAdapter'
 import { getDietType } from '../../utils/dietType'
 import {
@@ -37,6 +37,14 @@ interface ItemGridProps {
   /** Show Open Item tile at the end (Favorite Items section). */
   showOpenItem?: boolean
   onOpenItemClick?: () => void
+  /** Display Settings: show the price chip on each card. */
+  showPrice?: boolean
+  /** Display Settings: show the item picture on each card. */
+  showImages?: boolean
+  /** Display Settings: show the Search Item box. */
+  showSearch?: boolean
+  /** Display Settings: a tap adds the item (off: first tap selects, then Add). */
+  autoAdd?: boolean
 }
 
 type DietType = 'veg' | 'non-veg' | 'egg'
@@ -78,6 +86,10 @@ export function ItemGrid({
   favoriteIds,
   showOpenItem = false,
   onOpenItemClick,
+  showPrice = true,
+  showImages = false,
+  showSearch = true,
+  autoAdd = true,
 }: ItemGridProps) {
   const hasItems = items.length > 0
   const showEmpty = !hasItems && !showOpenItem
@@ -92,6 +104,8 @@ export function ItemGrid({
     ],
     [categoryOptions],
   )
+  // Without auto add the first tap only picks a card; its Add button adds it.
+  const [pickedId, setPickedId] = useState<string | null>(null)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -107,6 +121,15 @@ export function ItemGrid({
       key: (prev?.id === item.id ? prev.key : 0) + 1,
     }))
     clickTimerRef.current = setTimeout(() => setTapFlash(null), 320)
+    if (!autoAdd) {
+      setPickedId(item.id)
+      return
+    }
+    onAddItem(item)
+  }
+
+  function addPicked(item: MenuItemRow) {
+    setPickedId(null)
     onAddItem(item)
   }
 
@@ -128,6 +151,7 @@ export function ItemGrid({
           />
         </div>
         <div className="flex w-full min-w-0 flex-1 flex-col gap-2.5 sm:min-w-[260px] sm:flex-row sm:items-center sm:gap-2">
+          {showSearch ? (
           <input
             type="search"
             value={search}
@@ -141,6 +165,7 @@ export function ItemGrid({
             placeholder="Search item (Enter to add)"
             className="box-border h-12 min-h-12 w-full min-w-0 appearance-none rounded-lg border border-line bg-card px-3 py-3 text-base leading-normal text-ink outline-none placeholder:text-muted focus:border-primary sm:h-9 sm:min-h-9 sm:flex-1 sm:py-0 sm:text-sm"
           />
+          ) : null}
           <input
             type="search"
             value={shortCode}
@@ -152,6 +177,7 @@ export function ItemGrid({
               }
             }}
             placeholder="Short Code (Enter)"
+            data-vk="shortcode"
             className="box-border h-12 min-h-12 w-full min-w-0 appearance-none rounded-lg border border-line bg-card px-3 py-3 text-base leading-normal text-ink outline-none placeholder:text-muted focus:border-primary sm:h-9 sm:min-h-9 sm:flex-1 sm:py-0 sm:text-sm"
           />
         </div>
@@ -168,6 +194,7 @@ export function ItemGrid({
               const diet = getDietType(item.tags, item.name)
               const selectedQty = selectedQtyByItemId[item.id] ?? 0
               const selected = selectedQty > 0
+              const picked = !autoAdd && pickedId === item.id
               // solid red = in Favorite Items (by hand or best seller);
               // grey outline = not a favorite.
               const inFavorites = favoriteIds
@@ -180,8 +207,8 @@ export function ItemGrid({
                     disabled={!item.available}
                     onClick={() => handleItemClick(item)}
                     aria-pressed={selected}
-                    className={`billing-item-card relative flex min-h-[92px] w-full flex-col justify-between gap-2 overflow-hidden rounded-xl border p-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
-                      selected
+                    className={`billing-item-card relative flex min-h-[92px] w-full flex-col justify-between gap-2 overflow-hidden rounded-xl border p-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all disabled:cursor-not-allowed disabled:bg-page disabled:opacity-60 disabled:grayscale ${
+                      selected || picked
                         ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
                         : 'border-line bg-card hover:-translate-y-px hover:border-primary/40 hover:shadow-md'
                     }`}
@@ -191,6 +218,14 @@ export function ItemGrid({
                         key={tapFlash.key}
                         className="billing-item-tap-flash"
                         aria-hidden
+                      />
+                    ) : null}
+                    {showImages && item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt=""
+                        loading="lazy"
+                        className="-mx-2.5 -mt-2.5 h-20 w-[calc(100%+1.25rem)] max-w-none object-cover"
                       />
                     ) : null}
                     <span className="relative flex items-start justify-between gap-2">
@@ -206,16 +241,33 @@ export function ItemGrid({
                       </span>
                     </span>
                     <span className="relative flex items-center gap-1.5 pr-7">
-                      <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-xs font-bold tabular-nums text-accent">
-                        ₹{item.price}
-                      </span>
+                      {showPrice ? (
+                        <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-xs font-bold tabular-nums text-accent">
+                          ₹{item.price}
+                        </span>
+                      ) : null}
                       {item.shortCode ? (
                         <span className="rounded-md bg-page px-1.5 py-0.5 text-[11px] font-medium text-muted">
                           {item.shortCode}
                         </span>
                       ) : null}
+                      {!item.available ? (
+                        <span className="rounded-md bg-line px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+                          Unavailable
+                        </span>
+                      ) : null}
                     </span>
                   </button>
+                  {picked ? (
+                    <button
+                      type="button"
+                      onClick={() => addPicked(item)}
+                      className="absolute inset-x-2 bottom-2 z-10 inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-primary text-xs font-bold text-white shadow hover:bg-primary-hover"
+                    >
+                      <Plus size={14} />
+                      Add
+                    </button>
+                  ) : null}
                   {selected ? (
                     <span className="pointer-events-none absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold leading-none text-white shadow">
                       {selectedQty}

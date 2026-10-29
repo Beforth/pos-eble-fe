@@ -1,87 +1,57 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Download, Printer } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import { BillingHeader } from '../../components/billing/BillingHeader'
+import {
+  LoadState,
+  ReportCard,
+  ReportFilterBar,
+  ReportShell,
+  StatGrid,
+  StatTile,
+} from '../../components/reports/ReportShell'
+import { reportSubtitle } from '../../components/reports/reportStyles'
 import { fetchTipSummaryApi, type TipSummaryResult } from '../../services/reportService'
-import { useNewOrder } from '../../state/useNewOrder'
 import { downloadCsv } from '../../utils/exportCsv'
+import { formatINR } from '../../utils/format'
+import { todayIso } from '../../utils/reportDates'
 import { showToast } from '../../utils/toast'
 
-/** Local calendar day as YYYY-MM-DD, `offset` days from today. */
-function dayIso(offset = 0): string {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function displayDate(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return y && m && d ? `${d}-${m}-${y}` : iso
-}
-
-function num(value: string | number): string {
+function money(value: string | number): string {
   const n = Number(value)
-  return Number.isFinite(n)
-    ? n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : String(value)
+  return Number.isFinite(n) ? formatINR(n, 2) : String(value)
 }
 
-const BUTTON_CLASS =
-  'inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
-
-function TipTable({
-  title,
-  label,
-  rows,
-}: {
-  title: string
-  label: string
-  rows: { name: string; amount: string }[]
-}) {
+/** Name / amount lines, each with a bar sized against the biggest tip in the list. */
+function TipList({ rows }: { rows: { name: string; amount: string }[] }) {
+  if (rows.length === 0) {
+    return <p className="py-2 text-center text-sm text-muted">No tips recorded</p>
+  }
+  const top = Math.max(0, ...rows.map((row) => Number(row.amount) || 0))
   return (
-    <section>
-      <h2 className="px-3 pb-2 pt-4 text-sm font-bold text-ink">{title}</h2>
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-page text-muted">
-            <th className="border border-line px-3 py-3.5 text-left font-medium">{label}</th>
-            <th className="w-1/2 border border-line px-3 py-3.5 text-left font-medium">
-              Amount (₹)
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={2} className="border border-line px-3 py-4 text-muted">
-                No tips recorded
-              </td>
-            </tr>
-          ) : (
-            rows.map((row) => (
-              <tr key={row.name}>
-                <td className="border border-line px-3 py-4 text-ink">{row.name}</td>
-                <td className="border border-line px-3 py-4 tabular-nums text-ink">
-                  {num(row.amount)}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </section>
+    <ul className="space-y-3">
+      {rows.map((row) => (
+        <li key={row.name}>
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-ink">{row.name}</span>
+            <span className="tabular-nums text-ink">{money(row.amount)}</span>
+          </div>
+          <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-line">
+            <span
+              className="block h-full rounded-full bg-primary"
+              style={{
+                width: `${top > 0 ? Math.min(100, ((Number(row.amount) || 0) / top) * 100) : 0}%`,
+              }}
+            />
+          </span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
 export default function TipSummaryReport() {
-  const navigate = useNavigate()
-  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId } = useAuth()
-  const [billNo, setBillNo] = useState('')
-  const [from, setFrom] = useState(() => dayIso())
-  const [to, setTo] = useState(() => dayIso())
+  const [from, setFrom] = useState(todayIso)
+  const [to, setTo] = useState(todayIso)
   const [data, setData] = useState<TipSummaryResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -108,9 +78,9 @@ export default function TipSummaryReport() {
     }
   }, [encryptedOutletId, from, to])
 
-  function pickDay(offset: number) {
-    setFrom(dayIso(offset))
-    setTo(dayIso(offset))
+  function setRange(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom)
+    setTo(nextTo)
   }
 
   function exportCsv() {
@@ -125,94 +95,44 @@ export default function TipSummaryReport() {
     ])
   }
 
+  const topEmployee = data?.employees.reduce<{ employee: string; amount: string } | null>(
+    (best, row) => (!best || Number(row.amount) > Number(best.amount) ? row : best),
+    null,
+  )
+
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader
-        billNo={billNo}
-        onBillNoChange={setBillNo}
-        onNewOrder={() => startNewOrder()}
-        onViewKot={() => navigate('/billing?kot=1')}
-      />
+    <ReportShell title="Tip Summary" subtitle={reportSubtitle(from, to)}>
+      <ReportFilterBar from={from} to={to} onRange={setRange} onExport={exportCsv} />
 
-      <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
-        <h1 className="text-lg font-bold text-ink">Tip Summary</h1>
-        <button
-          type="button"
-          onClick={() => navigate('/reports')}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
-        >
-          <ChevronLeft size={14} />
-          Back
-        </button>
-      </div>
-
-      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-muted">
-            From
-            <input
-              type="date"
-              value={from}
-              max={to || undefined}
-              onChange={(event) => setFrom(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+      {loading && !data ? (
+        <LoadState loading error="" />
+      ) : error ? (
+        <LoadState loading={false} error={error} />
+      ) : data ? (
+        <>
+          <StatGrid>
+            <StatTile primary label="Total tip" value={money(data.total_tip)} />
+            <StatTile label="Employees tipped" value={data.employees.length} />
+            <StatTile label="Tables / counters" value={data.tables.length} />
+            <StatTile
+              label="Top earner"
+              value={topEmployee ? topEmployee.employee : '—'}
+              hint={topEmployee ? money(topEmployee.amount) : undefined}
             />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            To
-            <input
-              type="date"
-              value={to}
-              min={from || undefined}
-              onChange={(event) => setTo(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
-            />
-          </label>
-          <div className="ml-auto flex flex-wrap items-center gap-3">
-            <button type="button" onClick={() => pickDay(-1)} className={BUTTON_CLASS}>
-              Yesterday
-            </button>
-            <button type="button" onClick={() => pickDay(0)} className={BUTTON_CLASS}>
-              Today
-            </button>
-            <button type="button" onClick={() => window.print()} className={BUTTON_CLASS}>
-              <Printer size={16} />
-              Print
-            </button>
-            <button type="button" onClick={exportCsv} className={BUTTON_CLASS}>
-              <Download size={16} />
-              Export CSV
-            </button>
-          </div>
-        </div>
+          </StatGrid>
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-line bg-card pb-4 shadow-sm">
-          <p className="bg-primary/5 px-4 py-3 text-sm text-muted">
-            Tip Summary : From {displayDate(from)} to {displayDate(to)}
-          </p>
-          {loading && !data ? (
-            <p className="p-10 text-center text-sm text-muted">Loading…</p>
-          ) : error ? (
-            <p className="p-10 text-center text-sm text-danger">{error}</p>
-          ) : data ? (
-            <>
-              <p className="bg-page px-4 py-3.5 text-sm text-ink">
-                Total Tip: ₹ {Number(data.total_tip) === 0 ? '0' : num(data.total_tip)}
-              </p>
-              <TipTable
-                title="Employee Wise Tip"
-                label="Employee"
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ReportCard title="Employee Wise Tip">
+              <TipList
                 rows={data.employees.map((row) => ({ name: row.employee, amount: row.amount }))}
               />
-              <TipTable
-                title="Table Wise Tip"
-                label="Table"
-                rows={data.tables.map((row) => ({ name: row.table, amount: row.amount }))}
-              />
-            </>
-          ) : null}
-        </div>
-      </main>
-    </div>
+            </ReportCard>
+            <ReportCard title="Table Wise Tip">
+              <TipList rows={data.tables.map((row) => ({ name: row.table, amount: row.amount }))} />
+            </ReportCard>
+          </div>
+        </>
+      ) : null}
+    </ReportShell>
   )
 }

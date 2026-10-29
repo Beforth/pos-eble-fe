@@ -177,16 +177,9 @@ export function BillingOrdersTable({
         const due = row.balanceDue ?? 0
         return (
           <div className="whitespace-nowrap">
-            <button
-              type="button"
-              onClick={() => onEdit(row)}
-              aria-label={`Edit order ${row.orderNo}`}
-              data-tooltip="Edit order"
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-base font-bold tabular-nums text-ink hover:bg-page hover:text-primary"
-            >
+            <span className="text-base font-bold tabular-nums text-ink">
               {row.grandTotal.toFixed(2)}
-              <Pencil size={12} className="text-muted" />
-            </button>
+            </span>
             {due > 0 ? (
               <p className="mt-0.5 text-xs font-semibold text-danger">
                 {formatINR(due, 2)} due
@@ -231,6 +224,9 @@ export function BillingOrdersTable({
             ) : null}
             <IconAction label="View details" onClick={() => onView(row)}>
               <Eye size={15} />
+            </IconAction>
+            <IconAction label="Edit order" onClick={() => onEdit(row)}>
+              <Pencil size={15} />
             </IconAction>
             <IconAction label="Print kitchen ticket" onClick={() => onViewKot(row)}>
               <Printer size={15} />

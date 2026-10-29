@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Eye, Info, Pencil, PencilLine, Printer, ShoppingCart } from 'lucide-react'
+import { Eye, Info, Pencil, Printer, ShoppingCart } from 'lucide-react'
 import type { KotRow } from '../../mocks/kotData'
 import { KOT_STATUS_DOT, KOT_STATUS_PILL } from '../../utils/billingKotStatus'
 
@@ -88,9 +88,6 @@ export function BillingKotTable({
               <td className="px-4 py-3">
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
                   #{row.kotId}
-                  {row.modified ? (
-                    <PencilLine size={12} aria-label="Modified KOT" />
-                  ) : null}
                 </span>
               </td>
               <td className="whitespace-nowrap px-4 py-3 font-medium text-ink">

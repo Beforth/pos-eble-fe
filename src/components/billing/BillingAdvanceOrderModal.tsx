@@ -58,6 +58,9 @@ export function BillingAdvanceOrderModal({
   const [payment, setPayment] = useState('Cash')
   const [advance, setAdvance] = useState('0')
   const [note, setNote] = useState('')
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [showErrors, setShowErrors] = useState(false)
 
   // Start from "now" each time the dialog opens.
   useEffect(() => {
@@ -69,6 +72,11 @@ export function BillingAdvanceOrderModal({
     setPayment('Cash')
     setAdvance('0')
     setNote('')
+    // The bill's customer, if one was already entered, is the starting point.
+    setName(customerName)
+    setPhone(customerPhone.replace(/\D/g, '').slice(0, 10))
+    setShowErrors(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when it opens
   }, [open])
 
   useEffect(() => {
@@ -85,6 +93,9 @@ export function BillingAdvanceOrderModal({
   const advanceValue = Number(advance)
   const paid = Number.isFinite(advanceValue) && advanceValue > 0 ? advanceValue : 0
   const remaining = Math.max(0, Math.round((total - paid) * 100) / 100)
+  // An advance order is fulfilled later, so the customer has to be reachable.
+  const nameError = name.trim().length < 3
+  const phoneError = phone.length !== 10
 
   async function handleSave() {
     if (!outletId) {
@@ -99,6 +110,11 @@ export function BillingAdvanceOrderModal({
       showToast('Select a date')
       return
     }
+    if (nameError || phoneError) {
+      setShowErrors(true)
+      showToast('Enter the customer name (3+ letters) and a 10-digit mobile number')
+      return
+    }
     if (paid > total) {
       showToast('Advance amount cannot be more than the total')
       return
@@ -109,8 +125,8 @@ export function BillingAdvanceOrderModal({
     const payload: CreateAdvanceOrderPayload = {
       order_type: apiType,
       order_type_label: ORDER_TYPE_LABELS[apiType],
-      customer_name: customerName.trim(),
-      customer_phone: customerPhone.trim(),
+      customer_name: name.trim(),
+      customer_phone: phone,
       special_note: note.trim(),
       payment_type: payment,
       advance_amount: paid,
@@ -168,6 +184,48 @@ export function BillingAdvanceOrderModal({
         </header>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <label className="text-sm text-ink">
+              Customer Name <span className="text-primary">*</span>
+              <input
+                type="text"
+                value={name}
+                maxLength={60}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Customer name"
+                aria-invalid={showErrors && nameError}
+                className={`mt-1 ${fieldClass} ${
+                  showErrors && nameError ? 'border-primary' : ''
+                }`}
+              />
+              {showErrors && nameError ? (
+                <span className="mt-1 block text-xs text-primary">
+                  Enter at least 3 characters.
+                </span>
+              ) : null}
+            </label>
+            <label className="text-sm text-ink">
+              Mobile Number <span className="text-primary">*</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={phone}
+                maxLength={10}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="10-digit mobile number"
+                aria-invalid={showErrors && phoneError}
+                className={`mt-1 ${fieldClass} ${
+                  showErrors && phoneError ? 'border-primary' : ''
+                }`}
+              />
+              {showErrors && phoneError ? (
+                <span className="mt-1 block text-xs text-primary">
+                  Enter a 10-digit mobile number.
+                </span>
+              ) : null}
+            </label>
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <label className="text-sm text-ink">
               Select Date

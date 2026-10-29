@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Wallet, X } from 'lucide-react'
-import { OTHER_PAYMENT_TYPES, type OtherPaymentType } from './OtherPaymentModal'
+import { type OtherPaymentType } from './OtherPaymentModal'
+import { usePaymentTypeOptions } from '../../services/usePaymentTypeOptions'
 import type { PaymentMethod } from './BillPanel'
 
 const MAIN_METHODS: { id: PaymentMethod; label: string }[] = [
@@ -37,6 +38,7 @@ export function MorePaymentDrawer({
   onSelectOther,
   onClose,
 }: MorePaymentDrawerProps) {
+  const paymentTypeOptions = usePaymentTypeOptions()
   const [otherOpen, setOtherOpen] = useState(true)
 
   useEffect(() => {
@@ -112,7 +114,7 @@ export function MorePaymentDrawer({
             </button>
             {otherOpen ? (
               <div className="mt-3 grid grid-cols-3 gap-3">
-                {OTHER_PAYMENT_TYPES.map((type) => (
+                {paymentTypeOptions.map((type) => (
                   <button
                     key={type}
                     type="button"

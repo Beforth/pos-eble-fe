@@ -1,3 +1,4 @@
+import { usePrintLogoUrl } from '../../services/usePrintLogo'
 import { type CSSProperties } from 'react'
 import { Printer, X } from 'lucide-react'
 import { brand } from '../../theme/brand'
@@ -121,6 +122,7 @@ export function BillReceipt({
   onClose,
 }: BillReceiptProps) {
   const s = { ...shopDefaults, ...shop }
+  const logoUrl = usePrintLogoUrl()
   const m = meta ?? {}
   const c = { cgstPct: 0, sgstPct: 0, roundOff: 0, ...charges }
 
@@ -188,6 +190,9 @@ export function BillReceipt({
 
       <div id="bill-receipt" style={receiptStyle}>
         <div style={headerStyle}>
+          {logoUrl ? (
+            <img src={logoUrl} alt="" style={logoStyle} />
+          ) : null}
           <div style={shopNameStyle}>{s.name}</div>
           <div style={taglineStyle}>{s.tagline}</div>
           <div style={smallStyle}>{s.address}</div>
@@ -438,6 +443,16 @@ const receiptStyle: CSSProperties = {
 const headerStyle: CSSProperties = {
   textAlign: 'center',
   marginBottom: 4,
+}
+
+/** The outlet's print logo, centred above the name; kept black-and-white for thermal paper. */
+const logoStyle: CSSProperties = {
+  display: 'block',
+  margin: '0 auto 6px',
+  maxWidth: '60%',
+  maxHeight: '64px',
+  objectFit: 'contain',
+  filter: 'grayscale(1) contrast(1.2)',
 }
 
 const shopNameStyle: CSSProperties = {

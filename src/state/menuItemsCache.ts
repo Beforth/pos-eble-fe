@@ -9,6 +9,8 @@ const ALL_SCOPE = '__all__'
 const CACHE_TTL_MS = 30_000
 
 const cache = new Map<string, { items: Item[]; loadedAt: number }>()
+// Callers that ask for the same list while it is loading share one request.
+const inflight = new Map<string, Promise<Item[]>>()
 
 function freshHit(key: string, force?: boolean): Item[] | null {
   const hit = cache.get(key)
@@ -59,9 +61,16 @@ export async function fetchAllItemsCached(
   const key = keyFor(outletId, ALL_SCOPE)
   const hit = freshHit(key, options.force)
   if (hit) return hit
-  const items = await loadAllPages(outletId)
-  cache.set(key, { items, loadedAt: Date.now() })
-  return items
+  const pending = inflight.get(key)
+  if (pending) return pending
+  const request = loadAllPages(outletId)
+    .then((items) => {
+      cache.set(key, { items, loadedAt: Date.now() })
+      return items
+    })
+    .finally(() => inflight.delete(key))
+  inflight.set(key, request)
+  return request
 }
 
 export function invalidateMenuItems(

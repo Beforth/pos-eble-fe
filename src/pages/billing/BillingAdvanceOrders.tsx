@@ -1,11 +1,23 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, Eye, LayoutGrid, Loader2, Plus, Search, X } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronLeft,
+  Eye,
+  LayoutGrid,
+  Loader2,
+  Plus,
+  Search,
+  ShoppingCart,
+  X,
+} from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { AdvanceOrderModal } from '../../components/all-orders/AdvanceOrderModal'
+import { AdvanceOrderDetailsModal } from '../../components/billing/AdvanceOrderDetailsModal'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { Pagination } from '../../components/common/Pagination'
 import {
   cancelAdvanceOrderApi,
   listAdvanceOrdersApi,
@@ -19,6 +31,8 @@ import { showToast } from '../../utils/toast'
 type RangeKey = 'all' | 'today' | '1' | '2'
 type SortKey = 'latest' | 'oldest'
 
+const PAGE_SIZE = 10
+
 const RANGE_TABS: { value: RangeKey; label: string; days?: number }[] = [
   { value: 'all', label: 'All' },
   { value: 'today', label: 'Today', days: 0 },
@@ -26,15 +40,19 @@ const RANGE_TABS: { value: RangeKey; label: string; days?: number }[] = [
   { value: '2', label: 'Within 2 Day(s)', days: 2 },
 ]
 
-/** Row tint and legend dot per status; the legend names mirror the Orders page. */
+/** Legend dot and status pill per booking status; the names mirror the Orders page. */
 const STATUS_STYLE: Record<
   AdvanceOrderStatus,
-  { label: string; row: string; dot: string }
+  { label: string; dot: string; pill: string }
 > = {
-  booked: { label: 'Saved Bill', row: 'bg-card', dot: 'border border-line bg-card' },
-  confirmed: { label: 'Printed Bill', row: 'bg-emerald-300', dot: 'bg-emerald-400' },
-  cancelled: { label: 'Cancelled Bill', row: 'bg-red-100', dot: 'bg-red-400' },
-  completed: { label: 'Paid', row: 'bg-orange-100', dot: 'bg-orange-300' },
+  booked: { label: 'Saved Bill', dot: 'bg-slate-400', pill: 'bg-slate-100 text-slate-700' },
+  confirmed: {
+    label: 'Printed Bill',
+    dot: 'bg-accent',
+    pill: 'bg-accent/15 text-accent',
+  },
+  cancelled: { label: 'Cancelled Bill', dot: 'bg-ink/40', pill: 'bg-ink/10 text-muted' },
+  completed: { label: 'Paid', dot: 'bg-success', pill: 'bg-success/10 text-success' },
 }
 
 const LEGEND_ORDER: AdvanceOrderStatus[] = ['booked', 'confirmed', 'cancelled', 'completed']
@@ -53,6 +71,19 @@ function addDaysIso(days: number): string {
 function deliveryText(order: AdvanceOrderDto): string {
   if (!order.scheduled_date) return '—'
   return `${order.scheduled_date} ${(order.scheduled_time ?? '').slice(0, 8)}`.trim()
+}
+
+/** "Wed, 28 Oct" and "11:43 AM" for a card; a booking without a date shows a dash. */
+function deliveryParts(order: AdvanceOrderDto): { date: string; time: string } {
+  if (!order.scheduled_date) return { date: '—', time: '' }
+  const d = new Date(`${order.scheduled_date}T${(order.scheduled_time ?? '00:00:00').slice(0, 8)}`)
+  if (Number.isNaN(d.getTime())) return { date: order.scheduled_date, time: '' }
+  return {
+    date: d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }),
+    time: order.scheduled_time
+      ? d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+      : '',
+  }
 }
 
 function createdText(iso: string): string {
@@ -75,7 +106,7 @@ export default function BillingAdvanceOrders() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('latest')
   const [pastDate, setPastDate] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState<string | null>(null)
+  const [viewOrder, setViewOrder] = useState<AdvanceOrderDto | null>(null)
   const [cumulativeOpen, setCumulativeOpen] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<AdvanceOrderDto | null>(null)
@@ -138,6 +169,42 @@ export default function BillingAdvanceOrders() {
     )
   }, [rows])
 
+  // Chip and tab counts say what each would show, so they ignore their own filter.
+  const rangeCounts = useMemo(() => {
+    const today = toIsoDate(new Date())
+    const counts: Record<string, number> = {}
+    for (const tab of RANGE_TABS) {
+      counts[tab.value] = orders.filter((o) => {
+        if (tab.days === undefined) return true
+        const date = o.scheduled_date ?? ''
+        return date >= today && date <= addDaysIso(tab.days)
+      }).length
+    }
+    return counts
+  }, [orders])
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<AdvanceOrderStatus, number> = {
+      booked: 0,
+      confirmed: 0,
+      cancelled: 0,
+      completed: 0,
+    }
+    for (const o of orders) counts[o.status] += 1
+    return counts
+  }, [orders])
+
+  // The page restarts at 1 whenever a filter changes, without an effect: the
+  // page number is only trusted while the filters it was chosen under hold.
+  const filterKey = [range, status, search, sort, pastDate].join('|')
+  const [pageState, setPageState] = useState({ key: '', page: 1 })
+  const lastPage = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const currentPage = Math.min(pageState.key === filterKey ? pageState.page : 1, lastPage)
+  const visible = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  function setPage(next: number) {
+    setPageState({ key: filterKey, page: next })
+  }
+
   async function confirmCancel() {
     if (!cancelTarget || !encryptedOutletId) return
     setCancelling(true)
@@ -155,6 +222,10 @@ export default function BillingAdvanceOrders() {
     }
   }
 
+  function openInBilling(order: AdvanceOrderDto) {
+    navigate(`/billing?openAdvance=${encodeURIComponent(order.id)}`)
+  }
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
       <BillingHeader
@@ -170,6 +241,14 @@ export default function BillingAdvanceOrders() {
         defaultDate={new Date()}
         onClose={() => setNewOpen(false)}
         onCreated={() => void load()}
+      />
+      <AdvanceOrderDetailsModal
+        order={viewOrder}
+        deliveryText={viewOrder ? deliveryText(viewOrder) : ''}
+        createdText={viewOrder ? createdText(viewOrder.created_at) : ''}
+        statusLabel={viewOrder ? STATUS_STYLE[viewOrder.status].label : ''}
+        onOpenInBilling={openInBilling}
+        onClose={() => setViewOrder(null)}
       />
       <ConfirmDialog
         open={Boolean(cancelTarget)}
@@ -214,8 +293,12 @@ export default function BillingAdvanceOrders() {
         </button>
       </div>
 
-      <div className="flex flex-wrap items-stretch justify-between border-b border-line bg-card px-4 sm:px-6">
-        <div className="flex overflow-x-auto" role="tablist" aria-label="Delivery window">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-card px-4 py-3 sm:px-6">
+        <div
+          className="inline-flex max-w-full overflow-x-auto rounded-xl border border-line bg-page p-1"
+          role="tablist"
+          aria-label="Delivery window"
+        >
           {RANGE_TABS.map((tab) => {
             const active = range === tab.value
             return (
@@ -225,19 +308,24 @@ export default function BillingAdvanceOrders() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setRange(tab.value)}
-                className={`flex min-w-[96px] flex-col items-center justify-center gap-1 border-b-2 px-4 py-3 text-xs font-medium transition-colors ${
-                  active
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-transparent text-ink hover:bg-page'
+                className={`inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium transition-colors ${
+                  active ? 'bg-primary text-white shadow-sm' : 'text-ink hover:bg-card'
                 }`}
               >
-                {tab.value === 'all' ? <LayoutGrid size={22} /> : null}
-                <span className="whitespace-nowrap">{tab.label}</span>
+                {tab.value === 'all' ? <LayoutGrid size={15} /> : null}
+                {tab.label}
+                <span
+                  className={`rounded-full px-1.5 text-xs tabular-nums ${
+                    active ? 'bg-white/25' : 'bg-card text-muted'
+                  }`}
+                >
+                  {rangeCounts[tab.value] ?? 0}
+                </span>
               </button>
             )
           })}
         </div>
-        <div className="flex flex-wrap items-center gap-2 py-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setNewOpen(true)}
@@ -274,21 +362,8 @@ export default function BillingAdvanceOrders() {
       </div>
 
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        {pastDate !== null ? (
-          <label className="mb-3 inline-flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-sm text-muted">
-            <CalendarDays size={14} />
-            Delivery date
-            <input
-              type="date"
-              value={pastDate}
-              onChange={(e) => setPastDate(e.target.value || null)}
-              className="h-8 rounded-md border border-line bg-page px-2 text-sm text-ink outline-none focus:border-primary"
-            />
-          </label>
-        ) : null}
-
         {cumulativeOpen ? (
-          <div className="mb-4 rounded-xl border border-line bg-card p-4">
+          <div className="mb-4 rounded-2xl border border-line bg-card p-4">
             <h2 className="mb-2 text-sm font-bold text-ink">
               Cumulative Items ({rows.length} advance order{rows.length === 1 ? '' : 's'}, cancelled left out)
             </h2>
@@ -308,185 +383,240 @@ export default function BillingAdvanceOrders() {
         ) : null}
 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="relative w-full max-w-xs">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search order no., name or phone"
-              aria-label="Search advance orders"
-              className="h-9 w-full rounded-lg border border-line bg-card pl-9 pr-9 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
-            />
-            {search ? (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label="Clear search"
-                data-tooltip="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:text-ink"
-              >
-                <X size={14} />
-              </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-72 max-w-full">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search order no., name or phone"
+                aria-label="Search advance orders"
+                className="h-10 w-full rounded-xl border border-line bg-card pl-9 pr-9 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+              />
+              {search ? (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear search"
+                  data-tooltip="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:text-ink"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+            {pastDate !== null ? (
+              <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-card pl-3 pr-1.5 text-sm text-muted">
+                <CalendarDays size={14} />
+                Delivery date
+                <input
+                  type="date"
+                  value={pastDate}
+                  onChange={(e) => setPastDate(e.target.value || null)}
+                  className="h-8 rounded-lg border border-line bg-page px-2 text-sm text-ink outline-none focus:border-primary"
+                />
+              </label>
             ) : null}
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-muted">
-              Sort By
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                className="h-9 rounded-lg border border-line bg-primary/10 px-2.5 text-sm text-ink outline-none focus:border-primary"
-              >
-                <option value="latest">Latest Date</option>
-                <option value="oldest">Oldest Date</option>
-              </select>
-            </label>
-            <div
-              className="flex flex-wrap items-center gap-3 rounded-lg bg-card px-3 py-2 text-sm text-ink"
-              role="group"
-              aria-label="Filter by bill status"
+          <label className="flex items-center gap-2 text-sm text-muted">
+            Sort by
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="h-10 rounded-xl border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
             >
-              {LEGEND_ORDER.map((key) => {
-                const active = status === key
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setStatus(active ? 'all' : key)}
-                    className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 ${
-                      active ? 'bg-ink/10 font-semibold' : 'hover:bg-page'
-                    }`}
-                  >
-                    <span className={`size-3.5 rounded-full ${STATUS_STYLE[key].dot}`} />
-                    {STATUS_STYLE[key].label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+              <option value="latest">Latest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </label>
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-12 text-sm text-muted">
+        <div
+          className="mb-4 flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Filter by status"
+        >
+          <button
+            type="button"
+            aria-pressed={status === 'all'}
+            onClick={() => setStatus('all')}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+              status === 'all'
+                ? 'border-ink bg-ink text-white'
+                : 'border-line bg-card text-ink hover:bg-page'
+            }`}
+          >
+            All statuses
+          </button>
+          {LEGEND_ORDER.map((key) => {
+            const active = status === key
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setStatus(active ? 'all' : key)}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                  active
+                    ? 'border-ink bg-ink/5 text-ink'
+                    : 'border-line bg-card text-ink hover:bg-page'
+                }`}
+              >
+                <span className={`size-2.5 rounded-full ${STATUS_STYLE[key].dot}`} />
+                {STATUS_STYLE[key].label}
+                <span className="tabular-nums text-muted">{statusCounts[key]}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {loading && orders.length === 0 ? (
+          <div className="flex items-center justify-center gap-2 rounded-2xl border border-line bg-card px-4 py-12 text-sm text-muted">
             <Loader2 size={16} className="animate-spin" />
             Loading advance orders…
           </div>
         ) : rows.length === 0 ? (
-          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-line bg-card px-6 py-12 text-center">
+          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center">
             <p className="text-base font-semibold text-ink">No advance orders</p>
             <p className="mt-1 text-sm text-muted">
-              Bookings for a later date or time will show here.
+              Bookings for a future date will appear here.
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-line bg-card">
-            <div className="w-full overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-line bg-page">
-                    {['Delivery Date', 'Customer Name / Mobile', 'Grand Total (₹)', 'Customer Note', 'Created', ''].map(
-                      (heading) => (
-                        <th
-                          key={heading || 'actions'}
-                          scope="col"
-                          className="whitespace-nowrap px-3 py-3 text-left text-xs font-bold text-ink"
+          <>
+            <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              {visible.map((order) => {
+                const when = deliveryParts(order)
+                const advance = Number(order.advance_amount)
+                const total = Number(order.grand_total)
+                const balance = Math.max(0, Math.round((total - advance) * 100) / 100)
+                const open = order.status === 'booked' || order.status === 'confirmed'
+                const shownItems = order.items.slice(0, 2)
+                const moreItems = order.items.length - shownItems.length
+                return (
+                  <li
+                    key={order.id}
+                    className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm"
+                  >
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <CalendarDays size={18} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-bold text-ink">
+                              {when.date}
+                              {when.time ? ` · ${when.time}` : ''}
+                            </p>
+                            <p className="truncate text-xs text-muted">
+                              Advance #{order.adv_order_no} · Booked {createdText(order.created_at).slice(0, 16)}
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[order.status].pill}`}
                         >
-                          {heading}
-                        </th>
-                      ),
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((order) => {
-                    const open = expanded === order.id
-                    return (
-                      <Fragment key={order.id}>
-                        <tr className={`border-b border-line ${STATUS_STYLE[order.status].row}`}>
-                          <td className="px-3 py-3">
-                            <p className="whitespace-nowrap">{deliveryText(order)}</p>
-                            <p className="uppercase">[{order.order_type_label}]</p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <p>{order.customer_name}</p>
-                            <p className="text-muted">{order.customer_phone}</p>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className="inline-block rounded-lg bg-card px-2 py-1 font-semibold tabular-nums text-primary">
-                              {Number(order.grand_total).toFixed(2)}
-                            </span>
-                            {Number(order.advance_amount) > 0 ? (
-                              <p className="mt-0.5 text-xs text-muted">
-                                {formatINR(Number(order.advance_amount), 2)} advance paid
-                              </p>
-                            ) : null}
-                          </td>
-                          <td className="px-3 py-3">{order.special_note}</td>
-                          <td className="whitespace-nowrap px-3 py-3">{createdText(order.created_at)}</td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                aria-label="View items"
-                                data-tooltip="View items"
-                                aria-expanded={open}
-                                onClick={() => setExpanded(open ? null : order.id)}
-                                className="inline-flex size-8 items-center justify-center rounded-lg bg-card text-ink hover:bg-page"
-                              >
-                                <Eye size={15} />
-                              </button>
-                              {order.status === 'booked' || order.status === 'confirmed' ? (
-                                <button
-                                  type="button"
-                                  aria-label="Cancel advance order"
-                                  data-tooltip="Cancel advance order"
-                                  onClick={() => setCancelTarget(order)}
-                                  className="inline-flex size-8 items-center justify-center rounded-lg bg-card text-ink hover:bg-page"
-                                >
-                                  <X size={15} />
-                                </button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                        {open ? (
-                          <tr className="border-b border-line bg-card">
-                            <td colSpan={6} className="px-6 py-3">
-                              {order.items.length === 0 ? (
-                                <p className="text-sm text-muted">No items on this booking.</p>
-                              ) : (
-                                <ul className="space-y-1 text-sm">
-                                  {order.items.map((item, index) => (
-                                    <li key={`${item.name}-${index}`} className="flex justify-between gap-4">
-                                      <span>
-                                        {item.qty} × {item.name}
-                                        {item.note ? (
-                                          <span className="text-muted"> ({item.note})</span>
-                                        ) : null}
-                                      </span>
-                                      <span className="tabular-nums">
-                                        {formatINR(Number(item.total_price), 2)}
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </td>
-                          </tr>
+                          {STATUS_STYLE[order.status].label}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <span className="rounded-md bg-page px-2 py-0.5 text-xs font-semibold uppercase text-ink">
+                          {order.order_type_label || order.order_type}
+                        </span>
+                        <span className="truncate text-sm font-semibold text-ink">
+                          {order.customer_name || 'No customer name'}
+                        </span>
+                        {order.customer_phone ? (
+                          <span className="text-sm tabular-nums text-muted">
+                            {order.customer_phone}
+                          </span>
                         ) : null}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                      </div>
+
+                      {order.items.length > 0 ? (
+                        <p className="mt-2 truncate text-sm text-muted">
+                          {shownItems.map((item) => `${item.qty} × ${item.name}`).join(', ')}
+                          {moreItems > 0 ? ` +${moreItems} more` : ''}
+                        </p>
+                      ) : null}
+                      {order.special_note ? (
+                        <p className="mt-1 truncate text-xs italic text-muted">
+                          Note: {order.special_note}
+                        </p>
+                      ) : null}
+
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                            Grand total
+                          </p>
+                          <p className="text-xl font-bold tabular-nums text-ink">
+                            {formatINR(total, 2)}
+                          </p>
+                          {order.status === 'completed' && (order.bill_no || order.order_no) ? (
+                            <p className="text-xs text-muted">
+                              Billed as #{order.bill_no || order.order_no}
+                            </p>
+                          ) : advance > 0 ? (
+                            <p className="text-xs text-muted">
+                              {formatINR(advance, 2)} advance paid ·{' '}
+                              <span className="font-semibold text-ink">
+                                {formatINR(balance, 2)} balance
+                              </span>
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {open ? (
+                            <button
+                              type="button"
+                              onClick={() => openInBilling(order)}
+                              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
+                            >
+                              <ShoppingCart size={14} />
+                              Open in Billing
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            aria-label="View details"
+                            data-tooltip="View details"
+                            onClick={() => setViewOrder(order)}
+                            className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-ink hover:bg-page"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          {open ? (
+                            <button
+                              type="button"
+                              aria-label="Cancel advance order"
+                              data-tooltip="Cancel advance order"
+                              onClick={() => setCancelTarget(order)}
+                              className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-ink hover:bg-page hover:text-primary"
+                            >
+                              <X size={15} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+            <Pagination
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              total={rows.length}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </main>
     </div>

@@ -15,7 +15,8 @@ export const OTHER_PAYMENT_TYPES = [
   'Other',
 ] as const
 
-export type OtherPaymentType = (typeof OTHER_PAYMENT_TYPES)[number]
+/** One of the standard names above or a payment type the outlet added itself. */
+export type OtherPaymentType = string
 
 export interface OtherPaymentDetails {
   type: OtherPaymentType
@@ -25,6 +26,8 @@ export interface OtherPaymentDetails {
 interface OtherPaymentModalProps {
   open: boolean
   initial?: Partial<OtherPaymentDetails>
+  /** The choices; the standard list when left out. */
+  types?: readonly string[]
   onNo: () => void
   onYes: (details: OtherPaymentDetails) => void
 }
@@ -32,6 +35,7 @@ interface OtherPaymentModalProps {
 export function OtherPaymentModal({
   open,
   initial,
+  types = OTHER_PAYMENT_TYPES,
   onNo,
   onYes,
 }: OtherPaymentModalProps) {
@@ -100,7 +104,7 @@ export function OtherPaymentModal({
               onChange={(e) => setType(e.target.value as OtherPaymentType)}
               className="mt-1.5 h-10 w-full rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
             >
-              {OTHER_PAYMENT_TYPES.map((option) => (
+              {types.map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>

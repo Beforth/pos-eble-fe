@@ -34,6 +34,7 @@ import { BillingHeader } from '../../components/billing/BillingHeader'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
 import { useOutletSettings } from '../../services/useOutletSettings'
+import { invalidateDisplaySettings } from '../../services/useDisplaySettings'
 import { useNewOrder } from '../../state/useNewOrder'
 import type { OutletSettingsRecord } from '../../services/outletService'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
@@ -640,6 +641,7 @@ export default function DisplaySettings({ standalone = false }: { standalone?: b
     try {
       await save(payload)
       await reasonsOtp.save(reasonsPayload)
+      invalidateDisplaySettings()
       showToast('Display settings saved')
     } catch (error) {
       showToast(

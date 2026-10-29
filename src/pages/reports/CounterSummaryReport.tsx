@@ -1,53 +1,36 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, Columns3, Download, Printer } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
-import { BillingHeader } from '../../components/billing/BillingHeader'
+import {
+  ColumnsMenu,
+  LoadState,
+  ReportCard,
+  ReportFilterBar,
+  ReportShell,
+  SearchField,
+  StatGrid,
+  StatTile,
+} from '../../components/reports/ReportShell'
+import { TD, TH, decimal, reportSubtitle } from '../../components/reports/reportStyles'
 import { fetchReportApi, type ReportResult } from '../../services/reportService'
-import { useNewOrder } from '../../state/useNewOrder'
 import { downloadCsv } from '../../utils/exportCsv'
+import { formatINR } from '../../utils/format'
+import { todayIso } from '../../utils/reportDates'
 import { showToast } from '../../utils/toast'
-
-/** Local calendar day as YYYY-MM-DD, `offset` days from today. */
-function dayIso(offset = 0): string {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function displayDate(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return y && m && d ? `${d}-${m}-${y}` : iso
-}
 
 function formatCell(value: string | number | undefined, type: string): string {
   if (value === undefined || value === '') return ''
-  if (type === 'money') {
-    const n = Number(value)
-    return Number.isFinite(n)
-      ? n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : String(value)
-  }
-  return String(value)
+  return type === 'money' ? decimal(value) : String(value)
 }
 
-const BUTTON_CLASS =
-  'inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
-
 export default function CounterSummaryReport() {
-  const navigate = useNavigate()
-  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId } = useAuth()
-  const [billNo, setBillNo] = useState('')
-  const [from, setFrom] = useState(() => dayIso())
-  const [to, setTo] = useState(() => dayIso())
+  const [from, setFrom] = useState(todayIso)
+  const [to, setTo] = useState(todayIso)
+  const [search, setSearch] = useState('')
   const [data, setData] = useState<ReportResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [hidden, setHidden] = useState<Set<string>>(new Set())
-  const [columnsOpen, setColumnsOpen] = useState(false)
-  const columnsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!encryptedOutletId || !from || !to) return
@@ -71,23 +54,27 @@ export default function CounterSummaryReport() {
     }
   }, [encryptedOutletId, from, to])
 
-  useEffect(() => {
-    if (!columnsOpen) return
-    const onPointerDown = (event: MouseEvent) => {
-      if (!columnsRef.current?.contains(event.target as Node)) setColumnsOpen(false)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [columnsOpen])
-
   const columns = useMemo(
     () => (data?.columns ?? []).filter((col) => !hidden.has(col.key)),
     [data, hidden],
   )
-  const rows = data?.rows ?? []
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const all = data?.rows ?? []
+    return q ? all.filter((row) => String(row.counter).toLowerCase().includes(q)) : all
+  }, [data, search])
+  const totals = data?.totals ?? {}
   const hasTotals = data != null && Object.keys(data.totals).length > 0
+  // The payment columns carry keys `pay_0`, `pay_1`…: they feed the split card.
+  const payments = (data?.columns ?? [])
+    .filter((col) => col.key.startsWith('pay_'))
+    .map((col) => ({
+      label: col.label.replace(/ \(₹\)$/, ''),
+      amount: Number(totals[col.key]) || 0,
+    }))
+  const topPayment = Math.max(0, ...payments.map((payment) => payment.amount))
 
-  function toggleColumn(key: string) {
+  function toggleHidden(key: string) {
     setHidden((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -96,9 +83,9 @@ export default function CounterSummaryReport() {
     })
   }
 
-  function pickDay(offset: number) {
-    setFrom(dayIso(offset))
-    setTo(dayIso(offset))
+  function setRange(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom)
+    setTo(nextTo)
   }
 
   function exportCsv() {
@@ -116,123 +103,89 @@ export default function CounterSummaryReport() {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader
-        billNo={billNo}
-        onBillNoChange={setBillNo}
-        onNewOrder={() => startNewOrder()}
-        onViewKot={() => navigate('/billing?kot=1')}
-      />
+    <ReportShell
+      title="Counter Summary"
+      subtitle={reportSubtitle(
+        from,
+        to,
+        data ? `${rows.length} counter${rows.length === 1 ? '' : 's'}` : undefined,
+      )}
+    >
+      <ReportFilterBar from={from} to={to} onRange={setRange} onExport={exportCsv}>
+        <SearchField value={search} onChange={setSearch} placeholder="Search counter" />
+        <ColumnsMenu
+          options={(data?.columns ?? [])
+            .filter((col) => col.key !== 'counter')
+            .map((col) => ({ key: col.key, label: col.label }))}
+          hidden={hidden}
+          onToggle={toggleHidden}
+        />
+      </ReportFilterBar>
 
-      <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
-        <h1 className="text-lg font-bold text-ink">Counter Summary</h1>
-        <button
-          type="button"
-          onClick={() => navigate('/reports')}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
-        >
-          <ChevronLeft size={14} />
-          Back
-        </button>
-      </div>
-
-      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <div ref={columnsRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setColumnsOpen((open) => !open)}
-              aria-expanded={columnsOpen}
-              className={BUTTON_CLASS}
-            >
-              <Columns3 size={16} />
-              Configure Column
-              <ChevronDown
-                size={14}
-                className={`transition-transform ${columnsOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {columnsOpen && (
-              <div className="absolute left-0 top-12 z-20 max-h-80 w-72 overflow-y-auto rounded-lg border border-line bg-card shadow-lg">
-                {(data?.columns ?? [])
-                  .filter((col) => col.key !== 'counter')
-                  .map((col) => (
-                    <label
-                      key={col.key}
-                      className="flex cursor-pointer items-center gap-2 border-b border-line px-4 py-3 text-sm text-ink last:border-b-0 hover:bg-page"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={!hidden.has(col.key)}
-                        onChange={() => toggleColumn(col.key)}
-                        className="size-4 accent-primary"
-                      />
-                      {col.label}
-                    </label>
-                  ))}
-              </div>
-            )}
-          </div>
-
-          <label className="flex items-center gap-2 text-sm text-muted">
-            From
-            <input
-              type="date"
-              value={from}
-              max={to || undefined}
-              onChange={(event) => setFrom(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+      {data && rows.length > 0 ? (
+        <>
+          <StatGrid>
+            <StatTile primary label="Total sales" value={formatINR(Number(totals.total) || 0, 2)} />
+            <StatTile
+              label="Success orders"
+              value={Number(totals.success) || 0}
+              hint={`${Number(totals.cancelled) || 0} cancelled`}
             />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            To
-            <input
-              type="date"
-              value={to}
-              min={from || undefined}
-              onChange={(event) => setTo(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            <StatTile
+              label="Net amount"
+              value={formatINR(Number(totals.net) || 0, 2)}
+              hint={`Discount ${formatINR(Number(totals.discount) || 0, 2)}`}
             />
-          </label>
+            <StatTile
+              label="Not paid"
+              value={formatINR(Number(totals.not_paid) || 0, 2)}
+              hint={`Tax ${formatINR(Number(totals.tax) || 0, 2)}`}
+            />
+          </StatGrid>
 
-          <div className="ml-auto flex flex-wrap items-center gap-3">
-            <button type="button" onClick={() => pickDay(-1)} className={BUTTON_CLASS}>
-              Yesterday
-            </button>
-            <button type="button" onClick={() => pickDay(0)} className={BUTTON_CLASS}>
-              Today
-            </button>
-            <button type="button" onClick={() => window.print()} className={BUTTON_CLASS}>
-              <Printer size={16} />
-              Print
-            </button>
-            <button type="button" onClick={exportCsv} className={BUTTON_CLASS}>
-              <Download size={16} />
-              Export CSV
-            </button>
-          </div>
-        </div>
+          <ReportCard title="Collected by payment type">
+            <ul className="grid gap-x-8 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
+              {payments.map((payment) => (
+                <li key={payment.label}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-ink">{payment.label}</span>
+                    <span className="tabular-nums text-ink">{formatINR(payment.amount, 2)}</span>
+                  </div>
+                  <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-line">
+                    <span
+                      className="block h-full rounded-full bg-primary"
+                      style={{
+                        width: `${topPayment > 0 ? Math.min(100, (payment.amount / topPayment) * 100) : 0}%`,
+                      }}
+                    />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </ReportCard>
+        </>
+      ) : null}
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-line bg-card shadow-sm">
-          <p className="bg-primary/5 px-4 py-3 text-sm text-muted">
-            Counter Summary : From {displayDate(from)} to {displayDate(to)}
+      <ReportCard title="Counter-wise summary" flush>
+        {loading && !data ? (
+          <LoadState loading error="" />
+        ) : error ? (
+          <LoadState loading={false} error={error} />
+        ) : rows.length === 0 ? (
+          <p className="p-10 text-center text-sm text-muted">
+            No sales found for this date range.
           </p>
-          {loading && !data ? (
-            <p className="p-10 text-center text-sm text-muted">Loading…</p>
-          ) : error ? (
-            <p className="p-10 text-center text-sm text-danger">{error}</p>
-          ) : rows.length === 0 ? (
-            <p className="p-10 text-center text-sm text-muted">
-              No sales found for this date range.
-            </p>
-          ) : (
-            <table className="w-full border-collapse text-sm">
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] border-collapse">
               <thead>
-                <tr className="bg-page text-ink">
-                  {columns.map((col) => (
+                <tr className="bg-primary/5">
+                  {columns.map((col, index) => (
                     <th
                       key={col.key}
-                      className={`whitespace-nowrap px-3 py-4 font-medium ${col.type === 'text' ? 'text-left' : 'text-center'}`}
+                      className={`${TH} ${col.type === 'text' ? 'text-left' : 'text-right'} ${
+                        index === 0 ? 'sticky left-0 z-10 bg-[#fff1f2]' : ''
+                      }`}
                     >
                       {col.label}
                     </th>
@@ -240,35 +193,41 @@ export default function CounterSummaryReport() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
-                  <tr key={index} className="hover:bg-page/60">
-                    {columns.map((col) => (
+                {rows.map((row, rowIndex) => (
+                  <tr key={rowIndex} className="group border-t border-line hover:bg-page/60">
+                    {columns.map((col, index) => (
                       <td
                         key={col.key}
-                        className={`whitespace-nowrap border border-line px-3 py-4 text-ink ${col.type === 'text' ? '' : 'text-center tabular-nums'}`}
+                        className={`${TD} ${col.type === 'text' ? 'font-semibold' : 'text-right tabular-nums'} ${
+                          index === 0 ? 'sticky left-0 z-10 bg-card group-hover:bg-page' : ''
+                        } ${col.key === 'total' ? 'font-semibold' : ''}`}
                       >
                         {formatCell(row[col.key], col.type)}
                       </td>
                     ))}
                   </tr>
                 ))}
-                {hasTotals && data && rows.length > 1 && (
-                  <tr className="bg-page font-bold text-ink">
-                    {columns.map((col) => (
+              </tbody>
+              {hasTotals ? (
+                <tfoot>
+                  <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                    {columns.map((col, index) => (
                       <td
                         key={col.key}
-                        className={`whitespace-nowrap border border-line px-3 py-4 ${col.type === 'text' ? '' : 'text-center tabular-nums'}`}
+                        className={`${TD} ${col.type === 'text' ? '' : 'text-right tabular-nums'} ${
+                          index === 0 ? 'sticky left-0 z-10 bg-[#fff1f2]' : ''
+                        }`}
                       >
-                        {formatCell(data.totals[col.key], col.type)}
+                        {formatCell(totals[col.key], col.type)}
                       </td>
                     ))}
                   </tr>
-                )}
-              </tbody>
+                </tfoot>
+              ) : null}
             </table>
-          )}
-        </div>
-      </main>
-    </div>
+          </div>
+        )}
+      </ReportCard>
+    </ReportShell>
   )
 }

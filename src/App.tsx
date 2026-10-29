@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import {
   BrowserRouter,
   Navigate,
@@ -271,6 +271,12 @@ import VariantsManagement from './pages/VariantsManagement'
 
 function RouteErrorBoundary({ children }: { children: ReactNode }) {
   const location = useLocation()
+  // Dialogs lock the page scroll while open and put it back when they close; two
+  // dialogs closed in the other order leave it locked. A new page always starts
+  // scrollable, so that never carries over.
+  useEffect(() => {
+    document.body.style.overflow = ''
+  }, [location.pathname])
   return (
     <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
   )

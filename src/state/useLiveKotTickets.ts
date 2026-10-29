@@ -72,7 +72,11 @@ export function useLiveKotTickets(): { tickets: KotTicket[]; refresh: () => void
         }
         if (event === 'kot.cancelled' || event === 'kot.used_in_bill') {
           handleRemoved((data as KotEventData).id)
+          return
         }
+        // Day End starts the live view over: reconcile now so the tickets from
+        // before the close drop off at once.
+        if (event === 'day_end.close') void sync()
       },
     })
   }, [encryptedOutletId, token, reload, sync])

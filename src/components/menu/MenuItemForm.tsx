@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Plus, Tag, Trash2 } from 'lucide-react'
 import { SearchableSelect } from '../inventory/SearchableSelect'
 import { PrimaryButton } from './MenuActionButtons'
+import { ItemVariationRows } from './ItemVariationRows'
+import { newVariationRow, type VariationRowState } from '../../utils/itemVariationRows'
 import { showError } from '../../utils/toast'
 import type {
   AddonGroup,
@@ -319,11 +321,27 @@ export function MenuItemForm({
   )
   // The item API returns the linked variations and add-on groups, so an edit
   // starts with them ticked (inactive ones are not returned).
-  const [variationIds, setVariationIds] = useState<string[]>(
-    () =>
-      item?.variation_groups?.flatMap((group) =>
-        group.variations.map((variation) => variation.id),
-      ) ?? [],
+  const [variationRows, setVariationRows] = useState<VariationRowState[]>(() =>
+    (item?.item_variations ?? []).map((row) => ({
+      ...newVariationRow(),
+      variationId: row.variation_id,
+      price: row.price ?? '',
+      containerCharge: row.container_charge,
+      sapCode: row.sap_code,
+      profitMargin: row.profit_margin ?? '',
+      allowAddon: row.addon_group_ids.length > 0,
+      addonGroupIds: row.addon_group_ids,
+    })),
+  )
+  const [variationEnabled, setVariationEnabled] = useState(variationRows.length > 0)
+  const [considerAddon, setConsiderAddon] = useState(
+    Boolean(item?.flags?.consider_addon_on_variations),
+  )
+  const [showVariationErrors, setShowVariationErrors] = useState(false)
+  // Only the rows of a ticked Variation switch count.
+  const activeVariationRows = useMemo(
+    () => (variationEnabled ? variationRows : []),
+    [variationEnabled, variationRows],
   )
   const [flashList, setFlashList] = useState<'variations' | 'addons' | null>(null)
   const [addonGroupIds, setAddonGroupIds] = useState<string[]>(
@@ -349,12 +367,13 @@ export function MenuItemForm({
   const activeTags = useMemo(() => {
     const active: string[] = []
     const hasVariations =
-      variationIds.length > 0 ||
+      activeVariationRows.length > 0 ||
       (mode === 'edit' &&
         !variationsTouched &&
         initialTags.some((tag) => tag === 'V+' || tag === 'V'))
     const hasAddons =
       addonGroupIds.length > 0 ||
+      (considerAddon && activeVariationRows.some((row) => row.addonGroupIds.length > 0)) ||
       (mode === 'edit' && !addonsTouched && initialTags.includes('A'))
     if (hasVariations) active.push('V+', 'V')
     if (hasAddons) active.push('A')
@@ -377,7 +396,8 @@ export function MenuItemForm({
   }, [
     mode,
     initialTags,
-    variationIds,
+    activeVariationRows,
+    considerAddon,
     variationsTouched,
     addonGroupIds,
     addonsTouched,
@@ -563,6 +583,15 @@ export function MenuItemForm({
       return
     }
     setMissingRequired([])
+    if (activeVariationRows.some((row) => !row.variationId)) {
+      setShowVariationErrors(true)
+      showError('Choose a variation for every variation row')
+      document
+        .getElementById('item-form-variations')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    const numberOrNull = (value: string) => (value.trim() === '' ? null : Number(value))
     const payload: ItemPayload = {
       category_id: categoryId,
       name: name.trim(),
@@ -580,7 +609,7 @@ export function MenuItemForm({
       stock_status: stockStatus,
       rank: Number(rank) || 0,
       is_active: isActive,
-      flags: { ...flags },
+      flags: { ...flags, consider_addon_on_variations: variationEnabled && considerAddon },
       sap_code: sapCode.trim(),
       hsn_code: hsnCode.trim(),
       fsn_code: fsnCode.trim(),
@@ -588,15 +617,24 @@ export function MenuItemForm({
         profitMargin.trim() === '' ? null : Number(profitMargin),
       weight: weight.trim() === '' ? null : Number(weight),
       tax_ids: taxIds,
-      ...(mode === 'edit'
+      // Variation rows carry their own price and add-ons and replace the old
+      // plain variation list; an edit that touched neither leaves them as saved.
+      ...(mode !== 'edit' || variationsTouched
         ? {
-            ...(variationsTouched ? { variation_ids: variationIds } : {}),
-            ...(addonsTouched ? { addon_group_ids: addonGroupIds } : {}),
+            item_variations: activeVariationRows.map((row) => ({
+              variation_id: row.variationId,
+              price: numberOrNull(row.price),
+              container_charge: Number(row.containerCharge) || 0,
+              sap_code: row.sapCode.trim(),
+              profit_margin: numberOrNull(row.profitMargin),
+              addon_group_ids:
+                considerAddon && row.allowAddon ? row.addonGroupIds : [],
+            })),
           }
-        : {
-            variation_ids: variationIds,
-            addon_group_ids: addonGroupIds,
-          }),
+        : {}),
+      ...(mode === 'edit'
+        ? { ...(addonsTouched ? { addon_group_ids: addonGroupIds } : {}) }
+        : { addon_group_ids: addonGroupIds }),
       area_prices: channels.map((channel) => ({
         outlet_channel_id: channel.id,
         price:
@@ -1006,7 +1044,7 @@ export function MenuItemForm({
       </Section>
 
       {/* ── Assignments ── */}
-      <Section icon={<span className="text-xs font-bold">A</span>} title="Taxes, Variations & Addons">
+      <Section icon={<span className="text-xs font-bold">T</span>} title="Taxes & Addons">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <CheckboxList
             label="Taxes"
@@ -1014,29 +1052,45 @@ export function MenuItemForm({
             selected={taxIds}
             onToggle={(id) => toggleArray(setTaxIds, id)}
           />
-          <CheckboxList
-            id="item-form-variations"
-            highlight={flashList === 'variations'}
-            label="Variations"
-            options={variationOptions}
-            selected={variationIds}
-            onToggle={(id) => {
-              setVariationsTouched(true)
-              toggleArray(setVariationIds, id)
-            }}
-          />
-          <CheckboxList
-            id="item-form-addons"
-            highlight={flashList === 'addons'}
-            label="Addon Groups"
-            options={addonOptions}
-            selected={addonGroupIds}
-            onToggle={(id) => {
-              setAddonsTouched(true)
-              toggleArray(setAddonGroupIds, id)
-            }}
-          />
+          {/* With add-ons per variation, each variation row picks its own groups below. */}
+          {!(variationEnabled && considerAddon) ? (
+            <CheckboxList
+              id="item-form-addons"
+              highlight={flashList === 'addons'}
+              label="Addon Groups"
+              options={addonOptions}
+              selected={addonGroupIds}
+              onToggle={(id) => {
+                setAddonsTouched(true)
+                toggleArray(setAddonGroupIds, id)
+              }}
+            />
+          ) : null}
         </div>
+      </Section>
+
+      <Section icon={<span className="text-xs font-bold">V</span>} title="Variation / Addon">
+        <ItemVariationRows
+          variationEnabled={variationEnabled}
+          onVariationEnabledChange={(enabled) => {
+            setVariationsTouched(true)
+            setVariationEnabled(enabled)
+          }}
+          considerAddon={considerAddon}
+          onConsiderAddonChange={(consider) => {
+            setVariationsTouched(true)
+            setConsiderAddon(consider)
+          }}
+          rows={variationRows}
+          onRowsChange={(rows) => {
+            setVariationsTouched(true)
+            setVariationRows(rows)
+          }}
+          variationOptions={variationOptions}
+          addonOptions={addonOptions}
+          showErrors={showVariationErrors}
+          highlight={flashList === 'variations'}
+        />
       </Section>
 
       {/* ── Channel Pricing & Availability ── */}

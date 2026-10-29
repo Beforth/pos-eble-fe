@@ -10,7 +10,6 @@ import {
   CookingPot,
   Armchair,
   Grid2x2,
-  History,
   Home,
   LayoutDashboard,
   LogOut,
@@ -18,6 +17,7 @@ import {
   Monitor,
   Plus,
   Radio,
+  ReceiptText,
   RefreshCw,
   ScrollText,
   Search,
@@ -195,7 +195,7 @@ export function BillingHeader({
                     },
                   ]
                 : []),
-              { icon: History, label: 'Recent', onClick: () => setRecentOpen(true) },
+              { icon: ReceiptText, label: 'Recent', onClick: () => setRecentOpen(true) },
               ...(canAccess('/billing')
                 ? [{ icon: HoldIcon, label: 'Hold', onClick: () => setHoldOpen(true) }]
                 : []),

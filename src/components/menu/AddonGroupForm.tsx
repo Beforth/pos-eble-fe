@@ -117,6 +117,19 @@ function AddonGroupFormBody({
     initial?.allow_open_quantity ?? false,
   )
   const [status, setStatus] = useState(initial?.is_active ?? true)
+  // One Price column (the Base menu) unless an add-on already has its own prices
+  // on other menus, or the cashier switches the per-menu prices on.
+  const [perMenuPrices, setPerMenuPrices] = useState(() =>
+    (initial?.addons ?? []).some((addon) =>
+      (addon.area_prices ?? []).some(
+        (price) =>
+          price.outlet_channel_id !== baseChannel?.id &&
+          Number(price.price) !== Number(addon.base_price),
+      ),
+    ),
+  )
+  const shownChannels =
+    perMenuPrices || !baseChannel ? priceChannels : [baseChannel]
   /** The add-on's saved prices as text per menu; Base falls back to `base_price`. */
   function pricesOf(addon: NonNullable<AddonGroup['addons']>[number]) {
     const out: Record<string, string> = {}
@@ -272,11 +285,13 @@ function AddonGroupFormBody({
   const label = 'text-sm font-semibold text-ink'
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-lg border border-line bg-card p-5 sm:p-6">
-        <h2 className="mb-5 text-base font-bold text-ink">Department Details:</h2>
+    <div>
+      <section className="rounded-lg border border-line bg-card">
+        <h2 className="border-b border-line px-5 py-4 text-base font-bold text-ink sm:px-6">
+          Department Details:
+        </h2>
 
-        <div className="grid items-start gap-x-6 gap-y-4 md:grid-cols-[170px_1fr_200px_1fr]">
+        <div className="grid items-start gap-x-6 gap-y-5 px-5 py-5 sm:px-6 md:grid-cols-[190px_1fr_230px_1fr]">
           <label htmlFor="addon-department" className={`${label} md:pt-2.5`}>
             Department Name <span className="text-primary">*</span>
           </label>
@@ -368,13 +383,14 @@ function AddonGroupFormBody({
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 pb-5 sm:px-6">
           {(
             [
               ['Show in Online', showInOnline, setShowInOnline],
               ['Show in DineIn QR', showInDineinQr, setShowInDineinQr],
               ['Allow Open Quantity', allowOpenQuantity, setAllowOpenQuantity],
-              ['Status', status, setStatus],
+              // A new group is always active; Status only matters once it exists.
+              ...(initial ? ([['Status', status, setStatus]] as const) : []),
             ] as const
           ).map(([text, checked, set]) => (
             <label
@@ -391,23 +407,34 @@ function AddonGroupFormBody({
             </label>
           ))}
         </div>
-      </section>
 
-      <section className="rounded-lg border border-line bg-card p-5 sm:p-6">
-        <h2 className="mb-4 text-base font-bold text-ink">
-          Addon Group Item Details
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3 sm:px-6">
+          <h2 className="text-base font-bold text-ink">Addon Group Item Details</h2>
+          {priceChannels.length > 1 ? (
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={perMenuPrices}
+                onChange={(event) => setPerMenuPrices(event.target.checked)}
+                className="size-4 cursor-pointer accent-primary"
+              />
+              Set a different price for each menu
+            </label>
+          ) : null}
+        </div>
 
-        <div className="overflow-x-auto rounded-md border border-line">
-          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+        <div className="overflow-x-auto px-5 pb-5 sm:px-6">
+          <table className="w-full min-w-[820px] border-collapse text-left text-sm">
             <thead>
               <tr className="bg-primary/5 text-sm font-semibold text-ink">
                 <th className="px-3 py-3">
                   Addon Name <span className="text-primary">*</span>
                 </th>
-                {priceChannels.map((channel) => (
-                  <th key={channel.id} className="w-28 px-3 py-3">
-                    {channel.channel_label}
+                {shownChannels.map((channel) => (
+                  <th key={channel.id} className="w-32 px-3 py-3">
+                    {perMenuPrices || shownChannels.length > 1
+                      ? channel.channel_label
+                      : 'Price'}
                     {channel.id === baseChannel?.id ? (
                       <span className="text-primary"> *</span>
                     ) : null}
@@ -435,7 +462,7 @@ function AddonGroupFormBody({
                       className={inputClass}
                     />
                   </td>
-                  {priceChannels.map((channel) => (
+                  {shownChannels.map((channel) => (
                     <td key={channel.id} className="px-3 py-2.5">
                       <input
                         type="number"
@@ -518,17 +545,20 @@ function AddonGroupFormBody({
           </table>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setRows((prev) => [...prev, newRow()])}
-          className="mt-3 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-primary px-3 text-sm font-medium text-primary hover:bg-primary/5"
-        >
-          <Plus size={14} />
-          Add Addon Row
-        </button>
+        <div className="px-5 pb-5 sm:px-6">
+          <button
+            type="button"
+            onClick={() => setRows((prev) => [...prev, newRow()])}
+            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-primary px-3 text-sm font-medium text-primary hover:bg-primary/5"
+          >
+            <Plus size={14} />
+            Add Addon Row
+          </button>
+        </div>
       </section>
 
-      <div className="flex flex-wrap justify-end gap-2">
+      {/* Save stays in reach while the page scrolls. */}
+      <div className="sticky bottom-0 z-10 -mx-4 mt-4 flex flex-wrap justify-end gap-2 border-t border-line bg-card px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] sm:-mx-5 sm:px-5">
         <button
           type="button"
           onClick={onCancel}
