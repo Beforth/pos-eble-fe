@@ -51,6 +51,13 @@ export function VirtualKeyboard() {
             : kind === 'order-number'
               ? settings.vkOrderNumber
               : true
+      if (allowed) {
+        // Keep the device's own keyboard from also opening over ours.
+        if (next.dataset.vkOrigMode === undefined) {
+          next.dataset.vkOrigMode = next.getAttribute('inputmode') ?? ''
+        }
+        next.setAttribute('inputmode', 'none')
+      }
       fieldRef.current = allowed ? next : null
       setField(allowed ? next : null)
       setHidden(false)
@@ -70,13 +77,20 @@ export function VirtualKeyboard() {
     return () => {
       document.removeEventListener('focusin', onFocusIn)
       document.removeEventListener('focusout', onFocusOut)
+      // Give the fields their own input mode back when our keyboard goes away.
+      document.querySelectorAll<Field>('[data-vk-orig-mode]').forEach((el) => {
+        const original = el.dataset.vkOrigMode
+        if (original) el.setAttribute('inputmode', original)
+        else el.removeAttribute('inputmode')
+        delete el.dataset.vkOrigMode
+      })
     }
   }, [active, settings.vkShortCode, settings.vkOrderNumber])
 
   if (!active || !field || hidden) return null
 
   const numeric =
-    field.getAttribute('inputmode') === 'numeric' ||
+    (field.dataset.vkOrigMode ?? field.getAttribute('inputmode')) === 'numeric' ||
     (field instanceof HTMLInputElement && (field.type === 'tel' || field.type === 'number'))
 
   function press(key: string) {
