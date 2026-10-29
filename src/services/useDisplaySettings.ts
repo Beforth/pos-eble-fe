@@ -32,6 +32,21 @@ export interface DisplaySettings {
   addonMinMax: boolean
   /** Show the price on item cards. */
   displayItemPrice: boolean
+  /** Settle popup: show the Customer Paid box. */
+  settleAmountBox: boolean
+  /** Settle popup: the cashier must enter the amount (no prefill). */
+  settleMandatory: boolean
+  /** Settle popup: an amount below the bill may be settled (the rest is due). */
+  allowLowerSettle: boolean
+  /** Tip Configuration > Show Tip: the Tip field on the bill and settle popup. */
+  showTip: boolean
+  /** Quick-pick tips ('Percentage' of the bill or 'Fixed' amounts); 'None' = no chips. */
+  tipSelection: 'None' | 'Percentage' | 'Fixed'
+  tipValues: number[]
+  /** Item Sorting: A-Z, Z-A, Category or Custom (the menu's own order). */
+  itemSorting: 'A-Z' | 'Z-A' | 'Category' | 'Custom'
+  /** No. of Persons Mandatory for dine-in orders. */
+  personsMandatory: boolean
 }
 
 /** What a screen assumes until the settings load; the same as the saved defaults. */
@@ -50,6 +65,14 @@ export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
   displaySearch: true,
   addonMinMax: false,
   displayItemPrice: true,
+  settleAmountBox: true,
+  settleMandatory: false,
+  allowLowerSettle: true,
+  showTip: true,
+  tipSelection: 'None',
+  tipValues: [],
+  itemSorting: 'A-Z',
+  personsMandatory: false,
 }
 
 const CACHE_MS = 15_000
@@ -78,6 +101,29 @@ function parse(data: Record<string, unknown>): DisplaySettings {
     displaySearch: flag(data.display_search_item, d.displaySearch),
     addonMinMax: flag(data.addon_min_max_validation, d.addonMinMax),
     displayItemPrice: flag(data.display_item_price, d.displayItemPrice),
+    settleAmountBox: flag(data.display_settle_amount_box, d.settleAmountBox),
+    settleMandatory: flag(data.settle_amount_mandatory, d.settleMandatory),
+    allowLowerSettle: flag(data.allow_lower_settlement, d.allowLowerSettle),
+    showTip: flag(data.show_tip, d.showTip),
+    tipSelection:
+      text(data.tip_selection) === 'percentage'
+        ? 'Percentage'
+        : text(data.tip_selection) === 'fixed'
+          ? 'Fixed'
+          : 'None',
+    itemSorting:
+      text(data.item_sorting) === 'z-a'
+        ? 'Z-A'
+        : text(data.item_sorting) === 'category'
+          ? 'Category'
+          : text(data.item_sorting) === 'custom'
+            ? 'Custom'
+            : 'A-Z',
+    personsMandatory: flag(data.no_of_persons_mandatory, d.personsMandatory),
+    tipValues: String(data.tip_value ?? '')
+      .split(',')
+      .map((part) => Number(part.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0),
   }
 }
 

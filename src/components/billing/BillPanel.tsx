@@ -64,6 +64,7 @@ import {
 } from '../../services/usePaymentTypeOptions'
 import { PrimaryButton } from '../menu/MenuActionButtons'
 import { QtyInput } from '../common/QtyInput'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
 
 const SEED_CUSTOMER_HISTORY: Record<string, CustomerHistoryOrder[]> = {
   '1234567899': [
@@ -405,7 +406,8 @@ export function BillPanel({
 
   const deliveryValue = Number(deliveryCharge) || 0
   const containerValue = Number(containerCharge) || 0
-  const tipValue = Number(tip) || 0
+  const { showTip } = useDisplaySettings()
+  const tipValue = showTip ? Number(tip) || 0 : 0
   const paidValue = Number(customerPaid) || 0
 
   // Tax is priced over the live cart *and* the KOT lines already sent to the
@@ -1482,6 +1484,7 @@ export function BillPanel({
                     {money(returnToCustomer)}
                   </span>
                 </div>
+{showTip ? (
                 <label className="flex items-center justify-between gap-3 text-sm text-ink">
                   <span>Tip</span>
                   <input
@@ -1493,6 +1496,7 @@ export function BillPanel({
                     className="h-8 w-24 rounded-md border border-line bg-white px-2 text-right text-sm outline-none focus:border-primary"
                   />
                 </label>
+) : null}
               </>
             ) : null}
 

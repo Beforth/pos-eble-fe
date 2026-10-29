@@ -1047,7 +1047,15 @@ export default function Billing() {
   const filteredItems = useMemo(() => {
     // A typed short code looks across the whole menu, not just the open category.
     const codeLookup = shortCode.trim() !== ''
-    return menuItems.filter((item) => {
+    const byName = (a: MenuItemRow, b: MenuItemRow) => a.name.localeCompare(b.name)
+    const sorted = [...menuItems]
+    // Display Settings > Item Sorting; Custom keeps the menu's own rank order.
+    if (display.itemSorting === 'A-Z') sorted.sort(byName)
+    else if (display.itemSorting === 'Z-A') sorted.sort((a, b) => byName(b, a))
+    else if (display.itemSorting === 'Category')
+      sorted.sort((a, b) => a.categoryId.localeCompare(b.categoryId) || byName(a, b))
+    else sorted.sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
+    return sorted.filter((item) => {
       if (codeLookup) {
         if (!matchesShortCode(item, shortCode)) return false
         if (search.trim() && !itemNameMatchesQuery(item.name, search)) return false
@@ -1068,7 +1076,7 @@ export default function Billing() {
       }
       return true
     })
-  }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds, menuItems])
+  }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds, menuItems, display.itemSorting])
 
 
   // An item with variations / add-ons waits here for the cashier's choices.
@@ -2343,6 +2351,19 @@ export default function Billing() {
     action: string,
     charges?: BillChargesSnapshot,
   ) {
+    // Display Settings > No. of Persons Mandatory (dine-in, before anything is sent).
+    if (
+      display.personsMandatory &&
+      orderType === 'dine-in' &&
+      !resumeOrderId &&
+      lines.length > 0 &&
+      guests <= 0 &&
+      (tablesById[tableId]?.persons ?? 0) <= 0 &&
+      ['Save', 'Save & Print', 'Save & eBill', 'KOT', 'KOT & Print'].includes(action)
+    ) {
+      showToast('Enter the number of persons before saving')
+      return
+    }
     // A printed or Live Orders bill already exists on the server. Plain Save
     // would create a second order and strand it, so it is refused; the print
     // actions are fine, because printing an existing bill is a reprint.

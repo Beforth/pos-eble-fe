@@ -7,6 +7,7 @@ import {
 } from '../common/SelectDropdown'
 import type { PaymentMethod } from './BillPanel'
 import { OTHER_PAYMENT_TYPES, type OtherPaymentType } from './OtherPaymentModal'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
 import { showToast } from '../../utils/toast'
 import { isValidMobile, normalizeMobileDigits } from '../../utils/phone'
 
@@ -91,6 +92,9 @@ export function SettleSaveModal({
     () => Math.round(Number(billAmount) * 100) / 100,
     [billAmount],
   )
+  // Display Settings > settlement options
+  const { settleAmountBox, settleMandatory, allowLowerSettle, showTip, tipSelection, tipValues } =
+    useDisplaySettings()
   const [payment, setPayment] = useState<PaymentMethod>('cash')
   const [customerPaid, setCustomerPaid] = useState('')
   const [tip, setTip] = useState('0')
@@ -116,7 +120,7 @@ export function SettleSaveModal({
   useEffect(() => {
     if (open && !wasOpen.current) {
       setPayment('cash')
-      setCustomerPaid(String(exactBill))
+      setCustomerPaid(settleMandatory && settleAmountBox ? '' : String(exactBill))
       setTip('0')
       setName((customerName ?? '').trim())
       setNameError('')
@@ -130,7 +134,7 @@ export function SettleSaveModal({
       customerPaidTouched.current = false
     }
     wasOpen.current = open
-  }, [open, customerName, customerPhone, billAmount, exactBill])
+  }, [open, customerName, customerPhone, billAmount, exactBill, settleMandatory, settleAmountBox])
 
   /**
    * Both terminals feed one kitchen, so another KOT can land on this table while
@@ -139,9 +143,9 @@ export function SettleSaveModal({
    * short and silently book a due.
    */
   useEffect(() => {
-    if (!open || customerPaidTouched.current) return
+    if (!open || customerPaidTouched.current || (settleMandatory && settleAmountBox)) return
     setCustomerPaid(String(exactBill))
-  }, [open, exactBill])
+  }, [open, exactBill, settleMandatory, settleAmountBox])
 
   useEffect(() => {
     if (!open) return
@@ -195,7 +199,7 @@ const onKey = (event: KeyboardEvent) => {
     return raw >= exactBill ? exactBill : raw
   }, [customerPaid, exactBill, payment, partPaid])
 
-  const tipValue = Number(tip) || 0
+  const tipValue = showTip ? Number(tip) || 0 : 0
   const paidValue =
     payment === 'part' ? partPaid : Number(customerPaid) || 0
   const returnToCustomer = Math.max(
@@ -292,6 +296,10 @@ const onKey = (event: KeyboardEvent) => {
       const paid = Number(customerPaid)
       if (customerPaid.trim() === '' || Number.isNaN(paid) || paid < 0) {
         showToast('Enter the amount the customer paid')
+        return
+      }
+      if (payment !== 'due' && !allowLowerSettle && paid < exactBill - 0.001) {
+        showToast(`Settle the full amount of ₹${money(exactBill)}; a lower amount is not allowed`)
         return
       }
     }
@@ -566,6 +574,7 @@ const onKey = (event: KeyboardEvent) => {
             </div>
           ) : (
             <>
+              {settleAmountBox ? (
               <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
                 Customer Paid
                 <input
@@ -578,30 +587,58 @@ const onKey = (event: KeyboardEvent) => {
                     setCustomerPaid(e.target.value)
                   }}
                   autoFocus
+                  placeholder={settleMandatory ? 'Required' : undefined}
                   className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
                 />
               </label>
+              ) : null}
 
+              {settleAmountBox ? (
               <div className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
                 Return to Customer
                 <span className="text-base font-bold text-primary">
                   {money(returnToCustomer)}
                 </span>
               </div>
+              ) : null}
             </>
           )}
 
-          <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
-            Tip
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={tip}
-              onChange={(e) => setTip(e.target.value)}
-              className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
-            />
-          </label>
+          {showTip ? (
+            <>
+              <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
+                Tip
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={tip}
+                  onChange={(e) => setTip(e.target.value)}
+                  className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
+                />
+              </label>
+              {tipSelection !== 'None' && tipValues.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 pl-[152px]">
+                  {tipValues.map((value) => {
+                    const amount =
+                      tipSelection === 'Percentage'
+                        ? Math.round(exactBill * value) / 100
+                        : value
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setTip(String(amount))}
+                        className="inline-flex h-8 cursor-pointer items-center rounded-md border border-line bg-white px-2.5 text-xs font-semibold text-ink hover:bg-page"
+                      >
+                        {tipSelection === 'Percentage' ? `${value}%` : `₹${value}`}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </>
+          ) : null}
 
           <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
             Settlement Amount
