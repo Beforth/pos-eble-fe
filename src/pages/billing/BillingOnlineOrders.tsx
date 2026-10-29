@@ -36,13 +36,40 @@ const PLATFORM_TABS: { value: string; label: string }[] = [
   { value: 'swiggy', label: 'Swiggy' },
 ]
 
-const STATUS_STYLE: Record<StatusKey, { label: string; panel: string; dot: string }> = {
-  pending: { label: 'Pending', panel: 'bg-sky-200', dot: 'bg-sky-300' },
-  cancelled: { label: 'Cancelled', panel: 'bg-red-200', dot: 'bg-red-400' },
-  accepted: { label: 'Accepted', panel: 'bg-cyan-100', dot: 'bg-cyan-200' },
-  dispatched: { label: 'Dispatched', panel: 'bg-yellow-100', dot: 'bg-yellow-200' },
-  delivered: { label: 'Delivered / Finished', panel: 'bg-emerald-300', dot: 'bg-emerald-400' },
-  billed: { label: 'KOT or BILL Created', panel: 'bg-card', dot: 'border border-line bg-card' },
+const STATUS_STYLE: Record<
+  StatusKey,
+  { label: string; dot: string; pill: string }
+> = {
+  pending: {
+    label: 'Pending',
+    dot: 'bg-sky-400',
+    pill: 'bg-sky-100 text-sky-800',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    dot: 'bg-red-400',
+    pill: 'bg-red-100 text-red-800',
+  },
+  accepted: {
+    label: 'Accepted',
+    dot: 'bg-cyan-400',
+    pill: 'bg-cyan-100 text-cyan-800',
+  },
+  dispatched: {
+    label: 'Dispatched',
+    dot: 'bg-amber-400',
+    pill: 'bg-amber-100 text-amber-800',
+  },
+  delivered: {
+    label: 'Delivered / Finished',
+    dot: 'bg-emerald-500',
+    pill: 'bg-emerald-100 text-emerald-800',
+  },
+  billed: {
+    label: 'KOT or BILL Created',
+    dot: 'bg-slate-400',
+    pill: 'bg-slate-100 text-slate-700',
+  },
 }
 
 const LEGEND_ORDER: StatusKey[] = [
@@ -164,6 +191,32 @@ export default function BillingOnlineOrders() {
     return list
   }, [orders, platform, status, search, sort])
 
+  // Chip counts follow the platform tab, so each chip says what it would show.
+  const statusCounts = useMemo(() => {
+    const counts: Record<StatusKey, number> = {
+      pending: 0,
+      cancelled: 0,
+      accepted: 0,
+      dispatched: 0,
+      delivered: 0,
+      billed: 0,
+    }
+    for (const o of orders) {
+      if (platform && o.platform.toLowerCase() !== platform) continue
+      counts[statusKey(o)] += 1
+    }
+    return counts
+  }, [orders, platform])
+
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = { '': orders.length }
+    for (const o of orders) {
+      const k = o.platform.toLowerCase()
+      counts[k] = (counts[k] ?? 0) + 1
+    }
+    return counts
+  }, [orders])
+
   function toggle(id: string, panel: Panel) {
     setOpen((cur) => (cur?.id === id && cur.panel === panel ? null : { id, panel }))
   }
@@ -221,77 +274,104 @@ export default function BillingOnlineOrders() {
         </div>
       </div>
 
-      <div className="flex border-b border-line bg-card px-4 sm:px-6">
-        <div className="flex overflow-x-auto" role="tablist" aria-label="Aggregator">
-          {PLATFORM_TABS.map((tab) => {
-            const active = platform === tab.value
-            const logo = platformName(tab.value)
-            return (
-              <button
-                key={tab.value || 'all'}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setPlatform(tab.value)}
-                className={`flex min-w-[96px] flex-col items-center gap-1 border-b-2 px-4 py-3 text-xs font-medium transition-colors ${
-                  active
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-transparent text-ink hover:bg-page'
-                }`}
-              >
-                {logo ? <AggregatorLogo name={logo} size="sm" /> : <LayoutGrid size={22} />}
-                <span>{tab.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="relative w-full max-w-xs">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search order no., name or phone"
-              aria-label="Search online orders"
-              className="h-9 w-full rounded-lg border border-line bg-card pl-9 pr-9 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
-            />
-            {search ? (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label="Clear search"
-                data-tooltip="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:text-ink"
-              >
-                <X size={14} />
-              </button>
-            ) : null}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="inline-flex rounded-xl border border-line bg-card p-1"
+            role="tablist"
+            aria-label="Aggregator"
+          >
+            {PLATFORM_TABS.map((tab) => {
+              const active = platform === tab.value
+              const logo = platformName(tab.value)
+              return (
+                <button
+                  key={tab.value || 'all'}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setPlatform(tab.value)}
+                  className={`inline-flex h-9 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-ink hover:bg-page'
+                  }`}
+                >
+                  {logo ? (
+                    <AggregatorLogo name={logo} size="sm" />
+                  ) : (
+                    <LayoutGrid size={16} />
+                  )}
+                  {tab.label}
+                  <span
+                    className={`rounded-full px-1.5 text-xs tabular-nums ${
+                      active ? 'bg-white/25' : 'bg-page text-muted'
+                    }`}
+                  >
+                    {platformCounts[tab.value] ?? 0}
+                  </span>
+                </button>
+              )
+            })}
           </div>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            Sort By
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
-              className="h-9 rounded-lg border border-line bg-primary/10 px-2.5 text-sm text-ink outline-none focus:border-primary"
-            >
-              <option value="latest">Latest Date</option>
-              <option value="oldest">Oldest Date</option>
-            </select>
-          </label>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full min-w-[220px] sm:w-72">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search order no., name or phone"
+                aria-label="Search online orders"
+                className="h-10 w-full rounded-xl border border-line bg-card pl-9 pr-9 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+              />
+              {search ? (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear search"
+                  data-tooltip="Clear search"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:text-ink"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+            <label className="flex items-center gap-2 text-sm text-muted">
+              Sort by
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                className="h-10 rounded-xl border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+              >
+                <option value="latest">Latest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div
-          className="mb-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm text-ink"
+          className="mb-4 flex flex-wrap items-center gap-2"
           role="group"
           aria-label="Filter by order status"
         >
+          <button
+            type="button"
+            aria-pressed={status === 'all'}
+            onClick={() => setStatus('all')}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+              status === 'all'
+                ? 'border-ink bg-ink text-white'
+                : 'border-line bg-card text-ink hover:bg-page'
+            }`}
+          >
+            All statuses
+          </button>
           {LEGEND_ORDER.map((key) => {
             const active = status === key
             return (
@@ -300,115 +380,148 @@ export default function BillingOnlineOrders() {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setStatus(active ? 'all' : key)}
-                className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 ${
-                  active ? 'bg-ink/10 font-semibold' : 'hover:bg-card'
+                className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                  active
+                    ? 'border-ink bg-ink/5 text-ink'
+                    : 'border-line bg-card text-ink hover:bg-page'
                 }`}
               >
-                <span className={`size-3.5 rounded-full ${STATUS_STYLE[key].dot}`} />
+                <span className={`size-2.5 rounded-full ${STATUS_STYLE[key].dot}`} />
                 {STATUS_STYLE[key].label}
+                <span className="tabular-nums text-muted">{statusCounts[key]}</span>
               </button>
             )
           })}
         </div>
 
         {loading && orders.length === 0 ? (
-          <div className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-12 text-sm text-muted">
+          <div className="flex items-center justify-center gap-2 rounded-2xl border border-line bg-card px-4 py-12 text-sm text-muted">
             <Loader2 size={16} className="animate-spin" />
             Loading online orders…
           </div>
         ) : rows.length === 0 ? (
-          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-line bg-card px-6 py-12 text-center">
+          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center">
             <p className="text-base font-semibold text-ink">No online orders</p>
             <p className="mt-1 text-sm text-muted">
               Orders from Zomato and Swiggy will appear here.
             </p>
           </div>
         ) : (
-          <ul className="overflow-hidden rounded-xl border border-line bg-card">
+          <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             {rows.map((order) => {
               const key = statusKey(order)
               const logo = platformName(order.platform)
               const panel = open?.id === order.id ? open.panel : null
               const placed = placedAt(order)
               const support = titleCase(order.platform)
+              const shownItems = order.items.slice(0, 2)
+              const moreItems = order.items.length - shownItems.length
               return (
-                <li key={order.id} className="border-b border-line last:border-0">
-                  <div className="grid grid-cols-1 items-center gap-3 p-2 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_120px_minmax(0,1.2fr)]">
-                    <div className="flex items-center gap-3 px-2">
-                      {logo ? (
-                        <AggregatorLogo name={logo} size="md" />
-                      ) : (
-                        <span className="size-10 rounded bg-page" />
-                      )}
-                      <div className="min-w-0">
-                        <span className="rounded-md bg-page px-2 py-0.5 text-xs font-semibold text-ink">
-                          {ORDER_TYPE_LABEL[order.order_type]}
+                <li
+                  key={order.id}
+                  className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm"
+                >
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        {logo ? (
+                          <AggregatorLogo name={logo} size="md" />
+                        ) : (
+                          <span className="size-10 rounded bg-page" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-bold tabular-nums text-ink">
+                            #{order.external_order_id || order.reference}
+                          </p>
+                          <p className="truncate text-xs text-muted">
+                            {support} · {brand.outletName}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[key].pill}`}
+                        >
+                          {STATUS_STYLE[key].label}
                         </span>
-                        <p className="mt-1 truncate text-sm font-bold tabular-nums text-ink">
-                          {order.external_order_id || order.reference}
-                        </p>
-                        <p className="truncate text-xs font-medium text-ink">
-                          {support} | {brand.outletName}
-                        </p>
+                        <span className="text-xs text-muted">{placed.text}</span>
                       </div>
                     </div>
 
-                    <div className="border-line px-2 md:border-l">
-                      <p className="text-xs text-muted">Placed at: {placed.text}</p>
-                      <p className="mt-0.5 truncate text-sm font-bold text-ink">
-                        {order.customer.name || '—'}
-                      </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <span className="rounded-md bg-page px-2 py-0.5 text-xs font-semibold text-ink">
+                        {ORDER_TYPE_LABEL[order.order_type]}
+                      </span>
+                      <span className="truncate text-sm font-semibold text-ink">
+                        {order.customer.name || 'Customer'}
+                      </span>
                       {order.order_otp ? (
-                        <span className="mt-1 inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                          OTP: {order.order_otp}
+                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                          OTP {order.order_otp}
                         </span>
                       ) : null}
                     </div>
 
-                    <div className="border-line px-2 md:border-l">
-                      <p className="text-xs text-muted">Total(₹)</p>
-                      <p className="text-sm font-bold tabular-nums text-ink">
-                        {Number(order.net_amount).toFixed(2)}
+                    {order.items.length > 0 ? (
+                      <p className="mt-2 truncate text-sm text-muted">
+                        {shownItems
+                          .map((item) => `${item.qty} × ${item.name}`)
+                          .join(', ')}
+                        {moreItems > 0 ? ` +${moreItems} more` : ''}
                       </p>
-                      <p className="text-xs font-medium text-ink">
-                        {order.payment_mode === 'cash' ? 'Cash' : 'Online'}
-                      </p>
-                    </div>
+                    ) : null}
 
-                    <div
-                      className={`flex flex-wrap items-center justify-center gap-2 rounded-lg p-2 ${STATUS_STYLE[key].panel}`}
-                    >
-                      <button
-                        type="button"
-                        aria-expanded={panel === 'details'}
-                        onClick={() => toggle(order.id, 'details')}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
-                      >
-                        <Eye size={14} />
-                        View Details
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHelpOpen(true)}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
-                      >
-                        <Headset size={14} />
-                        {support} Support
-                      </button>
-                      <button
-                        type="button"
-                        aria-expanded={panel === 'delivery'}
-                        onClick={() => toggle(order.id, 'delivery')}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
-                      >
-                        <Bike size={14} />
-                        Delivery Status
-                      </button>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                          Total · {order.payment_mode === 'cash' ? 'Cash' : 'Online'}
+                        </p>
+                        <p className="text-xl font-bold tabular-nums text-ink">
+                          {formatINR(Number(order.net_amount), 2)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          aria-expanded={panel === 'details'}
+                          onClick={() => toggle(order.id, 'details')}
+                          className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                            panel === 'details'
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-primary text-primary hover:bg-primary/5'
+                          }`}
+                        >
+                          <Eye size={14} />
+                          View Details
+                        </button>
+                        <button
+                          type="button"
+                          aria-expanded={panel === 'delivery'}
+                          onClick={() => toggle(order.id, 'delivery')}
+                          className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                            panel === 'delivery'
+                              ? 'border-ink bg-ink text-white'
+                              : 'border-line text-ink hover:bg-page'
+                          }`}
+                        >
+                          <Bike size={14} />
+                          Delivery Status
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHelpOpen(true)}
+                          aria-label={`${support} Support`}
+                          data-tooltip={`${support} Support`}
+                          className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-ink hover:bg-page"
+                        >
+                          <Headset size={15} />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
                   {panel === 'details' ? (
-                    <div className="border-t border-line bg-page/60 px-6 py-3 text-sm">
+                    <div className="border-t border-line bg-page/60 px-4 py-3 text-sm">
                       <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
                         <p>
                           <span className="text-muted">Customer: </span>
@@ -448,7 +561,7 @@ export default function BillingOnlineOrders() {
                   ) : null}
 
                   {panel === 'delivery' ? (
-                    <div className="border-t border-line bg-page/60 px-6 py-3 text-sm">
+                    <div className="border-t border-line bg-page/60 px-4 py-3 text-sm">
                       {order.rider.name || order.rider.status ? (
                         <div className="grid gap-x-8 gap-y-1 sm:grid-cols-3">
                           <p>

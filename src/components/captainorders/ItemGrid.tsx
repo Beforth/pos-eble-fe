@@ -149,7 +149,7 @@ export function ItemGrid({
                     disabled={!item.available}
                     onClick={() => onAddItem(item)}
                     aria-pressed={selected}
-                    className={`relative flex min-h-[76px] w-full items-center overflow-hidden rounded-xl border px-3 py-2.5 text-left active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 sm:h-[72px] sm:py-0 ${
+                    className={`relative flex min-h-[76px] w-full items-center overflow-hidden rounded-xl border px-3 py-2.5 text-left active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-page disabled:opacity-60 disabled:grayscale sm:h-[72px] sm:py-0 ${
                       selected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
                         : 'border-line bg-card hover:border-primary/40'
@@ -167,6 +167,7 @@ export function ItemGrid({
                         <span className="mt-0.5 block text-xs text-muted">
                           ₹{item.price}
                           {item.shortCode ? ` · ${item.shortCode}` : ''}
+                          {!item.available ? ' · Unavailable' : ''}
                         </span>
                       </span>
                       <span className="flex shrink-0 flex-col items-center justify-center gap-1">

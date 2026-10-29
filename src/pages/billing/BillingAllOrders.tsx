@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../auth/AuthContext'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { BillingOrdersTable } from '../../components/billing/BillingOrdersTable'
+import { Pagination } from '../../components/common/Pagination'
 import { CancelOrderReasonModal } from '../../components/billing/CancelOrderReasonModal'
 import { BillReceipt } from '../../components/billing/BillReceipt'
 import { SelectDropdown } from '../../components/common/SelectDropdown'
@@ -43,7 +44,7 @@ import {
   type OrderFilterValues,
 } from '../../utils/orderFilters'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 const filterInputClass =
   'h-9 w-full rounded-lg border border-line bg-page px-2.5 text-sm text-ink outline-none focus:border-primary'
@@ -127,7 +128,7 @@ export default function BillingAllOrders() {
     reason: string
   } | null>(null)
   const [billNo, setBillNo] = useState('')
-  const [shown, setShown] = useState(PAGE_SIZE)
+  const [page, setPage] = useState(1)
 
   const [status, setStatus] = useState<OrderStatus | 'all'>('all')
   const [type, setType] = useState('')
@@ -138,7 +139,7 @@ export default function BillingAllOrders() {
 
   function setFilter<K extends keyof OrderFilterValues>(key: K, value: OrderFilterValues[K]) {
     setExtra((prev) => ({ ...prev, [key]: value }))
-    setShown(PAGE_SIZE)
+    setPage(1)
   }
 
   const tableOptions = useMemo(
@@ -199,7 +200,10 @@ export default function BillingAllOrders() {
     return counts
   }, [narrowed])
 
-  const visible = filtered.slice(0, shown)
+  // A cancel or edit can shrink the list under the page being viewed.
+  const lastPage = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, lastPage)
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const filtersOn =
     status !== 'all' ||
     type !== '' ||
@@ -211,7 +215,7 @@ export default function BillingAllOrders() {
     setType('')
     setSearch('')
     setExtra(EMPTY_ORDER_FILTERS)
-    setShown(PAGE_SIZE)
+    setPage(1)
   }
 
   function handleExport() {
@@ -342,7 +346,7 @@ export default function BillingAllOrders() {
                 aria-selected={active}
                 onClick={() => {
                   setType(tab.value)
-                  setShown(PAGE_SIZE)
+                  setPage(1)
                 }}
                 className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3.5 text-sm font-semibold transition-colors ${
                   active
@@ -504,7 +508,7 @@ export default function BillingAllOrders() {
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
-                setShown(PAGE_SIZE)
+                setPage(1)
               }}
               placeholder="Search order no., name, phone or item"
               aria-label="Search orders"
@@ -550,7 +554,7 @@ export default function BillingAllOrders() {
                     aria-pressed={active}
                     onClick={() => {
                       setStatus(active ? 'all' : key)
-                      setShown(PAGE_SIZE)
+                      setPage(1)
                     }}
                     className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors ${
                       active
@@ -615,17 +619,12 @@ export default function BillingAllOrders() {
                 onCancel={setCancelTarget}
               />
             </div>
-            {filtered.length > visible.length ? (
-              <div className="mt-4 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setShown((n) => n + PAGE_SIZE)}
-                  className="inline-flex h-10 items-center rounded-lg border border-line bg-card px-5 text-sm font-semibold text-ink hover:bg-page"
-                >
-                  Show {Math.min(PAGE_SIZE, filtered.length - visible.length)} more
-                </button>
-              </div>
-            ) : null}
+            <Pagination
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              total={filtered.length}
+              onPageChange={setPage}
+            />
           </>
         )}
       </main>

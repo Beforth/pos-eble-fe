@@ -1,87 +1,43 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Download, Printer } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
-import { BillingHeader } from '../../components/billing/BillingHeader'
+import {
+  LoadState,
+  PairList,
+  ReportCard,
+  ReportFilterBar,
+  ReportShell,
+  StatGrid,
+  StatTile,
+} from '../../components/reports/ReportShell'
+import { TD, TH, reportSubtitle } from '../../components/reports/reportStyles'
 import {
   fetchOrderSummaryApi,
   type OrderSummaryResult,
 } from '../../services/reportService'
-import { useNewOrder } from '../../state/useNewOrder'
 import { downloadCsv } from '../../utils/exportCsv'
+import { formatINR } from '../../utils/format'
+import { todayIso } from '../../utils/reportDates'
 import { showToast } from '../../utils/toast'
 
-/** Local calendar day as YYYY-MM-DD, `offset` days from today. */
-function dayIso(offset = 0): string {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function displayDate(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return y && m && d ? `${d}-${m}-${y}` : iso
-}
-
-function num(value: string | number): string {
+function money(value: string | number): string {
   const n = Number(value)
-  return Number.isFinite(n)
-    ? n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : String(value)
+  return Number.isFinite(n) ? formatINR(n, 2) : String(value)
 }
 
-const BUTTON_CLASS =
-  'inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
-
-const CELL = 'border border-line px-3 py-3.5'
-
-function SectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="px-3 pb-2 pt-4 text-sm font-bold text-ink">{children}</h2>
-}
-
-function Head({ cols }: { cols: { label: string; right?: boolean }[] }) {
+function EmptyRow({ cols }: { cols: number }) {
   return (
-    <thead>
-      <tr className="bg-page text-ink">
-        {cols.map((col, index) => (
-          <th
-            key={index}
-            className={`${CELL} font-semibold ${col.right ? 'text-right' : 'text-left'}`}
-          >
-            {col.label}
-          </th>
-        ))}
-      </tr>
-    </thead>
-  )
-}
-
-/** A two-column "label : value" table, as used by the summary blocks. */
-function PairTable({ rows }: { rows: { label: string; value: string; bold?: boolean }[] }) {
-  return (
-    <table className="w-full border-collapse text-sm">
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.label}>
-            <td className={`${CELL} text-ink ${row.bold ? 'font-bold' : ''}`}>{row.label} :</td>
-            <td className={`${CELL} w-1/2 text-right tabular-nums text-ink ${row.bold ? 'font-bold' : ''}`}>
-              {row.value}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <tr>
+      <td colSpan={cols} className="px-4 py-6 text-center text-sm text-muted">
+        Records not available
+      </td>
+    </tr>
   )
 }
 
 export default function OrderSummaryReport() {
-  const navigate = useNavigate()
-  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId, user } = useAuth()
-  const [billNo, setBillNo] = useState('')
-  const [from, setFrom] = useState(() => dayIso())
-  const [to, setTo] = useState(() => dayIso())
+  const [from, setFrom] = useState(todayIso)
+  const [to, setTo] = useState(todayIso)
   const [data, setData] = useState<OrderSummaryResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -108,9 +64,9 @@ export default function OrderSummaryReport() {
     }
   }, [encryptedOutletId, from, to])
 
-  function pickDay(offset: number) {
-    setFrom(dayIso(offset))
-    setTo(dayIso(offset))
+  function setRange(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom)
+    setTo(nextTo)
   }
 
   function exportCsv() {
@@ -134,224 +90,193 @@ export default function OrderSummaryReport() {
     downloadCsv(`order-report_${from}_${to}.csv`, ['Section', 'Label', 'Value 1', 'Value 2', 'Value 3'], rows)
   }
 
+  const grandTotal = data?.success.lines.find((line) => line.label === 'Grand Total')?.amount
+  const paymentsMax = Math.max(0, ...(data?.payments ?? []).map((row) => Number(row.total) || 0))
+
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader
-        billNo={billNo}
-        onBillNoChange={setBillNo}
-        onNewOrder={() => startNewOrder()}
-        onViewKot={() => navigate('/billing?kot=1')}
-      />
+    <ReportShell
+      title="Order Report"
+      subtitle={reportSubtitle(from, to, user?.outlet || undefined)}
+    >
+      <ReportFilterBar from={from} to={to} onRange={setRange} onExport={exportCsv} />
 
-      <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
-        <h1 className="text-lg font-bold text-ink">Order Report</h1>
-        <button
-          type="button"
-          onClick={() => navigate('/reports')}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
-        >
-          <ChevronLeft size={14} />
-          Back
-        </button>
-      </div>
-
-      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-muted">
-            From
-            <input
-              type="date"
-              value={from}
-              max={to || undefined}
-              onChange={(event) => setFrom(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+      {loading && !data ? (
+        <LoadState loading error="" />
+      ) : error ? (
+        <LoadState loading={false} error={error} />
+      ) : data ? (
+        <>
+          <StatGrid>
+            <StatTile
+              primary
+              label="Grand total"
+              value={grandTotal !== undefined ? money(grandTotal) : '—'}
+              hint={`${data.success.orders} successful order${data.success.orders === 1 ? '' : 's'}`}
             />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            To
-            <input
-              type="date"
-              value={to}
-              min={from || undefined}
-              onChange={(event) => setTo(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            <StatTile
+              label="Average per bill"
+              value={money(data.performance.avg_per_bill)}
+              hint={`Avg discount ${money(data.performance.avg_discount_per_order)}`}
             />
-          </label>
-          <div className="ml-auto flex flex-wrap items-center gap-3">
-            <button type="button" onClick={() => pickDay(-1)} className={BUTTON_CLASS}>
-              Yesterday Orders
-            </button>
-            <button type="button" onClick={() => pickDay(0)} className={BUTTON_CLASS}>
-              Today Orders
-            </button>
-            <button type="button" onClick={() => window.print()} className={BUTTON_CLASS}>
-              <Printer size={16} />
-              Print
-            </button>
-            <button type="button" onClick={exportCsv} className={BUTTON_CLASS}>
-              <Download size={16} />
-              Export CSV
-            </button>
-          </div>
-        </div>
+            <StatTile
+              label="Orders"
+              value={data.status_total.orders}
+              hint={`Total ${money(data.status_total.total)}`}
+            />
+            <StatTile
+              label="Cancelled"
+              value={data.cancelled.count}
+              hint={money(data.cancelled.amount)}
+            />
+          </StatGrid>
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-line bg-card shadow-sm">
-          <p className="border-b border-line px-4 py-4 text-center text-sm font-bold text-ink">
-            {user?.outlet}
-          </p>
-          <p className="bg-page px-4 py-3 text-sm text-ink">
-            <span className="font-bold">Order Summary Report</span> : {displayDate(from)} to{' '}
-            {displayDate(to)}
-          </p>
-
-          {loading && !data ? (
-            <p className="p-10 text-center text-sm text-muted">Loading…</p>
-          ) : error ? (
-            <p className="p-10 text-center text-sm text-danger">{error}</p>
-          ) : data ? (
-            <div className="pb-4">
-              <SectionTitle>Order Status</SectionTitle>
-              <table className="w-full border-collapse text-sm">
-                <Head
-                  cols={[
-                    { label: 'Order Status' },
-                    { label: 'My Amount (₹)', right: true },
-                    { label: 'Total (₹)', right: true },
-                    { label: 'Orders', right: true },
-                  ]}
-                />
-                <tbody>
-                  {data.status.map((row) => (
-                    <tr key={row.status}>
-                      <td className={`${CELL} text-ink`}>{row.status}:</td>
-                      <td className={`${CELL} text-right tabular-nums text-ink`}>{num(row.my_amount)}</td>
-                      <td className={`${CELL} text-right tabular-nums text-ink`}>{num(row.total)}</td>
-                      <td className={`${CELL} text-right tabular-nums text-ink`}>{row.orders}</td>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <ReportCard title="Order Status" flush>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-primary/5 text-left">
+                      <th className={TH}>Status</th>
+                      <th className={`${TH} text-right`}>My Amount (₹)</th>
+                      <th className={`${TH} text-right`}>Total (₹)</th>
+                      <th className={`${TH} text-right`}>Orders</th>
                     </tr>
-                  ))}
-                  <tr className="bg-page font-bold text-ink">
-                    <td className={CELL}>Total:</td>
-                    <td className={`${CELL} text-right tabular-nums`}>{num(data.status_total.my_amount)}</td>
-                    <td className={`${CELL} text-right tabular-nums`}>{num(data.status_total.total)}</td>
-                    <td className={`${CELL} text-right tabular-nums`}>{data.status_total.orders}</td>
-                  </tr>
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.status.map((row) => (
+                      <tr key={row.status} className="border-t border-line">
+                        <td className={`${TD} font-medium`}>{row.status}</td>
+                        <td className={`${TD} text-right tabular-nums`}>{money(row.my_amount)}</td>
+                        <td className={`${TD} text-right tabular-nums`}>{money(row.total)}</td>
+                        <td className={`${TD} text-right tabular-nums`}>{row.orders}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                      <td className={TD}>Total</td>
+                      <td className={`${TD} text-right tabular-nums`}>
+                        {money(data.status_total.my_amount)}
+                      </td>
+                      <td className={`${TD} text-right tabular-nums`}>
+                        {money(data.status_total.total)}
+                      </td>
+                      <td className={`${TD} text-right tabular-nums`}>{data.status_total.orders}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </ReportCard>
 
-              <SectionTitle>Success Orders ({data.success.orders})</SectionTitle>
-              <PairTable
+            <ReportCard title="Success Orders" aside={`${data.success.orders} orders`}>
+              <PairList
                 rows={data.success.lines.map((line) => ({
                   label: line.label,
-                  value: `₹ ${num(line.amount)}`,
+                  value: money(line.amount),
                   bold: line.label === 'Grand Total',
                 }))}
               />
+            </ReportCard>
 
-              <SectionTitle>Cancelled Orders</SectionTitle>
-              <PairTable
-                rows={[
-                  { label: 'Count', value: String(data.cancelled.count) },
-                  { label: 'Amount', value: `₹ ${num(data.cancelled.amount)}` },
-                ]}
-              />
-
-              <SectionTitle>Performance Indicator</SectionTitle>
-              <PairTable
-                rows={[
-                  { label: 'Average Per Bill', value: `₹ ${num(data.performance.avg_per_bill)}` },
-                  {
-                    label: 'Average Discount Per Order',
-                    value: `₹ ${num(data.performance.avg_discount_per_order)}`,
-                  },
-                ]}
-              />
-
-              <SectionTitle>Order Type</SectionTitle>
-              <table className="w-full border-collapse text-sm">
-                <Head
-                  cols={[
-                    { label: '' },
-                    { label: 'Count', right: true },
-                    { label: 'Total (₹)', right: true },
-                    { label: 'Net Sales (₹)', right: true },
-                  ]}
-                />
-                <tbody>
-                  {data.order_types.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className={`${CELL} text-muted`}>Records not available</td>
+            <ReportCard title="Order Type" flush>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-primary/5 text-left">
+                      <th className={TH}>Type</th>
+                      <th className={`${TH} text-right`}>Count</th>
+                      <th className={`${TH} text-right`}>Total (₹)</th>
+                      <th className={`${TH} text-right`}>Net Sales (₹)</th>
                     </tr>
-                  ) : (
-                    data.order_types.map((row) => (
-                      <tr key={row.type}>
-                        <td className={`${CELL} text-ink`}>{row.type}</td>
-                        <td className={`${CELL} text-right tabular-nums text-ink`}>{row.count}</td>
-                        <td className={`${CELL} text-right tabular-nums text-ink`}>{num(row.total)}</td>
-                        <td className={`${CELL} text-right tabular-nums text-ink`}>{num(row.net)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-
-              <SectionTitle>Payment Mode</SectionTitle>
-              <table className="w-full border-collapse text-sm">
-                <Head cols={[{ label: '' }, { label: 'Total (₹)', right: true }]} />
-                <tbody>
-                  {data.payments.length === 0 ? (
-                    <tr>
-                      <td colSpan={2} className={`${CELL} text-muted`}>Records not available</td>
-                    </tr>
-                  ) : (
-                    data.payments.map((row) => (
-                      <tr key={row.mode}>
-                        <td className={`${CELL} text-ink`}>{row.mode}</td>
-                        <td className={`${CELL} w-1/2 text-right tabular-nums text-ink`}>{num(row.total)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-
-              <SectionTitle>Online Orders</SectionTitle>
-              <table className="w-full border-collapse text-sm">
-                <Head
-                  cols={[
-                    { label: 'Source' },
-                    { label: 'My Amount (₹)', right: true },
-                    { label: 'Total (₹)', right: true },
-                    { label: 'Orders', right: true },
-                  ]}
-                />
-                <tbody>
-                  {data.online.rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className={`${CELL} text-muted`}>Records not available</td>
-                    </tr>
-                  ) : (
-                    <>
-                      {data.online.rows.map((row) => (
-                        <tr key={row.source}>
-                          <td className={`${CELL} font-semibold text-ink`}>{row.source}</td>
-                          <td className={`${CELL} text-right tabular-nums text-ink`}>{num(row.my_amount)}</td>
-                          <td className={`${CELL} text-right tabular-nums text-ink`}>{num(row.total)}</td>
-                          <td className={`${CELL} text-right tabular-nums text-ink`}>{row.orders}</td>
+                  </thead>
+                  <tbody>
+                    {data.order_types.length === 0 ? (
+                      <EmptyRow cols={4} />
+                    ) : (
+                      data.order_types.map((row) => (
+                        <tr key={row.type} className="border-t border-line">
+                          <td className={`${TD} font-medium`}>{row.type}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{row.count}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{money(row.total)}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{money(row.net)}</td>
                         </tr>
-                      ))}
-                      <tr className="bg-page font-bold text-ink">
-                        <td className={CELL}>Total:</td>
-                        <td className={`${CELL} text-right tabular-nums`}>{num(data.online.total.my_amount)}</td>
-                        <td className={`${CELL} text-right tabular-nums`}>{num(data.online.total.total)}</td>
-                        <td className={`${CELL} text-right tabular-nums`}>{data.online.total.orders}</td>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </ReportCard>
+
+            <ReportCard title="Payment Mode">
+              {data.payments.length === 0 ? (
+                <p className="py-2 text-center text-sm text-muted">Records not available</p>
+              ) : (
+                <ul className="space-y-3">
+                  {data.payments.map((row) => (
+                    <li key={row.mode}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-ink">{row.mode}</span>
+                        <span className="tabular-nums text-ink">{money(row.total)}</span>
+                      </div>
+                      <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-line">
+                        <span
+                          className="block h-full rounded-full bg-primary"
+                          style={{
+                            width: `${paymentsMax > 0 ? Math.min(100, ((Number(row.total) || 0) / paymentsMax) * 100) : 0}%`,
+                          }}
+                        />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </ReportCard>
+
+            <ReportCard title="Online Orders" flush>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-primary/5 text-left">
+                      <th className={TH}>Source</th>
+                      <th className={`${TH} text-right`}>My Amount (₹)</th>
+                      <th className={`${TH} text-right`}>Total (₹)</th>
+                      <th className={`${TH} text-right`}>Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.online.rows.length === 0 ? (
+                      <EmptyRow cols={4} />
+                    ) : (
+                      data.online.rows.map((row) => (
+                        <tr key={row.source} className="border-t border-line">
+                          <td className={`${TD} font-medium`}>{row.source}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{money(row.my_amount)}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{money(row.total)}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{row.orders}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {data.online.rows.length > 0 ? (
+                    <tfoot>
+                      <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                        <td className={TD}>Total</td>
+                        <td className={`${TD} text-right tabular-nums`}>
+                          {money(data.online.total.my_amount)}
+                        </td>
+                        <td className={`${TD} text-right tabular-nums`}>
+                          {money(data.online.total.total)}
+                        </td>
+                        <td className={`${TD} text-right tabular-nums`}>{data.online.total.orders}</td>
                       </tr>
-                    </>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </div>
-      </main>
-    </div>
+                    </tfoot>
+                  ) : null}
+                </table>
+              </div>
+            </ReportCard>
+          </div>
+        </>
+      ) : null}
+    </ReportShell>
   )
 }

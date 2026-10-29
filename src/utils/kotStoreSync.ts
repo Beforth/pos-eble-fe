@@ -28,7 +28,7 @@ const PAGE_SIZE = 100
  * is the point: the rail has no backlog, so a ticket closed in another tab (or
  * while this screen was disconnected) still uses to linger locally forever and
  * reads as a ticket "from nowhere". No date scoping — live work carries across
- * midnight (STANDARDS §22).
+ * midnight (STANDARDS §22); only Day End resets them.
  *
  * Deliberately **additive**: an already-known ticket is left untouched rather
  * than re-mapped, so local display context (prices, ready state) is not
@@ -50,6 +50,9 @@ export async function syncKotStoreFromServer(outletId: string): Promise<boolean>
       const res: KotsPage = await listKotsApi(outletId, {
         page,
         page_size: PAGE_SIZE,
+        // Day End starts the boards over: an open ticket from before the last
+        // close is not live work any more, and is pruned below.
+        sinceDayEnd: true,
       })
       for (const dto of res.results) {
         if (!isServerBackedKotId(dto.id)) continue

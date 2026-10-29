@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { PencilLine, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { AllOrderRow } from '../../mocks/allOrdersData'
 
 interface KotDetailsModalProps {
@@ -97,14 +97,6 @@ export function KotDetailsModal({ open, order, onClose }: KotDetailsModalProps) 
               </tbody>
             </table>
           </div>
-
-          <button
-            type="button"
-            className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-2 hover:underline"
-          >
-            <PencilLine size={14} />
-            Modified KOT
-          </button>
         </div>
       </div>
     </div>

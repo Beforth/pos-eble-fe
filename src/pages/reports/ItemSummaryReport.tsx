@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronUp,
@@ -18,19 +19,9 @@ import {
 } from '../../services/reportService'
 import { useNewOrder } from '../../state/useNewOrder'
 import { downloadCsv } from '../../utils/exportCsv'
+import { formatINR } from '../../utils/format'
+import { datePresets, displayDate, todayIso } from '../../utils/reportDates'
 import { showToast } from '../../utils/toast'
-
-/** Local calendar day as YYYY-MM-DD (the server reads it in the outlet's zone). */
-function todayIso(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function displayDate(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return y && m && d ? `${d}-${m}-${y}` : iso
-}
 
 function decimal(value: ReportCell | undefined): string {
   const n = Number(value)
@@ -47,7 +38,7 @@ interface CategoryGroup {
 }
 
 const BUTTON_CLASS =
-  'inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
+  'inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
 
 const TOGGLEABLE = [
   { key: 'code', label: 'Code' },
@@ -152,6 +143,13 @@ export default function ItemSummaryReport() {
   }
 
   const totals = data?.totals ?? {}
+  const presets = datePresets()
+  const itemCount = groups.reduce((sum, group) => sum + group.rows.length, 0)
+  const topAmount = groups.reduce(
+    (max, group) =>
+      group.rows.reduce((m, row) => Math.max(m, Number(row.amount) || 0), max),
+    0,
+  )
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page">
@@ -162,8 +160,14 @@ export default function ItemSummaryReport() {
         onViewKot={() => navigate('/billing?kot=1')}
       />
 
-      <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
-        <h1 className="text-lg font-bold text-ink">Item Report</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-card px-5 py-3">
+        <div>
+          <h1 className="text-lg font-bold text-ink">Item Report</h1>
+          <p className="text-xs text-muted">
+            {displayDate(from)} – {displayDate(to)}
+            {data ? ` · ${itemCount} item${itemCount === 1 ? '' : 's'} in ${groups.length} categor${groups.length === 1 ? 'y' : 'ies'}` : ''}
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => navigate('/reports')}
@@ -174,19 +178,70 @@ export default function ItemSummaryReport() {
         </button>
       </div>
 
-      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative w-56">
+      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5">
+        <section
+          aria-label="Report filters"
+          className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-3 shadow-sm"
+        >
+          <div
+            className="inline-flex overflow-x-auto rounded-xl border border-line bg-page p-1"
+            role="group"
+            aria-label="Date range"
+          >
+            {presets.map((preset) => {
+              const active = from === preset.from && to === preset.to
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setFrom(preset.from)
+                    setTo(preset.to)
+                  }}
+                  className={`h-8 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors ${
+                    active ? 'bg-primary text-white shadow-sm' : 'text-ink hover:bg-card'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <CalendarDays size={15} />
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(event) => setFrom(event.target.value)}
+              aria-label="From date"
+              className="h-10 rounded-xl border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            />
+            <span>to</span>
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(event) => setTo(event.target.value)}
+              aria-label="To date"
+              className="h-10 rounded-xl border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            />
+          </label>
+
+          <div className="relative w-60">
             <Search
               size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
             />
             <input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search item or category"
-              className="h-10 w-full rounded-lg border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+              aria-label="Search item or category"
+              className="h-10 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
             />
           </div>
 
@@ -198,14 +253,14 @@ export default function ItemSummaryReport() {
               className={BUTTON_CLASS}
             >
               <Columns3 size={16} />
-              Configure Column
+              Columns
               <ChevronDown
                 size={14}
                 className={`transition-transform ${columnsOpen ? 'rotate-180' : ''}`}
               />
             </button>
             {columnsOpen && (
-              <div className="absolute left-0 top-12 z-20 w-64 rounded-lg border border-line bg-card shadow-lg">
+              <div className="absolute left-0 top-12 z-20 w-64 overflow-hidden rounded-xl border border-line bg-card shadow-lg">
                 {TOGGLEABLE.map((col) => (
                   <label
                     key={col.key}
@@ -224,43 +279,46 @@ export default function ItemSummaryReport() {
             )}
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-muted">
-            From
-            <input
-              type="date"
-              value={from}
-              max={to || undefined}
-              onChange={(event) => setFrom(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            To
-            <input
-              type="date"
-              value={to}
-              min={from || undefined}
-              onChange={(event) => setTo(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
-            />
-          </label>
-
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={() => window.print()} className={BUTTON_CLASS}>
               <Printer size={16} />
               Print
             </button>
-            <button type="button" onClick={exportCsv} className={BUTTON_CLASS}>
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            >
               <Download size={16} />
               Export CSV
             </button>
           </div>
-        </div>
+        </section>
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-line bg-card shadow-sm">
-          <p className="bg-primary/5 px-4 py-3 text-sm text-muted">
-            Item Report : From {displayDate(from)} to {displayDate(to)}
-          </p>
+        {data && groups.length > 0 ? (
+          <section aria-label="Totals" className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Total sales</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-primary">
+                {formatINR(Number(totals.amount), 2)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Quantity sold</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{decimal(totals.qty)}</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Items sold</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{itemCount}</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Categories</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{groups.length}</p>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="shrink-0 overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
           {loading && !data ? (
             <p className="p-10 text-center text-sm text-muted">Loading…</p>
           ) : error ? (
@@ -270,49 +328,49 @@ export default function ItemSummaryReport() {
               No sales found for this date range.
             </p>
           ) : (
-            <table className="w-full min-w-[720px] border-collapse text-sm">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-page text-ink">
-                  <th className="px-4 py-4 text-left font-medium">Category</th>
-                  <th className="px-4 py-4 text-left font-medium">Item</th>
-                  {show('code') && <th className="px-4 py-4 text-left font-medium">Code</th>}
-                  {show('qty') && <th className="px-4 py-4 text-right font-medium">Qty.</th>}
-                  {show('amount') && (
-                    <th className="px-4 py-4 text-right font-medium">Total (₹)</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="bg-page font-bold text-ink">
-                  <td className="px-4 py-4">Total</td>
-                  <td className="px-4 py-4">-</td>
-                  {show('code') && <td className="px-4 py-4">-</td>}
-                  {show('qty') && (
-                    <td className="px-4 py-4 text-right tabular-nums">{decimal(totals.qty)}</td>
-                  )}
-                  {show('amount') && (
-                    <td className="px-4 py-4 text-right tabular-nums">{decimal(totals.amount)}</td>
-                  )}
-                </tr>
-                {groups.map((group) => {
-                  const isCollapsed = collapsed.has(group.category)
-                  return (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-primary/5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    <th className="px-4 py-3 text-left">Item</th>
+                    {show('code') && <th className="px-4 py-3 text-left">Code</th>}
+                    {show('qty') && <th className="px-4 py-3 text-right">Qty.</th>}
+                    {show('amount') && <th className="px-4 py-3 text-right">Total (₹)</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((group) => (
                     <GroupRows
                       key={group.category}
                       group={group}
-                      collapsed={isCollapsed}
-                      colCount={colCount}
+                      collapsed={collapsed.has(group.category)}
+                      colCount={colCount - 1}
+                      topAmount={topAmount}
                       showCode={show('code')}
                       showQty={show('qty')}
                       showAmount={show('amount')}
                       onToggle={() => toggleIn(setCollapsed, group.category)}
                     />
-                  )
-                })}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold text-ink">
+                    <td className="px-4 py-3.5">Total</td>
+                    {show('code') && <td className="px-4 py-3.5" />}
+                    {show('qty') && (
+                      <td className="px-4 py-3.5 text-right tabular-nums">{decimal(totals.qty)}</td>
+                    )}
+                    {show('amount') && (
+                      <td className="px-4 py-3.5 text-right tabular-nums">
+                        {decimal(totals.amount)}
+                      </td>
+                    )}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           )}
-        </div>
+        </section>
       </main>
     </div>
   )
@@ -322,6 +380,8 @@ interface GroupRowsProps {
   group: CategoryGroup
   collapsed: boolean
   colCount: number
+  /** Best-selling item's amount in the report; the bar on every row is relative to it. */
+  topAmount: number
   showCode: boolean
   showQty: boolean
   showAmount: boolean
@@ -332,6 +392,7 @@ function GroupRows({
   group,
   collapsed,
   colCount,
+  topAmount,
   showCode,
   showQty,
   showAmount,
@@ -339,49 +400,58 @@ function GroupRows({
 }: GroupRowsProps) {
   return (
     <>
-      <tr className="border-t border-line bg-primary/5">
-        <td colSpan={colCount} className="px-4 py-4">
+      <tr className="border-t border-line bg-page">
+        <td colSpan={colCount} className="px-4 py-3">
           <button
             type="button"
             onClick={onToggle}
             aria-expanded={!collapsed}
-            className="inline-flex items-center gap-3 text-ink"
+            className="flex w-full items-center gap-2 text-left font-semibold text-ink"
           >
-            {collapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+            {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
             {group.category}
+            <span className="rounded-full bg-card px-2 py-0.5 text-xs font-medium text-muted">
+              {group.rows.length} item{group.rows.length === 1 ? '' : 's'}
+            </span>
+            <span className="ml-auto flex items-center gap-4 text-sm font-semibold tabular-nums">
+              {showQty ? (
+                <span className="text-muted">
+                  Qty <span className="text-ink">{decimal(group.qty)}</span>
+                </span>
+              ) : null}
+              {showAmount ? <span className="text-ink">₹{decimal(group.amount)}</span> : null}
+            </span>
           </button>
         </td>
       </tr>
-      {!collapsed && (
-        <>
-          {group.rows.map((row, index) => (
+      {!collapsed &&
+        group.rows.map((row, index) => {
+          const amount = Number(row.amount) || 0
+          return (
             <tr key={index} className="border-t border-line hover:bg-page/60">
-              <td className="px-4 py-4" />
-              <td className="px-4 py-4 text-ink">{row.item}</td>
-              {showCode && <td className="px-4 py-4 text-ink">{row.code}</td>}
+              <td className="px-4 py-3 pl-10 text-ink">
+                <span className="block">{row.item}</span>
+                {showAmount && topAmount > 0 ? (
+                  <span className="mt-1.5 block h-1 w-40 max-w-full overflow-hidden rounded-full bg-line">
+                    <span
+                      className="block h-full rounded-full bg-primary"
+                      style={{ width: `${Math.min(100, (amount / topAmount) * 100)}%` }}
+                    />
+                  </span>
+                ) : null}
+              </td>
+              {showCode && <td className="px-4 py-3 text-muted">{row.code}</td>}
               {showQty && (
-                <td className="px-4 py-4 text-right tabular-nums text-ink">{decimal(row.qty)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-ink">{decimal(row.qty)}</td>
               )}
               {showAmount && (
-                <td className="px-4 py-4 text-right tabular-nums text-ink">
+                <td className="px-4 py-3 text-right font-medium tabular-nums text-ink">
                   {decimal(row.amount)}
                 </td>
               )}
             </tr>
-          ))}
-          <tr className="border-t border-line bg-page font-bold text-ink">
-            <td className="px-4 py-4">Sub Total</td>
-            <td className="px-4 py-4" />
-            {showCode && <td className="px-4 py-4" />}
-            {showQty && (
-              <td className="px-4 py-4 text-right tabular-nums">{decimal(group.qty)}</td>
-            )}
-            {showAmount && (
-              <td className="px-4 py-4 text-right tabular-nums">{decimal(group.amount)}</td>
-            )}
-          </tr>
-        </>
-      )}
+          )
+        })}
     </>
   )
 }

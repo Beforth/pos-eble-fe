@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, X } from 'lucide-react'
 import type { MenuItemRow } from '../../utils/menuAdapter'
 import {
   priceSelection,
   selectionProblem,
+  visibleAddonGroups,
   type OptionAddonGroup,
   type OptionSelection,
   type PricedSelection,
@@ -15,6 +16,10 @@ interface ItemOptionsModalProps {
   onClose: () => void
   /** The picked options, already priced and named for the cart line. */
   onConfirm: (priced: PricedSelection) => void
+  /** Enforce each add-on group's min and max (Addon Min-Max Validation). */
+  checkAddonLimits?: boolean
+  /** Add the item as soon as the choices are complete, without "Add to bill". */
+  autoAdd?: boolean
 }
 
 function hint(group: OptionAddonGroup): string {
@@ -35,19 +40,45 @@ function hint(group: OptionAddonGroup): string {
  * (Regular / Large) are required, one per group; add-ons follow each group's
  * own rules. The line goes in only when the choices are complete.
  */
+/** A square option tile; `has-[:focus-visible]` keeps keyboard focus visible on the hidden input. */
+function tileClass(active: boolean): string {
+  return `relative flex aspect-square cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 p-2 text-center transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40 ${
+    active
+      ? 'border-primary bg-primary/10 text-primary'
+      : 'border-line bg-card text-ink hover:border-primary/40 hover:bg-page'
+  }`
+}
+
+/** The tick in a tile's corner. */
+function TileMark({ active }: { active: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full border text-white ${
+        active ? 'border-primary bg-primary' : 'border-line bg-card'
+      }`}
+    >
+      {active ? <Check size={12} strokeWidth={3} /> : null}
+    </span>
+  )
+}
+
 export function ItemOptionsModal({
   item,
   onClose,
   onConfirm,
+  checkAddonLimits = true,
+  autoAdd = false,
 }: ItemOptionsModalProps) {
   const options = item.options
   const [selection, setSelection] = useState<OptionSelection>(() => {
     const variations: Record<string, string> = {}
-    // A group with a single choice needs no asking.
+    // Start with a variation already chosen - "Regular" when the group has
+    // one, else the first - so the cashier only changes it when asked to.
     for (const group of options?.variationGroups ?? []) {
-      if (group.variations.length === 1) {
-        variations[group.id] = group.variations[0].id
-      }
+      const regular = group.variations.find((v) => /^regular$/i.test(v.name.trim()))
+      const first = regular ?? group.variations[0]
+      if (first) variations[group.id] = first.id
     }
     return { variations, addons: {} }
   })
@@ -61,18 +92,40 @@ export function ItemOptionsModal({
   }, [onClose])
 
   const problem = useMemo(
-    () => (options ? selectionProblem(options, selection) : null),
-    [options, selection],
+    () => (options ? selectionProblem(options, selection, checkAddonLimits) : null),
+    [options, selection, checkAddonLimits],
   )
+  // Auto add: only after the cashier changes a choice, never on opening (the
+  // preselected "Regular" must not skip the popup).
+  const [touched, setTouched] = useState(false)
   const priced = useMemo(
     () =>
       options ? priceSelection(item.name, item.price, options, selection) : null,
     [item.name, item.price, options, selection],
   )
 
+  const addonGroups = useMemo(
+    () => (options ? visibleAddonGroups(options, selection) : []),
+    [options, selection],
+  )
+
+  const confirmRef = useRef(onConfirm)
+  useEffect(() => {
+    confirmRef.current = onConfirm
+  })
+  // Auto add: once every add-on group the cashier sees has a pick (no groups
+  // at all counts), the item goes in without pressing "Add to bill".
+  const complete = addonGroups.every((group) => (selection.addons[group.id] ?? []).length > 0)
+  useEffect(() => {
+    if (autoAdd && touched && priced && problem === null && complete) {
+      confirmRef.current(priced)
+    }
+  }, [autoAdd, touched, priced, problem, complete])
+
   if (!options || !priced) return null
 
   function toggleAddon(group: OptionAddonGroup, addonId: string) {
+    setTouched(true)
     setSelection((prev) => {
       const current = prev.addons[group.id] ?? []
       let next: string[]
@@ -80,7 +133,7 @@ export function ItemOptionsModal({
         next = current.filter((id) => id !== addonId)
       } else if (group.max === 1) {
         next = [addonId] // single choice: picking another swaps it
-      } else if (group.max > 0 && current.length >= group.max) {
+      } else if (checkAddonLimits && group.max > 0 && current.length >= group.max) {
         return prev // at the limit; untick one first
       } else {
         next = [...current, addonId]
@@ -101,7 +154,7 @@ export function ItemOptionsModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Choose options for ${item.name}`}
-        className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-line bg-card shadow-2xl"
+        className="relative z-10 flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-line bg-card shadow-2xl"
       >
         <header className="flex items-start justify-between gap-3 border-b border-line px-5 py-3.5">
           <div className="min-w-0">
@@ -130,37 +183,32 @@ export function ItemOptionsModal({
                   Required
                 </span>
               </legend>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
                 {group.variations.map((variation) => {
                   const active = selection.variations[group.id] === variation.id
                   return (
-                    <label
-                      key={variation.id}
-                      className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-                        active
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-line bg-card text-ink hover:bg-page'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name={`variation-${group.id}`}
-                          checked={active}
-                          onChange={() =>
-                            setSelection((prev) => ({
-                              ...prev,
-                              variations: {
-                                ...prev.variations,
-                                [group.id]: variation.id,
-                              },
-                            }))
-                          }
-                          className="size-4 accent-primary"
-                        />
-                        <span className="font-medium">{variation.name}</span>
+                    <label key={variation.id} className={tileClass(active)}>
+                      <input
+                        type="radio"
+                        name={`variation-${group.id}`}
+                        checked={active}
+                        onChange={() => {
+                          setTouched(true)
+                          setSelection((prev) => ({
+                            ...prev,
+                            variations: {
+                              ...prev.variations,
+                              [group.id]: variation.id,
+                            },
+                          }))
+                        }}
+                        className="sr-only"
+                      />
+                      <TileMark active={active} />
+                      <span className="line-clamp-3 break-words text-sm font-semibold leading-tight">
+                        {variation.name}
                       </span>
-                      <span className="font-semibold tabular-nums">
+                      <span className="text-sm font-bold tabular-nums">
                         {formatINR(variation.price, 2)}
                       </span>
                     </label>
@@ -170,7 +218,7 @@ export function ItemOptionsModal({
             </fieldset>
           ))}
 
-          {options.addonGroups.map((group) => {
+          {addonGroups.map((group) => {
             const picked = selection.addons[group.id] ?? []
             return (
               <fieldset key={group.id}>
@@ -180,36 +228,30 @@ export function ItemOptionsModal({
                     {hint(group)}
                   </span>
                 </legend>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
                   {group.addons.map((addon) => {
                     const active = picked.includes(addon.id)
                     return (
-                      <label
-                        key={addon.id}
-                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-                          active
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-line bg-card text-ink hover:bg-page'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <input
-                            type={group.max === 1 ? 'radio' : 'checkbox'}
-                            name={`addon-${group.id}`}
-                            checked={active}
-                            onChange={() => toggleAddon(group, addon.id)}
-                            onClick={() => {
-                              // A radio cannot be un-ticked by its own change
-                              // event; clicking the chosen add-on clears it.
-                              if (group.max === 1 && active && group.min === 0) {
-                                toggleAddon(group, addon.id)
-                              }
-                            }}
-                            className="size-4 accent-primary"
-                          />
-                          <span className="font-medium">{addon.name}</span>
+                      <label key={addon.id} className={tileClass(active)}>
+                        <input
+                          type={group.max === 1 ? 'radio' : 'checkbox'}
+                          name={`addon-${group.id}`}
+                          checked={active}
+                          onChange={() => toggleAddon(group, addon.id)}
+                          onClick={() => {
+                            // A radio cannot be un-ticked by its own change
+                            // event; clicking the chosen add-on clears it.
+                            if (group.max === 1 && active && group.min === 0) {
+                              toggleAddon(group, addon.id)
+                            }
+                          }}
+                          className="sr-only"
+                        />
+                        <TileMark active={active} />
+                        <span className="line-clamp-3 break-words text-sm font-semibold leading-tight">
+                          {addon.name}
                         </span>
-                        <span className="font-semibold tabular-nums">
+                        <span className="text-sm font-bold tabular-nums">
                           {addon.price > 0 ? `+ ${formatINR(addon.price, 2)}` : 'Free'}
                         </span>
                       </label>

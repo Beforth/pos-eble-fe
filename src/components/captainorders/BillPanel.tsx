@@ -237,8 +237,6 @@ export function BillPanel({
   guests,
   complimentary,
   itsPaid,
-  loyalty,
-  feedbackSms,
   customer,
   customerFormOpen,
   customerErrors,
@@ -248,8 +246,6 @@ export function BillPanel({
   onGuestsChange,
   onComplimentaryChange,
   onItsPaidChange,
-  onLoyaltyChange,
-  onFeedbackSmsChange,
   onQtyChange,
   onRemoveLine,
   onLineNoteChange,
@@ -1569,7 +1565,7 @@ export function BillPanel({
           </div>
 
           {canSettle ? (
-            <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
               {PAYMENTS.map((method) => (
                 <label
                   key={method.id}
@@ -1627,6 +1623,7 @@ export function BillPanel({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            {/* Loyalty and Send Feedback SMS are switched off for now:
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
               <input
                 type="checkbox"
@@ -1645,6 +1642,7 @@ export function BillPanel({
               />
               Send Feedback SMS
             </label>
+            */}
           </div>
 
           <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">

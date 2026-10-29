@@ -1,24 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, Columns3, Download, Printer, Search } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  Columns3,
+  Download,
+  Printer,
+  Search,
+} from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import { fetchReportApi, type ReportResult } from '../../services/reportService'
 import { useNewOrder } from '../../state/useNewOrder'
 import { downloadCsv } from '../../utils/exportCsv'
+import { formatINR } from '../../utils/format'
+import { datePresets, displayDate, todayIso } from '../../utils/reportDates'
 import { showToast } from '../../utils/toast'
-
-/** Local calendar day as YYYY-MM-DD (the server reads it in the outlet's zone). */
-function todayIso(): string {
-  const d = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function displayDate(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return y && m && d ? `${d}-${m}-${y}` : iso
-}
 
 function formatCell(value: string | number | undefined, type: string): string {
   if (value === undefined || value === '') return ''
@@ -32,7 +30,7 @@ function formatCell(value: string | number | undefined, type: string): string {
 }
 
 const BUTTON_CLASS =
-  'inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
+  'inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary'
 
 export default function CategorySummaryReport() {
   const navigate = useNavigate()
@@ -90,6 +88,7 @@ export default function CategorySummaryReport() {
     return q ? all.filter((row) => String(row.category).toLowerCase().includes(q)) : all
   }, [data, search])
   const hasTotals = data != null && Object.keys(data.totals).length > 0
+  const presets = datePresets()
 
   function toggleColumn(key: string) {
     setHidden((prev) => {
@@ -123,8 +122,14 @@ export default function CategorySummaryReport() {
         onViewKot={() => navigate('/billing?kot=1')}
       />
 
-      <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
-        <h1 className="text-lg font-bold text-ink">Category Report</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-card px-5 py-3">
+        <div>
+          <h1 className="text-lg font-bold text-ink">Category Report</h1>
+          <p className="text-xs text-muted">
+            {displayDate(from)} – {displayDate(to)}
+            {data ? ` · ${data.rows.length} categor${data.rows.length === 1 ? 'y' : 'ies'}` : ''}
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => navigate('/reports')}
@@ -135,19 +140,70 @@ export default function CategorySummaryReport() {
         </button>
       </div>
 
-      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-5">
-        <div className="flex flex-wrap items-center gap-3">
+      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-5">
+        <section
+          aria-label="Report filters"
+          className="flex shrink-0 flex-wrap items-center gap-3 rounded-2xl border border-line bg-card p-3 shadow-sm"
+        >
+          <div
+            className="inline-flex overflow-x-auto rounded-xl border border-line bg-page p-1"
+            role="group"
+            aria-label="Date range"
+          >
+            {presets.map((preset) => {
+              const active = from === preset.from && to === preset.to
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setFrom(preset.from)
+                    setTo(preset.to)
+                  }}
+                  className={`h-8 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors ${
+                    active ? 'bg-primary text-white shadow-sm' : 'text-ink hover:bg-card'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <CalendarDays size={15} />
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(event) => setFrom(event.target.value)}
+              aria-label="From date"
+              className="h-10 rounded-xl border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            />
+            <span>to</span>
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(event) => setTo(event.target.value)}
+              aria-label="To date"
+              className="h-10 rounded-xl border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
+            />
+          </label>
+
           <div className="relative w-56">
             <Search
               size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
             />
             <input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search category"
-              className="h-10 w-full rounded-lg border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+              aria-label="Search category"
+              className="h-10 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
             />
           </div>
 
@@ -159,14 +215,14 @@ export default function CategorySummaryReport() {
               className={BUTTON_CLASS}
             >
               <Columns3 size={16} />
-              Configure Column
+              Columns
               <ChevronDown
                 size={14}
                 className={`transition-transform ${columnsOpen ? 'rotate-180' : ''}`}
               />
             </button>
             {columnsOpen && (
-              <div className="absolute left-0 top-12 z-20 w-64 rounded-lg border border-line bg-card shadow-lg">
+              <div className="absolute left-0 top-12 z-20 w-64 overflow-hidden rounded-xl border border-line bg-card shadow-lg">
                 {(data?.columns ?? [])
                   .filter((col) => col.key !== 'category')
                   .map((col) => (
@@ -187,43 +243,53 @@ export default function CategorySummaryReport() {
             )}
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-muted">
-            From
-            <input
-              type="date"
-              value={from}
-              max={to || undefined}
-              onChange={(event) => setFrom(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            To
-            <input
-              type="date"
-              value={to}
-              min={from || undefined}
-              onChange={(event) => setTo(event.target.value)}
-              className="h-10 rounded-lg border border-line bg-card px-2 text-sm text-ink outline-none focus:border-primary"
-            />
-          </label>
-
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={() => window.print()} className={BUTTON_CLASS}>
               <Printer size={16} />
               Print
             </button>
-            <button type="button" onClick={exportCsv} className={BUTTON_CLASS}>
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            >
               <Download size={16} />
               Export CSV
             </button>
           </div>
-        </div>
+        </section>
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-line bg-card shadow-sm">
-          <p className="bg-primary/5 px-4 py-3 text-sm text-muted">
-            Category Report : From {displayDate(from)} to {displayDate(to)}
-          </p>
+        {hasTotals && data ? (
+          <section aria-label="Totals" className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Total sales</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-primary">
+                {formatINR(Number(data.totals.total), 2)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Net amount</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
+                {formatINR(Number(data.totals.net), 2)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Tax collected</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
+                {formatINR(Number(data.totals.tax), 2)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Orders · Items</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
+                {String(data.totals.orders)}
+                <span className="text-base font-medium text-muted"> · {String(data.totals.items)}</span>
+              </p>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="shrink-0 overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
           {loading && !data ? (
             <p className="p-10 text-center text-sm text-muted">Loading…</p>
           ) : error ? (
@@ -233,48 +299,77 @@ export default function CategorySummaryReport() {
               No sales found for this date range.
             </p>
           ) : (
-            <table className="w-full min-w-[800px] border-collapse text-sm">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-page text-ink">
-                  {columns.map((col) => (
-                    <th
-                      key={col.key}
-                      className={`px-4 py-4 font-medium ${col.type === 'text' ? 'text-left' : 'text-right'}`}
-                    >
-                      {col.label}
-                    </th>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-primary/5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    <th className="w-12 px-4 py-3 text-left">#</th>
+                    {columns.map((col) => (
+                      <th
+                        key={col.key}
+                        className={`px-4 py-3 ${col.type === 'text' ? 'text-left' : 'text-right'}`}
+                      >
+                        {col.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, index) => (
+                    <tr key={index} className="border-t border-line hover:bg-page/60">
+                      <td className="px-4 py-3.5 text-muted tabular-nums">{index + 1}</td>
+                      {columns.map((col) =>
+                        col.key === 'percentage' ? (
+                          <td key={col.key} className="px-4 py-3.5">
+                            <div className="flex items-center justify-end gap-2.5">
+                              <span className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
+                                <span
+                                  className="block h-full rounded-full bg-primary"
+                                  style={{
+                                    width: `${Math.min(100, Math.max(0, Number(row[col.key]) || 0))}%`,
+                                  }}
+                                />
+                              </span>
+                              <span className="w-12 text-right tabular-nums text-ink">
+                                {formatCell(row[col.key], col.type)}
+                              </span>
+                            </div>
+                          </td>
+                        ) : (
+                          <td
+                            key={col.key}
+                            className={`px-4 py-3.5 text-ink ${
+                              col.type === 'text'
+                                ? 'font-semibold'
+                                : 'text-right tabular-nums'
+                            }`}
+                          >
+                            {formatCell(row[col.key], col.type)}
+                          </td>
+                        ),
+                      )}
+                    </tr>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {hasTotals && data && (
-                  <tr className="bg-page font-bold text-ink">
-                    {columns.map((col) => (
-                      <td
-                        key={col.key}
-                        className={`px-4 py-4 ${col.type === 'text' ? '' : 'text-right tabular-nums'}`}
-                      >
-                        {formatCell(data.totals[col.key], col.type)}
-                      </td>
-                    ))}
-                  </tr>
-                )}
-                {rows.map((row, index) => (
-                  <tr key={index} className="border-t border-line hover:bg-page/60">
-                    {columns.map((col) => (
-                      <td
-                        key={col.key}
-                        className={`px-4 py-4 text-ink ${col.type === 'text' ? '' : 'text-right tabular-nums'}`}
-                      >
-                        {formatCell(row[col.key], col.type)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </tbody>
+                {hasTotals && data ? (
+                  <tfoot>
+                    <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold text-ink">
+                      <td className="px-4 py-3.5" />
+                      {columns.map((col) => (
+                        <td
+                          key={col.key}
+                          className={`px-4 py-3.5 ${col.type === 'text' ? '' : 'text-right tabular-nums'}`}
+                        >
+                          {formatCell(data.totals[col.key], col.type)}
+                        </td>
+                      ))}
+                    </tr>
+                  </tfoot>
+                ) : null}
+              </table>
+            </div>
           )}
-        </div>
+        </section>
       </main>
     </div>
   )

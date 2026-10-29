@@ -207,13 +207,12 @@ export function EditOrderModal({
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="bg-primary/5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  <th className="w-10 px-2 py-2.5" />
-                  <th className="w-10 px-2 py-2.5" />
                   <th className="px-3 py-2.5">Item Name</th>
                   <th className="px-3 py-2.5">Special Note</th>
                   <th className="px-3 py-2.5 text-center">Quantity</th>
                   <th className="px-3 py-2.5 text-right">Unit Price (₹)</th>
                   <th className="px-3 py-2.5 text-right">Total Price (₹)</th>
+                  <th className="w-24 px-3 py-2.5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -221,38 +220,6 @@ export function EditOrderModal({
                   const isEditing = editingItemId === item.id
                   return (
                     <tr key={item.id} className="border-t border-line">
-                      <td className="px-2 py-2">
-                        <button
-                          type="button"
-                          aria-label={`Remove ${item.name}`}
-                          data-tooltip={`Remove ${item.name}`}
-                          onClick={() => setPendingRemove(item)}
-                          className="flex size-7 items-center justify-center rounded border border-line text-danger hover:bg-page"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </td>
-                      <td className="px-2 py-2">
-                        <button
-                          type="button"
-                          aria-label={
-                            isEditing ? `Done editing ${item.name}` : `Edit ${item.name}`
-                          }
-                          data-tooltip={
-                            isEditing ? `Done editing ${item.name}` : `Edit ${item.name}`
-                          }
-                          onClick={() =>
-                            setEditingItemId(isEditing ? null : item.id)
-                          }
-                          className={`flex size-7 items-center justify-center rounded border transition-colors ${
-                            isEditing
-                              ? 'border-primary bg-primary/5 text-primary'
-                              : 'border-line text-muted hover:bg-page hover:text-ink'
-                          }`}
-                        >
-                          <Pencil size={13} />
-                        </button>
-                      </td>
                       <td className="px-3 py-2 text-ink">
                         {isEditing ? (
                           <input
@@ -292,13 +259,45 @@ export function EditOrderModal({
                       <td className="px-3 py-2 text-right tabular-nums text-ink">
                         {(item.unitPrice * item.quantity).toFixed(2)}
                       </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item.name}`}
+                          data-tooltip={`Remove ${item.name}`}
+                          onClick={() => setPendingRemove(item)}
+                          className="flex size-7 items-center justify-center rounded border border-line text-danger hover:bg-page"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={
+                            isEditing ? `Done editing ${item.name}` : `Edit ${item.name}`
+                          }
+                          data-tooltip={
+                            isEditing ? `Done editing ${item.name}` : `Edit ${item.name}`
+                          }
+                          onClick={() =>
+                            setEditingItemId(isEditing ? null : item.id)
+                          }
+                          className={`flex size-7 items-center justify-center rounded border transition-colors ${
+                            isEditing
+                              ? 'border-primary bg-primary/5 text-primary'
+                              : 'border-line text-muted hover:bg-page hover:text-ink'
+                          }`}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
                 {items.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={6}
                       className="px-3 py-8 text-center text-sm text-muted"
                     >
                       No items in this order.

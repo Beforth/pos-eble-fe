@@ -60,6 +60,7 @@ interface AcceptOrderCardProps {
   busy: boolean
   onAccept: (order: OnlineOrder, minutes: number) => void
   onReject: (order: OnlineOrder, reasonId: number) => void
+  onFoodReady: (order: OnlineOrder) => void
 }
 
 export function AcceptOrderCard({
@@ -70,6 +71,7 @@ export function AcceptOrderCard({
   busy,
   onAccept,
   onReject,
+  onFoodReady,
 }: AcceptOrderCardProps) {
   const [minutes, setMinutes] = useState(String(defaultPreparation))
   const [rejecting, setRejecting] = useState(false)
@@ -87,7 +89,7 @@ export function AcceptOrderCard({
 
   return (
     <article
-      className={`rounded-xl border bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
+      className={`flex flex-col rounded-xl border bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
         waiting ? 'border-primary/40' : 'border-line'
       }`}
     >
@@ -316,7 +318,7 @@ export function AcceptOrderCard({
           )}
         </div>
       ) : (
-        <div className="mt-4 space-y-1 border-t border-line pt-3 text-sm text-muted">
+        <div className="mt-4 flex flex-1 flex-col space-y-1 border-t border-line pt-3 text-sm text-muted">
           {(order.status === 'accepted' || order.status === 'auto_accepted') && (
             <p>
               {order.status === 'auto_accepted'
@@ -337,6 +339,25 @@ export function AcceptOrderCard({
           )}
           {order.status === 'cancelled' && (
             <p>Cancelled{order.cancel_reason ? `: ${order.cancel_reason}` : ''}</p>
+          )}
+          {(order.status === 'accepted' || order.status === 'auto_accepted') && (
+            <div className="!mt-auto flex justify-end pt-2">
+              {order.food_ready_at ? (
+                <p className="font-medium text-success">
+                  Food ready at {clock(order.food_ready_at)}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onFoodReady(order)}
+                  disabled={busy}
+                  className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-primary bg-card px-3 text-xs font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  Food ready
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}

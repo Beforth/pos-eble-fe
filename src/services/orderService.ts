@@ -276,6 +276,9 @@ export interface AdvanceOrderDto {
   source: string
   created_by: string
   created_at: string
+  /** The bill that fulfilled this booking; blank until it is completed. */
+  order_no?: string
+  bill_no?: string
   items: AdvanceOrderItemDto[]
 }
 
@@ -511,6 +514,8 @@ export interface LiveBoardOrderRecord {
   itemCount: number
   total: number
   items: LiveBoardOrderItemDto[]
+  /** When the order was created (ms), for the Live View order setting. */
+  createdAt: number
 }
 
 export interface LiveBoardKotRecord {
@@ -525,6 +530,8 @@ export interface LiveBoardKotRecord {
   items: LiveBoardOrderItemDto[]
   /** The ticket's bill is already paid (the kitchen may still be cooking it). */
   billed: boolean
+  /** When the ticket was sent (ms), for the Live View order setting. */
+  createdAt: number
 }
 
 export type LiveBoardRecord = LiveBoardOrderRecord | LiveBoardKotRecord
@@ -540,6 +547,7 @@ export function toLiveBoardOrderRecord(order: OrderDto): LiveBoardOrderRecord {
     itemCount: order.items.reduce((sum, i) => sum + Number(i.qty || 0), 0),
     total: Number(order.grand_total || 0),
     items: order.items,
+    createdAt: Date.parse(order.created_at) || 0,
   }
 }
 
@@ -558,6 +566,7 @@ export function toLiveBoardKotRecord(kot: KotDto): LiveBoardKotRecord {
     ),
     items: kot.items as LiveBoardOrderItemDto[],
     billed: Boolean(kot.billed),
+    createdAt: Date.parse(kot.created) || 0,
   }
 }
 
@@ -850,6 +859,29 @@ export async function updateAdvanceOrderApi(
   )
 }
 
+export async function getAdvanceOrderApi(
+  outletId: string,
+  id: string,
+): Promise<AdvanceOrderDto> {
+  return jsonRequest<AdvanceOrderDto>(
+    ordersPath(outletId, `/advance-orders/${id}/`),
+    'GET',
+  )
+}
+
+/** Close a booking as fulfilled on `orderId`, the bill that collected its balance. */
+export async function completeAdvanceOrderApi(
+  outletId: string,
+  id: string,
+  orderId: string,
+): Promise<AdvanceOrderDto> {
+  return jsonRequest<AdvanceOrderDto>(
+    ordersPath(outletId, `/advance-orders/${id}/complete/`),
+    'POST',
+    { order_id: orderId },
+  )
+}
+
 export async function cancelAdvanceOrderApi(
   outletId: string,
   id: string,
@@ -869,6 +901,8 @@ export interface ListKotsOptions {
   source?: string
   from?: string
   to?: string
+  /** Only tickets created after the outlet's last Day End. */
+  sinceDayEnd?: boolean
   page?: number
   page_size?: number
 }
@@ -884,6 +918,7 @@ export async function listKotsApi(
   if (options.source) params.push(`source=${encodeURIComponent(options.source)}`)
   if (options.from) params.push(`from=${encodeURIComponent(options.from)}`)
   if (options.to) params.push(`to=${encodeURIComponent(options.to)}`)
+  if (options.sinceDayEnd) params.push('since_day_end=1')
   if (options.page) params.push(`page=${options.page}`)
   if (options.page_size) params.push(`page_size=${options.page_size}`)
   const qs = params.length ? `?${params.join('&')}` : ''

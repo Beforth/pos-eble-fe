@@ -23,6 +23,7 @@ import {
 } from '../../mocks/kotViewData'
 import { markKotReadyApi } from '../../services/orderService'
 import { useLiveKotTickets } from '../../state/useLiveKotTickets'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
 import { useNewOrder } from '../../state/useNewOrder'
 import { billingUrlForKotId } from '../../utils/billingLinks'
 import { formatINR, formatNumber } from '../../utils/format'
@@ -88,6 +89,7 @@ export default function BillingLiveView() {
   const { startNewOrder } = useNewOrder()
   const { encryptedOutletId } = useAuth()
   const { tickets, refresh } = useLiveKotTickets()
+  const { kotLiveView } = useDisplaySettings()
   const [billNo, setBillNo] = useState('')
   const [type, setType] = useState<TypeFilter>('all')
   const [search, setSearch] = useState('')
@@ -105,9 +107,12 @@ export default function BillingLiveView() {
     () =>
       tickets
         .filter((ticket) => !(ticket.status === 'ready' && ticket.billed))
-        // Newest first: a ticket that was just punched shows at the top.
-        .sort((a, b) => b.createdAt - a.createdAt),
-    [tickets],
+        // Display Settings > KOT Live View: oldest first, or newest first so a
+        // ticket that was just punched shows at the top.
+        .sort((a, b) =>
+          kotLiveView === 'asc' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt,
+        ),
+    [tickets, kotLiveView],
   )
 
   const searched = useMemo(() => {
@@ -117,7 +122,8 @@ export default function BillingLiveView() {
       (ticket) =>
         String(ticket.kotNo).includes(q) ||
         (ticket.billNo ?? '').toLowerCase().includes(q) ||
-        ticket.tableNo.toLowerCase().includes(q),
+        ticket.tableNo.toLowerCase().includes(q) ||
+        (ticket.customerName ?? '').toLowerCase().includes(q),
     )
   }, [live, search])
 
@@ -245,7 +251,7 @@ export default function BillingLiveView() {
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="KOT, bill or table no."
+              placeholder="KOT, bill, table or name"
               aria-label="Find a ticket"
               className="h-9 w-full rounded-lg border border-line bg-card pl-8 pr-8 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
             />
@@ -333,6 +339,11 @@ export default function BillingLiveView() {
 
                   <div className="flex items-center gap-2 px-4 pb-2 text-xs text-muted">
                     <span className="truncate">{whereLine(ticket)}</span>
+                    {ticket.customerName ? (
+                      <span className="truncate font-medium text-ink">
+                        {ticket.customerName}
+                      </span>
+                    ) : null}
                     {ticket.persons > 0 ? (
                       <span className="inline-flex shrink-0 items-center gap-1">
                         <Users size={12} />

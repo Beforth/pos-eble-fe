@@ -30,6 +30,8 @@ export interface MenuItemRow {
   availableOnZomato?: boolean
   tags: string[]
   hasImage: boolean
+  /** First uploaded picture, shown on the billing cards when enabled. */
+  imageUrl?: string
   rank?: number
   isFavorite?: boolean
   /** Removed from Favorite Items on purpose; best sellers skip it. */
@@ -64,13 +66,21 @@ function toNumber(value: number | string | null | undefined): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function isAvailableForChannel(item: Item, channelId: string): boolean {
+/**
+ * Menu On/Off's POS switch writes the `base` channel, while billing prices
+ * from `dine-in`: an item switched off on either is not sellable at the counter.
+ */
+function isAvailableForChannel(
+  item: Item,
+  channelId: string,
+  alsoChannelIds: string[],
+): boolean {
   if (!item.is_active) return false
-  if (!channelId) return true
-  const entry = item.availability?.find(
-    (a) => a.outlet_channel_id === channelId,
-  )
-  return entry ? entry.is_available : true
+  return [channelId, ...alsoChannelIds].every((id) => {
+    if (!id) return true
+    const entry = item.availability?.find((a) => a.outlet_channel_id === id)
+    return entry ? entry.is_available : true
+  })
 }
 
 /**
@@ -80,7 +90,11 @@ function isAvailableForChannel(item: Item, channelId: string): boolean {
  * taxes: the item's assigned slabs, kept (plus `flags.ignore_tax`) so the cart
  * can price a line — the item list already returns both, so no extra request.
  */
-export function adaptItem(item: Item, channelId: string): MenuItemRow {
+export function adaptItem(
+  item: Item,
+  channelId: string,
+  alsoChannelIds: string[] = [],
+): MenuItemRow {
   const area = item.area_prices?.find(
     (price) => price.outlet_channel_id === channelId,
   )
@@ -96,9 +110,10 @@ export function adaptItem(item: Item, channelId: string): MenuItemRow {
     onlineDisplayName: item.online_display_name,
     price,
     description: item.description,
-    available: isAvailableForChannel(item, channelId),
+    available: isAvailableForChannel(item, channelId, alsoChannelIds),
     tags: [...(choiceMark ? [choiceMark] : []), ...(item.tags ?? [])],
     hasImage: item.has_image,
+    imageUrl: item.images?.[0]?.image || undefined,
     rank: item.rank,
     isFavorite: item.flags?.set_as_favorite ?? false,
     excludeFromAutoFavorites: item.flags?.exclude_from_auto_favorites ?? false,
@@ -160,6 +175,11 @@ export function useBillingMenu(): BillingMenuState {
     [channels],
   )
 
+  const baseChannelId = useMemo(
+    () => channels.find((c) => c.channel_slug === 'base')?.id ?? '',
+    [channels],
+  )
+
   const load = useCallback(
     async (force: boolean) => {
       if (!encryptedOutletId) {
@@ -189,9 +209,42 @@ export function useBillingMenu(): BillingMenuState {
     void load(false)
   }, [load])
 
+  // Menu On/Off is changed from another tab or device, so an open billing
+  // screen re-reads the items quietly (no loading state) when the tab regains
+  // focus and once a minute while it stays visible. The list is large, so it
+  // is read at most this often (a request in flight is shared) — more often
+  // and it queues ahead of the bill requests on the server.
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    let lastRefresh = Date.now()
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastRefresh < 15_000) return
+      lastRefresh = Date.now()
+      fetchAllItemsCached(encryptedOutletId, { force: true })
+        .then((all) => {
+          if (!cancelled) setRawItems(all)
+        })
+        .catch(() => undefined)
+    }
+    const timer = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [encryptedOutletId])
+
   const items = useMemo(
-    () => rawItems.map((item) => adaptItem(item, channelId)),
-    [rawItems, channelId],
+    () =>
+      rawItems.map((item) =>
+        adaptItem(item, channelId, baseChannelId ? [baseChannelId] : []),
+      ),
+    [rawItems, channelId, baseChannelId],
   )
 
   const setItemFavorite = useCallback(

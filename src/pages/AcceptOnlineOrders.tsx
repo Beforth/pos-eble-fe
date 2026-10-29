@@ -10,6 +10,7 @@ import { TopBar } from '../components/layout/TopBar'
 import {
   acceptOnlineOrderApi,
   listOnlineOrdersApi,
+  markFoodReadyApi,
   rejectOnlineOrderApi,
   type OnlineOrder,
   type OnlineOrderList,
@@ -150,6 +151,20 @@ export default function AcceptOnlineOrders() {
       setBusyId(null)
       refetch()
       refreshCounter()
+    }
+  }
+
+  async function handleFoodReady(order: OnlineOrder) {
+    if (!encryptedOutletId) return
+    setBusyId(order.id)
+    try {
+      await markFoodReadyApi(encryptedOutletId, order.id)
+      showToast('Wera told the food is ready')
+    } catch (failure) {
+      showToast(errorText(failure, 'Could not mark the food ready'))
+    } finally {
+      setBusyId(null)
+      refetch()
     }
   }
 
@@ -332,6 +347,7 @@ export default function AcceptOnlineOrders() {
                   busy={busyId === order.id}
                   onAccept={handleAccept}
                   onReject={handleReject}
+                  onFoodReady={handleFoodReady}
                 />
               ))}
             </div>

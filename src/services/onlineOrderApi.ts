@@ -33,6 +33,8 @@ export interface OnlineOrder {
   auto_accept_at: string | null
   accepted_at: string | null
   preparation_time: number | null
+  /** When the kitchen told Wera the food is ready for pickup. */
+  food_ready_at: string | null
   net_amount: string
   gross_amount: string
   discount: string
@@ -116,6 +118,13 @@ export function rejectOnlineOrderApi(
   return apiRequest<OnlineOrder>(ordersPath(outletId, `${id}/reject/`), {
     method: 'POST',
     body: JSON.stringify({ rejection_id: rejectionId }),
+    token: authToken(),
+  })
+}
+
+export function markFoodReadyApi(outletId: string, id: string): Promise<OnlineOrder> {
+  return apiRequest<OnlineOrder>(ordersPath(outletId, `${id}/food-ready/`), {
+    method: 'POST',
     token: authToken(),
   })
 }

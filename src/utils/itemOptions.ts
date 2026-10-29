@@ -9,6 +9,8 @@ export interface OptionVariation {
   id: string
   name: string
   price: number
+  /** Add-on groups this variation offers; set only when add-ons are per variation. */
+  addonGroupIds?: string[]
 }
 
 export interface OptionVariationGroup {
@@ -37,6 +39,25 @@ export interface OptionAddonGroup {
 export interface ItemOptions {
   variationGroups: OptionVariationGroup[]
   addonGroups: OptionAddonGroup[]
+  /** True when each variation offers its own add-on groups. */
+  addonsByVariation?: boolean
+}
+
+/**
+ * The add-on groups to ask about for this selection: all of them, or - when
+ * add-ons are per variation - only those of the variations chosen so far.
+ */
+export function visibleAddonGroups(
+  options: ItemOptions,
+  selection: OptionSelection,
+): OptionAddonGroup[] {
+  if (!options.addonsByVariation) return options.addonGroups
+  const allowed = new Set<string>()
+  for (const group of options.variationGroups) {
+    const chosen = group.variations.find((v) => v.id === selection.variations[group.id])
+    for (const id of chosen?.addonGroupIds ?? []) allowed.add(id)
+  }
+  return options.addonGroups.filter((group) => allowed.has(group.id))
 }
 
 /** What the cashier picked: one variation per group, any add-ons per group. */
@@ -80,13 +101,26 @@ export function buildItemOptions(
   item: Item,
   channelId: string,
 ): ItemOptions | undefined {
+  const addonsByVariation = Boolean(item.flags?.consider_addon_on_variations)
   const variationGroups: OptionVariationGroup[] = []
   for (const group of item.variation_groups ?? []) {
     const variations: OptionVariation[] = []
     for (const variation of group.variations) {
-      const price = menuPrice(variation.area_prices, channelId)
+      // The item's own price for the variation wins on every menu.
+      const own =
+        variation.item_price != null && variation.item_price !== ''
+          ? toNumber(variation.item_price)
+          : null
+      const price = own ?? menuPrice(variation.area_prices, channelId)
       if (price !== null) {
-        variations.push({ id: variation.id, name: variation.name, price })
+        variations.push({
+          id: variation.id,
+          name: variation.name,
+          price,
+          ...(addonsByVariation
+            ? { addonGroupIds: variation.item_addon_group_ids ?? [] }
+            : {}),
+        })
       }
     }
     if (variations.length > 0) {
@@ -127,18 +161,21 @@ export function buildItemOptions(
   }
 
   if (variationGroups.length === 0 && addonGroups.length === 0) return undefined
-  return { variationGroups, addonGroups }
+  return { variationGroups, addonGroups, addonsByVariation }
 }
 
 /** Why the selection cannot be added yet, or null when it is complete. */
 export function selectionProblem(
   options: ItemOptions,
   selection: OptionSelection,
+  /** Display Settings > Addon Min-Max Validation; off skips the add-on limits. */
+  checkAddonLimits = true,
 ): string | null {
   for (const group of options.variationGroups) {
     if (!selection.variations[group.id]) return `Choose a ${group.name}`
   }
-  for (const group of options.addonGroups) {
+  if (!checkAddonLimits) return null
+  for (const group of visibleAddonGroups(options, selection)) {
     const count = (selection.addons[group.id] ?? []).length
     if (count < group.min) {
       return `Choose at least ${group.min} from ${group.name}`
@@ -178,7 +215,7 @@ export function priceSelection(
     if (found) chosenVariations.push(found)
   }
   const chosenAddons: OptionAddon[] = []
-  for (const group of options.addonGroups) {
+  for (const group of visibleAddonGroups(options, selection)) {
     const picked = new Set(selection.addons[group.id] ?? [])
     for (const addon of group.addons) {
       if (picked.has(addon.id)) chosenAddons.push(addon)

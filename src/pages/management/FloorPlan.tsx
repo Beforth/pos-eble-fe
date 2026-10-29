@@ -260,6 +260,26 @@ export default function FloorPlan() {
     )
   }
 
+  // The screen manages one plan: open on the one saved most recently, so it
+  // shows (and Edit changes) it instead of starting empty and saving another.
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    listFloorPlansApi(encryptedOutletId)
+      .then((plans) => {
+        if (cancelled || plans.length === 0) return
+        const latest = [...plans].sort((a, b) =>
+          String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')),
+        )[0]
+        applyPlan(latest)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per outlet
+  }, [encryptedOutletId])
+
   function reloadPlan() {
     if (!planId || !encryptedOutletId) return
     listFloorPlansApi(encryptedOutletId)
@@ -411,20 +431,73 @@ export default function FloorPlan() {
           </PrimaryButton>
         }
       >
-        <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-          <span className="mb-5 flex size-28 items-center justify-center rounded-full bg-page">
-            <FloorPlanEmptyIcon />
-          </span>
-          <p className="text-base font-semibold text-ink">
-            {planId ? planName : 'No Floor Plan Available'}
-          </p>
-          {planId ? (
-            <p className="mt-1 text-sm text-muted">
-              {items.length} item{items.length === 1 ? '' : 's'} placed. Click
-              Edit Floor Plan to modify.
+        {planId && items.length > 0 ? (
+          <div className="rounded-xl border border-line bg-card">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
+              <p className="text-base font-semibold text-ink">{planName}</p>
+              <p className="text-sm text-muted">
+                {items.length} item{items.length === 1 ? '' : 's'} placed. Click Edit
+                Floor Plan to modify.
+              </p>
+            </div>
+            <div className="overflow-auto p-4">
+              <div
+                className="relative bg-white bg-[linear-gradient(to_right,rgba(0,0,0,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.045)_1px,transparent_1px)] bg-size-[20px_20px]"
+                style={{
+                  minHeight: Math.max(320, ...items.map((item) => item.y + item.height + 24)),
+                  minWidth: Math.max(480, ...items.map((item) => item.x + item.width + 24)),
+                }}
+              >
+                {items.map((item) => {
+                  const isBarrier = item.kind.startsWith('barrier')
+                  return (
+                    <span
+                      key={item.id}
+                      className={`absolute flex items-center justify-center border-2 select-none ${
+                        isBarrier ? 'border-transparent' : 'border-muted/60 bg-page/90'
+                      } ${itemSurfaceClass(item.kind)}`}
+                      style={{
+                        left: item.x,
+                        top: item.y,
+                        width: item.width,
+                        height: item.height,
+                        transform:
+                          item.kind === 'diamond'
+                            ? `rotate(${45 + item.rotation}deg)`
+                            : `rotate(${item.rotation}deg)`,
+                        fontSize: item.fontSize,
+                      }}
+                    >
+                      {!isBarrier ? (
+                        <span
+                          className={`font-semibold text-ink ${
+                            item.kind === 'diamond' ? '-rotate-45' : ''
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                      ) : null}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+            <span className="mb-5 flex size-28 items-center justify-center rounded-full bg-page">
+              <FloorPlanEmptyIcon />
+            </span>
+            <p className="text-base font-semibold text-ink">
+              {planId ? planName : 'No Floor Plan Available'}
             </p>
-          ) : null}
-        </div>
+            {planId ? (
+              <p className="mt-1 text-sm text-muted">
+                No items placed yet. Click Edit Floor Plan to add some.
+              </p>
+            ) : null}
+          </div>
+        )}
       </ReportsPageShell>
     )
   }

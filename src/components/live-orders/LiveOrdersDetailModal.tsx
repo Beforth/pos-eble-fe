@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Loader2, RefreshCw, X } from 'lucide-react'
 import { formatINR, formatNumber } from '../../utils/format'
 import {
@@ -6,6 +6,7 @@ import {
   liveBoardOrdersApi,
   type LiveBoardRecord,
 } from '../../services/orderService'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
 
 interface LiveOrdersDetailModalProps {
   open: boolean
@@ -69,6 +70,17 @@ export function LiveOrdersDetailModal({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [reload, setReload] = useState(0)
+  // The running board lists orders (Order Live View); the kitchen board lists
+  // tickets (KOT Live View). Each follows its own Display Setting.
+  const { orderLiveView, kotLiveView } = useDisplaySettings()
+  const direction = board === 'running' ? orderLiveView : kotLiveView
+  const ordered = useMemo(
+    () =>
+      [...records].sort((a, b) =>
+        direction === 'asc' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt,
+      ),
+    [records, direction],
+  )
 
   useEffect(() => {
     if (!open || !outletId) return
@@ -175,7 +187,7 @@ export function LiveOrdersDetailModal({
             </div>
           ) : (
             <ul className="space-y-3">
-              {records.map((record) => {
+              {ordered.map((record) => {
                 if (record.kind === 'order') {
                   return (
                     <li key={record.id}>
