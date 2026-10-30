@@ -7,6 +7,8 @@ export interface NavItemDef {
   label: string
   icon?: LucideIcon
   badge?: string
+  /** Visual shortcut hint, e.g. 'Ctrl+B'. */
+  shortcut?: string
   /** `alert` draws the badge as a red count pill instead of a label chip. */
   badgeTone?: 'alert'
   /** Show a right chevron (expandable section). */
@@ -206,12 +208,15 @@ export function SidebarNavItem({
     </>
   )
 
+  const tooltipLabel = item.shortcut ? `${item.label} (${item.shortcut})` : item.label
+
   return (
     <li>
       {to && !isExpandable ? (
         <Link
           to={to}
-          title={collapsed ? item.label : undefined}
+          title={collapsed ? tooltipLabel : undefined}
+          data-tooltip={collapsed ? tooltipLabel : undefined}
           aria-current={active ? 'page' : undefined}
           onClick={() => onClick(item.id)}
           className={className}
@@ -221,8 +226,8 @@ export function SidebarNavItem({
       ) : (
         <button
           type="button"
-          aria-label={collapsed ? item.label : undefined}
-          data-tooltip={collapsed ? item.label : undefined}
+          aria-label={collapsed ? tooltipLabel : undefined}
+          data-tooltip={collapsed ? tooltipLabel : undefined}
           aria-current={active ? 'page' : undefined}
           aria-expanded={item.children?.length ? expanded : undefined}
           onClick={handleClick}

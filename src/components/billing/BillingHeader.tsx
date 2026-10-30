@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
+import { useChrome } from '../../state/ChromeContext'
 import { ChangelogModal } from '../layout/ChangelogModal'
 import { isCashierUser } from '../../auth/routePermissions'
 import { BrandLogo } from '../brand/BrandLogo'
@@ -45,10 +46,10 @@ import {
 } from '../../config/billingReports'
 
 const SIDEBAR_LINKS = [
-  { to: '/billing', label: 'Billing', icon: UtensilsCrossed },
-  { to: '/billing/live-orders', label: 'Live Orders', icon: Monitor },
-  { to: '/billing/all-orders', label: 'All Orders', icon: BookOpen },
-  { to: '/billing/kot', label: 'KOT', icon: ChefHat },
+  { to: '/billing', label: 'Billing', icon: UtensilsCrossed, shortcut: 'Ctrl+B' },
+  { to: '/billing/live-orders', label: 'Live Orders', icon: Monitor, shortcut: 'Ctrl+L' },
+  { to: '/billing/all-orders', label: 'All Orders', icon: BookOpen, shortcut: 'Ctrl+A' },
+  { to: '/billing/kot', label: 'KOT', icon: ChefHat, shortcut: 'Ctrl+K' },
   { to: '/billing/day-end', label: 'Day End', icon: Sun },
   { to: '/billing/logs', label: 'Logs', icon: ScrollText },
 ] as const
@@ -74,7 +75,7 @@ export function BillingHeader({
   // biller and a captain do not. `isAdmin` implies `canSeeHome`, so the
   // admin-only cross-links below keep rendering whenever this block does.
   const canSeeHome = isAdmin || isCashierUser(user)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const { billingDrawerOpen, setBillingDrawerOpen } = useChrome()
   const [profileOpen, setProfileOpen] = useState(false)
 
   const [storeInfoOpen, setStoreInfoOpen] = useState(false)
@@ -88,13 +89,13 @@ export function BillingHeader({
   const [changelogOpen, setChangelogOpen] = useState(false)
 
   useEffect(() => {
-    if (!drawerOpen) return
+    if (!billingDrawerOpen) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDrawerOpen(false)
+      if (event.key === 'Escape') setBillingDrawerOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [drawerOpen])
+  }, [billingDrawerOpen, setBillingDrawerOpen])
 
   useEffect(() => {
     if (!profileOpen) return
@@ -117,7 +118,7 @@ export function BillingHeader({
   }
 
   function closeDrawer() {
-    setDrawerOpen(false)
+    setBillingDrawerOpen(false)
   }
 
   return (
@@ -125,9 +126,9 @@ export function BillingHeader({
       <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-line bg-card px-1.5 sm:gap-2 sm:px-3">
         <button
           type="button"
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open navigation"
-          data-tooltip="Open navigation"
+          onClick={() => setBillingDrawerOpen((prev) => !prev)}
+          aria-label="Open navigation ([)"
+          data-tooltip="Open navigation ([)"
           className="inline-flex size-9 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink"
         >
           <Menu size={20} />
@@ -367,7 +368,7 @@ export function BillingHeader({
       </header>
 
       {/* ─── Side Drawer ─── */}
-      {drawerOpen ? (
+      {billingDrawerOpen ? (
         <div className="fixed inset-0 z-50 flex">
           <button
             type="button"

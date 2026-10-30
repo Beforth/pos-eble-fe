@@ -1,15 +1,40 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { useParams } from 'react-router-dom'
 import { useNavigate } from '../../utils/inventoryRouter'
 import { Box, FilePenLine, Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import { SelectRecordAlert } from '../../components/menu/SelectRecordAlert'
 import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_WASTAGE_WRITE_PERMISSION,
+  createWastageApi,
+  getWastageApi,
+  listAllRawMaterialsApi,
+  listRecipeMenuItemsApi,
+  updateWastageApi,
+  type MenuItemRef,
+  type RawMaterial,
+} from '../../services/inventoryService'
 
 interface LineItem {
   id: string
@@ -22,21 +47,6 @@ interface LineItem {
   note: string
 }
 
-const RAW_MATERIALS = [
-  { name: 'Tomatoes', unit: 'Kg', avgPrice: '40.000' },
-  { name: 'Onion', unit: 'Kg', avgPrice: '28.000' },
-  { name: 'Paneer', unit: 'Kg', avgPrice: '320.000' },
-  { name: 'Milk', unit: 'Ltr', avgPrice: '56.000' },
-  { name: 'Butter', unit: 'Kg', avgPrice: '480.000' },
-  { name: 'Flour', unit: 'Kg', avgPrice: '42.000' },
-]
-const MENU_ITEMS = [
-  { name: 'Dabeli', unit: 'Pcs', avgPrice: '35.000' },
-  { name: 'Vada Pav', unit: 'Pcs', avgPrice: '25.000' },
-  { name: 'Misal Pav', unit: 'Pcs', avgPrice: '60.000' },
-  { name: 'Tea', unit: 'Cup', avgPrice: '15.000' },
-]
-const UNITS = ['Kg', 'Ltr', 'Pcs', 'Box', 'Packet', 'Cup']
 const WASTAGE_BY_AREA = [
   'Standard recipe',
   'Standard & Home Delivery',
@@ -70,10 +80,17 @@ function formatAmount(value: number) {
 
 export default function AddWastage() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WASTAGE_WRITE_PERMISSION)
+  const isEdit = Boolean(id)
+  const { units, loadMasters } = useInventoryMasters()
   const [wastageFor, setWastageFor] = useState<'raw-material' | 'item'>(
     'raw-material',
   )
-  const [wastageDate, setWastageDate] = useState('2026-08-11')
+  const [wastageDate, setWastageDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [wastageByArea, setWastageByArea] = useState('Standard recipe')
   const [lines, setLines] = useState<LineItem[]>([emptyLine()])
   const isItemMode = wastageFor === 'item'
@@ -81,8 +98,78 @@ export default function AddWastage() {
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
+  const [menuItems, setMenuItems] = useState<MenuItemRef[]>([])
+  const quickAdd = useInventoryQuickAdd({
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.wastage.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    { wastageFor, wastageDate, wastageByArea, lines },
+    (saved) => {
+      setWastageFor(saved.wastageFor)
+      setWastageDate(saved.wastageDate)
+      setWastageByArea(saved.wastageByArea)
+      setLines(saved.lines)
+    },
+  )
 
-  const catalog = isItemMode ? MENU_ITEMS : RAW_MATERIALS
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    void listAllRawMaterialsApi(encryptedOutletId)
+      .then(setRawMaterials)
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
+    void listRecipeMenuItemsApi(encryptedOutletId)
+      .then(setMenuItems)
+      .catch(() => setMenuItems([]))
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!id || !encryptedOutletId) return
+    getWastageApi(encryptedOutletId, id)
+      .then((row) => {
+        setWastageFor(row.wastage_for === 'item' ? 'item' : 'raw-material')
+        setWastageDate(row.wastage_date)
+        setWastageByArea(row.wastage_by_area || 'Standard recipe')
+        setLines(
+          row.lines.length
+            ? row.lines.map((line) => ({
+                id: `line-${line.raw_material_id || line.item_id}-${Math.random()}`,
+                selected: false,
+                rawMaterial: line.item_name || line.raw_material_name || '',
+                qty: line.qty,
+                unit: line.unit_name || '',
+                avgPurchasePrice: line.avg_purchase_price,
+                amount: line.amount,
+                note: line.note,
+              }))
+            : [emptyLine()],
+        )
+      })
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load wastage',
+        )
+      })
+  }, [id, encryptedOutletId])
+
+  const catalogNames = isItemMode
+    ? menuItems.map((row) => row.name)
+    : rawMaterials.map((row) => row.name)
+  const unitNames = units.filter((row) => row.is_active).map((row) => row.name)
   const materialLabel = isItemMode ? 'Item' : 'Raw Material'
 
   const allSelected = lines.length > 0 && lines.every((line) => line.selected)
@@ -99,7 +186,6 @@ export default function AddWastage() {
       }, 0),
     [lines],
   )
-
 
   function updateLine(id: string, patch: Partial<LineItem>) {
     setLines((prev) =>
@@ -137,17 +223,18 @@ export default function AddWastage() {
     setNoteLineId(null)
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (!canWrite || !encryptedOutletId) return
     if (!wastageDate) {
       setError('Date is required')
       return
     }
-    const validLine = lines.some((line) => {
+    const validLines = lines.filter((line) => {
       if (!line.rawMaterial || toNumber(line.qty) <= 0) return false
       if (isItemMode) return true
       return Boolean(line.unit)
     })
-    if (!validLine) {
+    if (validLines.length === 0) {
       setError(
         isItemMode
           ? 'Add at least one item with quantity'
@@ -155,18 +242,71 @@ export default function AddWastage() {
       )
       return
     }
+    let payloadLines
+    try {
+      payloadLines = validLines.map((line) => {
+        if (isItemMode) {
+          const item = menuItems.find((row) => row.name === line.rawMaterial)
+          if (!item) throw new Error('Select a saved menu item')
+          return {
+            item_id: item.id,
+            qty: line.qty,
+            note: line.note,
+          }
+        }
+        const raw = rawMaterials.find((row) => row.name === line.rawMaterial)
+        const unit = units.find((row) => row.name === line.unit)
+        if (!raw || !unit) {
+          throw new Error('Select a saved raw material and unit')
+        }
+        return {
+          raw_material_id: raw.id,
+          qty: line.qty,
+          unit_id: unit.id,
+          avg_purchase_price: line.avgPurchasePrice || '0',
+          amount:
+            line.amount ||
+            String(toNumber(line.qty) * toNumber(line.avgPurchasePrice)),
+          note: line.note,
+        }
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save wastage')
+      return
+    }
     setError('')
-    showToast('Wastage saved')
-    window.setTimeout(() => {
+    setSaving(true)
+    try {
+      const payload = {
+        wastage_for: isItemMode ? 'item' : 'raw_material',
+        wastage_date: wastageDate,
+        wastage_by_area: isItemMode ? wastageByArea : '',
+        total_amount: String(totalAmount),
+        lines: payloadLines,
+      }
+      if (isEdit && id) await updateWastageApi(encryptedOutletId, id, payload)
+      else await createWastageApi(encryptedOutletId, payload)
+      draft.clearDraft()
+      showToast(isEdit ? 'Wastage updated' : 'Wastage saved')
       navigate('/inventory/wastage')
-    }, 900)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to save wastage')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <InventoryPageShell activeItem="wastage">
-
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
       <div className="mb-4">
-        <h1 className="text-lg font-bold text-ink">Add Wastage Details</h1>
+        <h1 className="text-lg font-bold text-ink">
+          {isEdit ? 'Edit Wastage Details' : 'Add Wastage Details'}
+        </h1>
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-6 rounded-xl border border-line bg-card p-4">
@@ -266,7 +406,14 @@ export default function AddWastage() {
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -281,24 +428,68 @@ export default function AddWastage() {
                 <td className="min-w-[200px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
                   <SearchableSelect
                     value={line.rawMaterial}
-                    options={catalog.map((m) => m.name)}
+                    options={catalogNames}
                     placeholder={`Select ${materialLabel}`}
                     searchPlaceholder="Search..."
                     compact
                     dropdownPlacement="auto"
                     onChange={(value) => {
-                      const material = catalog.find((m) => m.name === value)
+                      if (isItemMode) {
+                        updateLine(line.id, { rawMaterial: value })
+                        return
+                      }
+                      const material = rawMaterials.find((m) => m.name === value)
                       updateLine(line.id, {
                         rawMaterial: value,
-                        unit: material?.unit ?? line.unit,
-                        avgPurchasePrice: material?.avgPrice ?? line.avgPurchasePrice,
+                        unit: material?.consumption_unit.name ?? line.unit,
+                        avgPurchasePrice:
+                          material?.purchase_price ?? line.avgPurchasePrice,
                         amount:
                           material && toNumber(line.qty) > 0
-                            ? formatAmount(toNumber(line.qty) * toNumber(material.avgPrice))
+                            ? formatAmount(
+                                toNumber(line.qty) *
+                                  toNumber(material.purchase_price),
+                              )
                             : line.amount,
                       })
                     }}
+                    onAddNew={
+                      isItemMode
+                        ? undefined
+                        : quickAdd.handler('raw-material', (row) =>
+                            updateLine(line.id, {
+                              rawMaterial: row.name,
+                              unit: row.consumption_unit.name,
+                              avgPurchasePrice: row.purchase_price,
+                            }),
+                          )
+                    }
                   />
+                  {!isItemMode && encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {!isItemMode &&
+                  getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -314,21 +505,17 @@ export default function AddWastage() {
                 </td>
                 {!isItemMode ? (
                   <>
-                    <td className="px-3 py-2.5">
-                      <select
+                    <td className="min-w-[140px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                      <SearchableSelect
                         value={line.unit}
-                        onChange={(event) =>
-                          updateLine(line.id, { unit: event.target.value })
+                        options={unitNames}
+                        placeholder="Select Unit"
+                        searchPlaceholder="Search unit..."
+                        compact
+                        onChange={(value) =>
+                          updateLine(line.id, { unit: value })
                         }
-                        className="h-9 min-w-[120px] rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                      >
-                        <option value="">Select Unit</option>
-                        {UNITS.map((unit) => (
-                          <option key={unit} value={unit}>
-                            {unit}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </td>
                     <td className="px-3 py-2.5">
                       <input
@@ -462,7 +649,17 @@ export default function AddWastage() {
         </div>
       ) : null}
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
         <button
@@ -472,7 +669,9 @@ export default function AddWastage() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+        <PrimaryButton onClick={() => void handleSave()} disabled={saving || !canWrite}>
+          {saving ? 'Saving…' : 'Save Changes'}
+        </PrimaryButton>
       </div>
 
       {noteLine ? (
@@ -528,6 +727,7 @@ export default function AddWastage() {
         message={alertMessage ?? undefined}
         onClose={() => setAlertMessage(null)}
       />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { FileText } from 'lucide-react'
+import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
@@ -62,6 +64,16 @@ export default function VirtualWallet() {
     [filteredRows],
   )
 
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filteredRows,
+    (row) => [row.mobileNo, row.remainingAmount, row.created],
+    (row, key) => {
+      if (key === 'remainingAmount') return row.remainingAmount
+      if (key === 'created') return row.created
+      return row.mobileNo
+    },
+  )
+
 
   function handleSearch() {
     setAppliedMobile(mobileNo)
@@ -116,16 +128,40 @@ export default function VirtualWallet() {
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-line bg-primary/5 text-sm font-semibold text-ink">
               <tr>
-                <th className="px-4 py-3 text-left">Mobile No.</th>
-                <th className="px-4 py-3 text-center">
+                <SortableTh
+                  columnKey="mobileNo"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-4 py-3"
+                >
+                  Mobile No.
+                </SortableTh>
+                <SortableTh
+                  columnKey="remainingAmount"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="center"
+                  className="px-4 py-3"
+                >
                   Remaining Amount ({brand.currency}) ({formatAmount(remainingTotal)})
-                </th>
-                <th className="px-4 py-3 text-center">Created</th>
+                </SortableTh>
+                <SortableTh
+                  columnKey="created"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="center"
+                  className="px-4 py-3"
+                >
+                  Created
+                </SortableTh>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRows.length === 0 ? (
+              {visible.length === 0 ? (
                 <tr>
                   <td
                     colSpan={4}
@@ -135,7 +171,7 @@ export default function VirtualWallet() {
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row) => (
+                visible.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-0 hover:bg-page/50"
@@ -170,9 +206,9 @@ export default function VirtualWallet() {
         </div>
         <div className="border-t border-line bg-page/60 px-4 py-3">
           <p className="text-sm text-muted">
-            {filteredRows.length === 0
+            {visible.length === 0
               ? 'Showing 0 records'
-              : `Showing 1 to ${filteredRows.length} of ${filteredRows.length} records`}
+              : `Showing 1 to ${visible.length} of ${visible.length} records`}
           </p>
         </div>
       </div>

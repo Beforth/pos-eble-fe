@@ -4,6 +4,8 @@ import { showToast } from '../../utils/toast'
 import { Search, ChevronDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
@@ -125,6 +127,17 @@ export default function InvoiceSequence() {
     })
   }, [sequences, appliedQuery, statusFilter])
 
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filtered,
+    (row) => [row.name, row.prefix, row.startNumber, row.active],
+    (row, key) => {
+      if (key === 'prefix') return row.prefix
+      if (key === 'startNumber') return row.startNumber
+      if (key === 'status') return row.active ? 1 : 0
+      return row.name
+    },
+  )
+
   function handleSearch() {
     setAppliedQuery(nameQuery.trim())
   }
@@ -178,7 +191,7 @@ export default function InvoiceSequence() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center">
             <span className="mb-4 flex size-20 items-center justify-center rounded-full bg-page">
               <Search
@@ -197,14 +210,46 @@ export default function InvoiceSequence() {
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
                 <tr>
-                  <th className="px-4 py-3">Sequence Name</th>
-                  <th className="px-4 py-3">Prefix</th>
-                  <th className="px-4 py-3">Start Number</th>
-                  <th className="px-4 py-3">Status</th>
+                  <SortableTh
+                    columnKey="name"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Sequence Name
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="prefix"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Prefix
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="startNumber"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Start Number
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="status"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Status
+                  </SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
+                {visible.map((row) => (
                   <tr key={row.id} className="border-b border-line last:border-0">
                     <td className="px-4 py-3 text-ink">{row.name}</td>
                     <td className="px-4 py-3 text-ink">{row.prefix}</td>

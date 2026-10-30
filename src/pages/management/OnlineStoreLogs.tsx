@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { Calendar, Info, RotateCcw, Search, Sparkles } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
@@ -63,6 +66,26 @@ export default function OnlineStoreLogs() {
   const [selectedOutlet, setSelectedOutlet] = useState('Select Outlet')
   const [isSearched, setIsSearched] = useState(true)
   const [logs, setLogs] = useState<LogEntry[]>([])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      logs,
+      (row) => [
+        row.dateTime,
+        row.outlet,
+        row.channel,
+        row.action,
+        row.performedBy,
+        row.status,
+      ],
+      (row, key) => {
+        if (key === 'outlet') return row.outlet
+        if (key === 'platform') return row.channel
+        if (key === 'action') return row.action
+        if (key === 'performedBy') return row.performedBy
+        if (key === 'status') return row.status
+        return row.dateTime
+      },
+    )
   const [piDrawerOpen, setPiDrawerOpen] = useState(false)
 
 
@@ -191,20 +214,28 @@ export default function OnlineStoreLogs() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
+              <div className="border-b border-line p-4">
+                <ListSearch
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search store logs"
+                />
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-ink">
                 <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="px-4 py-3">Date & Time</th>
-                    <th className="px-4 py-3">Outlet</th>
-                    <th className="px-4 py-3">Platform</th>
-                    <th className="px-4 py-3">Action Description</th>
-                    <th className="px-4 py-3">Performed By</th>
-                    <th className="px-4 py-3 text-right">Status</th>
+                    <SortableTh columnKey="dateTime" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Date & Time</SortableTh>
+                    <SortableTh columnKey="outlet" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Outlet</SortableTh>
+                    <SortableTh columnKey="platform" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Platform</SortableTh>
+                    <SortableTh columnKey="action" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Action Description</SortableTh>
+                    <SortableTh columnKey="performedBy" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Performed By</SortableTh>
+                    <SortableTh columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-3">Status</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {logs.map((log) => (
+                  {visible.map((log) => (
                     <tr
                       key={log.id}
                       className="transition-colors hover:bg-page/50"
@@ -231,6 +262,7 @@ export default function OnlineStoreLogs() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>

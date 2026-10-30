@@ -30,6 +30,7 @@ import {
   X,
 } from 'lucide-react'
 import { brand } from '../../theme/brand'
+import type { StockCountKind } from '../../services/inventoryService'
 import { BrandLogo } from '../brand/BrandLogo'
 import { useChrome } from '../../state/ChromeContext'
 
@@ -75,7 +76,7 @@ const INVENTORY_ROUTES: Record<string, string> = {
   suppliers: '/inventory/suppliers',
   units: '/inventory/units',
   categories: '/inventory/categories',
-  settings: '/inventory',
+  settings: '/inventory/settings',
 }
 
 const TOP_NAV: NavBranch[] = [
@@ -181,6 +182,12 @@ interface InventorySidebarProps {
   onToggleCollapse: () => void
   onCloseMobile: () => void
   activeItem: string
+  /**
+   * Per-leaf Manage Stock visibility. Available and Closing are separate
+   * rights on the backend, so a role holding only one must still see the page
+   * it is allowed to open.
+   */
+  canCountStock?: Record<StockCountKind, boolean>
 }
 
 export function InventorySidebar({
@@ -189,11 +196,22 @@ export function InventorySidebar({
   onToggleCollapse,
   onCloseMobile,
   activeItem,
+  canCountStock = { available: true, closing: true },
 }: InventorySidebarProps) {
   const navigate = useNavigate()
   const { expanded: expandedIds, toggleExpanded, mergeExpanded, navScroll, setNavScroll } =
     useChrome()
   const expandedList = expandedIds.inventory
+
+  function stockCountBranch(item: NavBranch): NavBranch | null {
+    const children = (item.children ?? []).filter((child) => {
+      if (child.id === 'available-stock') return canCountStock.available
+      if (child.id === 'closing-stock') return canCountStock.closing
+      return true
+    })
+    if (children.length === 0) return null
+    return { ...item, children }
+  }
 
   useEffect(() => {
     const purchaseChildIds = [
@@ -335,7 +353,7 @@ export function InventorySidebar({
                 {item.label}
                 {item.id === 'settings' ? (
                   <span className="mt-0.5 block text-[10px] font-normal text-muted">
-                    (RestId - 133856)
+                    Outlet preferences
                   </span>
                 ) : null}
               </span>
@@ -420,7 +438,8 @@ export function InventorySidebar({
           <button
             type="button"
             onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'}
+            data-tooltip={collapsed ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'}
             className="m-1.5 cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
           >
             {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
@@ -433,11 +452,16 @@ export function InventorySidebar({
           className="flex-1 overflow-y-auto overflow-x-hidden py-2"
         >
           <ul className="space-y-0.5">
-            {TOP_NAV.map((item) =>
-              item.id === 'back-billing' || item.id === 'dashboard'
-                ? renderLeaf(item)
-                : renderBranch(item),
-            )}
+            {TOP_NAV.map((item) => {
+              if (item.id === 'back-billing' || item.id === 'dashboard') {
+                return renderLeaf(item)
+              }
+              if (item.id === 'manage-stock') {
+                const branch = stockCountBranch(item)
+                return branch ? renderBranch(branch) : null
+              }
+              return renderBranch(item)
+            })}
           </ul>
 
           <div className="my-2 border-t border-line" />

@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { Calendar, RotateCcw, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
@@ -48,6 +51,26 @@ export default function WithdrawalLogsPage() {
   const [updateType, setUpdateType] = useState('All')
   const [isSearched, setIsSearched] = useState(true)
   const [logs, setLogs] = useState<WithdrawalLogEntry[]>([])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      logs,
+      (row) => [
+        row.dateTime,
+        row.amount,
+        row.paymentMethod,
+        row.updateType,
+        row.remarks,
+        row.performedBy,
+      ],
+      (row, key) => {
+        if (key === 'amount') return row.amount
+        if (key === 'paymentMethod') return row.paymentMethod
+        if (key === 'updateType') return row.updateType
+        if (key === 'remarks') return row.remarks
+        if (key === 'performedBy') return row.performedBy
+        return row.dateTime
+      },
+    )
 
 
   function handleSearch() {
@@ -150,20 +173,77 @@ export default function WithdrawalLogsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
+              <div className="border-b border-line p-4">
+                <ListSearch
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search withdrawal logs"
+                />
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-ink">
                 <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="px-4 py-3">Date & Time</th>
-                    <th className="px-4 py-3">Withdrawal Amount (₹)</th>
-                    <th className="px-4 py-3">Payment Method</th>
-                    <th className="px-4 py-3">Update Type</th>
-                    <th className="px-4 py-3">Remarks</th>
-                    <th className="px-4 py-3 text-right">Performed By</th>
+                    <SortableTh
+                      columnKey="dateTime"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Date & Time
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="amount"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Withdrawal Amount (₹)
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="paymentMethod"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Payment Method
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="updateType"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Update Type
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="remarks"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Remarks
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="performedBy"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-4 py-3"
+                    >
+                      Performed By
+                    </SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {logs.map((l) => (
+                  {visible.map((l) => (
                     <tr
                       key={l.id}
                       className="transition-colors hover:bg-page/50"
@@ -188,6 +268,7 @@ export default function WithdrawalLogsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>

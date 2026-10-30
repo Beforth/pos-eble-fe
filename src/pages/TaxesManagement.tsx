@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, ClipboardList, Pencil, Plus } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
@@ -11,6 +11,7 @@ import {
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { SelectRecordAlert } from '../components/menu/SelectRecordAlert'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
+import { PaginationControls } from '../components/common/PaginationControls'
 import type { Tax } from '../types/menu'
 import { useAuth } from '../auth/AuthContext'
 import { useMenuReference } from '../state/MenuReferenceContext'
@@ -26,6 +27,8 @@ export default function TaxesManagement() {
   const [taxType] = useState<'item' | 'order'>(savedTaxType)
   const [changesName, setChangesName] = useState<string | null>(null)
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   const { taxes: refTaxes, reload } = useMenuReference(['taxes'])
 
@@ -37,8 +40,16 @@ export default function TaxesManagement() {
     setTaxes(refTaxes)
   }, [refTaxes])
 
+  const totalRecords = taxes.length
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pageRows = useMemo(
+    () => taxes.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [taxes, currentPage, pageSize],
+  )
+
   const allSelected =
-    taxes.length > 0 && taxes.every((row) => selected.has(row.id))
+    pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
 
   function setSelectedStatus(status: 'Active' | 'Inactive') {
     if (selected.size === 0) {
@@ -113,7 +124,7 @@ export default function TaxesManagement() {
                     setSelected(
                       allSelected
                         ? new Set()
-                        : new Set(taxes.map((r) => r.id)),
+                        : new Set(pageRows.map((r) => r.id)),
                     )
                   }
                   className="cursor-pointer accent-primary"
@@ -129,62 +140,77 @@ export default function TaxesManagement() {
             </tr>
           </thead>
           <tbody>
-            {taxes.map((row) => (
-              <tr
-                key={row.id}
-                className="border-b border-line last:border-b-0 hover:bg-page/80"
-              >
-                <td className="px-3 py-3.5">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(row.id)}
-                    onChange={() =>
-                      setSelected((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(row.id)) next.delete(row.id)
-                        else next.add(row.id)
-                        return next
-                      })
-                    }
-                    className="cursor-pointer accent-primary"
-                  />
-                </td>
-                <td className="px-3 py-3.5 font-medium text-ink">{row.title}</td>
-                <td className="px-3 py-3.5 text-ink">
-                  {row.online_display_name}
-                </td>
-                <td className="px-3 py-3.5 text-ink">{row.tax_type}</td>
-                <td className="px-3 py-3.5 text-ink">{row.type}</td>
-                <td className="px-3 py-3.5 tabular-nums text-ink">
-                  {row.amount}
-                </td>
-                <td
-                  className={`px-3 py-3.5 font-medium ${
-                    row.is_active ? 'text-success' : 'text-muted'
-                  }`}
-                >
-                  {row.is_active ? 'Active' : 'Inactive'}
-                </td>
-                <td className="px-3 py-3.5">
-                  <div className="flex items-center gap-1">
-                    <RowActionButton
-                      label="Edit"
-                      onClick={() => navigate(`/menu/taxes/${row.id}/edit`)}
-                    >
-                      <Pencil size={16} />
-                    </RowActionButton>
-                    <RowActionButton
-                      label="Show Changes"
-                      onClick={() => setChangesName(row.title)}
-                    >
-                      <ClipboardList size={16} />
-                    </RowActionButton>
-                  </div>
+            {pageRows.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-3 py-12 text-center text-sm text-muted">
+                  No taxes found
                 </td>
               </tr>
-            ))}
+            ) : (
+              pageRows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="border-b border-line last:border-b-0 hover:bg-page/80"
+                >
+                  <td className="px-3 py-3.5">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(row.id)}
+                      onChange={() =>
+                        setSelected((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(row.id)) next.delete(row.id)
+                          else next.add(row.id)
+                          return next
+                        })
+                      }
+                      className="cursor-pointer accent-primary"
+                    />
+                  </td>
+                  <td className="px-3 py-3.5 font-medium text-ink">{row.title}</td>
+                  <td className="px-3 py-3.5 text-ink">
+                    {row.online_display_name}
+                  </td>
+                  <td className="px-3 py-3.5 text-ink">{row.tax_type}</td>
+                  <td className="px-3 py-3.5 text-ink">{row.type}</td>
+                  <td className="px-3 py-3.5 tabular-nums text-ink">
+                    {row.amount}
+                  </td>
+                  <td
+                    className={`px-3 py-3.5 font-medium ${
+                      row.is_active ? 'text-success' : 'text-muted'
+                    }`}
+                  >
+                    {row.is_active ? 'Active' : 'Inactive'}
+                  </td>
+                  <td className="px-3 py-3.5">
+                    <div className="flex items-center gap-1">
+                      <RowActionButton
+                        label="Edit"
+                        onClick={() => navigate(`/menu/taxes/${row.id}/edit`)}
+                      >
+                        <Pencil size={16} />
+                      </RowActionButton>
+                      <RowActionButton
+                        label="Show Changes"
+                        onClick={() => setChangesName(row.title)}
+                      >
+                        <ClipboardList size={16} />
+                      </RowActionButton>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
+        <PaginationControls
+          totalRecords={totalRecords}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
       <p className="mt-3 text-sm text-muted">
         Note : <span className="font-medium text-primary">Drag row</span> to

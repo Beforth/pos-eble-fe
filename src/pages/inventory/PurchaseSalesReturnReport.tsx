@@ -1,35 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  categoryIdByName,
+  listPurchaseSalesReturnReportApi,
+  type PurchaseSalesReturnReportRow,
+} from '../../services/inventoryService'
 
-const RETURN_TYPE_OPTIONS = ['Purchase Return', 'Sales Return']
+const RETURN_TYPE_OPTIONS = ['All', 'Purchase Return', 'Sales Return']
 
-const CATEGORY_OPTIONS = [
-  'All',
-  'Rice/pulses/flours',
-  'Bread/dairy',
-  'Oils/masala/salt/sugar',
-  'Ready To Cook/ready To Eat',
-  'Sauces/dressings/marinades',
-  'Snacks',
-  'Packaging/storage',
-  'Fruits/vegetables',
-  'No Category',
-]
-
-function ExportMenu({
-  onExportReport,
-  onExportSummary,
-  onExportOld,
-}: {
-  onExportReport?: () => void
-  onExportSummary?: () => void
-  onExportOld?: () => void
-}) {
+function ExportMenu({ onExportReport }: { onExportReport?: () => void }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -44,21 +33,6 @@ function ExportMenu({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
 
-  const items = [
-    {
-      label: 'Export Purchase-Sales Return Report',
-      onClick: onExportReport,
-    },
-    {
-      label: 'Export Purchase-Sales Return Summary Report',
-      onClick: onExportSummary,
-    },
-    {
-      label: 'Export Purchase-Sales Return Report (Old)',
-      onClick: onExportOld,
-    },
-  ]
-
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -72,20 +46,18 @@ function ExportMenu({
       </button>
       {open ? (
         <ul className="absolute right-0 z-40 mt-1.5 min-w-[300px] overflow-hidden rounded-md border border-line bg-card py-1 shadow-lg">
-          {items.map((item) => (
-            <li key={item.label}>
-              <button
-                type="button"
-                onClick={() => {
-                  item.onClick?.()
-                  setOpen(false)
-                }}
-                className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
-              >
-                {item.label}
-              </button>
-            </li>
-          ))}
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                onExportReport?.()
+                setOpen(false)
+              }}
+              className="w-full px-3 py-2 text-left text-sm text-ink hover:bg-page"
+            >
+              Export Purchase-Sales Return Report
+            </button>
+          </li>
         </ul>
       ) : null}
     </div>
@@ -93,38 +65,109 @@ function ExportMenu({
 }
 
 export default function PurchaseSalesReturnReport() {
-  const [returnType, setReturnType] = useState('Purchase Return')
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
+  const { categories, loadMasters } = useInventoryMasters()
+  const [returnType, setReturnType] = useState('All')
   const [rawMaterial, setRawMaterial] = useState('')
   const [category, setCategory] = useState('All')
-  const [fromDate, setFromDate] = useState('2026-08-04')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [applied, setApplied] = useState({
+    search: '',
+    category: 'All',
+    fromDate: '',
+    toDate: '',
+  })
+  const [rows, setRows] = useState<PurchaseSalesReturnReportRow[]>([])
+  const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
 
-  function handleClear() {
-    setReturnType('Purchase Return')
-    setRawMaterial('')
-    setCategory('All')
-    setFromDate('2026-08-04')
-    setToDate('2026-08-11')
-  }
+  const categoryOptions = useMemo(
+    () => ['All', ...categories.map((row) => row.name), 'No Category'],
+    [categories],
+  )
+
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    setLoading(true)
+    try {
+      const categoryId =
+        applied.category === 'All'
+          ? undefined
+          : applied.category === 'No Category'
+            ? 'no-category'
+            : categoryIdByName(categories, applied.category)
+      const data = await listPurchaseSalesReturnReportApi(encryptedOutletId, {
+        search: applied.search || undefined,
+        categoryId,
+        dateFrom: applied.fromDate || undefined,
+        dateTo: applied.toDate || undefined,
+      })
+      setRows(data)
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load purchase/sales return report',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, canRead, applied, categories])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const filtered = useMemo(() => {
+    if (returnType === 'Purchase Return') {
+      return rows.filter((row) => row.return_type === 'purchase_return')
+    }
+    if (returnType === 'Sales Return') {
+      return rows.filter((row) => row.return_type === 'sales_return')
+    }
+    return rows
+  }, [rows, returnType])
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">
           Purchase-Sales Return Report
         </h1>
         <ExportMenu
-          onExportReport={() =>
-            showToast('Exported Purchase-Sales Return Report')
-          }
-          onExportSummary={() =>
-            showToast('Exported Purchase-Sales Return Summary Report')
-          }
-          onExportOld={() =>
-            showToast('Exported Purchase-Sales Return Report (Old)')
-          }
+          onExportReport={() => {
+            downloadCsv(
+              [
+                'type',
+                'date',
+                'document',
+                'party',
+                'raw_material',
+                'qty',
+                'unit',
+                'amount',
+              ],
+              filtered.map((row) => [
+                row.return_type === 'purchase_return'
+                  ? 'Purchase Return'
+                  : 'Sales Return',
+                row.date,
+                row.document_number || '',
+                row.party_name || '',
+                row.raw_material_name,
+                row.qty,
+                row.unit_name,
+                row.amount,
+              ]),
+              'purchase-sales-return-report.csv',
+            )
+            showToast('Exported report')
+          }}
         />
       </div>
 
@@ -134,13 +177,13 @@ export default function PurchaseSalesReturnReport() {
             label="Return Type"
             value={returnType}
             options={RETURN_TYPE_OPTIONS}
-            placeholder="Purchase Return"
+            placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={setReturnType}
           />
         </div>
-        <div className="min-w-[150px] flex-1">
+        <div className="min-w-[160px] flex-1">
           <label className="mb-1.5 block text-sm font-medium text-ink">
             Raw Material
           </label>
@@ -151,11 +194,11 @@ export default function PurchaseSalesReturnReport() {
             className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <div className="min-w-[150px]">
+        <div className="min-w-[160px]">
           <SearchableSelect
             label="Category"
             value={category}
-            options={CATEGORY_OPTIONS}
+            options={categoryOptions}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -164,46 +207,120 @@ export default function PurchaseSalesReturnReport() {
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">
-            From Date
+            From
           </label>
           <input
             type="date"
             value={fromDate}
             onChange={(event) => setFromDate(event.target.value)}
-            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            className="h-10 rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink">
-            To Date
-          </label>
+          <label className="mb-1.5 block text-sm font-medium text-ink">To</label>
           <input
             type="date"
             value={toDate}
             onChange={(event) => setToDate(event.target.value)}
-            className="h-10 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            className="h-10 rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
+        <OutlineButton
+          onClick={() =>
+            setApplied({
+              search: rawMaterial.trim(),
+              category,
+              fromDate,
+              toDate,
+            })
+          }
+        >
           Search
         </OutlineButton>
-        <OutlineButton variant="gray" onClick={handleClear}>
+        <OutlineButton
+          variant="gray"
+          onClick={() => {
+            setReturnType('All')
+            setRawMaterial('')
+            setCategory('All')
+            setFromDate('')
+            setToDate('')
+            setApplied({
+              search: '',
+              category: 'All',
+              fromDate: '',
+              toDate: '',
+            })
+          }}
+        >
           Clear
         </OutlineButton>
       </div>
 
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-        <span className="relative mb-4 text-muted">
-          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
-          <Search
-            size={24}
-            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-          />
-        </span>
-        <p className="text-base font-semibold text-ink">
-          Purchase-Sales Return Report Record Not Found
-        </p>
-      </div>
+      {!canRead ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          You do not have permission to view inventory reports.
+        </div>
+      ) : loading ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          Loading…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+          <span className="relative mb-4 text-muted">
+            <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
+            <Search
+              size={24}
+              className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+            />
+          </span>
+          <p className="text-base font-semibold text-ink">No records found</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-line bg-card">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
+              <tr>
+                <th className="px-3 py-2.5">Type</th>
+                <th className="px-3 py-2.5">Date</th>
+                <th className="px-3 py-2.5">Document</th>
+                <th className="px-3 py-2.5">Party</th>
+                <th className="px-3 py-2.5">Raw Material</th>
+                <th className="px-3 py-2.5">Qty</th>
+                <th className="px-3 py-2.5">Unit</th>
+                <th className="px-3 py-2.5">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row, index) => (
+                <tr
+                  key={`${row.return_type}-${row.raw_material_id}-${index}`}
+                  className="border-b border-line last:border-b-0"
+                >
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.return_type === 'purchase_return'
+                      ? 'Purchase Return'
+                      : 'Sales Return'}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">{row.date}</td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.document_number || '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.party_name || '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.raw_material_name}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">{row.qty}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.unit_name}</td>
+                  <td className="px-3 py-2.5 text-ink">{row.amount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </InventoryPageShell>
   )
 }

@@ -46,6 +46,7 @@ export type UserPayload = {
   discount_capping?: string
   discount_value?: string | number | null
   group?: string | ''
+  groups?: string[]
   permissions?: string[]
 }
 

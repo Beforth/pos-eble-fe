@@ -311,6 +311,10 @@ export default function AddTable() {
             <select
               value={areaId}
               onChange={(event) => {
+                if (event.target.value === '__add_new__') {
+                  navigate('/menu/tables/areas/new')
+                  return
+                }
                 setAreaId(event.target.value)
                 if (fieldErrors.area) setFieldErrors((prev) => ({ ...prev, area: '' }))
               }}
@@ -324,6 +328,9 @@ export default function AddTable() {
                   {area.name}
                 </option>
               ))}
+              <option value="__add_new__" className="font-semibold text-primary">
+                + Add New Area
+              </option>
             </select>
             {fieldErrors.area ? (
               <p className="mt-1 text-xs text-primary">{fieldErrors.area}</p>

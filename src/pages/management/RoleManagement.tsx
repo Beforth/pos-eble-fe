@@ -5,6 +5,7 @@ import { Pencil, Plus, RefreshCcw, Search, Trash2, UserRound } from 'lucide-reac
 import { useNavigate } from 'react-router-dom'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { PaginationControls } from '../../components/common/PaginationControls'
 import {
   OutlineButton,
   PrimaryButton,
@@ -19,6 +20,8 @@ export default function RoleManagement() {
   const loading = status === 'loading'
   const [deleteTarget, setDeleteTarget] = useState<Role | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
 
   useEffect(() => {
@@ -107,48 +110,57 @@ export default function RoleManagement() {
                 </tr>
               </thead>
               <tbody>
-                {roles.map((role) => (
-                  <tr
-                    key={role.id}
-                    className="border-b border-line last:border-0 hover:bg-page/50"
-                  >
-                    <td className="px-4 py-3 font-medium text-ink">
-                      {role.name}
-                    </td>
-                    <td className="px-4 py-3 text-muted">{role.code}</td>
-                    <td className="px-4 py-3 text-muted">
-                      {role.description || '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-0.5">
-                        <button
-                          type="button"
-                          aria-label={`Edit ${role.name}`}
-                          data-tooltip={`Edit ${role.name}`}
-                          onClick={() =>
-                            navigate(
-                              `/management/user-management/roles/${role.id}`,
-                            )
-                          }
-                          className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Delete ${role.name}`}
-                          data-tooltip={`Delete ${role.name}`}
-                          onClick={() => setDeleteTarget(role)}
-                          className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-danger/10 hover:text-danger"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {roles
+                  .slice((page - 1) * pageSize, page * pageSize)
+                  .map((role) => (
+                    <tr
+                      key={role.id}
+                      className="border-b border-line last:border-0 hover:bg-page/50"
+                    >
+                      <td className="px-4 py-3 font-medium text-ink">
+                        {role.name}
+                      </td>
+                      <td className="px-4 py-3 text-muted">{role.code}</td>
+                      <td className="px-4 py-3 text-muted">
+                        {role.description || '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <button
+                            type="button"
+                            aria-label={`Edit ${role.name}`}
+                            data-tooltip={`Edit ${role.name}`}
+                            onClick={() =>
+                              navigate(
+                                `/management/user-management/roles/${role.id}`,
+                              )
+                            }
+                            className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Delete ${role.name}`}
+                            data-tooltip={`Delete ${role.name}`}
+                            onClick={() => setDeleteTarget(role)}
+                            className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-danger/10 hover:text-danger"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
+            <PaginationControls
+              totalRecords={roles.length}
+              currentPage={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )}
       </div>

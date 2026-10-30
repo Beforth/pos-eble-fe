@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { useNavigate } from '../../utils/inventoryRouter'
 import {
   ChevronDown,
@@ -17,24 +18,27 @@ import {
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
-  buildRecipeIngredients,
   RecipeViewModal,
 } from '../../components/inventory/RecipeViewModal'
 import { RecipeModificationLogModal } from '../../components/inventory/RecipeModificationLogModal'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
+import { SortableTh } from '../../components/common/SortableTh'
+import { PaginationControls } from '../../components/common/PaginationControls'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   ActionDropdown,
   OutlineButton,
   PrimaryButton,
   RowActionButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { ApiError } from '../../services/apiClient'
 import {
-  ITEM_RECIPES,
-  RECIPE_CATEGORIES,
-  RECIPE_CREATED_OPTIONS,
-  RECIPE_ITEM_OPTIONS,
-  type RecipeRow,
-} from '../../mocks/itemRecipesData'
+  INV_WRITE_PERMISSION,
+  deleteRecipeApi,
+  listAllRecipesApi,
+  type ItemRecipe,
+} from '../../services/inventoryService'
 
 function ClipboardEyeIcon({ size = 15 }: { size?: number }) {
   return (
@@ -227,17 +231,16 @@ function CategoryTabBar({
 
 export default function ItemRecipes() {
   const navigate = useNavigate()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WRITE_PERMISSION)
   const [itemFilter, setItemFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
-  const [createdFilter, setCreatedFilter] = useState('All')
   const [appliedItem, setAppliedItem] = useState('All')
   const [appliedCategory, setAppliedCategory] = useState('All')
-  const [appliedCreated, setAppliedCreated] = useState('All')
   const [cardCategory, setCardCategory] = useState('all')
-  const [autoConsumption, setAutoConsumption] = useState(false)
-  const [rows, setRows] = useState<RecipeRow[]>(() => [...ITEM_RECIPES])
+  const [rows, setRows] = useState<ItemRecipe[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
-  const [viewRecipeName, setViewRecipeName] = useState<string | null>(null)
+  const [viewRecipe, setViewRecipe] = useState<ItemRecipe | null>(null)
   const [logRecipeName, setLogRecipeName] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{
     type: 'single' | 'multiple'
@@ -245,30 +248,79 @@ export default function ItemRecipes() {
     name?: string
   } | null>(null)
 
+  useEffect(() => {
+    if (!encryptedOutletId) {
+      setRows([])
+      return
+    }
+    listAllRecipesApi(encryptedOutletId)
+      .then(setRows)
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load recipes',
+        )
+      })
+  }, [encryptedOutletId])
+
+  const categoryNames = useMemo(() => {
+    const names = new Set(
+      rows.map((row) => row.item_category_name).filter(Boolean),
+    )
+    return [...names]
+  }, [rows])
+
+  const itemNames = useMemo(
+    () => ['All', ...rows.map((row) => row.item_name)],
+    [rows],
+  )
+
   const categoryTabs = useMemo(
     () => [
       { id: 'all', label: 'All categories' },
-      ...RECIPE_CATEGORIES.map((category) => ({
+      ...categoryNames.map((category) => ({
         id: category,
         label: category,
       })),
     ],
-    [],
+    [categoryNames],
   )
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
-      if (cardCategory !== 'all' && row.category !== cardCategory) return false
-      if (appliedCategory !== 'All' && row.category !== appliedCategory) {
+      if (cardCategory !== 'all' && row.item_category_name !== cardCategory) {
         return false
       }
-      if (appliedItem !== 'All' && row.name !== appliedItem) return false
-      if (appliedCreated === 'Not Created') return false
+      if (
+        appliedCategory !== 'All' &&
+        row.item_category_name !== appliedCategory
+      ) {
+        return false
+      }
+      if (appliedItem !== 'All' && row.item_name !== appliedItem) return false
       return true
     })
-  }, [rows, cardCategory, appliedCategory, appliedItem, appliedCreated])
+  }, [rows, cardCategory, appliedCategory, appliedItem])
 
-  const pageIds = filteredRows.map((row) => row.id)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [rows, cardCategory, appliedCategory, appliedItem])
+
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filteredRows,
+    (row) => [row.item_name, row.item_category_name],
+    (row, key) =>
+      key === 'category' ? row.item_category_name : row.item_name,
+  )
+
+  const pageRows = useMemo(
+    () => visible.slice((page - 1) * pageSize, page * pageSize),
+    [visible, page, pageSize],
+  )
+
+  const pageIds = pageRows.map((row) => row.id)
   const allSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id))
 
@@ -276,7 +328,6 @@ export default function ItemRecipes() {
   function applySearch() {
     setAppliedItem(itemFilter)
     setAppliedCategory(categoryFilter)
-    setAppliedCreated(createdFilter)
     if (categoryFilter !== 'All') setCardCategory(categoryFilter)
     showToast('Search applied')
   }
@@ -284,10 +335,8 @@ export default function ItemRecipes() {
   function clearFilters() {
     setItemFilter('All')
     setCategoryFilter('All')
-    setCreatedFilter('All')
     setAppliedItem('All')
     setAppliedCategory('All')
-    setAppliedCreated('All')
     setCardCategory('all')
   }
 
@@ -309,23 +358,31 @@ export default function ItemRecipes() {
     })
   }
 
-  function confirmDelete() {
-    if (!pendingDelete) return
-    if (pendingDelete.type === 'single' && pendingDelete.id) {
-      const id = pendingDelete.id
-      setRows((prev) => prev.filter((row) => row.id !== id))
-      setSelectedIds((prev) => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
-      showToast('Recipe deleted')
-      return
-    }
-    if (pendingDelete.type === 'multiple') {
-      setRows((prev) => prev.filter((row) => !selectedIds.has(row.id)))
-      setSelectedIds(new Set())
-      showToast('Selected recipes deleted')
+  async function confirmDelete() {
+    if (!pendingDelete || !encryptedOutletId) return
+    try {
+      if (pendingDelete.type === 'single' && pendingDelete.id) {
+        await deleteRecipeApi(encryptedOutletId, pendingDelete.id)
+        const deletedId = pendingDelete.id
+        setRows((prev) => prev.filter((row) => row.id !== deletedId))
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          next.delete(deletedId)
+          return next
+        })
+        showToast('Recipe deleted')
+        return
+      }
+      if (pendingDelete.type === 'multiple') {
+        for (const id of selectedIds) {
+          await deleteRecipeApi(encryptedOutletId, id)
+        }
+        setRows((prev) => prev.filter((row) => !selectedIds.has(row.id)))
+        setSelectedIds(new Set())
+        showToast('Selected recipes deleted')
+      }
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Unable to delete recipe')
     }
   }
 
@@ -335,12 +392,14 @@ export default function ItemRecipes() {
       <div className="relative z-40 mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Recipe Management</h1>
         <div className="flex flex-wrap gap-2">
-          <PrimaryButton
-            onClick={() => navigate('/inventory/item-recipes/new')}
-          >
-            <Plus size={15} />
-            Create New
-          </PrimaryButton>
+          {canWrite ? (
+            <PrimaryButton
+              onClick={() => navigate('/inventory/item-recipes/new')}
+            >
+              <Plus size={15} />
+              Add Recipe
+            </PrimaryButton>
+          ) : null}
           <ActionDropdown
             label="More Actions"
             options={[
@@ -360,20 +419,69 @@ export default function ItemRecipes() {
                 label: 'Replicate Recipe',
                 onClick: () => showToast('Replicate Recipe'),
               },
-              {
-                label: 'Delete Multiple Recipe',
-                danger: true,
-                onClick: () => {
-                  if (selectedIds.size === 0) {
-                    showToast('Select at least one recipe')
-                    return
-                  }
-                  setPendingDelete({ type: 'multiple' })
-                },
-              },
+              ...(canWrite
+                ? [
+                    {
+                      label: 'Delete Multiple Recipe',
+                      danger: true,
+                      onClick: () => {
+                        if (selectedIds.size === 0) {
+                          showToast('Select at least one recipe')
+                          return
+                        }
+                        setPendingDelete({ type: 'multiple' })
+                      },
+                    },
+                  ]
+                : []),
             ]}
           />
-          <FilesMenu onAction={showToast} />
+          <FilesMenu
+            onAction={(label) => {
+              const recipeHeaders = [
+                'name',
+                'category',
+                'ingredients',
+              ] as const
+              const toCsvRows = (list: ItemRecipe[]) =>
+                list.map((row) => [
+                  row.item_name,
+                  row.item_category_name || '',
+                  row.lines.length,
+                ])
+              if (
+                label === 'Active Menu Recipe' ||
+                label === 'For Branch Copy' ||
+                label === 'Export All'
+              ) {
+                const source =
+                  label === 'Export All' ? filteredRows : visible
+                const filename =
+                  label === 'Active Menu Recipe'
+                    ? 'active-menu-recipes.csv'
+                    : label === 'For Branch Copy'
+                      ? 'branch-copy-recipes.csv'
+                      : 'recipes-all.csv'
+                downloadCsv(
+                  [...recipeHeaders],
+                  toCsvRows(source),
+                  filename,
+                )
+                showToast(`Exported ${label}`)
+                return
+              }
+              if (label === 'Download' || label.startsWith('Download')) {
+                downloadCsv(
+                  [...recipeHeaders],
+                  [],
+                  'recipe-import-template.csv',
+                )
+                showToast('Template downloaded')
+                return
+              }
+              showToast(label)
+            }}
+          />
         </div>
       </div>
 
@@ -382,7 +490,7 @@ export default function ItemRecipes() {
           <SearchableSelect
             label="Select Item"
             value={itemFilter}
-            options={RECIPE_ITEM_OPTIONS}
+            options={itemNames}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -394,7 +502,7 @@ export default function ItemRecipes() {
           <SearchableSelect
             label="Select Category"
             value={categoryFilter}
-            options={['All', ...RECIPE_CATEGORIES]}
+            options={['All', ...categoryNames]}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -402,47 +510,10 @@ export default function ItemRecipes() {
             onChange={setCategoryFilter}
           />
         </div>
-        <div className="min-w-[180px] flex-1">
-          <SearchableSelect
-            label="Created Recipes"
-            value={createdFilter}
-            options={[...RECIPE_CREATED_OPTIONS]}
-            placeholder="All"
-            searchPlaceholder="Search"
-            includePlaceholderOption={false}
-            compact
-            onChange={setCreatedFilter}
-          />
-        </div>
         <OutlineButton onClick={applySearch}>Search</OutlineButton>
         <OutlineButton variant="gray" onClick={clearFilters}>
           Clear
         </OutlineButton>
-        <div className="ml-auto flex items-center gap-2 pb-1">
-          <span className="text-sm font-medium text-ink">Auto Consumption</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={autoConsumption}
-            onClick={() => {
-              setAutoConsumption((prev) => !prev)
-              showToast(
-                autoConsumption
-                  ? 'Auto Consumption disabled'
-                  : 'Auto Consumption enabled',
-              )
-            }}
-            className={`relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full transition-colors ${
-              autoConsumption ? 'bg-primary' : 'bg-line'
-            }`}
-          >
-            <span
-              className={`inline-block size-3.5 rounded-full bg-card transition-transform ${
-                autoConsumption ? 'translate-x-4' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
       </div>
 
       <CategoryTabBar
@@ -469,13 +540,29 @@ export default function ItemRecipes() {
                     className="size-4 accent-primary"
                   />
                 </th>
-                <th className="px-3 py-2.5">Name</th>
-                <th className="px-3 py-2.5">Category</th>
+                <SortableTh
+                  columnKey="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Name
+                </SortableTh>
+                <SortableTh
+                  columnKey="category"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Category
+                </SortableTh>
                 <th className="px-3 py-2.5 text-center">Action</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRows.length === 0 ? (
+              {visible.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-3 py-16 text-center">
                     <span className="relative mx-auto mb-4 inline-flex text-muted">
@@ -491,7 +578,7 @@ export default function ItemRecipes() {
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row, index) => (
+                pageRows.map((row, index) => (
                   <tr
                     key={row.id}
                     className={`border-b border-line last:border-b-0 ${
@@ -503,49 +590,53 @@ export default function ItemRecipes() {
                         type="checkbox"
                         checked={selectedIds.has(row.id)}
                         onChange={() => toggleSelect(row.id)}
-                        aria-label={`Select ${row.name}`}
+                        aria-label={`Select ${row.item_name}`}
                         className="size-4 accent-primary"
                       />
                     </td>
-                    <td className="px-3 py-2.5 text-ink">{row.name}</td>
-                    <td className="px-3 py-2.5 text-ink">{row.category}</td>
+                    <td className="px-3 py-2.5 text-ink">{row.item_name}</td>
+                    <td className="px-3 py-2.5 text-ink">
+                      {row.item_category_name || '—'}
+                    </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-center gap-1.5">
                         <RowActionButton
                           boxed
                           label="View Recipe"
-                          onClick={() => setViewRecipeName(row.name)}
+                          onClick={() => setViewRecipe(row)}
                         >
                           <ClipboardList size={15} strokeWidth={1.75} />
                         </RowActionButton>
-                        <RowActionButton
-                          boxed
-                          label="Edit"
-                          onClick={() =>
-                            navigate(`/inventory/item-recipes/${row.id}/edit`, {
-                              state: { row },
-                            })
-                          }
-                        >
-                          <Pencil size={15} strokeWidth={1.75} />
-                        </RowActionButton>
-                        <RowActionButton
-                          boxed
-                          label="Delete"
-                          onClick={() =>
-                            setPendingDelete({
-                              type: 'single',
-                              id: row.id,
-                              name: row.name,
-                            })
-                          }
-                        >
-                          <Trash2 size={15} strokeWidth={1.75} />
-                        </RowActionButton>
+                        {canWrite ? (
+                          <RowActionButton
+                            boxed
+                            label="Edit"
+                            onClick={() =>
+                              navigate(`/inventory/item-recipes/${row.id}/edit`)
+                            }
+                          >
+                            <Pencil size={15} strokeWidth={1.75} />
+                          </RowActionButton>
+                        ) : null}
+                        {canWrite ? (
+                          <RowActionButton
+                            boxed
+                            label="Delete"
+                            onClick={() =>
+                              setPendingDelete({
+                                type: 'single',
+                                id: row.id,
+                                name: row.item_name,
+                              })
+                            }
+                          >
+                            <Trash2 size={15} strokeWidth={1.75} />
+                          </RowActionButton>
+                        ) : null}
                         <RowActionButton
                           boxed
                           label="View Log"
-                          onClick={() => setLogRecipeName(row.name)}
+                          onClick={() => setLogRecipeName(row.item_name)}
                         >
                           <ClipboardEyeIcon />
                         </RowActionButton>
@@ -557,22 +648,29 @@ export default function ItemRecipes() {
             </tbody>
           </table>
         </div>
-        <div className="border-t border-line px-4 py-3">
-          <p className="text-sm text-muted">
-            {filteredRows.length === 0
-              ? 'Showing 0 records'
-              : `Showing 1 to ${filteredRows.length} of ${filteredRows.length} records`}
-          </p>
-        </div>
+        <PaginationControls
+          totalRecords={visible.length}
+          currentPage={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       <RecipeViewModal
-        open={Boolean(viewRecipeName)}
-        recipeName={viewRecipeName}
+        open={Boolean(viewRecipe)}
+        recipeName={viewRecipe?.item_name ?? null}
         ingredients={
-          viewRecipeName ? buildRecipeIngredients(viewRecipeName) : []
+          viewRecipe
+            ? viewRecipe.lines.map((line) => ({
+                name: line.raw_material_name,
+                quantity: line.qty,
+                unit: line.unit_name,
+                area: line.area,
+              }))
+            : []
         }
-        onClose={() => setViewRecipeName(null)}
+        onClose={() => setViewRecipe(null)}
       />
       <RecipeModificationLogModal
         open={Boolean(logRecipeName)}
@@ -597,7 +695,7 @@ export default function ItemRecipes() {
           'The item no longer produces this recipe for a kitchen order.',
         ]}
         confirmLabel="Delete"
-        onConfirm={confirmDelete}
+        onConfirm={() => void confirmDelete()}
         onClose={() => setPendingDelete(null)}
       />
     </InventoryPageShell>

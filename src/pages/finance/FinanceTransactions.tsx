@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { Download, FileText, Search } from 'lucide-react'
 import { FinancePageShell } from '../../components/layout/FinancePageShell'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
@@ -122,9 +124,41 @@ export default function FinanceTransactions() {
   const rowsForTable =
     tab === 'card-upi' || tab === 'wallet' ? [] : filtered
 
-  const totalPages = Math.max(1, Math.ceil(rowsForTable.length / PAGE_SIZE) || 1)
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    rowsForTable,
+    (row) => [
+      row.billNo,
+      row.orderType,
+      row.subOrderType,
+      row.paymentType,
+      row.tax,
+      row.discount,
+      row.total,
+      row.tip,
+      row.status,
+      row.createdOn,
+      row.orderDate,
+      row.serviceProvider,
+    ],
+    (row, key) => {
+      if (key === 'orderType') return row.orderType
+      if (key === 'subOrderType') return row.subOrderType
+      if (key === 'paymentType') return row.paymentType
+      if (key === 'tax') return row.tax
+      if (key === 'discount') return row.discount
+      if (key === 'total') return row.total
+      if (key === 'tip') return row.tip
+      if (key === 'status') return row.status
+      if (key === 'createdOn') return row.createdOn
+      if (key === 'orderDate') return row.orderDate ?? row.createdOn
+      if (key === 'serviceProvider') return row.serviceProvider
+      return row.billNo
+    },
+  )
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE) || 1)
   const currentPage = Math.min(page, totalPages)
-  const pageRows = rowsForTable.slice(
+  const pageRows = visible.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   )
@@ -355,49 +389,49 @@ export default function FinanceTransactions() {
               <tr>
                 {tab === 'card-upi' ? (
                   <>
-                    <th className="px-3 py-2.5">Bill No</th>
-                    <th className="px-3 py-2.5">Order Date</th>
+                    <SortableTh columnKey="billNo" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Bill No</SortableTh>
+                    <SortableTh columnKey="orderDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Order Date</SortableTh>
                     <th className="px-3 py-2.5">Txn Unique ID</th>
                     <th className="px-3 py-2.5">TID</th>
-                    <th className="px-3 py-2.5">Service Provider</th>
-                    <th className="px-3 py-2.5">Payment Method</th>
+                    <SortableTh columnKey="serviceProvider" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Service Provider</SortableTh>
+                    <SortableTh columnKey="paymentType" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Payment Method</SortableTh>
                     <th className="px-3 py-2.5">Card Brand</th>
-                    <th className="px-3 py-2.5 text-right">Tax (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Discount (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Bill Amount (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Tip (Rs.)</th>
+                    <SortableTh columnKey="tax" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Tax (Rs.)</SortableTh>
+                    <SortableTh columnKey="discount" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Discount (Rs.)</SortableTh>
+                    <SortableTh columnKey="total" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Bill Amount (Rs.)</SortableTh>
+                    <SortableTh columnKey="tip" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Tip (Rs.)</SortableTh>
                     <th className="px-3 py-2.5 text-right">Provider Charges (Rs.)</th>
                     <th className="px-3 py-2.5 text-right">Settled Amount (Rs.)</th>
-                    <th className="px-3 py-2.5">Bill Status</th>
+                    <SortableTh columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Bill Status</SortableTh>
                     <th className="px-3 py-2.5">Txn Status</th>
                     <th className="px-3 py-2.5">Txn Modified Date</th>
                   </>
                 ) : tab === 'wallet' || tab === 'online' ? (
                   <>
-                    <th className="px-3 py-2.5">Bill No</th>
-                    <th className="px-3 py-2.5">Order Date</th>
-                    <th className="px-3 py-2.5">Order Type</th>
-                    <th className="px-3 py-2.5">Sub Order Type</th>
-                    <th className="px-3 py-2.5">Payment Type</th>
-                    <th className="px-3 py-2.5">Service Provider</th>
-                    <th className="px-3 py-2.5 text-right">Tax (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Discount (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Bill Amount (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Tip (Rs.)</th>
-                    <th className="px-3 py-2.5">Bill Status</th>
+                    <SortableTh columnKey="billNo" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Bill No</SortableTh>
+                    <SortableTh columnKey="orderDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Order Date</SortableTh>
+                    <SortableTh columnKey="orderType" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Order Type</SortableTh>
+                    <SortableTh columnKey="subOrderType" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Sub Order Type</SortableTh>
+                    <SortableTh columnKey="paymentType" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Payment Type</SortableTh>
+                    <SortableTh columnKey="serviceProvider" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Service Provider</SortableTh>
+                    <SortableTh columnKey="tax" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Tax (Rs.)</SortableTh>
+                    <SortableTh columnKey="discount" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Discount (Rs.)</SortableTh>
+                    <SortableTh columnKey="total" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Bill Amount (Rs.)</SortableTh>
+                    <SortableTh columnKey="tip" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Tip (Rs.)</SortableTh>
+                    <SortableTh columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Bill Status</SortableTh>
                   </>
                 ) : (
                   <>
-                    <th className="px-3 py-2.5">Bill No</th>
-                    <th className="px-3 py-2.5">Order Type</th>
-                    <th className="px-3 py-2.5">Sub Order Type</th>
-                    <th className="px-3 py-2.5">Payment Type</th>
-                    <th className="px-3 py-2.5 text-right">Tax (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Discount (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Total (Rs.)</th>
-                    <th className="px-3 py-2.5 text-right">Tip (Rs.)</th>
-                    <th className="px-3 py-2.5">Status</th>
-                    <th className="px-3 py-2.5">Created On</th>
+                    <SortableTh columnKey="billNo" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Bill No</SortableTh>
+                    <SortableTh columnKey="orderType" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Order Type</SortableTh>
+                    <SortableTh columnKey="subOrderType" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Sub Order Type</SortableTh>
+                    <SortableTh columnKey="paymentType" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Payment Type</SortableTh>
+                    <SortableTh columnKey="tax" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Tax (Rs.)</SortableTh>
+                    <SortableTh columnKey="discount" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Discount (Rs.)</SortableTh>
+                    <SortableTh columnKey="total" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Total (Rs.)</SortableTh>
+                    <SortableTh columnKey="tip" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-3 py-2.5">Tip (Rs.)</SortableTh>
+                    <SortableTh columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Status</SortableTh>
+                    <SortableTh columnKey="createdOn" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-3 py-2.5">Created On</SortableTh>
                   </>
                 )}
               </tr>

@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { Calendar, RotateCcw, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
@@ -53,6 +56,18 @@ export default function SupportManagement() {
   const [endDate, setEndDate] = useState('')
   const [isSearched, setIsSearched] = useState(true)
   const [tickets, setTickets] = useState<SupportTicketEntry[]>([])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      tickets,
+      (row) => [row.ticketNo, row.category, row.subject, row.createdDate, row.status],
+      (row, key) => {
+        if (key === 'category') return row.category
+        if (key === 'subject') return row.subject
+        if (key === 'createdDate') return row.createdDate
+        if (key === 'status') return row.status
+        return row.ticketNo
+      },
+    )
 
 
   function handleSearch() {
@@ -178,19 +193,27 @@ export default function SupportManagement() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
+              <div className="border-b border-line p-4">
+                <ListSearch
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search tickets"
+                />
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-ink">
                 <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="px-4 py-3">Support Ticket No.</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Subject / Issue</th>
-                    <th className="px-4 py-3">Created Date</th>
-                    <th className="px-4 py-3 text-right">Status</th>
+                    <SortableTh columnKey="ticketNo" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Support Ticket No.</SortableTh>
+                    <SortableTh columnKey="category" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Category</SortableTh>
+                    <SortableTh columnKey="subject" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Subject / Issue</SortableTh>
+                    <SortableTh columnKey="createdDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Created Date</SortableTh>
+                    <SortableTh columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-3">Status</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {tickets.map((t) => (
+                  {visible.map((t) => (
                     <tr
                       key={t.id}
                       className="transition-colors hover:bg-page/50"
@@ -214,6 +237,7 @@ export default function SupportManagement() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>

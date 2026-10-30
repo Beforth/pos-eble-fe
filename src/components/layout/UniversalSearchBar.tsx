@@ -99,7 +99,10 @@ export function UniversalSearchBar({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      const isSearchShortcut =
+        ((event.ctrlKey || event.metaKey) && event.key === '/') ||
+        (!event.ctrlKey && !event.metaKey && !event.altKey && event.key === '/')
+      if (isSearchShortcut) {
         const target = event.target as HTMLElement | null
         if (
           target &&
@@ -182,7 +185,7 @@ export function UniversalSearchBar({
         {!compact && (
           <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
             <kbd className="rounded border border-line bg-page px-1.5 py-0.5 text-[10px] font-medium text-muted">
-              Ctrl K
+              Ctrl /
             </kbd>
           </span>
         )}

@@ -26,6 +26,7 @@ import { AddTableDiscountModal } from '../components/menu/AddTableDiscountModal'
 import { EditTableModal } from '../components/menu/EditTableModal'
 import { ConfirmDeleteModal } from '../components/common/ConfirmDeleteModal'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
+import { PaginationControls } from '../components/common/PaginationControls'
 import { useAuth } from '../auth/AuthContext'
 import {
   listDiningAreasApi,
@@ -97,6 +98,13 @@ export default function TablesAreasManagement() {
     }
   }, [encryptedOutletId])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  useEffect(() => {
+    setPage(1)
+  }, [subTab, appliedTableNo, area, appliedAreaName])
+
   const filtered = useMemo(() => {
     const q = appliedTableNo.trim().toLowerCase()
     return tables.filter((row) => {
@@ -107,11 +115,21 @@ export default function TablesAreasManagement() {
     })
   }, [appliedTableNo, area, tables])
 
+  const pagedTables = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  )
+
   const filteredAreas = useMemo(() => {
     const q = appliedAreaName.trim().toLowerCase()
     if (!q) return areas
     return areas.filter((row) => row.name.toLowerCase().includes(q))
   }, [appliedAreaName, areas])
+
+  const pagedAreas = useMemo(
+    () => filteredAreas.slice((page - 1) * pageSize, page * pageSize),
+    [filteredAreas, page, pageSize],
+  )
 
   const allSelected =
     filtered.length > 0 && filtered.every((row) => selected.has(row.id))
@@ -412,15 +430,24 @@ export default function TablesAreasManagement() {
               <div className="relative">
                 <select
                   value={area}
-                  onChange={(event) => setArea(event.target.value)}
+                  onChange={(event) => {
+                    if (event.target.value === '__add_new__') {
+                      navigate('/menu/tables/areas/new')
+                      return
+                    }
+                    setArea(event.target.value)
+                  }}
                   className="h-9 w-full appearance-none rounded-md border border-line bg-card px-3 pr-8 text-sm outline-none focus:border-primary"
                 >
-                  <option value="all">All</option>
+                  <option value="all">All Areas</option>
                   {areas.map((a) => (
                     <option key={a.id} value={a.name}>
                       {a.name}
                     </option>
                   ))}
+                  <option value="__add_new__" className="font-semibold text-primary">
+                    + Add New Area
+                  </option>
                 </select>
                 <ChevronDown
                   size={14}
@@ -510,7 +537,7 @@ export default function TablesAreasManagement() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
+                {pagedTables.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-b-0 hover:bg-page/80"
@@ -620,9 +647,13 @@ export default function TablesAreasManagement() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm text-muted">
-            Showing 1 to {filtered.length} of {filtered.length} records
-          </p>
+          <PaginationControls
+            totalRecords={filtered.length}
+            currentPage={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </>
       ) : (
         <>
@@ -638,7 +669,7 @@ export default function TablesAreasManagement() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAreas.map((row) => (
+                {pagedAreas.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-b-0 hover:bg-page/80"
@@ -698,10 +729,13 @@ export default function TablesAreasManagement() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm text-muted">
-            Showing 1 to {filteredAreas.length} of {filteredAreas.length}{' '}
-            records
-          </p>
+          <PaginationControls
+            totalRecords={filteredAreas.length}
+            currentPage={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </>
       )}
 

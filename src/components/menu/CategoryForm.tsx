@@ -188,9 +188,14 @@ export function CategoryForm({
               <select
                 id="category-parent"
                 value={parentCategoryId ?? ''}
-                onChange={(event) =>
+                onChange={(event) => {
+                  if (event.target.value === '__add_new__') {
+                    showToast('Opening Parent Categories')
+                    window.location.href = '/menu/parent-categories/new'
+                    return
+                  }
                   setParentCategoryId(event.target.value || null)
-                }
+                }}
                 className="h-10 w-full appearance-none rounded-md border border-line bg-card px-3 pr-9 text-sm text-ink outline-none focus:border-primary"
               >
                 <option value="">No Parent Category</option>
@@ -199,6 +204,9 @@ export function CategoryForm({
                     {option.name}
                   </option>
                 ))}
+                <option value="__add_new__" className="font-semibold text-primary">
+                  + Add New Parent Category
+                </option>
               </select>
               <ChevronDown
                 size={14}

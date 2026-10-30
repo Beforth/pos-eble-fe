@@ -1,53 +1,30 @@
 import { useMemo, useState } from 'react'
-
-import { showToast } from '../../utils/toast'
 import { useNavigate } from '../../utils/inventoryRouter'
 import { GripVertical, Trash2 } from 'lucide-react'
+import { showToast } from '../../utils/toast'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { PrimaryButton } from '../../components/menu/MenuActionButtons'
-
-type AlignOption = 'Left' | 'Center' | 'Right'
-type PositionOption = 'Top' | 'Bottom'
-type FontWeightOption = 'Normal' | 'Bold'
-type FieldType =
-  | 'Custom Label'
-  | 'Raw Material Name'
-  | 'Barcode'
-  | 'Barcode Number'
-
-interface ConfigField {
-  id: string
-  field: FieldType
-  label: string
-  align: AlignOption
-  position: PositionOption
-  fontSize: string
-  fontWeight: FontWeightOption
-  lockedField?: boolean
-}
-
-const FIELD_OPTIONS: FieldType[] = [
-  'Custom Label',
-  'Raw Material Name',
-  'Barcode',
-  'Barcode Number',
-]
-const ALIGN_OPTIONS: AlignOption[] = ['Left', 'Center', 'Right']
-const POSITION_OPTIONS: PositionOption[] = ['Top', 'Bottom']
-const FONT_WEIGHT_OPTIONS: FontWeightOption[] = ['Normal', 'Bold']
-
-const DEFAULT_FIELDS: ConfigField[] = [
-  {
-    id: 'field-raw-material',
-    field: 'Raw Material Name',
-    label: 'Raw Material',
-    align: 'Center',
-    position: 'Top',
-    fontSize: '5',
-    fontWeight: 'Bold',
-    lockedField: true,
-  },
-]
+import {
+  ALIGN_OPTIONS,
+  FIELD_OPTIONS,
+  FONT_WEIGHT_OPTIONS,
+  POSITION_OPTIONS,
+  loadBarcodeConfig,
+  saveBarcodeConfig,
+  type AlignOption,
+  type ConfigField,
+  type FieldType,
+  type FontWeightOption,
+  type PositionOption,
+} from '../../utils/barcodeConfig'
+import { generateBarcodeSvgString } from '../../utils/barcodeSvg'
+import {
+  PX_PER_MM,
+  barcodeHeightPx,
+  fieldFontPx,
+  getLabelGeometry,
+  loadPrinterSettings,
+} from '../../utils/barcodeLabels'
 
 function emptyDraft(): Omit<ConfigField, 'id'> {
   return {
@@ -89,10 +66,13 @@ function SelectCell({
 
 export default function BarcodeConfiguration() {
   const navigate = useNavigate()
-  const [backgroundColor, setBackgroundColor] = useState('#FFFFFF')
-  const [textColor, setTextColor] = useState('#000000')
-  const [alignment, setAlignment] = useState<'Column' | 'Row'>('Column')
-  const [fields, setFields] = useState<ConfigField[]>(DEFAULT_FIELDS)
+  const initialConfig = useMemo(() => loadBarcodeConfig(), [])
+  const [backgroundColor, setBackgroundColor] = useState(
+    initialConfig.backgroundColor,
+  )
+  const [textColor, setTextColor] = useState(initialConfig.textColor)
+  const [alignment, setAlignment] = useState(initialConfig.alignment)
+  const [fields, setFields] = useState<ConfigField[]>(initialConfig.fields)
   const [draft, setDraft] = useState(emptyDraft)
   const [dragId, setDragId] = useState<string | null>(null)
 
@@ -104,6 +84,15 @@ export default function BarcodeConfiguration() {
     () => fields.filter((f) => f.position === 'Bottom'),
     [fields],
   )
+  // Preview uses the real label size and the same px rules as the print output,
+  // scaled down to fit the panel, so what you see matches what prints.
+  const labelGeometry = useMemo(
+    () => getLabelGeometry(loadPrinterSettings().paperSize),
+    [],
+  )
+  const labelWidthPx = labelGeometry.widthMm * PX_PER_MM
+  const labelHeightPx = labelGeometry.heightMm * PX_PER_MM
+  const previewScale = 240 / labelWidthPx
 
 
   function handleAdd() {
@@ -156,28 +145,17 @@ export default function BarcodeConfiguration() {
     return list.map((field) => {
       if (field.field === 'Barcode') {
         return (
-          <div key={field.id} className="flex w-full justify-center py-1">
-            <svg
-              viewBox="0 0 120 40"
-              className="h-10 w-full max-w-[140px]"
-              aria-hidden="true"
-            >
-              {Array.from({ length: 28 }).map((_, index) => {
-                const x = 4 + index * 4
-                const wide = index % 3 === 0
-                return (
-                  <rect
-                    key={index}
-                    x={x}
-                    y={2}
-                    width={wide ? 2.5 : 1.2}
-                    height={36}
-                    fill={textColor}
-                  />
-                )
-              })}
-            </svg>
-          </div>
+          <div
+            key={field.id}
+            className="flex w-full justify-center"
+            dangerouslySetInnerHTML={{
+              __html: generateBarcodeSvgString(
+                '1000001',
+                textColor,
+                barcodeHeightPx(labelGeometry.heightMm),
+              ),
+            }}
+          />
         )
       }
       const content =
@@ -187,18 +165,20 @@ export default function BarcodeConfiguration() {
             ? 'Raw Material Name'
             : field.label || 'Custom Label'
       return (
-        <p
+        <div
           key={field.id}
-          className={`w-full px-1 ${previewTextAlign(field.align)} ${
+          className={`field-item w-full ${previewTextAlign(field.align)} ${
             field.fontWeight === 'Bold' ? 'font-bold' : 'font-normal'
           }`}
           style={{
             color: textColor,
-            fontSize: `${Math.max(10, Number(field.fontSize) * 2.2)}px`,
+            fontSize: `${fieldFontPx(field.fontSize)}px`,
+            fontFamily:
+              field.field === 'Barcode Number' ? 'monospace' : undefined,
           }}
         >
           {content}
-        </p>
+        </div>
       )
     })
   }
@@ -320,6 +300,12 @@ export default function BarcodeConfiguration() {
                           label: event.target.value,
                         }))
                       }
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          handleAdd()
+                        }
+                      }}
                       className="h-9 w-full rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
                     />
                   </td>
@@ -496,11 +482,14 @@ export default function BarcodeConfiguration() {
             </button>
             <PrimaryButton
               onClick={() => {
+                saveBarcodeConfig({
+                  backgroundColor,
+                  textColor,
+                  alignment,
+                  fields,
+                })
                 showToast('Barcode configuration saved')
-                window.setTimeout(
-                  () => navigate('/inventory/barcode-generation'),
-                  700,
-                )
+                navigate('/inventory/barcode-generation')
               }}
             >
               Save Changes
@@ -509,65 +498,50 @@ export default function BarcodeConfiguration() {
         </div>
 
         <aside className="rounded-xl border border-line bg-card p-4">
-          <h2 className="mb-3 text-base font-semibold text-ink">
+          <h2 className="mb-1 text-base font-semibold text-ink">
             Barcode Preview
           </h2>
+          <p className="mb-3 text-xs text-muted">
+            {labelGeometry.widthMm} × {labelGeometry.heightMm} mm (from Printer Settings)
+          </p>
           <div
-            className={`flex min-h-[220px] rounded-lg border border-line p-3 ${
-              alignment === 'Column'
-                ? 'flex-col items-stretch justify-between gap-2'
-                : 'flex-row items-center justify-between gap-2'
-            }`}
-            style={{ backgroundColor }}
+            className="overflow-hidden rounded-lg border border-line"
+            style={{
+              width: 240,
+              height: labelHeightPx * previewScale,
+            }}
           >
             <div
-              className={`flex min-w-0 flex-1 ${
-                alignment === 'Column'
-                  ? 'flex-col items-stretch gap-1'
-                  : 'flex-row flex-wrap items-center gap-2'
-              }`}
+              className="flex flex-col justify-between overflow-hidden"
+              style={{
+                width: labelWidthPx,
+                height: labelHeightPx,
+                padding: '1.5mm',
+                backgroundColor,
+                transform: `scale(${previewScale})`,
+                transformOrigin: 'top left',
+              }}
             >
-              {renderPreviewLines(previewTop)}
-            </div>
-            <div className="flex w-full justify-center py-1">
-              <svg
-                viewBox="0 0 120 40"
-                className="h-12 w-full max-w-[160px]"
-                aria-label="Barcode preview"
+              <div
+                className={`flex w-full gap-[2px] ${
+                  alignment === 'Column'
+                    ? 'flex-col items-stretch'
+                    : 'flex-row flex-wrap items-center'
+                }`}
               >
-                {Array.from({ length: 30 }).map((_, index) => {
-                  const x = 2 + index * 4
-                  const wide = index % 4 === 0
-                  return (
-                    <rect
-                      key={index}
-                      x={x}
-                      y={2}
-                      width={wide ? 2.8 : 1.3}
-                      height={36}
-                      fill={textColor}
-                    />
-                  )
-                })}
-              </svg>
-            </div>
-            <div
-              className={`flex min-w-0 flex-1 ${
-                alignment === 'Column'
-                  ? 'flex-col items-stretch gap-1'
-                  : 'flex-row flex-wrap items-center gap-2'
-              }`}
-            >
+                {renderPreviewLines(previewTop)}
+              </div>
               {previewBottom.length > 0 ? (
-                renderPreviewLines(previewBottom)
-              ) : (
-                <p
-                  className="w-full text-center text-xs font-medium"
-                  style={{ color: textColor }}
+                <div
+                  className={`flex w-full gap-[2px] ${
+                    alignment === 'Column'
+                      ? 'flex-col items-stretch'
+                      : 'flex-row flex-wrap items-center'
+                  }`}
                 >
-                  1000001
-                </p>
-              )}
+                  {renderPreviewLines(previewBottom)}
+                </div>
+              ) : null}
             </div>
           </div>
         </aside>

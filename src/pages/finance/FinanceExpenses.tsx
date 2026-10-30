@@ -8,6 +8,8 @@ import {
   Receipt,
 } from 'lucide-react'
 import { FinancePageShell } from '../../components/layout/FinancePageShell'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
@@ -54,10 +56,34 @@ export default function FinanceExpenses() {
     })
   }, [applied])
 
-  const totalRecords = Math.max(EXPENSE_SUMMARY.expense.count, filtered.length)
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filtered,
+    (row) => [
+      row.expenseDate,
+      row.description,
+      row.amount,
+      row.category,
+      row.status,
+      row.type,
+      row.paidFrom,
+      row.billingUser,
+    ],
+    (row, key) => {
+      if (key === 'description') return row.description
+      if (key === 'amount') return row.amount
+      if (key === 'category') return row.category
+      if (key === 'status') return row.status
+      if (key === 'type') return row.type
+      if (key === 'paidFrom') return row.paidFrom
+      if (key === 'billingUser') return row.billingUser
+      return row.expenseDate
+    },
+  )
+
+  const totalRecords = Math.max(EXPENSE_SUMMARY.expense.count, visible.length)
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
-  const pageRows = filtered.slice(
+  const pageRows = visible.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   )
@@ -232,14 +258,79 @@ export default function FinanceExpenses() {
           <table className="min-w-[900px] w-full text-left text-sm">
             <thead className="border-b border-line bg-page text-xs font-semibold text-ink">
               <tr>
-                <th className="px-3 py-2.5">Expense Date</th>
-                <th className="px-3 py-2.5">Description</th>
-                <th className="px-3 py-2.5 text-right">Amount (Rs.)</th>
-                <th className="px-3 py-2.5">Category</th>
-                <th className="px-3 py-2.5">Status</th>
-                <th className="px-3 py-2.5">Type</th>
-                <th className="px-3 py-2.5">Paid From</th>
-                <th className="px-3 py-2.5">Billing User</th>
+                <SortableTh
+                  columnKey="expenseDate"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Expense Date
+                </SortableTh>
+                <SortableTh
+                  columnKey="description"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Description
+                </SortableTh>
+                <SortableTh
+                  columnKey="amount"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="right"
+                  className="px-3 py-2.5"
+                >
+                  Amount (Rs.)
+                </SortableTh>
+                <SortableTh
+                  columnKey="category"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Category
+                </SortableTh>
+                <SortableTh
+                  columnKey="status"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Status
+                </SortableTh>
+                <SortableTh
+                  columnKey="type"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Type
+                </SortableTh>
+                <SortableTh
+                  columnKey="paidFrom"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Paid From
+                </SortableTh>
+                <SortableTh
+                  columnKey="billingUser"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Billing User
+                </SortableTh>
               </tr>
             </thead>
             <tbody>
@@ -271,7 +362,7 @@ export default function FinanceExpenses() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-primary/5 px-4 py-3">
           <p className="text-sm text-ink">
             Showing {(currentPage - 1) * PAGE_SIZE + 1} to{' '}
-            {Math.min(currentPage * PAGE_SIZE, filtered.length)} of{' '}
+            {Math.min(currentPage * PAGE_SIZE, visible.length)} of{' '}
             {totalRecords} expenses
           </p>
           <div className="flex flex-wrap items-center gap-1">

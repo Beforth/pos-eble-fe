@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
 import { useNavigate } from '../../utils/inventoryRouter'
 import {
   ChevronDown,
@@ -16,9 +17,8 @@ import {
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
-  QuickAddRawMaterialModal,
-  resolveQuickAddCategory,
-} from '../../components/inventory/QuickAddRawMaterialModal'
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import {
   buildRawMaterialDetails,
   RawMaterialDetailsModal,
@@ -26,20 +26,65 @@ import {
 } from '../../components/inventory/RawMaterialDetailsModal'
 import { RawMaterialModificationLogModal } from '../../components/inventory/RawMaterialModificationLogModal'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
+import { SortableTh } from '../../components/common/SortableTh'
+import { PaginationControls } from '../../components/common/PaginationControls'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   ActionDropdown,
   OutlineButton,
   PrimaryButton,
   RowActionButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
 import {
-  RAW_MATERIAL_CATEGORIES,
-  RAW_MATERIALS,
-  type RawMaterialRow,
-} from '../../mocks/rawMaterialsData'
+  INV_WRITE_PERMISSION,
+  categoryIdByName,
+  deleteRawMaterialApi,
+  listRawMaterialsApi,
+  updateRawMaterialApi,
+  type RawMaterial,
+} from '../../services/inventoryService'
 
-const PAGE_SIZE = 100
-const FILTER_CATEGORY_OPTIONS = ['All', ...RAW_MATERIAL_CATEGORIES]
+type ListRow = {
+  id: string
+  name: string
+  category: string
+  categoryId: string | null
+  favourite: boolean
+  active: boolean
+  stockQty: number
+  unitName: string
+  source: RawMaterial
+}
+
+function toListRow(row: RawMaterial): ListRow {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category?.name ?? '',
+    categoryId: row.category?.id ?? null,
+    favourite: row.is_favourite,
+    active: row.is_active,
+    stockQty: Number(row.stock_qty || '0'),
+    unitName: row.consumption_unit?.name ?? '',
+    source: row,
+  }
+}
+
+async function loadAllRawMaterials(outletId: string): Promise<RawMaterial[]> {
+  const first = await listRawMaterialsApi(outletId, { page: 1 })
+  const rows = [...first.results]
+  let page = 2
+  while (rows.length < first.count) {
+    const next = await listRawMaterialsApi(outletId, { page })
+    if (next.results.length === 0) break
+    rows.push(...next.results)
+    page += 1
+  }
+  return rows
+}
 
 function ClipboardEyeIcon({ size = 15 }: { size?: number }) {
   return (
@@ -225,36 +270,89 @@ function CategoryTabBar({
 
 export default function RawMaterials() {
   const navigate = useNavigate()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WRITE_PERMISSION)
+  const { categories, loadMasters } = useInventoryMasters()
   const [nameInput, setNameInput] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [appliedName, setAppliedName] = useState('')
   const [appliedCategory, setAppliedCategory] = useState('All')
   const [cardCategory, setCardCategory] = useState('all')
-  const [rows, setRows] = useState<RawMaterialRow[]>(() => [...RAW_MATERIALS])
+  const [rows, setRows] = useState<ListRow[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [page, setPage] = useState(1)
   const [dirty, setDirty] = useState(false)
-  const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [details, setDetails] = useState<RawMaterialDetails | null>(null)
   const [logMaterialName, setLogMaterialName] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState(false)
+  const [pageSize, setPageSize] = useState(25)
+  const quickAdd = useInventoryQuickAdd({
+    onRawMaterialCreated: (row) => {
+      setRows((prev) => [toListRow(row), ...prev])
+      setCardCategory('all')
+      setCategoryFilter('All')
+      setAppliedCategory('All')
+      setPage(1)
+    },
+  })
 
+  const categoryNames = useMemo(
+    () => categories.map((row) => row.name),
+    [categories],
+  )
+  const filterCategoryOptions = useMemo(
+    () => ['All', ...categoryNames],
+    [categoryNames],
+  )
   const categoryTabs = useMemo(
     () => [
       { id: 'all', label: 'All categories' },
-      ...RAW_MATERIAL_CATEGORIES.map((category) => ({
-        id: category,
-        label: category,
-      })),
+      ...categoryNames.map((name) => ({ id: name, label: name })),
     ],
-    [],
+    [categoryNames],
   )
+
+  useEffect(() => {
+    void loadMasters({ force: true })
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) {
+      setRows([])
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    loadAllRawMaterials(encryptedOutletId)
+      .then((items) => {
+        if (!cancelled) setRows(items.map(toListRow))
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          showToast(
+            err instanceof ApiError
+              ? err.message
+              : 'Unable to load raw materials',
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
   const filteredRows = useMemo(() => {
     const q = appliedName.trim().toLowerCase()
     return rows.filter((row) => {
-      if (cardCategory !== 'all' && row.category !== cardCategory) return false
-      if (appliedCategory !== 'All' && row.category !== appliedCategory) {
+      const matchesCategory = (name: string) =>
+        row.category === name || row.source.sub_category?.name === name
+      if (cardCategory !== 'all' && !matchesCategory(cardCategory)) return false
+      if (appliedCategory !== 'All' && !matchesCategory(appliedCategory)) {
         return false
       }
       if (q && !row.name.toLowerCase().includes(q)) return false
@@ -262,12 +360,24 @@ export default function RawMaterials() {
     })
   }, [rows, cardCategory, appliedCategory, appliedName])
 
-  const totalRecords = filteredRows.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filteredRows,
+    (row) => [row.name, row.category, row.stockQty, row.favourite, row.active],
+    (row, key) => {
+      if (key === 'category') return row.category
+      if (key === 'stockQty') return row.stockQty
+      if (key === 'favourite') return row.favourite
+      if (key === 'active') return row.active
+      return row.name
+    },
+  )
+
+  const totalRecords = visible.length
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const pageRows = filteredRows.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+  const pageRows = visible.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   )
   const pageIds = pageRows.map((row) => row.id)
   const allPageSelected =
@@ -314,7 +424,7 @@ export default function RawMaterials() {
     })
   }
 
-  function updateRow(id: string, patch: Partial<RawMaterialRow>) {
+  function updateRow(id: string, patch: Partial<ListRow>) {
     setRows((prev) =>
       prev.map((row) => (row.id === id ? { ...row, ...patch } : row)),
     )
@@ -322,7 +432,7 @@ export default function RawMaterials() {
   }
 
   function applyBulk(
-    patch: Partial<Pick<RawMaterialRow, 'active' | 'favourite'>>,
+    patch: Partial<Pick<ListRow, 'active' | 'favourite'>>,
     message: string,
   ) {
     if (selectedIds.size === 0) {
@@ -346,11 +456,66 @@ export default function RawMaterials() {
     setPendingDelete(true)
   }
 
-  function confirmDeleteSelected() {
-    setRows((prev) => prev.filter((row) => !selectedIds.has(row.id)))
-    setSelectedIds(new Set())
-    setDirty(true)
-    showToast('Selected raw materials deleted')
+  async function confirmDeleteSelected() {
+    if (!encryptedOutletId) return
+    const ids = [...selectedIds]
+    try {
+      for (const id of ids) {
+        await deleteRawMaterialApi(encryptedOutletId, id)
+      }
+      setRows((prev) => prev.filter((row) => !selectedIds.has(row.id)))
+      setSelectedIds(new Set())
+      showToast('Selected raw materials deleted')
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to delete selected raw materials',
+      )
+    }
+  }
+
+  async function applyChanges() {
+    if (!encryptedOutletId || !canWrite) return
+    if (!dirty) {
+      showToast('No changes to apply')
+      return
+    }
+    const changed = rows.filter(
+      (row) =>
+        row.name !== row.source.name ||
+        row.categoryId !== (row.source.category?.id ?? null) ||
+        row.favourite !== row.source.is_favourite ||
+        row.active !== row.source.is_active,
+    )
+    if (changed.length === 0) {
+      setDirty(false)
+      showToast('No changes to apply')
+      return
+    }
+    setSaving(true)
+    try {
+      const updated: ListRow[] = []
+      for (const row of changed) {
+        const saved = await updateRawMaterialApi(encryptedOutletId, row.id, {
+          name: row.name.trim(),
+          category_id: row.categoryId,
+          is_favourite: row.favourite,
+          is_active: row.active,
+        })
+        updated.push(toListRow(saved))
+      }
+      const byId = new Map(updated.map((row) => [row.id, row]))
+      setRows((prev) => prev.map((row) => byId.get(row.id) ?? row))
+      setDirty(false)
+      showToast('Changes applied')
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : 'Unable to apply changes',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -359,49 +524,85 @@ export default function RawMaterials() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Raw Materials Management</h1>
         <div className="flex flex-wrap gap-2">
-          <PrimaryButton
-            onClick={() => navigate('/inventory/raw-materials/new')}
-          >
-            <Plus size={15} />
-            Create New
-          </PrimaryButton>
-          <OutlineButton onClick={() => setQuickAddOpen(true)}>
-            <Plus size={15} />
-            Quick Add
-          </OutlineButton>
+          {canWrite ? (
+            <PrimaryButton
+              onClick={() => navigate('/inventory/raw-materials/new')}
+            >
+              <Plus size={15} />
+              Create New
+            </PrimaryButton>
+          ) : null}
+          {canWrite ? (
+            <OutlineButton onClick={() => quickAdd.open('raw-material')}>
+              <Plus size={15} />
+              Quick Add
+            </OutlineButton>
+          ) : null}
           <ActionDropdown
             options={[
-              {
-                label: 'Active',
-                onClick: () => applyBulk({ active: true }, 'Marked as active'),
-              },
-              {
-                label: 'Inactive',
-                onClick: () =>
-                  applyBulk({ active: false }, 'Marked as inactive'),
-              },
-              {
-                label: 'Set as Favorite',
-                onClick: () =>
-                  applyBulk({ favourite: true }, 'Set as favorite'),
-              },
-              {
-                label: 'Remove From Favorite',
-                onClick: () =>
-                  applyBulk({ favourite: false }, 'Removed from favorite'),
-              },
-              {
-                label: 'Delete',
-                danger: true,
-                onClick: requestDeleteSelected,
-              },
+              ...(canWrite
+                ? [
+                    {
+                      label: 'Active',
+                      onClick: () =>
+                        applyBulk({ active: true }, 'Marked as active'),
+                    },
+                    {
+                      label: 'Inactive',
+                      onClick: () =>
+                        applyBulk({ active: false }, 'Marked as inactive'),
+                    },
+                    {
+                      label: 'Set as Favorite',
+                      onClick: () =>
+                        applyBulk({ favourite: true }, 'Set as favorite'),
+                    },
+                    {
+                      label: 'Remove From Favorite',
+                      onClick: () =>
+                        applyBulk({ favourite: false }, 'Removed from favorite'),
+                    },
+                    {
+                      label: 'Delete',
+                      danger: true,
+                      onClick: requestDeleteSelected,
+                    },
+                  ]
+                : []),
               {
                 label: 'Raw material deleted logs',
                 onClick: () => showToast('Opening deleted logs'),
               },
             ]}
           />
-          <FilesMenu onAction={showToast} />
+          <FilesMenu
+            onAction={(label) => {
+              const headers = ['name', 'category', 'favourite', 'active']
+              const toCsv = (list: ListRow[]) =>
+                list.map((row) => [
+                  row.name,
+                  row.category,
+                  row.favourite ? 'Yes' : 'No',
+                  row.active ? 'Yes' : 'No',
+                ])
+              if (label === 'Export Current Page') {
+                downloadCsv(headers, toCsv(pageRows), 'raw-materials-page.csv')
+                showToast('Exported current page')
+                return
+              }
+              if (label === 'Export All') {
+                downloadCsv(headers, toCsv(visible), 'raw-materials-all.csv')
+                showToast('Exported all')
+                return
+              }
+              if (label === 'Download') {
+                downloadCsv(headers, [], 'raw-materials-import-template.csv')
+                showToast('Template downloaded')
+                return
+              }
+              showToast(label)
+            }}
+          />
         </div>
       </div>
 
@@ -424,7 +625,7 @@ export default function RawMaterials() {
           <SearchableSelect
             label="Category"
             value={categoryFilter}
-            options={FILTER_CATEGORY_OPTIONS}
+            options={filterCategoryOptions}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -436,19 +637,16 @@ export default function RawMaterials() {
         <OutlineButton variant="gray" onClick={clearFilters}>
           Clear
         </OutlineButton>
-        <OutlineButton
-          variant="gray"
-          onClick={() => {
-            if (!dirty) {
-              showToast('No changes to apply')
-              return
-            }
-            setDirty(false)
-            showToast('Changes applied')
-          }}
-        >
-          Apply Changes
-        </OutlineButton>
+        {canWrite ? (
+          <OutlineButton
+            variant="gray"
+            onClick={() => {
+              void applyChanges()
+            }}
+          >
+            {saving ? 'Saving…' : 'Apply Changes'}
+          </OutlineButton>
+        ) : null}
       </div>
 
       <CategoryTabBar
@@ -476,10 +674,54 @@ export default function RawMaterials() {
                     className="size-4 accent-primary"
                   />
                 </th>
-                <th className="px-3 py-2.5">Name</th>
-                <th className="min-w-[220px] px-3 py-2.5">Category</th>
-                <th className="px-3 py-2.5 text-center">Set As Favourite</th>
-                <th className="px-3 py-2.5 text-center">Active</th>
+                <SortableTh
+                  columnKey="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Name
+                </SortableTh>
+                <SortableTh
+                  columnKey="category"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="min-w-[220px] px-3 py-2.5"
+                >
+                  Category
+                </SortableTh>
+                <SortableTh
+                  columnKey="stockQty"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="right"
+                  className="px-3 py-2.5"
+                >
+                  Current Stock
+                </SortableTh>
+                <SortableTh
+                  columnKey="favourite"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="center"
+                  className="px-3 py-2.5"
+                >
+                  Set As Favourite
+                </SortableTh>
+                <SortableTh
+                  columnKey="active"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="center"
+                  className="px-3 py-2.5"
+                >
+                  Active
+                </SortableTh>
                 <th className="px-3 py-2.5 text-center">Action</th>
               </tr>
             </thead>
@@ -487,10 +729,12 @@ export default function RawMaterials() {
               {pageRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-3 py-16 text-center text-sm text-muted"
                   >
-                    No raw materials found
+                    {loading
+                      ? 'Loading raw materials…'
+                      : 'No raw materials found'}
                   </td>
                 </tr>
               ) : (
@@ -514,16 +758,17 @@ export default function RawMaterials() {
                       <input
                         type="text"
                         value={row.name}
+                        disabled={!canWrite}
                         onChange={(event) =>
                           updateRow(row.id, { name: event.target.value })
                         }
-                        className="h-9 w-full min-w-[160px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+                        className="h-9 w-full min-w-[160px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary disabled:opacity-70"
                       />
                     </td>
                     <td className="px-3 py-2">
                       <SearchableSelect
                         value={row.category}
-                        options={[...RAW_MATERIAL_CATEGORIES]}
+                        options={categoryNames}
                         placeholder="Select category"
                         searchPlaceholder="Search"
                         includePlaceholderOption={false}
@@ -531,17 +776,30 @@ export default function RawMaterials() {
                         dropdownPlacement={
                           index > pageRows.length - 4 ? 'above' : 'below'
                         }
-                        onChange={(value) =>
+                        onChange={(value) => {
+                          if (!canWrite) return
                           updateRow(row.id, {
-                            category: value as RawMaterialRow['category'],
+                            category: value,
+                            categoryId:
+                              categoryIdByName(categories, value) ?? null,
                           })
-                        }
+                        }}
+                        onAddNew={quickAdd.handler('category', (created) =>
+                          updateRow(row.id, {
+                            category: created.name,
+                            categoryId: created.id,
+                          }),
+                        )}
                       />
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-ink">
+                      {row.stockQty} {row.unitName}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <input
                         type="checkbox"
                         checked={row.favourite}
+                        disabled={!canWrite}
                         onChange={(event) =>
                           updateRow(row.id, {
                             favourite: event.target.checked,
@@ -555,6 +813,7 @@ export default function RawMaterials() {
                       <input
                         type="checkbox"
                         checked={row.active}
+                        disabled={!canWrite}
                         onChange={(event) =>
                           updateRow(row.id, { active: event.target.checked })
                         }
@@ -568,22 +827,22 @@ export default function RawMaterials() {
                           boxed
                           label="View Raw Material"
                           onClick={() =>
-                            setDetails(buildRawMaterialDetails(row))
+                            setDetails(buildRawMaterialDetails(row.source))
                           }
                         >
                           <ClipboardList size={15} strokeWidth={1.75} />
                         </RowActionButton>
-                        <RowActionButton
-                          boxed
-                          label="Edit"
-                          onClick={() =>
-                            navigate(`/inventory/raw-materials/${row.id}/edit`, {
-                              state: { row },
-                            })
-                          }
-                        >
-                          <Pencil size={15} strokeWidth={1.75} />
-                        </RowActionButton>
+                        {canWrite ? (
+                          <RowActionButton
+                            boxed
+                            label="Edit"
+                            onClick={() =>
+                              navigate(`/inventory/raw-materials/${row.id}/edit`)
+                            }
+                          >
+                            <Pencil size={15} strokeWidth={1.75} />
+                          </RowActionButton>
+                        ) : null}
                         <RowActionButton
                           boxed
                           label="View Log"
@@ -600,69 +859,16 @@ export default function RawMaterials() {
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
-          <p className="text-sm text-muted">
-            {totalRecords === 0
-              ? 'Showing 0 records'
-              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1} to ${Math.min(
-                  currentPage * PAGE_SIZE,
-                  totalRecords,
-                )} of ${totalRecords} records`}
-          </p>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPage(n)}
-                className={`flex size-8 items-center justify-center rounded-lg border text-sm font-medium ${
-                  currentPage === n
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-line bg-card text-ink hover:bg-page'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() =>
-                setPage((prev) => Math.min(totalPages, prev + 1))
-              }
-              className="h-8 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            >
-              Next
-            </button>
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage(totalPages)}
-              className="h-8 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            >
-              Last
-            </button>
-          </div>
-        </div>
+        <PaginationControls
+          totalRecords={totalRecords}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
-      <QuickAddRawMaterialModal
-        open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
-        onSave={(values) => {
-          const next: RawMaterialRow = {
-            id: `quick-${Date.now()}`,
-            name: values.name,
-            category: resolveQuickAddCategory(values.category),
-            favourite: false,
-            active: true,
-          }
-          setRows((prev) => [next, ...prev])
-          setPage(1)
-          setDirty(true)
-          showToast(`${values.name} added`)
-        }}
-      />
+      {quickAdd.host}
       <RawMaterialDetailsModal
         open={Boolean(details)}
         details={details}
@@ -682,7 +888,7 @@ export default function RawMaterials() {
           'They stop appearing when you raise production, purchase or wastage entries.',
         ]}
         confirmLabel="Delete"
-        onConfirm={confirmDeleteSelected}
+        onConfirm={() => void confirmDeleteSelected()}
         onClose={() => setPendingDelete(false)}
       />
     </InventoryPageShell>

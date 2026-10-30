@@ -1,73 +1,112 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useLocation, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useNavigate } from '../../utils/inventoryRouter'
 import { Plus, Trash2 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
+import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
 import {
-  buildRecipeIngredients,
-  type RecipeIngredient,
-} from '../../components/inventory/RecipeViewModal'
-import {
-  ITEM_RECIPES,
-  RECIPE_ITEM_OPTIONS,
-  type RecipeRow,
-} from '../../mocks/itemRecipesData'
-import { RAW_MATERIALS } from '../../mocks/rawMaterialsData'
+  INV_WRITE_PERMISSION,
+  getRecipeApi,
+  listAllRawMaterialsApi,
+  listRecipeMenuItemsApi,
+  updateRecipeApi,
+  type MenuItemRef,
+  type RawMaterial,
+} from '../../services/inventoryService'
 
-const MENU_OPTIONS = RECIPE_ITEM_OPTIONS.filter((item) => item !== 'All')
-const RAW_MATERIAL_OPTIONS = Array.from(
-  new Set(RAW_MATERIALS.map((row) => row.name)),
-).slice(0, 80)
-const UNITS = ['GM', 'ML', 'pcs', 'Kg', 'Ltr', 'BOX', 'pkt']
 const AREA_OPTIONS = ['', 'Kitchen', 'Counter', 'Store']
 
-interface EditableIngredient extends RecipeIngredient {
+interface EditableIngredient {
   id: string
-}
-
-function toEditable(rows: RecipeIngredient[]): EditableIngredient[] {
-  return rows.map((row, index) => ({
-    ...row,
-    id: `ing-${index}-${row.name}`,
-  }))
+  name: string
+  quantity: string
+  unit: string
+  area: string
 }
 
 export default function EditRecipe() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { id } = useParams<{ id: string }>()
-  const stateRow = (location.state as { row?: RecipeRow } | null)?.row
-  const existing =
-    stateRow ?? ITEM_RECIPES.find((row) => row.id === id) ?? null
-
-  const [menuItem, setMenuItem] = useState(existing?.name ?? '')
-  const [rows, setRows] = useState<EditableIngredient[]>(() =>
-    toEditable(buildRecipeIngredients(existing?.name ?? '')),
-  )
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WRITE_PERMISSION)
+  const { units, loadMasters } = useInventoryMasters()
+  const [menuItem, setMenuItem] = useState('')
+  const [items, setItems] = useState<MenuItemRef[]>([])
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
+  const [rows, setRows] = useState<EditableIngredient[]>([])
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const quickAdd = useInventoryQuickAdd({
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
 
   useEffect(() => {
-    if (!existing) return
-    setMenuItem(existing.name)
-    setRows(toEditable(buildRecipeIngredients(existing.name)))
-  }, [existing])
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    void listRecipeMenuItemsApi(encryptedOutletId)
+      .then(setItems)
+      .catch(() => setItems([]))
+    void listAllRawMaterialsApi(encryptedOutletId)
+      .then(setRawMaterials)
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!id || !encryptedOutletId) return
+    getRecipeApi(encryptedOutletId, id)
+      .then((recipe) => {
+        setMenuItem(recipe.item_name)
+        setRows(
+          recipe.lines.map((line, index) => ({
+            id: `ing-${index}-${line.raw_material_id}`,
+            name: line.raw_material_name,
+            quantity: line.qty,
+            unit: line.unit_name,
+            area: line.area,
+          })),
+        )
+      })
+      .catch((err) => {
+        showToast(err instanceof ApiError ? err.message : 'Unable to load recipe')
+      })
+  }, [id, encryptedOutletId])
 
   const materialOptions = useMemo(() => {
     const current = rows.map((row) => row.name).filter(Boolean)
-    return Array.from(new Set([...RAW_MATERIAL_OPTIONS, ...current]))
-  }, [rows])
+    return Array.from(
+      new Set([...rawMaterials.map((row) => row.name), ...current]),
+    )
+  }, [rows, rawMaterials])
 
+  const unitNames = units.filter((row) => row.is_active).map((row) => row.name)
 
-  function updateRow(id: string, patch: Partial<EditableIngredient>) {
+  function updateRow(rowId: string, patch: Partial<EditableIngredient>) {
     setRows((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+      prev.map((row) => (row.id === rowId ? { ...row, ...patch } : row)),
     )
   }
 
@@ -78,7 +117,7 @@ export default function EditRecipe() {
         id: `ing-${Date.now()}`,
         name: '',
         quantity: '',
-        unit: 'GM',
+        unit: unitNames[0] ?? '',
         area: '',
       },
     ])
@@ -92,8 +131,10 @@ export default function EditRecipe() {
     showToast('Recipe preserved')
   }
 
-  function handleSave() {
-    if (!menuItem) {
+  async function handleSave() {
+    if (!canWrite || !encryptedOutletId || !id) return
+    const selected = items.find((item) => item.name === menuItem)
+    if (!selected) {
       setError('Please select a menu item')
       return
     }
@@ -102,13 +143,35 @@ export default function EditRecipe() {
       return
     }
     setError('')
-    showToast('Recipe updated')
-    window.setTimeout(() => navigate('/inventory/item-recipes'), 900)
+    setSaving(true)
+    try {
+      await updateRecipeApi(encryptedOutletId, id, {
+        item_id: selected.id,
+        lines: rows.map((row) => {
+          const raw = rawMaterials.find((item) => item.name === row.name)
+          const unit = units.find((item) => item.name === row.unit)
+          if (!raw || !unit) {
+            throw new Error('Select a saved raw material and unit')
+          }
+          return {
+            raw_material_id: raw.id,
+            qty: row.quantity,
+            unit_id: unit.id,
+            area: row.area,
+          }
+        }),
+      })
+      showToast('Recipe updated')
+      navigate('/inventory/item-recipes')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Unable to save recipe')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <InventoryPageShell activeItem="item-recipes">
-
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-ink">Edit Recipe</h1>
@@ -116,23 +179,24 @@ export default function EditRecipe() {
             <SearchableSelect
               label="Select Menu"
               value={menuItem}
-              options={MENU_OPTIONS}
+              options={items.map((item) => item.name)}
               placeholder="Select Item"
               searchPlaceholder="Search"
               includePlaceholderOption={false}
               onChange={(value) => {
                 setMenuItem(value)
-                setRows(toEditable(buildRecipeIngredients(value)))
                 setError('')
               }}
             />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <OutlineButton onClick={addRawMaterial}>
-            <Plus size={15} />
-            Add New Raw-Material
-          </OutlineButton>
+          {canWrite ? (
+            <OutlineButton onClick={addRawMaterial}>
+              <Plus size={15} />
+              Add New Raw-Material
+            </OutlineButton>
+          ) : null}
           <OutlineButton variant="gray" onClick={handlePreserve}>
             Preserve
           </OutlineButton>
@@ -185,7 +249,21 @@ export default function EditRecipe() {
                         dropdownPlacement={
                           index > rows.length - 3 ? 'above' : 'below'
                         }
-                        onChange={(value) => updateRow(row.id, { name: value })}
+                        onChange={(value) => {
+                          const material = rawMaterials.find(
+                            (item) => item.name === value,
+                          )
+                          updateRow(row.id, {
+                            name: value,
+                            unit: material?.consumption_unit.name ?? row.unit,
+                          })
+                        }}
+                        onAddNew={quickAdd.handler('raw-material', (created) =>
+                          updateRow(row.id, {
+                            name: created.name,
+                            unit: created.consumption_unit.name,
+                          }),
+                        )}
                       />
                     </td>
                     <td className="px-3 py-2">
@@ -201,7 +279,7 @@ export default function EditRecipe() {
                     <td className="relative z-10 px-3 py-2">
                       <SearchableSelect
                         value={row.unit}
-                        options={UNITS}
+                        options={unitNames}
                         placeholder="Unit"
                         searchPlaceholder="Search"
                         includePlaceholderOption={false}
@@ -210,6 +288,9 @@ export default function EditRecipe() {
                           index > rows.length - 3 ? 'above' : 'below'
                         }
                         onChange={(value) => updateRow(row.id, { unit: value })}
+                        onAddNew={quickAdd.handler('unit', (created) =>
+                          updateRow(row.id, { unit: created.name }),
+                        )}
                       />
                     </td>
                     <td className="relative z-10 px-3 py-2">
@@ -227,15 +308,16 @@ export default function EditRecipe() {
                       />
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        aria-label="Remove raw material"
-                        data-tooltip="Remove raw material"
-                        onClick={() => removeRow(row.id)}
-                        className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          aria-label="Remove raw material"
+                          onClick={() => removeRow(row.id)}
+                          className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))
@@ -255,8 +337,13 @@ export default function EditRecipe() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+        {canWrite ? (
+          <PrimaryButton onClick={() => void handleSave()}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
+        ) : null}
       </div>
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }
