@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { useParams } from 'react-router-dom'
 import { useNavigate } from '../../utils/inventoryRouter'
 import {
-  ChevronDown,
   Copy,
   MoreVertical,
   Plus,
@@ -13,10 +13,39 @@ import {
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { PaymentHistoryPanel } from '../../components/inventory/PaymentHistoryPanel'
 import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
+import { OtherDetailsDrawer } from '../../components/inventory/OtherDetailsDrawer'
+import {
+  ActionDropdown,
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import { listOutletsApi } from '../../services/outletService'
+import {
+  INV_PURCHASE_WRITE_PERMISSION,
+  createPurchaseReturnApi,
+  getPurchaseReturnApi,
+  listAllRawMaterialsApi,
+  listSuppliersApi,
+  updatePurchaseReturnApi,
+  type RawMaterial,
+  type Supplier,
+} from '../../services/inventoryService'
+import { downloadCsv } from '../../utils/downloadFile'
 
 interface LineItem {
   id: string
@@ -26,22 +55,10 @@ interface LineItem {
   unit: string
   price: string
   amount: string
+  cgst: string
+  sgst: string
+  igst: string
 }
-
-const SUPPLIERS = ['The Bandhan', 'Fresh Mart', 'Daily Dairy', 'Veggie Hub']
-const RESTAURANTS = [
-  "Annapurna's Rajubhai Dabeliwale — Dadar",
-  "Annapurna's Rajubhai Dabeliwale — Andheri",
-]
-const RAW_MATERIALS = [
-  { name: 'Tomatoes', unit: 'Kg' },
-  { name: 'Onion', unit: 'Kg' },
-  { name: 'Paneer', unit: 'Kg' },
-  { name: 'Milk', unit: 'Ltr' },
-  { name: 'Butter', unit: 'Kg' },
-  { name: 'Flour', unit: 'Kg' },
-]
-const UNITS = ['Kg', 'Ltr', 'Pcs', 'Box', 'Packet']
 
 function emptyLine(): LineItem {
   return {
@@ -52,6 +69,9 @@ function emptyLine(): LineItem {
     unit: '',
     price: '',
     amount: '',
+    cgst: '',
+    sgst: '',
+    igst: '',
   }
 }
 
@@ -66,31 +86,161 @@ function formatAmount(value: number) {
 
 export default function AddPurchaseReturn() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_PURCHASE_WRITE_PERMISSION)
+  const isEdit = Boolean(id)
+  const { units, loadMasters } = useInventoryMasters()
   const [returnTo, setReturnTo] = useState<'supplier' | 'restaurant'>(
     'restaurant',
   )
   const [supplier, setSupplier] = useState('')
   const [restaurant, setRestaurant] = useState('')
-  const [deliveryDate, setDeliveryDate] = useState('2026-08-10')
+  const [deliveryDate, setDeliveryDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [deliveryTime, setDeliveryTime] = useState('')
-  const [poNumber] = useState('PO0000000001')
+  const [poNumber, setPoNumber] = useState('')
+  const [invoiceNo, setInvoiceNo] = useState('')
   const [lines, setLines] = useState<LineItem[]>([emptyLine()])
   const [deliveryCharges, setDeliveryCharges] = useState(0)
   const [recipientCanEdit, setRecipientCanEdit] = useState(true)
+  const [paymentType, setPaymentType] = useState<'unpaid' | 'paid'>('unpaid')
   const [error, setError] = useState('')
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
+  const [restaurants, setRestaurants] = useState<{ id: string; name: string }[]>(
+    [],
+  )
+  const quickAdd = useInventoryQuickAdd({
+    onSupplierCreated: (row) => setSuppliers((prev) => prependById(prev, row)),
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.purchase-return.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    {
+      returnTo,
+      supplier,
+      restaurant,
+      deliveryDate,
+      deliveryTime,
+      poNumber,
+      invoiceNo,
+      lines,
+      deliveryCharges,
+      recipientCanEdit,
+      paymentType,
+    },
+    (saved) => {
+      setReturnTo(saved.returnTo)
+      setSupplier(saved.supplier)
+      setRestaurant(saved.restaurant)
+      setDeliveryDate(saved.deliveryDate)
+      setDeliveryTime(saved.deliveryTime)
+      setPoNumber(saved.poNumber)
+      setInvoiceNo(saved.invoiceNo)
+      setLines(saved.lines)
+      setDeliveryCharges(saved.deliveryCharges)
+      setRecipientCanEdit(saved.recipientCanEdit)
+      setPaymentType(saved.paymentType)
+    },
+  )
 
   const totals = useMemo(() => {
     let subTotal = 0
+    let lineTax = 0
     for (const line of lines) {
       const amount =
         toNumber(line.amount) || toNumber(line.qty) * toNumber(line.price)
       subTotal += amount
+      lineTax +=
+        (amount *
+          (toNumber(line.cgst) + toNumber(line.sgst) + toNumber(line.igst))) /
+        100
     }
     return {
       subTotal,
-      grand: Math.max(0, subTotal + deliveryCharges),
+      lineTax,
+      grand: Math.max(0, subTotal + lineTax + deliveryCharges),
     }
   }, [lines, deliveryCharges])
+
+  const supplierNames = suppliers.filter((row) => row.is_active).map((row) => row.name)
+  const restaurantNames = restaurants.map((row) => row.name)
+  const rawNames = rawMaterials.map((row) => row.name)
+  const unitNames = units.filter((row) => row.is_active).map((row) => row.name)
+
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    void listSuppliersApi().then(setSuppliers).catch(() => setSuppliers([]))
+    void listAllRawMaterialsApi(encryptedOutletId)
+      .then(setRawMaterials)
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
+    void listOutletsApi()
+      .then((rows) =>
+        setRestaurants(
+          rows
+            .filter((row) => row.encrypted_id !== encryptedOutletId)
+            .map((row) => ({
+              id: row.encrypted_id,
+              name: row.outlet_name,
+            })),
+        ),
+      )
+      .catch(() => setRestaurants([]))
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!id || !encryptedOutletId) return
+    getPurchaseReturnApi(encryptedOutletId, id)
+      .then((row) => {
+        setReturnTo(row.source_type === 'supplier' ? 'supplier' : 'restaurant')
+        setSupplier(row.supplier_name ?? '')
+        setRestaurant(row.restaurant_name ?? '')
+        setDeliveryDate(row.delivery_date)
+        setDeliveryTime(row.delivery_time ? String(row.delivery_time).slice(0, 5) : '')
+        setPoNumber(row.po_number)
+        setInvoiceNo(row.invoice_number ?? '')
+        setDeliveryCharges(Number(row.delivery_charges) || 0)
+        setRecipientCanEdit(row.recipient_can_edit)
+        setPaymentType(row.payment_status === 'paid' ? 'paid' : 'unpaid')
+        setLines(
+          row.lines.length
+            ? row.lines.map((line) => ({
+                id: `line-${line.raw_material_id}-${Math.random()}`,
+                selected: false,
+                rawMaterial: line.raw_material_name,
+                qty: line.qty,
+                unit: line.unit_name,
+                price: line.price,
+                amount: line.amount,
+                cgst: line.cgst,
+                sgst: line.sgst,
+                igst: line.igst,
+              }))
+            : [emptyLine()],
+        )
+      })
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load purchase return',
+        )
+      })
+  }, [id, encryptedOutletId])
 
   function updateLine(id: string, patch: Partial<LineItem>) {
     setLines((prev) =>
@@ -126,7 +276,47 @@ export default function AddPurchaseReturn() {
     setLines((prev) => prev.map((line) => ({ ...line, selected: checked })))
   }
 
-  function handleSave() {
+  function deleteSelectedLines() {
+    setLines((prev) => {
+      const next = prev.filter((line) => !line.selected)
+      return next.length ? next : [emptyLine()]
+    })
+    showToast('Selected rows removed')
+  }
+
+  function clearEmptyLines() {
+    setLines((prev) => {
+      const next = prev.filter(
+        (line) =>
+          line.rawMaterial.trim() ||
+          line.qty.trim() ||
+          Number(line.price) > 0,
+      )
+      return next.length ? next : [emptyLine()]
+    })
+    showToast('Empty rows cleared')
+  }
+
+  function exportLinesCsv() {
+    downloadCsv(
+      ['raw_material', 'qty', 'unit', 'price', 'amount', 'cgst', 'sgst', 'igst'],
+      lines.map((line) => [
+        line.rawMaterial,
+        line.qty,
+        line.unit,
+        line.price,
+        line.amount,
+        line.cgst,
+        line.sgst,
+        line.igst,
+      ]),
+      `purchase-return-lines-${poNumber || 'draft'}.csv`,
+    )
+    showToast('Lines exported')
+  }
+
+  async function handleSave() {
+    if (!canWrite || !encryptedOutletId) return
     if (returnTo === 'supplier' && !supplier) {
       setError('Please select a supplier')
       return
@@ -139,27 +329,79 @@ export default function AddPurchaseReturn() {
       setError('Delivery date is required')
       return
     }
-    const validLine = lines.some(
+    const validLines = lines.filter(
       (line) => line.rawMaterial && toNumber(line.qty) > 0 && line.unit,
     )
-    if (!validLine) {
+    if (validLines.length === 0) {
       setError('Add at least one raw material with qty and unit')
       return
     }
     setError('')
-    showToast('Purchase return saved')
-    window.setTimeout(() => {
+    setSaving(true)
+    try {
+      const payload = {
+        source_type: returnTo,
+        supplier_id:
+          returnTo === 'supplier'
+            ? suppliers.find((row) => row.name === supplier)?.id ?? null
+            : null,
+        restaurant_id:
+          returnTo === 'restaurant'
+            ? restaurants.find((row) => row.name === restaurant)?.id ?? null
+            : null,
+        delivery_date: deliveryDate,
+        delivery_time: deliveryTime || null,
+        po_number: poNumber,
+        invoice_number: invoiceNo,
+        recipient_can_edit: recipientCanEdit,
+        subtotal: String(totals.subTotal),
+        delivery_charges: String(deliveryCharges),
+        grand_total: String(totals.grand),
+        payment_status: paymentType,
+        lines: validLines.map((line) => {
+          const raw = rawMaterials.find((row) => row.name === line.rawMaterial)
+          const unit = units.find((row) => row.name === line.unit)
+          if (!raw || !unit) throw new Error('Select a saved raw material and unit')
+          return {
+            raw_material_id: raw.id,
+            qty: line.qty,
+            unit_id: unit.id,
+            price: line.price || '0',
+            amount: line.amount || String(toNumber(line.qty) * toNumber(line.price)),
+            cgst: line.cgst || '0',
+            sgst: line.sgst || '0',
+            igst: line.igst || '0',
+          }
+        }),
+      }
+      if (isEdit && id) await updatePurchaseReturnApi(encryptedOutletId, id, payload)
+      else await createPurchaseReturnApi(encryptedOutletId, payload)
+      draft.clearDraft()
+      showToast(isEdit ? 'Purchase return updated' : 'Purchase return saved')
       navigate('/inventory/purchase-return')
-    }, 900)
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Unable to save purchase return',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   const allSelected = lines.length > 0 && lines.every((line) => line.selected)
 
   return (
     <InventoryPageShell activeItem="purchase-return">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-bold text-ink">Add Purchase Return</h1>
+        <h1 className="text-lg font-bold text-ink">
+          {isEdit ? 'Edit Purchase Return' : 'Add Purchase Return'}
+        </h1>
         <div className="inline-flex overflow-hidden rounded-md border border-line">
           <button
             type="button"
@@ -195,10 +437,13 @@ export default function AddPurchaseReturn() {
               label={<>Supplier <span className="text-primary">*</span></>}
               required
               value={supplier}
-              options={SUPPLIERS}
+              options={supplierNames}
               placeholder="Select Supplier"
               searchPlaceholder="Search suppliers..."
               onChange={setSupplier}
+              onAddNew={quickAdd.handler('supplier', (row) =>
+                setSupplier(row.name),
+              )}
             />
           </div>
         ) : (
@@ -207,7 +452,7 @@ export default function AddPurchaseReturn() {
               label={<>Restaurant <span className="text-primary">*</span></>}
               required
               value={restaurant}
-              options={RESTAURANTS}
+              options={restaurantNames}
               placeholder="Select Restaurant"
               searchPlaceholder="Search restaurants..."
               onChange={setRestaurant}
@@ -239,16 +484,31 @@ export default function AddPurchaseReturn() {
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">
-            PO Number
+            Purchase Return No.
           </label>
           <input
             type="text"
             value={poNumber}
             readOnly
+            placeholder="Generated on save"
             className="h-10 w-40 rounded-md border border-line bg-page px-3 text-sm text-ink outline-none"
           />
         </div>
-        <OutlineButton variant="gray">Other Details</OutlineButton>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink">
+            Return Invoice / Debit Note No.
+          </label>
+          <input
+            type="text"
+            value={invoiceNo}
+            onChange={(event) => setInvoiceNo(event.target.value)}
+            placeholder="Optional reference"
+            className="h-10 w-52 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+          />
+        </div>
+        <OutlineButton variant="gray" onClick={() => setDetailsOpen(true)}>
+          Other Details
+        </OutlineButton>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
@@ -256,13 +516,22 @@ export default function AddPurchaseReturn() {
           <Plus size={15} />
           Add New
         </OutlineButton>
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
-        >
-          More Actions
-          <ChevronDown size={14} className="text-muted" />
-        </button>
+        <ActionDropdown
+          label="More Actions"
+          options={[
+            {
+              label: 'Delete selected',
+              onClick: deleteSelectedLines,
+              danger: true,
+            },
+            { label: 'Clear empty rows', onClick: clearEmptyLines },
+            { label: 'Export lines (CSV)', onClick: exportLinesCsv },
+            {
+              label: 'Add blank row',
+              onClick: () => setLines((prev) => [...prev, emptyLine()]),
+            },
+          ]}
+        />
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-card [&:has([aria-expanded=true])]:overflow-visible">
@@ -289,12 +558,22 @@ export default function AddPurchaseReturn() {
               </th>
               <th className="px-3 py-3">Price</th>
               <th className="px-3 py-3">Amount</th>
+              <th className="px-3 py-3">CGST %</th>
+              <th className="px-3 py-3">SGST %</th>
+              <th className="px-3 py-3">IGST %</th>
               <th className="px-3 py-3">Action</th>
             </tr>
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -309,19 +588,59 @@ export default function AddPurchaseReturn() {
                 <td className="px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
                   <SearchableSelect
                     value={line.rawMaterial}
-                    options={RAW_MATERIALS.map((m) => m.name)}
+                    options={rawNames}
                     placeholder="Select/Add Raw Material"
                     searchPlaceholder="Search materials..."
                     compact
                     dropdownPlacement="auto"
                     onChange={(value) => {
-                      const material = RAW_MATERIALS.find((m) => m.name === value)
+                      const material = rawMaterials.find((m) => m.name === value)
+                      const defaultPrice =
+                        material?.purchase_price && Number(material.purchase_price) > 0
+                          ? material.purchase_price
+                          : ''
                       updateLine(line.id, {
                         rawMaterial: value,
-                        unit: material?.unit ?? line.unit,
+                        unit: material?.consumption_unit.name ?? line.unit,
+                        ...(defaultPrice ? { price: defaultPrice } : {}),
                       })
                     }}
+                    onAddNew={quickAdd.handler('raw-material', (row) => {
+                      const defaultPrice =
+                        row.purchase_price && Number(row.purchase_price) > 0
+                          ? row.purchase_price
+                          : ''
+                      updateLine(line.id, {
+                        rawMaterial: row.name,
+                        unit: row.consumption_unit.name,
+                        ...(defaultPrice ? { price: defaultPrice } : {}),
+                      })
+                    })}
                   />
+                  {encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -334,21 +653,17 @@ export default function AddPurchaseReturn() {
                     className="h-9 w-20 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
                   />
                 </td>
-                <td className="px-3 py-2.5">
-                  <select
+                <td className="min-w-[130px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                  <SearchableSelect
                     value={line.unit}
-                    onChange={(event) =>
-                      updateLine(line.id, { unit: event.target.value })
+                    options={unitNames}
+                    placeholder="Unit"
+                    searchPlaceholder="Search unit..."
+                    compact
+                    onChange={(value) =>
+                      updateLine(line.id, { unit: value })
                     }
-                    className="h-9 w-24 rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">Unit</option>
-                    {UNITS.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -372,6 +687,19 @@ export default function AddPurchaseReturn() {
                     className="h-9 w-24 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
                   />
                 </td>
+                {(['cgst', 'sgst', 'igst'] as const).map((tax) => (
+                  <td key={tax} className="px-3 py-2.5">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={line[tax]}
+                      onChange={(event) =>
+                        updateLine(line.id, { [tax]: event.target.value })
+                      }
+                      className="h-9 w-20 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
+                    />
+                  </td>
+                ))}
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-1">
                     <button
@@ -424,14 +752,65 @@ export default function AddPurchaseReturn() {
               {formatAmount(deliveryCharges)}
             </span>
           </button>
+          <div className="flex items-center justify-between text-ink">
+            <span>GST Total</span>
+            <span className="font-semibold">{formatAmount(totals.lineTax)}</span>
+          </div>
           <div className="flex items-center justify-between border-t border-line pt-2 text-base font-bold text-ink">
             <span>Grand Total</span>
             <span>{formatAmount(totals.grand)}</span>
           </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="font-medium text-ink">Refund Status</span>
+            <div className="inline-flex overflow-hidden rounded-md border border-line">
+              <button
+                type="button"
+                onClick={() => setPaymentType('unpaid')}
+                className={`h-8 px-3 text-xs font-semibold ${
+                  paymentType === 'unpaid'
+                    ? 'bg-primary text-white'
+                    : 'bg-card text-ink hover:bg-page'
+                }`}
+              >
+                Pending
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentType('paid')}
+                className={`h-8 px-3 text-xs font-semibold ${
+                  paymentType === 'paid'
+                    ? 'bg-primary text-white'
+                    : 'bg-card text-ink hover:bg-page'
+                }`}
+              >
+                Refunded
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {isEdit && id && encryptedOutletId ? (
+        <PaymentHistoryPanel
+          outletId={encryptedOutletId}
+          documentType="purchase_return"
+          documentId={id}
+          canAdd={canWrite}
+          terminology="refund"
+        />
+      ) : null}
+
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -451,9 +830,20 @@ export default function AddPurchaseReturn() {
           >
             Cancel
           </button>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          {canWrite ? (
+            <PrimaryButton onClick={() => void handleSave()}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </PrimaryButton>
+          ) : null}
         </div>
       </div>
+
+      <OtherDetailsDrawer
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        variant="sales"
+      />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }

@@ -18,6 +18,7 @@ import {
 } from '../services/authService'
 import { getPermissionCatalogApi } from '../services/permissionService'
 import { useRoles } from '../state/RoleContext'
+import { useInventoryMasters } from '../state/InventoryMastersContext'
 import { switchOutletApi } from '../services/outletService'
 import {
   AUTH_ENCRYPTED_OUTLET_KEY,
@@ -119,6 +120,7 @@ function encryptedIdForOutlet(
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { clearRoles } = useRoles()
+  const { clearMasters } = useInventoryMasters()
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem(AUTH_TOKEN_KEY),
   )
@@ -216,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     clearAuthStorage()
     clearRoles()
+    clearMasters()
     setToken(null)
     setRefresh(null)
     setUser(null)

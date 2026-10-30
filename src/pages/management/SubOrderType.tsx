@@ -4,6 +4,8 @@ import { showToast } from '../../utils/toast'
 import { Pencil, Plus, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '../../components/common/Badge'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import {
   ActionDropdown,
@@ -42,6 +44,18 @@ export default function SubOrderType() {
     })
   }, [rows, appliedQuery, statusFilter])
 
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filtered,
+    (row) => [row.name, row.type, row.orderTypes, row.active, row.created],
+    (row, key) => {
+      if (key === 'type') return row.type
+      if (key === 'orderTypes') return row.orderTypes
+      if (key === 'status') return row.active ? 1 : 0
+      if (key === 'created') return row.created
+      return row.name
+    },
+  )
+
 
   function handleSearch() {
     setAppliedQuery(nameQuery.trim())
@@ -64,11 +78,11 @@ export default function SubOrderType() {
   }
 
   function toggleSelectAll() {
-    if (selectedIds.size === filtered.length) {
+    if (selectedIds.size === visible.length) {
       setSelectedIds(new Set())
       return
     }
-    setSelectedIds(new Set(filtered.map((row) => row.id)))
+    setSelectedIds(new Set(visible.map((row) => row.id)))
   }
 
   function setActive(active: boolean) {
@@ -151,7 +165,7 @@ export default function SubOrderType() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="flex min-h-[320px] flex-col items-center justify-center px-6 py-16 text-center">
             <Search
               size={48}
@@ -172,24 +186,64 @@ export default function SubOrderType() {
                     <input
                       type="checkbox"
                       checked={
-                        filtered.length > 0 &&
-                        selectedIds.size === filtered.length
+                        visible.length > 0 &&
+                        selectedIds.size === visible.length
                       }
                       onChange={toggleSelectAll}
                       className="size-4 cursor-pointer accent-primary"
                       aria-label="Select all"
                     />
                   </th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Order Type</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Created</th>
+                  <SortableTh
+                    columnKey="name"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Name
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="type"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Type
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="orderTypes"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Order Type
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="status"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Status
+                  </SortableTh>
+                  <SortableTh
+                    columnKey="created"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                    className="px-4 py-3"
+                  >
+                    Created
+                  </SortableTh>
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
+                {visible.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-line last:border-0 hover:bg-page/50"

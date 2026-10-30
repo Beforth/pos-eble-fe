@@ -18,6 +18,7 @@ import { ConfirmDeleteModal } from '../components/common/ConfirmDeleteModal'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
 import { AddTagDrawer } from '../components/menu/AddTagDrawer'
 import { RowActionButton } from '../components/menu/MenuActionButtons'
+import { PaginationControls } from '../components/common/PaginationControls'
 import { useAuth } from '../auth/AuthContext'
 import { listParentCategoriesApi, deleteParentCategoryApi, listMenuGroupsApi, deleteMenuGroupApi, deleteCategoryApi } from '../services/menuService'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
@@ -185,11 +186,19 @@ export default function CategoryManagement() {
     }
   }, [searchParams])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
   useEffect(() => {
     setQuery('')
     setAppliedQuery('')
     setSelected(new Set())
+    setPage(1)
   }, [subTab])
+
+  useEffect(() => {
+    setPage(1)
+  }, [appliedQuery])
 
   const categoryRows = useMemo(() => {
     const q = appliedQuery.trim().toLowerCase()
@@ -204,6 +213,21 @@ export default function CategoryManagement() {
 
   const parentRows = parents
   const groupRows = groups
+
+  const pagedParentRows = useMemo(
+    () => parentRows.slice((page - 1) * pageSize, page * pageSize),
+    [parentRows, page, pageSize],
+  )
+
+  const pagedCategoryRows = useMemo(
+    () => categoryRows.slice((page - 1) * pageSize, page * pageSize),
+    [categoryRows, page, pageSize],
+  )
+
+  const pagedGroupRows = useMemo(
+    () => groupRows.slice((page - 1) * pageSize, page * pageSize),
+    [groupRows, page, pageSize],
+  )
 
   const showEmpty =
     (subTab === 'grouping' && groupRows.length === 0) ||
@@ -492,7 +516,7 @@ export default function CategoryManagement() {
                 </tr>
               </thead>
               <tbody>
-                {parentRows.map((row) => {
+                {pagedParentRows.map((row) => {
                   const checked = selected.has(row.id)
                   const childNames =
                     (row.categories ?? [])
@@ -557,6 +581,13 @@ export default function CategoryManagement() {
               </tbody>
             </table>
           </div>
+          <PaginationControls
+            totalRecords={parentRows.length}
+            currentPage={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </>
       ) : null}
 
@@ -586,7 +617,7 @@ export default function CategoryManagement() {
                 </tr>
               </thead>
               <tbody>
-                {categoryRows.map((row) => {
+                {pagedCategoryRows.map((row) => {
                   const checked = selected.has(row.id)
                   return (
                     <tr
@@ -661,9 +692,13 @@ export default function CategoryManagement() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm text-muted">
-            Showing 1 to {categoryRows.length} of {categoryRows.length} records
-          </p>
+          <PaginationControls
+            totalRecords={categoryRows.length}
+            currentPage={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </>
       ) : null}
 
@@ -692,7 +727,7 @@ export default function CategoryManagement() {
                 </tr>
               </thead>
               <tbody>
-                {groupRows.map((row) => {
+                {pagedGroupRows.map((row) => {
                   const checked = selected.has(row.id)
                   const childNames =
                     (row.categories ?? []).map((c) => c.name).join(', ') || '—'
@@ -745,9 +780,13 @@ export default function CategoryManagement() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm text-muted">
-            Showing 1 to {groupRows.length} of {groupRows.length} records
-          </p>
+          <PaginationControls
+            totalRecords={groupRows.length}
+            currentPage={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </>
       ) : null}
 

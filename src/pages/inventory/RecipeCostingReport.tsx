@@ -287,13 +287,16 @@ export default function RecipeCostingReport() {
   const [calculateFrom, setCalculateFrom] = useState(
     'Latest average purchase price',
   )
-  const [appliedMenu, setAppliedMenu] = useState('All')
+  const [applied, setApplied] = useState({
+    menuName: 'All',
+    calculateFrom: 'Latest average purchase price',
+  })
   const [selectedRow, setSelectedRow] = useState<RecipeRow | null>(null)
 
   const rows = useMemo(() => {
-    if (appliedMenu === 'All') return ALL_ROWS
-    return ALL_ROWS.filter((row) => row.menuName === appliedMenu)
-  }, [appliedMenu])
+    if (applied.menuName === 'All') return ALL_ROWS
+    return ALL_ROWS.filter((row) => row.menuName === applied.menuName)
+  }, [applied.menuName])
 
 
   return (
@@ -332,7 +335,7 @@ export default function RecipeCostingReport() {
         </div>
         <OutlineButton
           onClick={() => {
-            setAppliedMenu(menuName)
+            setApplied({ menuName, calculateFrom })
             showToast('Search applied')
           }}
         >
@@ -343,13 +346,19 @@ export default function RecipeCostingReport() {
           onClick={() => {
             setMenuName('All')
             setCalculateFrom('Latest average purchase price')
-            setAppliedMenu('All')
-            showToast('Filters cleared')
+            setApplied({
+              menuName: 'All',
+              calculateFrom: 'Latest average purchase price',
+            })
           }}
         >
           Clear Filter
         </OutlineButton>
       </div>
+
+      <p className="mb-3 text-xs text-muted">
+        Applied: menu={applied.menuName} · calculateFrom={applied.calculateFrom}
+      </p>
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="overflow-x-auto">

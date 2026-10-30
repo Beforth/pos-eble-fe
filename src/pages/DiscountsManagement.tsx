@@ -9,6 +9,7 @@ import {
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { NoRecordFound } from '../components/menu/NoRecordFound'
 import { SelectRecordAlert } from '../components/menu/SelectRecordAlert'
+import { PaginationControls } from '../components/common/PaginationControls'
 import { useAuth } from '../auth/AuthContext'
 import { showToast } from '../utils/toast'
 import { listDiscountsApi } from '../services/menuService'
@@ -29,6 +30,8 @@ export default function DiscountsManagement() {
   const [discounts, setDiscounts] = useState<DiscountRow[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectAlertOpen, setSelectAlertOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   useEffect(() => {
     let cancelled = false
@@ -132,40 +135,49 @@ export default function DiscountsManagement() {
               </tr>
             </thead>
             <tbody>
-              {discounts.map((row) => (
-                <tr
-                  key={row.id}
-                  className="border-b border-line last:border-b-0 hover:bg-page/80"
-                >
-                  <td className="px-3 py-3.5">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.id)}
-                      onChange={() => toggleRow(row.id)}
-                      className="cursor-pointer accent-primary"
-                    />
-                  </td>
-                  <td className="px-3 py-3.5 font-medium text-ink">
-                    {row.name}
-                  </td>
-                  <td className="px-3 py-3.5 text-ink">{row.type}</td>
-                  <td className="px-3 py-3.5 tabular-nums text-ink">
-                    {row.type === 'Percentage' ? `${row.value}%` : row.value}
-                  </td>
-                  <td className="px-3 py-3.5 tabular-nums text-ink">
-                    {row.maxAmount === null ? '—' : row.maxAmount}
-                  </td>
-                  <td
-                    className={`px-3 py-3.5 font-medium ${
-                      row.active ? 'text-success' : 'text-muted'
-                    }`}
+              {discounts
+                .slice((page - 1) * pageSize, page * pageSize)
+                .map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-b border-line last:border-b-0 hover:bg-page/80"
                   >
-                    {row.active ? 'Active' : 'Inactive'}
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-3 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleRow(row.id)}
+                        className="cursor-pointer accent-primary"
+                      />
+                    </td>
+                    <td className="px-3 py-3.5 font-medium text-ink">
+                      {row.name}
+                    </td>
+                    <td className="px-3 py-3.5 text-ink">{row.type}</td>
+                    <td className="px-3 py-3.5 tabular-nums text-ink">
+                      {row.type === 'Percentage' ? `${row.value}%` : row.value}
+                    </td>
+                    <td className="px-3 py-3.5 tabular-nums text-ink">
+                      {row.maxAmount === null ? '—' : row.maxAmount}
+                    </td>
+                    <td
+                      className={`px-3 py-3.5 font-medium ${
+                        row.active ? 'text-success' : 'text-muted'
+                      }`}
+                    >
+                      {row.active ? 'Active' : 'Inactive'}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
+          <PaginationControls
+            totalRecords={discounts.length}
+            currentPage={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

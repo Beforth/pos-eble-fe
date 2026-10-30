@@ -1,9 +1,12 @@
 import { useState } from 'react'
 
-import { showToast } from '../../utils/toast'
-import { FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  REPORT_UNAVAILABLE_MESSAGE,
+  ReportEmptyState,
+  ReportUnavailableNotice,
+} from '../../components/inventory/ReportUnavailableNotice'
 import { DateTimeField } from '../../components/common/DateTimeField'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
 
@@ -37,7 +40,6 @@ export default function StockReportTimewise() {
   const [fromDateTime, setFromDateTime] = useState(defaultFromDate)
   const [toDateTime, setToDateTime] = useState(defaultToDate)
 
-
   function handleClear() {
     setRawMaterial('')
     setUnit('Purchase Unit')
@@ -48,10 +50,11 @@ export default function StockReportTimewise() {
 
   return (
     <InventoryPageShell activeItem="other-reports">
-
       <div className="mb-4">
         <h1 className="text-lg font-bold text-ink">Stock Report Timewise</h1>
       </div>
+
+      <ReportUnavailableNotice />
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
         <div className="min-w-[150px] flex-1">
@@ -99,7 +102,7 @@ export default function StockReportTimewise() {
           onChange={setToDateTime}
           defaultTime={{ hours: 23, minutes: 59, seconds: 59 }}
         />
-        <OutlineButton onClick={() => showToast('Search applied')}>
+        <OutlineButton disabled title={REPORT_UNAVAILABLE_MESSAGE}>
           Search
         </OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
@@ -107,19 +110,7 @@ export default function StockReportTimewise() {
         </OutlineButton>
       </div>
 
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-        <span className="relative mb-4 text-muted">
-          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
-          <Search
-            size={24}
-            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-          />
-        </span>
-        <p className="text-base font-semibold text-ink">No Record Found</p>
-        <p className="mt-1 max-w-sm text-sm text-muted">
-          We could not find what you searched for Try searching again
-        </p>
-      </div>
+      <ReportEmptyState title="No Record Found" />
     </InventoryPageShell>
   )
 }

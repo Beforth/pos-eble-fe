@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 
 interface NotificationLogEntry {
   id: string
@@ -13,6 +16,18 @@ interface NotificationLogEntry {
 
 export default function NotificationLogs() {
   const [notifications] = useState<NotificationLogEntry[]>([])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      notifications,
+      (row) => [row.dateTime, row.title, row.message, row.type, row.target],
+      (row, key) => {
+        if (key === 'title') return row.title
+        if (key === 'message') return row.message
+        if (key === 'type') return row.type
+        if (key === 'target') return row.target
+        return row.dateTime
+      },
+    )
 
   return (
     <ReportsPageShell
@@ -33,19 +48,68 @@ export default function NotificationLogs() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
+              <div className="border-b border-line p-4">
+                <ListSearch
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search notifications"
+                />
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-ink">
                 <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="px-4 py-3">Date & Time</th>
-                    <th className="px-4 py-3">Notification Title</th>
-                    <th className="px-4 py-3">Message</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3 text-right">Recipient</th>
+                    <SortableTh
+                      columnKey="dateTime"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Date & Time
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="title"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Notification Title
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="message"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Message
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="type"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Type
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="target"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-4 py-3"
+                    >
+                      Recipient
+                    </SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {notifications.map((n) => (
+                  {visible.map((n) => (
                     <tr
                       key={n.id}
                       className="transition-colors hover:bg-page/50"
@@ -67,6 +131,7 @@ export default function NotificationLogs() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>

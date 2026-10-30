@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { Calendar, RotateCcw, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
@@ -48,6 +51,26 @@ export default function ExpenseLogsPage() {
   const [updateType, setUpdateType] = useState('All')
   const [isSearched, setIsSearched] = useState(true)
   const [logs, setLogs] = useState<ExpenseLogEntry[]>([])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      logs,
+      (row) => [
+        row.dateTime,
+        row.category,
+        row.amount,
+        row.updateType,
+        row.remarks,
+        row.performedBy,
+      ],
+      (row, key) => {
+        if (key === 'category') return row.category
+        if (key === 'amount') return row.amount
+        if (key === 'updateType') return row.updateType
+        if (key === 'remarks') return row.remarks
+        if (key === 'performedBy') return row.performedBy
+        return row.dateTime
+      },
+    )
 
 
   function handleSearch() {
@@ -148,20 +171,77 @@ export default function ExpenseLogsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
+              <div className="border-b border-line p-4">
+                <ListSearch
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search expense logs"
+                />
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-ink">
                 <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="px-4 py-3">Date & Time</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Amount (₹)</th>
-                    <th className="px-4 py-3">Update Type</th>
-                    <th className="px-4 py-3">Remarks</th>
-                    <th className="px-4 py-3 text-right">Performed By</th>
+                    <SortableTh
+                      columnKey="dateTime"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Date & Time
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="category"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Category
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="amount"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Amount (₹)
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="updateType"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Update Type
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="remarks"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      className="px-4 py-3"
+                    >
+                      Remarks
+                    </SortableTh>
+                    <SortableTh
+                      columnKey="performedBy"
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={toggleSort}
+                      align="right"
+                      className="px-4 py-3"
+                    >
+                      Performed By
+                    </SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {logs.map((l) => (
+                  {visible.map((l) => (
                     <tr
                       key={l.id}
                       className="transition-colors hover:bg-page/50"
@@ -188,6 +268,7 @@ export default function ExpenseLogsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>

@@ -3,6 +3,9 @@ import { useState } from 'react'
 import { showToast } from '../../utils/toast'
 import { Calendar, RotateCcw, Search } from 'lucide-react'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { ListSearch } from '../../components/common/ListSearch'
+import { SortableTh } from '../../components/common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import {
   OutlineButton,
@@ -52,6 +55,18 @@ export default function AutoAcceptChangeLogs() {
   )
   const [isSearched, setIsSearched] = useState(true)
   const [logs, setLogs] = useState<AutoAcceptLogEntry[]>([])
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      logs,
+      (row) => [row.dateTime, row.outlet, row.platform, row.status, row.performedBy],
+      (row, key) => {
+        if (key === 'outlet') return row.outlet
+        if (key === 'platform') return row.platform
+        if (key === 'status') return row.status
+        if (key === 'performedBy') return row.performedBy
+        return row.dateTime
+      },
+    )
 
 
   function handleSearch() {
@@ -155,19 +170,27 @@ export default function AutoAcceptChangeLogs() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
+              <div className="border-b border-line p-4">
+                <ListSearch
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search auto-accept logs"
+                />
+              </div>
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-ink">
                 <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="px-4 py-3">Date & Time</th>
-                    <th className="px-4 py-3">Outlet</th>
-                    <th className="px-4 py-3">Platform</th>
-                    <th className="px-4 py-3">Auto Accept Status</th>
-                    <th className="px-4 py-3 text-right">Performed By</th>
+                    <SortableTh columnKey="dateTime" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Date & Time</SortableTh>
+                    <SortableTh columnKey="outlet" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Outlet</SortableTh>
+                    <SortableTh columnKey="platform" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Platform</SortableTh>
+                    <SortableTh columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-3">Auto Accept Status</SortableTh>
+                    <SortableTh columnKey="performedBy" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-3">Performed By</SortableTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {logs.map((log) => (
+                  {visible.map((log) => (
                     <tr
                       key={log.id}
                       className="transition-colors hover:bg-page/50"
@@ -197,6 +220,7 @@ export default function AutoAcceptChangeLogs() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>

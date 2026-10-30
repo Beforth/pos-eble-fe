@@ -1,6 +1,8 @@
 import type { PlatformRow } from '../../types'
 import { formatINR, formatNumber } from '../../utils/format'
+import { ListSearch } from '../common/ListSearch'
 import { Table, type Column } from '../common/Table'
+import { useListQuery } from '../../hooks/useListQuery'
 
 interface PlatformOrdersTableProps {
   platforms: PlatformRow[]
@@ -13,7 +15,20 @@ const platformDot: Record<string, string> = {
 }
 
 export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
-  const totals = platforms.reduce(
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
+    useListQuery(
+      platforms,
+      (row) => [row.platform, row.brands, row.orders, row.prepaidRevenue, row.codRevenue, row.revenue],
+      (row, key) => {
+        if (key === 'orders') return row.orders
+        if (key === 'prepaid') return row.prepaidRevenue
+        if (key === 'cod') return row.codRevenue
+        if (key === 'revenue') return row.revenue
+        return row.platform
+      },
+    )
+
+  const totals = visible.reduce(
     (acc, row) => ({
       orders: acc.orders + row.orders,
       prepaid: acc.prepaid + row.prepaidRevenue,
@@ -27,6 +42,7 @@ export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
     {
       key: 'platform',
       header: 'Platform',
+      sortable: true,
       render: (row) => (
         <span className="flex items-center gap-2">
           <span
@@ -45,6 +61,7 @@ export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
       key: 'orders',
       header: 'Orders',
       align: 'right',
+      sortable: true,
       render: (row) => (
         <span className="tabular-nums">{formatNumber(row.orders)}</span>
       ),
@@ -53,6 +70,7 @@ export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
       key: 'prepaid',
       header: 'Prepaid Orders',
       align: 'right',
+      sortable: true,
       render: (row) => (
         <span className="tabular-nums">
           {row.prepaidRevenue > 0 ? formatINR(row.prepaidRevenue) : '—'}
@@ -63,6 +81,7 @@ export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
       key: 'cod',
       header: 'COD Orders',
       align: 'right',
+      sortable: true,
       render: (row) => (
         <span className="tabular-nums">
           {row.codRevenue > 0 ? formatINR(row.codRevenue) : '—'}
@@ -73,6 +92,7 @@ export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
       key: 'revenue',
       header: 'Revenue',
       align: 'right',
+      sortable: true,
       render: (row) => (
         <span className="font-semibold text-ink tabular-nums">
           {formatINR(row.revenue)}
@@ -102,12 +122,22 @@ export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
   )
 
   return (
-    <Table
-      columns={columns}
-      rows={platforms}
-      rowKey={(row) => row.platform}
-      footer={footer}
-      dense
-    />
+    <div className="space-y-3">
+      <ListSearch
+        value={search}
+        onChange={setSearch}
+        placeholder="Search platforms"
+      />
+      <Table
+        columns={columns}
+        rows={visible}
+        rowKey={(row) => row.platform}
+        footer={footer}
+        dense
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={toggleSort}
+      />
+    </div>
   )
 }

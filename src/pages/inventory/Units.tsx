@@ -2,18 +2,27 @@ import { useEffect, useId, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { createPortal } from 'react-dom'
+import { FileText, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useNavigate } from '../../utils/inventoryRouter'
-import { FileText, Pencil, Plus, X } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
+import { SortableTh } from '../../components/common/SortableTh'
+import { PaginationControls } from '../../components/common/PaginationControls'
+import { useListQuery } from '../../hooks/useListQuery'
 import {
   OutlineButton,
   PrimaryButton,
   RowActionButton,
 } from '../../components/menu/MenuActionButtons'
-import { UNITS, type UnitRow } from '../../mocks/unitsData'
-
-const PAGE_SIZE = 10
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_WRITE_PERMISSION,
+  deleteUnitApi,
+  formatInventoryStamp,
+  type InventoryUnit,
+} from '../../services/inventoryService'
 
 function UnitNameModal({
   open,
@@ -21,7 +30,7 @@ function UnitNameModal({
   onClose,
 }: {
   open: boolean
-  unit: UnitRow | null
+  unit: InventoryUnit | null
   onClose: () => void
 }) {
   const titleId = useId()
@@ -83,26 +92,42 @@ function UnitNameModal({
 
 export default function Units() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<UnitRow[]>(() => [...UNITS])
+  const { hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_WRITE_PERMISSION)
+  const { units, status, error, loadMasters, removeUnit } = useInventoryMasters()
   const [nameInput, setNameInput] = useState('')
   const [appliedName, setAppliedName] = useState('')
   const [page, setPage] = useState(1)
-  const [viewUnit, setViewUnit] = useState<UnitRow | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<UnitRow | null>(null)
+  const [pageSize, setPageSize] = useState(25)
+  const [viewUnit, setViewUnit] = useState<InventoryUnit | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<InventoryUnit | null>(null)
 
+  useEffect(() => {
+    void loadMasters({ force: true })
+  }, [loadMasters])
 
   const filteredRows = useMemo(() => {
     const q = appliedName.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter((row) => row.name.toLowerCase().includes(q))
-  }, [rows, appliedName])
+    if (!q) return units
+    return units.filter((row) => row.name.toLowerCase().includes(q))
+  }, [units, appliedName])
 
-  const totalRecords = filteredRows.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filteredRows,
+    (row) => [row.name, row.created_at, row.updated_at],
+    (row, key) => {
+      if (key === 'created') return row.created_at
+      if (key === 'modified') return row.updated_at
+      return row.name
+    },
+  )
+
+  const totalRecords = visible.length
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const pageRows = filteredRows.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+  const pageRows = visible.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
   )
 
   function handleSearch() {
@@ -116,22 +141,32 @@ export default function Units() {
     setPage(1)
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!pendingDelete) return
-    setRows((prev) => prev.filter((row) => row.id !== pendingDelete.id))
-    showToast('Unit deleted')
+    try {
+      await deleteUnitApi(pendingDelete.id)
+      removeUnit(pendingDelete.id)
+      showToast('Unit deleted')
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Unable to delete unit')
+    }
   }
 
   return (
     <InventoryPageShell activeItem="units">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Unit Management</h1>
-        <PrimaryButton onClick={() => navigate('/inventory/units/new')}>
-          <Plus size={15} />
-          Create New
-        </PrimaryButton>
+        {canWrite ? (
+          <PrimaryButton onClick={() => navigate('/inventory/units/new')}>
+            <Plus size={15} />
+            Create New
+          </PrimaryButton>
+        ) : null}
       </div>
+
+      {status === 'error' && error ? (
+        <p className="mb-3 text-sm text-primary">{error}</p>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
         <div className="min-w-[220px] flex-1">
@@ -159,9 +194,33 @@ export default function Units() {
           <table className="min-w-[720px] w-full text-left text-sm">
             <thead className="border-b border-line bg-page text-xs font-semibold text-ink">
               <tr>
-                <th className="px-3 py-2.5">Name</th>
-                <th className="px-3 py-2.5">Created</th>
-                <th className="px-3 py-2.5">Modified</th>
+                <SortableTh
+                  columnKey="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Name
+                </SortableTh>
+                <SortableTh
+                  columnKey="created"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Created
+                </SortableTh>
+                <SortableTh
+                  columnKey="modified"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  className="px-3 py-2.5"
+                >
+                  Modified
+                </SortableTh>
                 <th className="px-3 py-2.5 text-center">Actions</th>
               </tr>
             </thead>
@@ -172,7 +231,9 @@ export default function Units() {
                     colSpan={4}
                     className="px-3 py-16 text-center text-sm font-semibold text-ink"
                   >
-                    Unit Management Record Not Found
+                    {status === 'loading'
+                      ? 'Loading units…'
+                      : 'Unit Management Record Not Found'}
                   </td>
                 </tr>
               ) : (
@@ -184,8 +245,12 @@ export default function Units() {
                     }`}
                   >
                     <td className="px-3 py-2.5 text-ink">{row.name}</td>
-                    <td className="px-3 py-2.5 text-ink">{row.created}</td>
-                    <td className="px-3 py-2.5 text-ink">{row.modified}</td>
+                    <td className="px-3 py-2.5 text-ink">
+                      {formatInventoryStamp(row.created_at)}
+                    </td>
+                    <td className="px-3 py-2.5 text-ink">
+                      {formatInventoryStamp(row.updated_at)}
+                    </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-center gap-1.5">
                         <RowActionButton
@@ -195,24 +260,24 @@ export default function Units() {
                         >
                           <FileText size={15} strokeWidth={1.75} />
                         </RowActionButton>
-                        <RowActionButton
-                          boxed
-                          label="Edit"
-                          onClick={() =>
-                            navigate(`/inventory/units/${row.id}/edit`, {
-                              state: { row },
-                            })
-                          }
-                        >
-                          <Pencil size={15} strokeWidth={1.75} />
-                        </RowActionButton>
-                        {row.canDelete ? (
+                        {canWrite ? (
+                          <RowActionButton
+                            boxed
+                            label="Edit"
+                            onClick={() =>
+                              navigate(`/inventory/units/${row.id}/edit`)
+                            }
+                          >
+                            <Pencil size={15} strokeWidth={1.75} />
+                          </RowActionButton>
+                        ) : null}
+                        {canWrite ? (
                           <RowActionButton
                             boxed
                             label="Delete"
                             onClick={() => setPendingDelete(row)}
                           >
-                            <X size={15} strokeWidth={1.75} />
+                            <Trash2 size={15} strokeWidth={1.75} />
                           </RowActionButton>
                         ) : null}
                       </div>
@@ -224,52 +289,13 @@ export default function Units() {
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
-          <p className="text-sm text-muted">
-            {totalRecords === 0
-              ? 'Showing 0 records'
-              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1} to ${Math.min(
-                  currentPage * PAGE_SIZE,
-                  totalRecords,
-                )} of ${totalRecords} records`}
-          </p>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .slice(0, 8)
-              .map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPage(n)}
-                  className={`flex size-8 items-center justify-center rounded-lg border text-sm font-medium ${
-                    currentPage === n
-                      ? 'border-primary bg-primary text-white'
-                      : 'border-line bg-card text-ink hover:bg-page'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() =>
-                setPage((prev) => Math.min(totalPages, prev + 1))
-              }
-              className="h-8 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            >
-              Next
-            </button>
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage(totalPages)}
-              className="h-8 rounded-lg border border-line px-3 text-sm font-medium text-ink hover:bg-page disabled:opacity-40"
-            >
-              Last
-            </button>
-          </div>
-        </div>
+        <PaginationControls
+          totalRecords={totalRecords}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       <UnitNameModal
@@ -283,7 +309,7 @@ export default function Units() {
         target={pendingDelete?.name}
         message="This unit stops appearing when you enter quantities."
         confirmLabel="Delete"
-        onConfirm={confirmDelete}
+        onConfirm={() => void confirmDelete()}
         onClose={() => setPendingDelete(null)}
       />
     </InventoryPageShell>

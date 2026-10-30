@@ -1,4 +1,5 @@
-import { apiRequest } from './apiClient'
+import { apiRequest, multipartApiRequest } from './apiClient'
+import { AUTH_TOKEN_KEY } from '../auth/storage'
 
 export interface LoginCredentials {
   identifier: string
@@ -25,11 +26,16 @@ export interface RoleSummary {
 export interface AuthUser {
   name: string
   identifier: string
+  firstName?: string
+  lastName?: string
+  email?: string
   outlet: string
   outletId?: number | null
   encryptedOutletId?: string
   phone?: string
   photoUrl?: string
+  userCode?: string
+  lastLoginIp?: string
   role?: RoleSummary | null
   roleId?: string | null
   groups: string[]
@@ -67,10 +73,13 @@ type ApiUser = {
   id: number
   username: string
   name: string
+  first_name?: string | null
+  last_name?: string | null
   email?: string | null
   phone?: string | null
   photo?: string | null
   user_code?: string | null
+  last_login_ip?: string | null
   role?: RoleSummary | null
   role_id?: string | null
   groups?: string[]
@@ -111,10 +120,15 @@ function mapUser(apiUser: ApiUser, fallbackIdentifier: string): AuthUser {
   return {
     name: apiUser.name,
     identifier: apiUser.username || fallbackIdentifier,
+    firstName: apiUser.first_name ?? undefined,
+    lastName: apiUser.last_name ?? undefined,
+    email: apiUser.email ?? undefined,
     outlet: active?.outletName || '',
     outletId: active?.outletId ?? null,
     phone: apiUser.phone ?? undefined,
     photoUrl: apiUser.photo ?? undefined,
+    userCode: apiUser.user_code ?? undefined,
+    lastLoginIp: apiUser.last_login_ip ?? undefined,
     role: apiUser.role ?? null,
     roleId: apiUser.role_id ?? apiUser.role?.id ?? null,
     groups: apiUser.groups ?? active?.groups ?? [],
@@ -178,4 +192,66 @@ export async function loginApi(
     permissions: perm.permissions,
     outletId: perm.outletId ?? loginData.outlet_id ?? null,
   }
+}
+
+export const EDIT_OWN_PROFILE_PERMISSION = 'accounts.cfg_edit_own_profile'
+export const CHANGE_OWN_PASSWORD_PERMISSION = 'accounts.cfg_change_own_password'
+
+function authToken(): string | undefined {
+  return localStorage.getItem(AUTH_TOKEN_KEY) ?? undefined
+}
+
+/** Current signed-in user. Any authenticated user may call this. */
+export async function fetchMeApi(): Promise<AuthUser> {
+  const data = await apiRequest<ApiUser>('/api/v1/accounts/me/', {
+    method: 'GET',
+    token: authToken(),
+  })
+  return mapUser(data, data.username)
+}
+
+export type ProfileUpdatePayload = {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  photo?: File | null
+}
+
+/** Update own profile. Requires accounts.cfg_edit_own_profile. */
+export async function updateProfileApi(
+  payload: ProfileUpdatePayload,
+): Promise<AuthUser> {
+  const form = new FormData()
+  form.append('first_name', payload.firstName)
+  form.append('last_name', payload.lastName)
+  form.append('email', payload.email)
+  form.append('phone', payload.phone)
+  if (payload.photo) {
+    form.append('photo', payload.photo)
+  }
+  const data = await multipartApiRequest<ApiUser>(
+    '/api/v1/accounts/me/',
+    form,
+    {
+      method: 'PATCH',
+      token: authToken(),
+    },
+  )
+  return mapUser(data, data.username)
+}
+
+/** Change own password. Requires accounts.cfg_change_own_password. */
+export async function changePasswordApi(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await apiRequest('/api/v1/accounts/me/password/', {
+    method: 'POST',
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+    token: authToken(),
+  })
 }

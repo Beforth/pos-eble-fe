@@ -1,27 +1,27 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { downloadCsv } from '../../utils/downloadFile'
+import { ChevronDown, Eye, FilePenLine, FileText, Info, Plus, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from '../../utils/inventoryRouter'
-import { ChevronDown, FileText, Info, Plus, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
 import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
-
-const CATEGORY_OPTIONS = [
-  'All',
-  'Rice/pulses/flours',
-  'Bread/dairy',
-  'Oils/masala/salt/sugar',
-  'Ready To Cook/ready To Eat',
-  'Sauces/dressings/marinades',
-  'Snacks',
-  'Packaging/storage',
-  'Fruits/vegetables',
-  'No Category',
-] as const
+import { PaginationControls } from '../../components/common/PaginationControls'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_PRODUCTION_WRITE_PERMISSION,
+  categoryIdByName,
+  deleteProductionProcessApi,
+  listAllProductionProcessesApi,
+  type ProductionProcess,
+} from '../../services/inventoryService'
 
 function DropdownMenu({
   label,
@@ -102,62 +102,122 @@ function DropdownMenu({
 
 export default function ProductionMaster() {
   const navigate = useNavigate()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_PRODUCTION_WRITE_PERMISSION)
+  const { categories, loadMasters } = useInventoryMasters()
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState<string>('All')
+  const [category, setCategory] = useState('All')
+  const [appliedSearch, setAppliedSearch] = useState('')
+  const [appliedCategory, setAppliedCategory] = useState('All')
+  const [rows, setRows] = useState<ProductionProcess[]>([])
+  const [loading, setLoading] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
+  useEffect(() => {
+    setPage(1)
+  }, [appliedSearch, appliedCategory, rows])
+
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize)
+
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
+
+  const categoryOptions = useMemo(
+    () => ['All', ...categories.map((row) => row.name), 'No Category'],
+    [categories],
+  )
+
+  const load = useCallback(async () => {
+    if (!encryptedOutletId) return
+    setLoading(true)
+    try {
+      const categoryId =
+        appliedCategory === 'All'
+          ? undefined
+          : appliedCategory === 'No Category'
+            ? 'no-category'
+            : categoryIdByName(categories, appliedCategory)
+      const data = await listAllProductionProcessesApi(encryptedOutletId, {
+        search: appliedSearch || undefined,
+        categoryId,
+      })
+      setRows(data)
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load production processes',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, appliedSearch, appliedCategory, categories])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function handleDelete() {
+    if (!encryptedOutletId || !deleteId || !canWrite) return
+    try {
+      await deleteProductionProcessApi(encryptedOutletId, deleteId)
+      showToast('Production process deleted')
+      setDeleteId(null)
+      void load()
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : 'Unable to delete process',
+      )
+    }
+  }
 
   return (
     <InventoryPageShell activeItem="production-master">
-
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Production List</h1>
         <div className="flex flex-wrap gap-2">
-          <PrimaryButton
-            onClick={() => navigate('/inventory/production-master/new')}
-          >
-            <Plus size={15} />
-            Create New
-          </PrimaryButton>
-          <DropdownMenu
-            label="Action"
-            items={[
-              {
-                label: 'Copy Production',
-                onClick: () => showToast('Copy Production'),
-              },
-              {
-                label: 'Delete Multiple Production',
-                onClick: () => showToast('Delete Multiple Production'),
-              },
-            ]}
-          />
+          {canWrite ? (
+            <PrimaryButton
+              onClick={() => navigate('/inventory/production-master/new')}
+            >
+              <Plus size={15} />
+              Create New
+            </PrimaryButton>
+          ) : null}
           <DropdownMenu
             label="Files"
             icon={<FileText size={15} className="text-muted" />}
             sections={[
               {
-                title: 'Import',
-                items: [
-                  {
-                    label: 'Download',
-                    onClick: () => showToast('Template downloaded'),
-                  },
-                  {
-                    label: 'Upload',
-                    onClick: () => showToast('Upload started'),
-                  },
-                ],
-              },
-              {
                 title: 'Export',
                 items: [
                   {
                     label: 'Export Current Page',
-                    onClick: () => showToast('Exported current page'),
-                  },
-                  {
-                    label: 'Export All',
-                    onClick: () => showToast('Exported all'),
+                    onClick: () => {
+                      downloadCsv(
+                        [
+                          'name',
+                          'to_raw_material',
+                          'category',
+                          'output_qty',
+                          'output_unit',
+                          'inputs',
+                        ],
+                        rows.map((row) => [
+                          row.name,
+                          row.output_raw_material_name,
+                          row.output_category_name || '',
+                          row.output_qty,
+                          row.output_unit_name,
+                          row.lines.length,
+                        ]),
+                        'production-master-page.csv',
+                      )
+                      showToast('Exported current page')
+                    },
                   },
                 ],
               },
@@ -190,7 +250,7 @@ export default function ProductionMaster() {
               </>
             }
             value={category}
-            options={[...CATEGORY_OPTIONS]}
+            options={categoryOptions}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -198,7 +258,10 @@ export default function ProductionMaster() {
           />
         </div>
         <OutlineButton
-          onClick={() => showToast('Search applied')}
+          onClick={() => {
+            setAppliedSearch(search.trim())
+            setAppliedCategory(category)
+          }}
         >
           Search
         </OutlineButton>
@@ -207,24 +270,122 @@ export default function ProductionMaster() {
           onClick={() => {
             setSearch('')
             setCategory('All')
+            setAppliedSearch('')
+            setAppliedCategory('All')
           }}
         >
           Clear
         </OutlineButton>
       </div>
 
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-        <span className="relative mb-4 text-muted">
-          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
-          <Search
-            size={24}
-            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+      {loading ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          Loading…
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
+          <span className="relative mb-4 text-muted">
+            <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
+            <Search
+              size={24}
+              className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+            />
+          </span>
+          <p className="text-base font-semibold text-ink">
+            Convert Raw Material Management Record Not Found
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-line bg-card">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
+              <tr>
+                <th className="px-3 py-2.5">Production Name</th>
+                <th className="px-3 py-2.5">To Raw Material</th>
+                <th className="px-3 py-2.5">Category</th>
+                <th className="px-3 py-2.5">Output Qty</th>
+                <th className="px-3 py-2.5">Inputs</th>
+                <th className="px-3 py-2.5 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedRows.map((row) => (
+                <tr key={row.id} className="border-b border-line last:border-b-0">
+                  <td className="px-3 py-2.5 font-medium text-ink">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/inventory/production-master/${row.id}/view`)}
+                      className="text-left font-medium text-ink hover:text-primary hover:underline"
+                    >
+                      {row.name}
+                    </button>
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.output_raw_material_name}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.output_category_name || '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">
+                    {row.output_qty} {row.output_unit_name}
+                  </td>
+                  <td className="px-3 py-2.5 text-ink">{row.lines.length}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        type="button"
+                        aria-label="View Process"
+                        title="View Details"
+                        onClick={() => navigate(`/inventory/production-master/${row.id}/view`)}
+                        className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
+                      >
+                        <Eye size={15} />
+                      </button>
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          aria-label="Edit Process"
+                          title="Edit Process"
+                          onClick={() => navigate(`/inventory/production-master/${row.id}/edit`)}
+                          className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page"
+                        >
+                          <FilePenLine size={15} />
+                        </button>
+                      ) : null}
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          aria-label="Delete Process"
+                          title="Delete Process"
+                          onClick={() => setDeleteId(row.id)}
+                          className="inline-flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink hover:bg-page hover:text-red-600"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <PaginationControls
+            totalRecords={rows.length}
+            currentPage={page}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
-        </span>
-        <p className="text-base font-semibold text-ink">
-          Convert Raw Material Management Record Not Found
-        </p>
-      </div>
+        </div>
+      )}
+
+      <ConfirmDeleteModal
+        open={Boolean(deleteId)}
+        title="Delete production process?"
+        message="This cannot be undone if the process has no runs."
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </InventoryPageShell>
   )
 }

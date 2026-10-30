@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Clipboard, History, ReceiptText } from 'lucide-react'
 import type { OnlineOrderRow, OnlineOrderStatus } from '../../mocks/onlineOrdersData'
+import { SortableTh } from '../common/SortableTh'
+import { useListQuery } from '../../hooks/useListQuery'
 import { OnlineOrderActivityDrawer } from './OnlineOrderActivityDrawer'
 import { OnlineOrderBillModal } from './OnlineOrderBillModal'
 import { OnlineOrderDetailsModal } from './OnlineOrderDetailsModal'
@@ -82,6 +84,36 @@ export function OnlineOrdersTable({ rows }: OnlineOrdersTableProps) {
   const [activityOrder, setActivityOrder] = useState<OnlineOrderRow | null>(
     null,
   )
+  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
+    rows,
+    (row) => [
+      row.orderNo,
+      row.paymentLabel,
+      row.outletName,
+      row.channelLabel,
+      row.orderType,
+      row.riderName,
+      row.riderPhone,
+      row.customerName,
+      row.customerPhone,
+      row.otp,
+      row.created,
+      row.total,
+      row.status,
+      row.atCount,
+    ],
+    (row, key) => {
+      if (key === 'outlet') return `${row.outletName} ${row.channelLabel}`
+      if (key === 'orderType') return row.orderType
+      if (key === 'customer') return row.customerName
+      if (key === 'otp') return row.otp
+      if (key === 'dateTime') return row.created
+      if (key === 'total') return row.total
+      if (key === 'status') return row.status
+      if (key === 'at') return row.atCount
+      return row.orderNo
+    },
+  )
 
   return (
     <>
@@ -89,20 +121,94 @@ export function OnlineOrdersTable({ rows }: OnlineOrdersTableProps) {
         <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-line bg-page/80 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              <th className="px-3 py-2.5">Order No.</th>
-              <th className="px-3 py-2.5">Outlet Name / Order From</th>
-              <th className="px-3 py-2.5">Order Type / Rider Details</th>
-              <th className="px-3 py-2.5">Customer Details</th>
-              <th className="px-3 py-2.5">OTP</th>
-              <th className="px-3 py-2.5">Date Time</th>
-              <th className="col-total px-3 py-2.5 text-right">Total</th>
-              <th className="px-3 py-2.5">Status</th>
-              <th className="px-3 py-2.5 text-center">At</th>
+              <SortableTh
+                columnKey="orderNo"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                className="px-3 py-2.5"
+              >
+                Order No.
+              </SortableTh>
+              <SortableTh
+                columnKey="outlet"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                className="px-3 py-2.5"
+              >
+                Outlet Name / Order From
+              </SortableTh>
+              <SortableTh
+                columnKey="orderType"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                className="px-3 py-2.5"
+              >
+                Order Type / Rider Details
+              </SortableTh>
+              <SortableTh
+                columnKey="customer"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                className="px-3 py-2.5"
+              >
+                Customer Details
+              </SortableTh>
+              <SortableTh
+                columnKey="otp"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                className="px-3 py-2.5"
+              >
+                OTP
+              </SortableTh>
+              <SortableTh
+                columnKey="dateTime"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                className="px-3 py-2.5"
+              >
+                Date Time
+              </SortableTh>
+              <SortableTh
+                columnKey="total"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                align="right"
+                className="col-total px-3 py-2.5"
+              >
+                Total
+              </SortableTh>
+              <SortableTh
+                columnKey="status"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                className="px-3 py-2.5"
+              >
+                Status
+              </SortableTh>
+              <SortableTh
+                columnKey="at"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+                align="center"
+                className="px-3 py-2.5"
+              >
+                At
+              </SortableTh>
               <th className="px-3 py-2.5">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {visible.map((row) => (
               <tr
                 key={row.id}
                 className="border-b border-line last:border-0 hover:bg-page/40"

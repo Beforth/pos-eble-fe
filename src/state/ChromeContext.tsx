@@ -11,9 +11,15 @@ export type RailKey = 'main' | 'menu' | 'inventory' | 'finance' | 'audit'
 
 interface ChromeContextValue {
   collapsed: boolean
+  billingDrawerOpen: boolean
+  mobileNavOpen: boolean
   expanded: Record<RailKey, string[]>
   navScroll: Record<RailKey, number>
   toggleCollapsed: () => void
+  setBillingDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>
+  toggleBillingDrawer: () => void
+  setMobileNavOpen: React.Dispatch<React.SetStateAction<boolean>>
+  toggleMobileNav: () => void
   toggleExpanded: (rail: RailKey, id: string) => void
   mergeExpanded: (rail: RailKey, ids: string[]) => void
   setNavScroll: (rail: RailKey, top: number) => void
@@ -39,11 +45,21 @@ const INITIAL_SCROLL: Record<RailKey, number> = {
 
 export function ChromeProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
+  const [billingDrawerOpen, setBillingDrawerOpen] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [expanded, setExpanded] = useState(INITIAL_EXPANDED)
   const [navScroll, setNavScrollState] = useState(INITIAL_SCROLL)
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => !prev)
+  }, [])
+
+  const toggleBillingDrawer = useCallback(() => {
+    setBillingDrawerOpen((prev) => !prev)
+  }, [])
+
+  const toggleMobileNav = useCallback(() => {
+    setMobileNavOpen((prev) => !prev)
   }, [])
 
   const toggleExpanded = useCallback((rail: RailKey, id: string) => {
@@ -72,18 +88,30 @@ export function ChromeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ChromeContextValue>(
     () => ({
       collapsed,
+      billingDrawerOpen,
+      mobileNavOpen,
       expanded,
       navScroll,
       toggleCollapsed,
+      setBillingDrawerOpen,
+      toggleBillingDrawer,
+      setMobileNavOpen,
+      toggleMobileNav,
       toggleExpanded,
       mergeExpanded,
       setNavScroll,
     }),
     [
       collapsed,
+      billingDrawerOpen,
+      mobileNavOpen,
       expanded,
       navScroll,
       toggleCollapsed,
+      setBillingDrawerOpen,
+      toggleBillingDrawer,
+      setMobileNavOpen,
+      toggleMobileNav,
       toggleExpanded,
       mergeExpanded,
       setNavScroll,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
+import { useParams } from 'react-router-dom'
 import { useNavigate } from '../../utils/inventoryRouter'
 import {
   BadgePercent,
@@ -18,13 +19,39 @@ import {
   Upload,
 } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
+import { PaymentHistoryPanel } from '../../components/inventory/PaymentHistoryPanel'
 import { SelectPurchaseOrderModal } from '../../components/inventory/SelectPurchaseOrderModal'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
+import {
+  DraftRecoveryBanner,
+  getInsufficientStockMaterial,
+  StockAvailabilityButton,
+  StockShortfallNote,
+  useInventoryFormDraft,
+} from '../../components/inventory/InventoryStockAssist'
+import {
+  prependById,
+  useInventoryQuickAdd,
+} from '../../components/inventory/InventoryQuickAdd'
 import { SelectRecordAlert } from '../../components/menu/SelectRecordAlert'
 import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import { listOutletsApi } from '../../services/outletService'
+import {
+  INV_SALES_WRITE_PERMISSION,
+  createSalesReturnApi,
+  getSalesReturnApi,
+  listAllRawMaterialsApi,
+  listSuppliersApi,
+  updateSalesReturnApi,
+  type RawMaterial,
+  type Supplier,
+} from '../../services/inventoryService'
 
 interface LineItem {
   id: string
@@ -40,21 +67,6 @@ interface LineItem {
   note: string
 }
 
-const RESTAURANTS = [
-  'The Bandhan',
-  "Annapurna's Rajubhai Dabeliwale — Dadar",
-  "Annapurna's Rajubhai Dabeliwale — Andheri",
-]
-const SUPPLIERS = ['The Bandhan', 'Fresh Mart', 'Daily Dairy', 'Veggie Hub']
-const RAW_MATERIALS = [
-  { name: 'Tomatoes', unit: 'Kg' },
-  { name: 'Onion', unit: 'Kg' },
-  { name: 'Paneer', unit: 'Kg' },
-  { name: 'Milk', unit: 'Ltr' },
-  { name: 'Butter', unit: 'Kg' },
-  { name: 'Flour', unit: 'Kg' },
-]
-const UNITS = ['Kg', 'Ltr', 'Pcs', 'Box', 'Packet']
 const PAYMENT_METHODS = ['Cash', 'Card', 'Cheque', 'Online', 'Other']
 
 function emptyLine(): LineItem {
@@ -84,11 +96,18 @@ function formatAmount(value: number) {
 
 export default function AddSalesReturn() {
   const navigate = useNavigate()
+  const { id } = useParams()
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canWrite = hasPermission(INV_SALES_WRITE_PERMISSION)
+  const isEdit = Boolean(id)
+  const { units, loadMasters } = useInventoryMasters()
   const [returnFrom, setReturnFrom] = useState<'supplier' | 'restaurant'>(
     'restaurant',
   )
   const [party, setParty] = useState('')
-  const [invoiceDate, setInvoiceDate] = useState('2026-08-11')
+  const [invoiceDate, setInvoiceDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [creditNoteNo, setCreditNoteNo] = useState('1')
   const [creditNoteEditable, setCreditNoteEditable] = useState(false)
   const [saleInvoiceNo, setSaleInvoiceNo] = useState('')
@@ -97,7 +116,9 @@ export default function AddSalesReturn() {
   const [otherCharges, setOtherCharges] = useState(0)
   const [otherTaxes, setOtherTaxes] = useState(0)
   const [paymentType, setPaymentType] = useState<'unpaid' | 'paid'>('unpaid')
-  const [paymentDate, setPaymentDate] = useState('2026-08-11')
+  const [paymentDate, setPaymentDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
   const [paidAmount, setPaidAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [updateStock, setUpdateStock] = useState(true)
@@ -113,6 +134,52 @@ export default function AddSalesReturn() {
   const [moreActionOpen, setMoreActionOpen] = useState(false)
   const moreActionRef = useRef<HTMLDivElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+  const [saving, setSaving] = useState(false)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
+  const [restaurants, setRestaurants] = useState<
+    { id: string; name: string }[]
+  >([])
+  const quickAdd = useInventoryQuickAdd({
+    onSupplierCreated: (row) => setSuppliers((prev) => prependById(prev, row)),
+    onRawMaterialCreated: (row) =>
+      setRawMaterials((prev) => prependById(prev, row)),
+  })
+  const draft = useInventoryFormDraft(
+    `rajubhai.inventory.sales-return.${encryptedOutletId ?? 'unknown'}.${id ?? 'new'}`,
+    {
+      returnFrom,
+      party,
+      invoiceDate,
+      creditNoteNo,
+      saleInvoiceNo,
+      lines,
+      discount,
+      otherCharges,
+      otherTaxes,
+      paymentType,
+      paymentDate,
+      paidAmount,
+      paymentMethod,
+      updateStock,
+    },
+    (saved) => {
+      setReturnFrom(saved.returnFrom)
+      setParty(saved.party)
+      setInvoiceDate(saved.invoiceDate)
+      setCreditNoteNo(saved.creditNoteNo)
+      setSaleInvoiceNo(saved.saleInvoiceNo)
+      setLines(saved.lines)
+      setDiscount(saved.discount)
+      setOtherCharges(saved.otherCharges)
+      setOtherTaxes(saved.otherTaxes)
+      setPaymentType(saved.paymentType)
+      setPaymentDate(saved.paymentDate)
+      setPaidAmount(saved.paidAmount)
+      setPaymentMethod(saved.paymentMethod)
+      setUpdateStock(saved.updateStock)
+    },
+  )
 
   useEffect(() => {
     if (!discountTypeOpen) return
@@ -142,6 +209,78 @@ export default function AddSalesReturn() {
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [moreActionOpen])
 
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    void listSuppliersApi().then(setSuppliers).catch(() => setSuppliers([]))
+    void listAllRawMaterialsApi(encryptedOutletId)
+      .then(setRawMaterials)
+      .catch((err) => {
+        setRawMaterials([])
+        showToast(
+          err instanceof ApiError
+            ? err.message
+            : 'Unable to load raw materials',
+        )
+      })
+    void listOutletsApi()
+      .then((rows) =>
+        setRestaurants(
+          rows
+            .filter((row) => row.encrypted_id !== encryptedOutletId)
+            .map((row) => ({
+              id: row.encrypted_id,
+              name: row.outlet_name,
+            })),
+        ),
+      )
+      .catch(() => setRestaurants([]))
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    if (!id || !encryptedOutletId) return
+    getSalesReturnApi(encryptedOutletId, id)
+      .then((row) => {
+        setReturnFrom(row.source_type === 'supplier' ? 'supplier' : 'restaurant')
+        setParty(row.supplier_name || row.restaurant_name || '')
+        setInvoiceDate(row.invoice_date)
+        setCreditNoteNo(row.credit_note_number)
+        setSaleInvoiceNo(row.sale_invoice_number)
+        setDiscount(Number(row.discount) || 0)
+        setOtherCharges(Number(row.other_charges) || 0)
+        setOtherTaxes(Number(row.other_taxes) || 0)
+        setPaymentType(row.payment_status === 'paid' ? 'paid' : 'unpaid')
+        setPaymentDate(row.payment_date || new Date().toISOString().slice(0, 10))
+        setPaidAmount(row.paid_amount)
+        setPaymentMethod(row.payment_method || 'Cash')
+        setUpdateStock(row.update_inventory_stock)
+        setLines(
+          row.lines.length
+            ? row.lines.map((line) => ({
+                id: `line-${line.raw_material_id}-${Math.random()}`,
+                selected: false,
+                rawMaterial: line.raw_material_name,
+                qty: line.qty,
+                unit: line.unit_name,
+                price: line.price,
+                amount: line.amount,
+                cgst: line.cgst,
+                sgst: line.sgst,
+                igst: line.igst,
+                note: line.note,
+              }))
+            : [emptyLine()],
+        )
+      })
+      .catch((err) => {
+        showToast(
+          err instanceof ApiError ? err.message : 'Unable to load sales return',
+        )
+      })
+  }, [id, encryptedOutletId])
 
   function clearAllLines() {
     setLines([emptyLine()])
@@ -179,6 +318,11 @@ export default function AddSalesReturn() {
     }
   }, [lines, discount, otherCharges, otherTaxes])
 
+  const rawNames = rawMaterials.map((row) => row.name)
+  const unitNames = units.filter((row) => row.is_active).map((row) => row.name)
+  const supplierNames = suppliers.filter((row) => row.is_active).map((row) => row.name)
+  const restaurantNames = restaurants.map((row) => row.name)
+
   function updateLine(id: string, patch: Partial<LineItem>) {
     setLines((prev) =>
       prev.map((line) => {
@@ -197,7 +341,8 @@ export default function AddSalesReturn() {
     setLines((prev) => prev.map((line) => ({ ...line, selected: checked })))
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (!canWrite || !encryptedOutletId) return
     if (!party) {
       setError(
         returnFrom === 'restaurant'
@@ -214,10 +359,10 @@ export default function AddSalesReturn() {
       setError('Credit note number is required')
       return
     }
-    const validLine = lines.some(
+    const validLines = lines.filter(
       (line) => line.rawMaterial && toNumber(line.qty) > 0 && line.unit,
     )
-    if (!validLine) {
+    if (validLines.length === 0) {
       setError('Add at least one raw material with qty and unit')
       return
     }
@@ -235,23 +380,89 @@ export default function AddSalesReturn() {
         return
       }
     }
+    let payloadLines
+    try {
+      payloadLines = validLines.map((line) => {
+        const raw = rawMaterials.find((row) => row.name === line.rawMaterial)
+        const unit = units.find((row) => row.name === line.unit)
+        if (!raw || !unit) {
+          throw new Error('Select a saved raw material and unit')
+        }
+        return {
+          raw_material_id: raw.id,
+          qty: line.qty,
+          unit_id: unit.id,
+          price: line.price || '0',
+          amount: line.amount || String(toNumber(line.qty) * toNumber(line.price)),
+          cgst: line.cgst || '0',
+          sgst: line.sgst || '0',
+          igst: line.igst || '0',
+          note: line.note,
+        }
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save sales return')
+      return
+    }
     setError('')
-    showToast('Sales return saved')
-    window.setTimeout(() => {
+    setSaving(true)
+    try {
+      const payload = {
+        source_type: returnFrom,
+        supplier_id:
+          returnFrom === 'supplier'
+            ? suppliers.find((row) => row.name === party)?.id ?? null
+            : null,
+        restaurant_id:
+          returnFrom === 'restaurant'
+            ? restaurants.find((row) => row.name === party)?.id ?? null
+            : null,
+        invoice_date: invoiceDate,
+        credit_note_number: creditNoteNo,
+        sale_invoice_number: saleInvoiceNo,
+        subtotal: String(totals.subTotal),
+        discount: String(discount),
+        other_charges: String(otherCharges),
+        other_taxes: String(otherTaxes),
+        grand_total: String(totals.grand),
+        payment_status: paymentType,
+        payment_date: paymentType === 'paid' ? paymentDate : null,
+        paid_amount: paymentType === 'paid' ? paidAmount : '0',
+        payment_method: paymentType === 'paid' ? paymentMethod : '',
+        update_inventory_stock: updateStock,
+        lines: payloadLines,
+      }
+      if (isEdit && id) await updateSalesReturnApi(encryptedOutletId, id, payload)
+      else await createSalesReturnApi(encryptedOutletId, payload)
+      draft.clearDraft()
+      showToast(isEdit ? 'Sales return updated' : 'Sales return saved')
       navigate('/inventory/sales-return')
-    }, 900)
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Unable to save sales return',
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   const allSelected = lines.length > 0 && lines.every((line) => line.selected)
   const noteLine = lines.find((line) => line.id === noteLineId)
-  const partyOptions = returnFrom === 'restaurant' ? RESTAURANTS : SUPPLIERS
+  const partyOptions = returnFrom === 'restaurant' ? restaurantNames : supplierNames
 
   return (
     <InventoryPageShell activeItem="sales-return">
+      <DraftRecoveryBanner
+        visible={draft.hasDraft}
+        onRestore={draft.restoreDraft}
+        onDiscard={draft.discardDraft}
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
-          <h1 className="text-lg font-bold text-ink">Add Sales Return</h1>
+          <h1 className="text-lg font-bold text-ink">
+            {isEdit ? 'Edit Sales Return' : 'Add Sales Return'}
+          </h1>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-semibold text-ink">From</span>
             <div className="inline-flex overflow-hidden rounded-md border border-line">
@@ -308,6 +519,11 @@ export default function AddSalesReturn() {
             placeholder="Please select"
             searchPlaceholder="Search"
             onChange={setParty}
+            onAddNew={
+              returnFrom === 'supplier'
+                ? quickAdd.handler('supplier', (row) => setParty(row.name))
+                : undefined
+            }
           />
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink">
@@ -539,7 +755,14 @@ export default function AddSalesReturn() {
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className="border-b border-line last:border-b-0">
+              <tr
+                key={line.id}
+                className={`border-b border-line last:border-b-0 ${
+                  getInsufficientStockMaterial(error) === line.rawMaterial
+                    ? 'bg-red-50 outline outline-1 outline-red-200'
+                    : ''
+                }`}
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -554,19 +777,49 @@ export default function AddSalesReturn() {
                 <td className="min-w-[200px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
                   <SearchableSelect
                     value={line.rawMaterial}
-                    options={RAW_MATERIALS.map((m) => m.name)}
+                    options={rawNames}
                     placeholder="Select/Add Raw Material"
                     searchPlaceholder="Search materials..."
                     compact
                     dropdownPlacement="auto"
                     onChange={(value) => {
-                      const material = RAW_MATERIALS.find((m) => m.name === value)
+                      const material = rawMaterials.find((m) => m.name === value)
                       updateLine(line.id, {
                         rawMaterial: value,
-                        unit: material?.unit ?? line.unit,
+                        unit: material?.consumption_unit.name ?? line.unit,
                       })
                     }}
+                    onAddNew={quickAdd.handler('raw-material', (row) =>
+                      updateLine(line.id, {
+                        rawMaterial: row.name,
+                        unit: row.consumption_unit.name,
+                      }),
+                    )}
                   />
+                  {encryptedOutletId ? (
+                    <StockAvailabilityButton
+                      outletId={encryptedOutletId}
+                      material={rawMaterials.find(
+                        (row) => row.name === line.rawMaterial,
+                      )}
+                    />
+                  ) : null}
+                  {getInsufficientStockMaterial(error) === line.rawMaterial ? (
+                    <StockShortfallNote
+                      available={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.stock_qty ?? '0'
+                      }
+                      availableUnit={
+                        rawMaterials.find(
+                          (row) => row.name === line.rawMaterial,
+                        )?.consumption_unit.name
+                      }
+                      required={line.qty || '0'}
+                      requiredUnit={line.unit}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -579,21 +832,17 @@ export default function AddSalesReturn() {
                     className="h-9 w-20 rounded-md border border-line px-2 text-sm outline-none focus:border-primary"
                   />
                 </td>
-                <td className="px-3 py-2.5">
-                  <select
+                <td className="min-w-[130px] px-3 py-2.5 relative z-0 [&:has([aria-expanded=true])]:z-30">
+                  <SearchableSelect
                     value={line.unit}
-                    onChange={(event) =>
-                      updateLine(line.id, { unit: event.target.value })
+                    options={unitNames}
+                    placeholder="Unit"
+                    searchPlaceholder="Search unit..."
+                    compact
+                    onChange={(value) =>
+                      updateLine(line.id, { unit: value })
                     }
-                    className="h-9 w-24 rounded-md border border-line bg-card px-2 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">Unit</option>
-                    {UNITS.map((unit) => (
-                      <option key={unit} value={unit}>
-                        {unit}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </td>
                 <td className="px-3 py-2.5">
                   <input
@@ -816,7 +1065,26 @@ export default function AddSalesReturn() {
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-primary">{error}</p> : null}
+      {isEdit && id && encryptedOutletId ? (
+        <PaymentHistoryPanel
+          outletId={encryptedOutletId}
+          documentType="sales_return"
+          documentId={id}
+          canAdd={canWrite}
+        />
+      ) : null}
+
+      {error ? (
+        <p
+          className={`mt-3 rounded-md px-3 py-2 text-xs font-medium ${
+            getInsufficientStockMaterial(error)
+              ? 'border border-red-200 bg-red-50 text-red-700'
+              : 'text-primary'
+          }`}
+        >
+          {error}
+        </p>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
@@ -836,7 +1104,9 @@ export default function AddSalesReturn() {
           >
             Cancel
           </button>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          <PrimaryButton onClick={() => void handleSave()} disabled={saving || !canWrite}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
         </div>
       </div>
 
@@ -883,6 +1153,7 @@ export default function AddSalesReturn() {
         message="Please select Item."
         onClose={() => setSelectItemAlertOpen(false)}
       />
+      {quickAdd.host}
     </InventoryPageShell>
   )
 }
