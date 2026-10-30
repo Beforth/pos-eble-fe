@@ -1,268 +1,174 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Printer, Search, Settings2 } from 'lucide-react'
-import { BillingHeader } from '../../components/billing/BillingHeader'
-import { SortableTh } from '../../components/common/SortableTh'
-import { useListQuery } from '../../hooks/useListQuery'
+import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../../auth/AuthContext'
 import {
-  buildCoverSizeReportRows,
-  coverSizeReportGeneratedLabel,
-  loadCoverSizeEntries,
-} from '../../utils/coverSizeStore'
+  ColumnsMenu,
+  LoadState,
+  ReportCard,
+  ReportFilterBar,
+  ReportShell,
+  SearchField,
+  StatGrid,
+  StatTile,
+} from '../../components/reports/ReportShell'
+import { TD, TH, reportSubtitle } from '../../components/reports/reportStyles'
+import { fetchReportApi, type ReportResult } from '../../services/reportService'
+import { downloadCsv } from '../../utils/exportCsv'
+import { isoOffset, todayIso } from '../../utils/reportDates'
+import { showToast } from '../../utils/toast'
 
 export default function CoverSizeReport() {
-  const navigate = useNavigate()
-  const [billNo, setBillNo] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [appliedFrom, setAppliedFrom] = useState('')
-  const [appliedTo, setAppliedTo] = useState('')
-  const [showPersonsCol, setShowPersonsCol] = useState(true)
-  const [columnsOpen, setColumnsOpen] = useState(false)
-  const [preferenceSaved, setPreferenceSaved] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const { encryptedOutletId } = useAuth()
+  // A cover-size trend reads better over several days, so it opens on the last six.
+  const [from, setFrom] = useState(() => isoOffset(-5))
+  const [to, setTo] = useState(todayIso)
+  const [search, setSearch] = useState('')
+  const [data, setData] = useState<ReportResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
 
-  const reportDateLabel = coverSizeReportGeneratedLabel()
+  useEffect(() => {
+    if (!encryptedOutletId || !from || !to) return
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    fetchReportApi(encryptedOutletId, 'cover-size', { from, to })
+      .then((result) => {
+        if (!cancelled) setData(result)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setData(null)
+        setError(err instanceof Error ? err.message : 'Could not load the report')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, from, to])
 
-  const displayRows = useMemo(() => {
-    void refreshKey
-    const entries = loadCoverSizeEntries().filter((entry) => {
-      if (appliedFrom && entry.dateKey < appliedFrom) return false
-      if (appliedTo && entry.dateKey > appliedTo) return false
-      return true
+  const rows = useMemo(() => {
+    const q = search.trim()
+    const all = data?.rows ?? []
+    return q ? all.filter((row) => String(row.date).includes(q)) : all
+  }, [data, search])
+  const totals = data?.totals ?? {}
+  const showOrders = !hidden.has('orders')
+  const persons = Number(totals.persons) || 0
+  const orders = Number(totals.orders) || 0
+  const busiest = Math.max(0, ...rows.map((row) => Number(row.persons) || 0))
+
+  function toggleHidden(key: string) {
+    setHidden((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
     })
-    return buildCoverSizeReportRows(entries)
-  }, [appliedFrom, appliedTo, refreshKey])
-
-  const dataRows = useMemo(
-    () => displayRows.filter((row) => !row.isTotal),
-    [displayRows],
-  )
-  const totalRow = useMemo(
-    () => displayRows.find((row) => row.isTotal),
-    [displayRows],
-  )
-
-  const { sortKey, sortDir, toggleSort, visible } = useListQuery(
-    dataRows,
-    (row) => [row.label, row.persons],
-    (row, key) => (key === 'persons' ? row.persons : row.label),
-  )
-
-  function handlePrint() {
-    window.print()
   }
 
-  function handleExportExcel() {
-    const header = showPersonsCol
-      ? ['Date', 'No. of Persons (Success Orders)']
-      : ['Date']
-    const lines = [
-      header.join(','),
-      ...displayRows.map((row) =>
-        showPersonsCol ? `${row.label},${row.persons}` : row.label,
-      ),
-    ]
-    const blob = new Blob([lines.join('\n')], {
-      type: 'text/csv;charset=utf-8;',
-    })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `cover-size-report-${reportDateLabel}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+  function setRange(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom)
+    setTo(nextTo)
   }
 
-  function applySearch() {
-    setAppliedFrom(fromDate)
-    setAppliedTo(toDate)
-    setRefreshKey((n) => n + 1)
+  function exportCsv() {
+    if (rows.length === 0) {
+      showToast('Nothing to export')
+      return
+    }
+    const headers = ['Date', 'No. of Persons (Success Orders)', ...(showOrders ? ['Orders'] : [])]
+    downloadCsv(
+      `cover-size-report_${from}_${to}.csv`,
+      headers,
+      rows.map((row) => [row.date, row.persons, ...(showOrders ? [row.orders] : [])]),
+    )
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader
-        billNo={billNo}
-        onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view')}
-        onViewKot={() => navigate('/billing?kot=1')}
-      />
+    <ReportShell
+      title="Cover Size Report"
+      subtitle={reportSubtitle(from, to, data ? `${rows.length} day${rows.length === 1 ? '' : 's'}` : undefined)}
+    >
+      <ReportFilterBar from={from} to={to} onRange={setRange} onExport={exportCsv}>
+        <SearchField value={search} onChange={setSearch} placeholder="Search date (2026-10-21)" />
+        <ColumnsMenu
+          options={[{ key: 'orders', label: 'Orders' }]}
+          hidden={hidden}
+          onToggle={toggleHidden}
+        />
+      </ReportFilterBar>
 
-      <main className="flex-1 overflow-y-auto bg-white px-4 py-4 sm:px-6">
-        <h1 className="mb-3 text-lg font-semibold text-ink">Cover Size Report</h1>
+      {data && rows.length > 0 ? (
+        <StatGrid>
+          <StatTile primary label="Total persons" value={persons} hint="Success orders" />
+          <StatTile label="Orders" value={orders} />
+          <StatTile
+            label="Avg persons per order"
+            value={orders > 0 ? (persons / orders).toFixed(1) : '—'}
+          />
+          <StatTile label="Days" value={rows.length} />
+        </StatGrid>
+      ) : null}
 
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSearchOpen((open) => !open)}
-            className="inline-flex h-9 items-center gap-1.5 rounded border border-line bg-white px-3 text-sm text-ink hover:bg-page"
-          >
-            <Search size={14} className="text-muted" />
-            Search
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              window.alert('Print configuration will be available soon.')
-            }
-            className="inline-flex h-9 items-center gap-1.5 rounded border border-line bg-white px-3 text-sm text-ink hover:bg-page"
-          >
-            <Settings2 size={14} className="text-muted" />
-            Print Configuration
-          </button>
-        </div>
-
-        {searchOpen ? (
-          <div className="mb-3 flex flex-wrap items-end gap-3 rounded border border-line bg-page/60 p-3">
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              From
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(event) => setFromDate(event.target.value)}
-                className="h-9 rounded border border-line bg-white px-2 text-sm text-ink outline-none focus:border-primary"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              To
-              <input
-                type="date"
-                value={toDate}
-                onChange={(event) => setToDate(event.target.value)}
-                className="h-9 rounded border border-line bg-white px-2 text-sm text-ink outline-none focus:border-primary"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={applySearch}
-              className="inline-flex h-9 items-center rounded bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
-            >
-              Apply
-            </button>
-          </div>
-        ) : null}
-
-        <div className="overflow-hidden rounded border border-line bg-white">
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2.5">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setColumnsOpen((open) => !open)}
-                className="inline-flex h-8 items-center rounded bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
-              >
-                Columns
-              </button>
-              {columnsOpen ? (
-                <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded border border-line bg-white p-2 shadow-lg">
-                  <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-ink hover:bg-page">
-                    <input
-                      type="checkbox"
-                      checked={showPersonsCol}
-                      onChange={(event) =>
-                        setShowPersonsCol(event.target.checked)
-                      }
-                      className="accent-primary"
-                    />
-                    No. of Persons (Success Orders)
-                  </label>
-                </div>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setPreferenceSaved(true)
-                window.setTimeout(() => setPreferenceSaved(false), 2000)
-              }}
-              className="inline-flex h-8 items-center rounded border border-line bg-white px-3 text-sm text-ink hover:bg-page"
-            >
-              {preferenceSaved ? 'Saved' : 'Save Preference'}
-            </button>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleExportExcel}
-                className="inline-flex h-8 items-center rounded border border-line bg-white px-3 text-sm text-ink hover:bg-page"
-              >
-                Export Excel
-              </button>
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="inline-flex h-8 items-center gap-1.5 rounded border border-line bg-white px-3 text-sm text-ink hover:bg-page"
-              >
-                <Printer size={14} className="text-muted" />
-                Print
-              </button>
-            </div>
-          </div>
-
-          <div className="border-b border-line bg-[#f3f3f3] px-3 py-2 text-sm font-medium text-ink">
-            Cover Size Report - {reportDateLabel}
-          </div>
-
+      <ReportCard title="Persons served per day" flush>
+        {loading && !data ? (
+          <LoadState loading error="" />
+        ) : error ? (
+          <LoadState loading={false} error={error} />
+        ) : rows.length === 0 ? (
+          <p className="p-10 text-center text-sm text-muted">
+            No sales found for this date range.
+          </p>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-sm">
+            <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-white">
-                  <SortableTh
-                    columnKey="label"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="border-b border-r border-line px-3 py-2 font-semibold text-ink"
-                  >
-                    {' '}
-                  </SortableTh>
-                  {showPersonsCol ? (
-                    <SortableTh
-                      columnKey="persons"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={toggleSort}
-                      className="border-b border-line px-3 py-2 font-semibold text-ink"
-                    >
-                      No. of Persons (Success Orders)
-                    </SortableTh>
-                  ) : null}
+                <tr className="bg-primary/5 text-left">
+                  <th className={TH}>Date</th>
+                  <th className={`${TH} text-right`}>No. of Persons (Success Orders)</th>
+                  {showOrders && <th className={`${TH} text-right`}>Orders</th>}
                 </tr>
               </thead>
               <tbody>
-                {visible.length === 0 && (!totalRow || totalRow.persons === 0) ? (
-                  <tr>
-                    <td
-                      colSpan={showPersonsCol ? 2 : 1}
-                      className="border-b border-line px-3 py-8 text-center text-sm text-muted"
-                    >
-                      No cover size data yet. Enter no. of persons on billing,
-                      send KOT / settle the order, then reopen this report.
-                    </td>
-                  </tr>
-                ) : (
-                  [...visible, ...(totalRow ? [totalRow] : [])].map((row) => (
-                    <tr key={row.label} className="bg-white hover:bg-page/50">
-                      <td
-                        className={`border-b border-r border-line px-3 py-2 text-ink ${
-                          row.isTotal ? 'font-semibold' : ''
-                        }`}
-                      >
-                        {row.label}
+                {rows.map((row) => {
+                  const people = Number(row.persons) || 0
+                  return (
+                    <tr key={String(row.date)} className="border-t border-line hover:bg-page/60">
+                      <td className={`${TD} font-medium`}>{row.date}</td>
+                      <td className={`${TD} text-right`}>
+                        <span className="inline-flex items-center justify-end gap-3">
+                          <span className="h-1.5 w-28 overflow-hidden rounded-full bg-line">
+                            <span
+                              className="block h-full rounded-full bg-primary"
+                              style={{
+                                width: `${busiest > 0 ? Math.min(100, (people / busiest) * 100) : 0}%`,
+                              }}
+                            />
+                          </span>
+                          <span className="w-12 tabular-nums">{row.persons}</span>
+                        </span>
                       </td>
-                      {showPersonsCol ? (
-                        <td className="border-b border-line px-3 py-2 text-ink">
-                          {row.persons}
-                        </td>
-                      ) : null}
+                      {showOrders && (
+                        <td className={`${TD} text-right tabular-nums`}>{row.orders}</td>
+                      )}
                     </tr>
-                  ))
-                )}
+                  )
+                })}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                  <td className={TD}>Total</td>
+                  <td className={`${TD} text-right tabular-nums`}>{persons}</td>
+                  {showOrders && <td className={`${TD} text-right tabular-nums`}>{orders}</td>}
+                </tr>
+              </tfoot>
             </table>
           </div>
-        </div>
-      </main>
-    </div>
+        )}
+      </ReportCard>
+    </ReportShell>
   )
 }

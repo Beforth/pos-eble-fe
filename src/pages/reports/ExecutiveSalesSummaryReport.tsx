@@ -1,103 +1,161 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Download, Printer } from 'lucide-react'
-import { BillingHeader } from '../../components/billing/BillingHeader'
-import { ListSearch } from '../../components/common/ListSearch'
-import { SortableTh } from '../../components/common/SortableTh'
-import { useListQuery } from '../../hooks/useListQuery'
-import { PAX_SALES_ROWS, summarizePaxSales } from '../../mocks/paxSalesReportData'
+import { useEffect, useState } from 'react'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  LoadState,
+  PairList,
+  ReportCard,
+  ReportFilterBar,
+  ReportShell,
+  StatGrid,
+  StatTile,
+} from '../../components/reports/ReportShell'
+import { reportSubtitle } from '../../components/reports/reportStyles'
+import {
+  fetchOrderSummaryApi,
+  type OrderSummaryResult,
+} from '../../services/reportService'
+import { downloadCsv } from '../../utils/exportCsv'
+import { formatINR } from '../../utils/format'
+import { todayIso } from '../../utils/reportDates'
+import { showToast } from '../../utils/toast'
+
+function money(value: string | number): string {
+  const n = Number(value)
+  return Number.isFinite(n) ? formatINR(n, 2) : String(value)
+}
+
+interface Pair {
+  label: string
+  value: string
+  bold?: boolean
+}
 
 export default function ExecutiveSalesSummaryReport() {
-  const navigate = useNavigate()
-  const [billNo, setBillNo] = useState('')
+  const { encryptedOutletId } = useAuth()
+  const [from, setFrom] = useState(todayIso)
+  const [to, setTo] = useState(todayIso)
+  const [data, setData] = useState<OrderSummaryResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      PAX_SALES_ROWS,
-      (row) => [row.name, row.totalPax, row.totalSales, row.apc],
-      (row, key) => {
-        if (key === 'totalPax') return row.totalPax
-        if (key === 'totalSales') return row.totalSales
-        if (key === 'apc') return row.apc
-        return row.name
-      },
-    )
+  useEffect(() => {
+    if (!encryptedOutletId || !from || !to) return
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    fetchOrderSummaryApi(encryptedOutletId, { from, to })
+      .then((result) => {
+        if (!cancelled) setData(result)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setData(null)
+        setError(err instanceof Error ? err.message : 'Could not load the report')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId, from, to])
 
-  const stats = useMemo(() => summarizePaxSales(visible), [visible])
-
-  function handleExport() {
-    const header = 'Executive,Pax,Sales,APC'
-    const lines = [header, ...visible.map((r) => `${r.name},${r.totalPax},${r.totalSales},${r.apc}`)]
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'executive-sales-summary.csv'; a.click()
-    URL.revokeObjectURL(url)
+  function setRange(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom)
+    setTo(nextTo)
   }
 
+  const invoiceRange =
+    data && (data.success.invoice_from || data.success.invoice_to)
+      ? `${data.success.invoice_from} - ${data.success.invoice_to}`
+      : '-'
+
+  const successRows: Pair[] = data
+    ? [
+        { label: 'Count', value: String(data.success.orders) },
+        { label: 'Invoice Nos.', value: invoiceRange },
+        ...data.success.lines.map((line) => ({
+          label: line.label,
+          value: money(line.amount),
+          bold: line.label === 'Grand Total',
+        })),
+      ]
+    : []
+  const cancelledRows: Pair[] = data
+    ? [
+        { label: 'Count', value: String(data.cancelled.count) },
+        { label: 'Amount', value: money(data.cancelled.amount) },
+      ]
+    : []
+  const performanceRows: Pair[] = data
+    ? [
+        { label: 'Average Per Bill', value: money(data.performance.avg_per_bill) },
+        {
+          label: 'Average Discount Per Order',
+          value: money(data.performance.avg_discount_per_order),
+        },
+      ]
+    : []
+
+  function exportCsv() {
+    if (!data) {
+      showToast('Nothing to export')
+      return
+    }
+    const rows = [
+      ...successRows.map((r) => ['Success Orders', r.label, r.value]),
+      ...cancelledRows.map((r) => ['Cancelled Orders', r.label, r.value]),
+      ...performanceRows.map((r) => ['Performance Indicator', r.label, r.value]),
+    ]
+    downloadCsv(`executive-sales_${from}_${to}.csv`, ['Section', 'Label', 'Value'], rows)
+  }
+
+  const grandTotal = data?.success.lines.find((line) => line.label === 'Grand Total')?.amount
+
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader billNo={billNo} onBillNoChange={setBillNo} onNewOrder={() => navigate('/table-view')} onViewKot={() => navigate('/billing?kot=1')} />
-      <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-ink">Executive Sales Summary</h1>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={handleExport} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Download size={14} className="text-muted" /> Export CSV
-            </button>
-            <button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Printer size={14} className="text-muted" /> Print
-            </button>
-          </div>
-        </div>
+    <ReportShell title="Executive Sales Summary" subtitle={reportSubtitle(from, to)}>
+      <ReportFilterBar from={from} to={to} onRange={setRange} onExport={exportCsv} />
 
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Pax</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{stats?.totalPax ?? 0}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Sales</p>
-            <p className="mt-1 text-xl font-extrabold text-accent">₹{(stats?.totalSales ?? 0).toLocaleString('en-IN')}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Avg. Cost / Pax</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">₹{(stats?.apc ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-line bg-card">
-          <div className="border-b border-line p-3">
-            <ListSearch
-              value={search}
-              onChange={setSearch}
-              placeholder="Search executives"
+      {loading && !data ? (
+        <LoadState loading error="" />
+      ) : error ? (
+        <LoadState loading={false} error={error} />
+      ) : data ? (
+        <>
+          <StatGrid>
+            <StatTile
+              primary
+              label="Grand total"
+              value={grandTotal !== undefined ? money(grandTotal) : '—'}
+              hint={`${data.success.orders} successful order${data.success.orders === 1 ? '' : 's'}`}
             />
+            <StatTile
+              label="Average per bill"
+              value={money(data.performance.avg_per_bill)}
+            />
+            <StatTile
+              label="Cancelled"
+              value={data.cancelled.count}
+              hint={money(data.cancelled.amount)}
+            />
+            <StatTile label="Invoice Nos." value={invoiceRange} />
+          </StatGrid>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ReportCard title="Success Orders">
+              <PairList rows={successRows} />
+            </ReportCard>
+            <div className="flex flex-col gap-4">
+              <ReportCard title="Cancelled Orders">
+                <PairList rows={cancelledRows} />
+              </ReportCard>
+              <ReportCard title="Performance Indicator">
+                <PairList rows={performanceRows} />
+              </ReportCard>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px] border-collapse text-sm">
-              <thead>
-                <tr className="bg-page/60">
-                  <SortableTh columnKey="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Executive</SortableTh>
-                  <SortableTh columnKey="totalPax" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Total Pax</SortableTh>
-                  <SortableTh columnKey="totalSales" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Total Sales</SortableTh>
-                  <SortableTh columnKey="apc" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">APC</SortableTh>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {visible.map((r) => (
-                  <tr key={r.id} className="hover:bg-page/40">
-                    <td className="px-4 py-2.5 font-medium text-ink">{r.name}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink">{r.totalPax}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-accent">₹{r.totalSales.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink">₹{r.apc.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </main>
-    </div>
+        </>
+      ) : null}
+    </ReportShell>
   )
 }

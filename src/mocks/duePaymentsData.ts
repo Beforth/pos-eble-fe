@@ -82,6 +82,14 @@ export function clientDue(client: DueClient) {
   return money2(client.bills.reduce((sum, bill) => sum + billPending(bill), 0))
 }
 
+/** The most recent open bill for a client (newest/oldest sort + Last Bill column). */
+export function latestBill(client: DueClient): DueBill | null {
+  return client.bills.reduce<DueBill | null>(
+    (latest, bill) => (!latest || bill.dateMs > latest.dateMs ? bill : latest),
+    null,
+  )
+}
+
 export function monthlyTaken(client: DueClient, month: number, year: number) {
   return money2(
     client.bills

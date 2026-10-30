@@ -263,6 +263,10 @@ export function ImportSheetCsvModal({
       if (res.created > 0) {
         showToast(`${res.created} item${res.created === 1 ? '' : 's'} created`)
         onSaved()
+        // Close by itself once the menu has been told to refresh; a moment
+        // is left so the finished state is seen. Nothing created keeps the
+        // window open so the reasons stay on screen.
+        window.setTimeout(onClose, 900)
       } else {
         showToast('Import complete — no new items created', '', 'neutral')
       }

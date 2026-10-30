@@ -4,6 +4,7 @@ import { showToast } from '../utils/toast'
 import { formatDayMonth } from '../utils/format'
 import type { AllOrderRow, OrdersChartPoint } from '../mocks/allOrdersData'
 import {
+  cancelOrderApi,
   changePaymentApi,
   collectDueApi,
   dailySummaryApi,
@@ -181,6 +182,25 @@ export function useAllOrdersData(
     }
   }
 
+  /** Cancels the order with a reason; resolves to the cancelled order (or null on failure). */
+  async function cancelOrder(
+    orderId: string,
+    reason: string,
+  ): Promise<OrderDto | null> {
+    if (!encryptedOutletId) return null
+    try {
+      const updated = await cancelOrderApi(encryptedOutletId, orderId, reason)
+      setOrders((prev) =>
+        prev.map((row) => (row.id === orderId ? toAllOrderRow(updated) : row)),
+      )
+      showToast('Order cancelled')
+      return updated
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to cancel order')
+      return null
+    }
+  }
+
   return {
     orders,
     chartSeries,
@@ -188,5 +208,6 @@ export function useAllOrdersData(
     loading,
     saveChangePayment,
     saveDueCollect,
+    cancelOrder,
   }
 }

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import {
   OutlineButton,

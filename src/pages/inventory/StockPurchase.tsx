@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate } from 'react-router-dom'
 import { ChevronDown, Eye, FileCog, FileText, Pencil, Plus, ScanLine, Trash2 } from 'lucide-react'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { ScanPurchaseModal } from '../../components/inventory/ScanPurchaseModal'
 import { PurchaseOrderSettingsDrawer } from '../../components/inventory/PurchaseOrderSettingsDrawer'

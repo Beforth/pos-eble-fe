@@ -5,8 +5,9 @@ import {
   useMenuReference,
   type MenuReferenceStatus,
 } from '../state/MenuReferenceContext'
-import { fetchAllItemsCached } from '../state/menuItemsCache'
+import { fetchAllItemsCached, invalidateMenuItems } from '../state/menuItemsCache'
 import type { Category, Item, TaxSummary } from '../types/menu'
+import { buildItemOptions, type ItemOptions } from './itemOptions'
 
 /**
  * Billing menu row shape — the single grid row contract shared by Billing,
@@ -29,8 +30,12 @@ export interface MenuItemRow {
   availableOnZomato?: boolean
   tags: string[]
   hasImage: boolean
+  /** First uploaded picture, shown on the billing cards when enabled. */
+  imageUrl?: string
   rank?: number
   isFavorite?: boolean
+  /** Removed from Favorite Items on purpose; best sellers skip it. */
+  excludeFromAutoFavorites?: boolean
   /**
    * Active tax slabs assigned to this item. Drives `computeTax`. Optional so
    * locally-built rows (combo builder, demo fixtures) stay tax-free by default;
@@ -39,6 +44,11 @@ export interface MenuItemRow {
   taxes?: TaxSummary[]
   /** Item's "ignore tax" flag — when true the item is priced tax-free. */
   ignoreTax?: boolean
+  /**
+   * Variations and add-ons the cashier is asked about when the item is added,
+   * priced for the billing menu. Undefined when the item has none.
+   */
+  options?: ItemOptions
 }
 
 /** Channel whose per-channel price/availability drives POS billing. */
@@ -56,13 +66,21 @@ function toNumber(value: number | string | null | undefined): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function isAvailableForChannel(item: Item, channelId: string): boolean {
+/**
+ * Menu On/Off's POS switch writes the `base` channel, while billing prices
+ * from `dine-in`: an item switched off on either is not sellable at the counter.
+ */
+function isAvailableForChannel(
+  item: Item,
+  channelId: string,
+  alsoChannelIds: string[],
+): boolean {
   if (!item.is_active) return false
-  if (!channelId) return true
-  const entry = item.availability?.find(
-    (a) => a.outlet_channel_id === channelId,
-  )
-  return entry ? entry.is_available : true
+  return [channelId, ...alsoChannelIds].every((id) => {
+    if (!id) return true
+    const entry = item.availability?.find((a) => a.outlet_channel_id === id)
+    return entry ? entry.is_available : true
+  })
 }
 
 /**
@@ -72,7 +90,11 @@ function isAvailableForChannel(item: Item, channelId: string): boolean {
  * taxes: the item's assigned slabs, kept (plus `flags.ignore_tax`) so the cart
  * can price a line — the item list already returns both, so no extra request.
  */
-export function adaptItem(item: Item, channelId: string): MenuItemRow {
+export function adaptItem(
+  item: Item,
+  channelId: string,
+  alsoChannelIds: string[] = [],
+): MenuItemRow {
   const area = item.area_prices?.find(
     (price) => price.outlet_channel_id === channelId,
   )
@@ -88,13 +110,16 @@ export function adaptItem(item: Item, channelId: string): MenuItemRow {
     onlineDisplayName: item.online_display_name,
     price,
     description: item.description,
-    available: isAvailableForChannel(item, channelId),
+    available: isAvailableForChannel(item, channelId, alsoChannelIds),
     tags: [...(choiceMark ? [choiceMark] : []), ...(item.tags ?? [])],
     hasImage: item.has_image,
+    imageUrl: item.images?.[0]?.image || undefined,
     rank: item.rank,
     isFavorite: item.flags?.set_as_favorite ?? false,
+    excludeFromAutoFavorites: item.flags?.exclude_from_auto_favorites ?? false,
     taxes: item.taxes ?? [],
     ignoreTax: item.flags?.ignore_tax ?? false,
+    options: buildItemOptions(item, channelId),
   }
 }
 
@@ -116,6 +141,15 @@ export interface BillingMenuState {
   categoriesError: string | null
   /** Force-refetches items *and* categories. */
   reload: () => Promise<void>
+  /**
+   * Set an item's favorite flags in memory (and drop the shared items cache so
+   * the next screen refetches). The caller saves them with `updateItemApi`.
+   * `excluded` = removed from Favorite Items, so best sellers skip it.
+   */
+  setItemFavorite: (
+    itemId: string,
+    flags: { favorite: boolean; excluded: boolean },
+  ) => void
 }
 
 /**
@@ -138,6 +172,11 @@ export function useBillingMenu(): BillingMenuState {
 
   const channelId = useMemo(
     () => channels.find((c) => c.channel_slug === POS_CHANNEL_SLUG)?.id ?? '',
+    [channels],
+  )
+
+  const baseChannelId = useMemo(
+    () => channels.find((c) => c.channel_slug === 'base')?.id ?? '',
     [channels],
   )
 
@@ -170,9 +209,63 @@ export function useBillingMenu(): BillingMenuState {
     void load(false)
   }, [load])
 
+  // Menu On/Off is changed from another tab or device, so an open billing
+  // screen re-reads the items quietly (no loading state) when the tab regains
+  // focus and once a minute while it stays visible. The list is large, so it
+  // is read at most this often (a request in flight is shared) — more often
+  // and it queues ahead of the bill requests on the server.
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    let lastRefresh = Date.now()
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastRefresh < 15_000) return
+      lastRefresh = Date.now()
+      fetchAllItemsCached(encryptedOutletId, { force: true })
+        .then((all) => {
+          if (!cancelled) setRawItems(all)
+        })
+        .catch(() => undefined)
+    }
+    const timer = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [encryptedOutletId])
+
   const items = useMemo(
-    () => rawItems.map((item) => adaptItem(item, channelId)),
-    [rawItems, channelId],
+    () =>
+      rawItems.map((item) =>
+        adaptItem(item, channelId, baseChannelId ? [baseChannelId] : []),
+      ),
+    [rawItems, channelId, baseChannelId],
+  )
+
+  const setItemFavorite = useCallback(
+    (itemId: string, { favorite, excluded }: { favorite: boolean; excluded: boolean }) => {
+      setRawItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                flags: {
+                  ...item.flags,
+                  set_as_favorite: favorite,
+                  exclude_from_auto_favorites: excluded,
+                },
+              }
+            : item,
+        ),
+      )
+      if (encryptedOutletId) invalidateMenuItems(encryptedOutletId)
+    },
+    [encryptedOutletId],
   )
 
   return {
@@ -187,5 +280,6 @@ export function useBillingMenu(): BillingMenuState {
       // categories fetch could never be recovered from the Retry button.
       await Promise.all([load(true), reloadReference('categories', { force: true })])
     },
+    setItemFavorite,
   }
 }

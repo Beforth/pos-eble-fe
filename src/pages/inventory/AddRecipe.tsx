@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate } from 'react-router-dom'
 import { AlertCircle, ArrowDown, ArrowUp, Plus, Trash2, UtensilsCrossed } from 'lucide-react'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'

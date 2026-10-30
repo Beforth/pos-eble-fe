@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { SETTLE_CODENAME } from '../../auth/routePermissions'
 import { showToast } from '../../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNewOrder } from '../../state/useNewOrder'
 import { CaptainOrdersHeader } from '../../components/captainorders/CaptainOrdersHeader'
 import {
   BillPanel,
@@ -21,6 +22,8 @@ import { FinalBillCustomerModal } from '../../components/captainorders/FinalBill
 import { DummyBillModal, type DummyBillData } from '../../components/captainorders/DummyBillModal'
 
 import { OpenItemModal } from '../../components/captainorders/OpenItemModal'
+import { ItemOptionsModal } from '../../components/billing/ItemOptionsModal'
+import { matchMenuItemId, type PricedSelection } from '../../utils/itemOptions'
 import { OtherPaymentModal, type OtherPaymentDetails } from '../../components/captainorders/OtherPaymentModal'
 import { OrderNotesModal } from '../../components/captainorders/OrderNotesModal'
 import { DraftBillsModal } from '../../components/captainorders/DraftBillsModal'
@@ -61,7 +64,9 @@ import {
   type KotEventData,
   type KotOrderType,
   type OrderDto,
+  updateKotApi,
 } from '../../services/orderService'
+import { isServerBackedKotId } from '../../utils/kotListStore'
 import {
   getItemInitials,
   itemNameMatchesQuery,
@@ -97,6 +102,8 @@ import {
   type TaxSettings,
 } from '../../utils/taxEngine'
 import { useOutletSettings } from '../../services/useOutletSettings'
+import { useFavoriteItems } from '../../state/useFavoriteItems'
+import { useMenuOnRight } from '../../state/useMenuOnRight'
 import { subscribeToRail } from '../../services/liveRailClient'
 
 const FAVORITES_ID = 'favorites'
@@ -196,6 +203,7 @@ function findBySearchQuery(
 
 export default function CaptainOrders() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { user, encryptedOutletId, token, hasPermission } = useAuth()
   const billerName = user?.name?.trim() || user?.identifier?.trim() || ''
   const [searchParams] = useSearchParams()
@@ -359,6 +367,7 @@ export default function CaptainOrders() {
     grandTotal: number
     /** Tendered cash (may be lower than grandTotal → the balance books as due). */
     receivedAmount: number
+    tip?: number
     customerName: string
     customerPhone: string
     paymentLabel: string
@@ -402,6 +411,7 @@ export default function CaptainOrders() {
       discount: params.discount,
       grand_total: params.grandTotal,
       received_amount: params.receivedAmount,
+      tip: params.tip && params.tip > 0 ? params.tip : undefined,
       settlement_by: billerName || undefined,
     })
     return order
@@ -590,6 +600,18 @@ export default function CaptainOrders() {
       }
       if (cancelled || !ticket) return
 
+      // A ticket on a paid bill is finished business here: the KOT view hides it
+      // and the bill leaves it out, so opening it would show an empty cart.
+      if (ticket.billed) {
+        if (toastedOpenKotRef.current !== id) {
+          toastedOpenKotRef.current = id
+          showToast(`KOT ${ticket.kotNo} is on a paid bill, so there is nothing to open`)
+        }
+        setKotViewOpen(false)
+        navigate('/captain-orders', { replace: true })
+        return
+      }
+
       setOrderType(ticket.orderType)
       let nextTableId = ''
       if (ticket.tableId && ticket.tableId !== 'no-table') {
@@ -672,13 +694,10 @@ export default function CaptainOrders() {
       // Order items are a name/qty/price snapshot with no menu FK, so the menu
       // row is matched by name to recover the tax slabs the bill panel prices
       // lines with. An unmatched item still bills, just untaxed.
-      const menuIdByName = new Map(
-        menuItems.map((item) => [item.name.trim().toLowerCase(), item.id]),
-      )
       setLines(
         order.items.map((item, index) => ({
           id: `order-${order.id}-${index}`,
-          itemId: menuIdByName.get(item.name.trim().toLowerCase()) ?? '',
+          itemId: matchMenuItemId(item.name, menuItems),
           name: item.name,
           price: Number(item.unit_price || 0),
           qty: Number(item.qty || 0),
@@ -718,19 +737,20 @@ export default function CaptainOrders() {
     }
   }, [openOrderId, encryptedOutletId, menuItems, menuLoading, navigate])
 
-  const favoriteIds = useMemo(
-    () =>
-      new Set(
-        menuItems
-          .filter((i) => i.isFavorite)
-          .slice(0, 12)
-          .map((i) => i.id),
-      ),
-    [menuItems],
-  )
+  // Manual favorites first, then best sellers fill the outlet's favorite slots.
+  const { favoriteIds } = useFavoriteItems(menuItems)
+  // Display settings: menu on the right of the bill (Touch Screen layout only).
+  const menuOnRight = useMenuOnRight()
 
   const filteredItems = useMemo(() => {
+    // A typed short code looks across the whole menu, not just the open category.
+    const codeLookup = shortCode.trim() !== ''
     return menuItems.filter((item) => {
+      if (codeLookup) {
+        if (!matchesShortCode(item, shortCode)) return false
+        if (search.trim() && !itemNameMatchesQuery(item.name, search)) return false
+        return true
+      }
       if (railCategoryId === FAVORITES_ID) {
         if (!favoriteIds.has(item.id)) return false
       } else if (railCategoryId === ALL_CATEGORIES_ID) {
@@ -744,18 +764,50 @@ export default function CaptainOrders() {
       if (search.trim()) {
         if (!itemNameMatchesQuery(item.name, search)) return false
       }
-      if (shortCode.trim()) {
-        if (!matchesShortCode(item, shortCode)) return false
-      }
       return true
     })
   }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds, menuItems])
 
 
+  // An item with variations / add-ons waits here for the cashier's choices.
+  const [optionsItem, setOptionsItem] = useState<MenuItemRow | null>(null)
+
+  function addConfiguredItem(item: MenuItemRow, priced: PricedSelection) {
+    setLines((prev) => {
+      const existing = prev.find(
+        (line) => line.itemId === item.id && line.optionKey === priced.key,
+      )
+      if (existing) {
+        return prev.map((line) =>
+          line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
+        )
+      }
+      return [
+        ...prev,
+        {
+          id: `line-${item.id}-${Date.now()}`,
+          itemId: item.id,
+          name: priced.name,
+          price: priced.price,
+          qty: 1,
+          optionKey: priced.key,
+        },
+      ]
+    })
+    setOptionsItem(null)
+    showToast(`Added ${priced.name}`)
+  }
+
   function addItem(item: MenuItemRow) {
     if (!item.available) return
+    if (item.options) {
+      setOptionsItem(item)
+      return
+    }
     setLines((prev) => {
-      const existing = prev.find((line) => line.itemId === item.id)
+      const existing = prev.find(
+        (line) => line.itemId === item.id && !line.optionKey,
+      )
       if (existing) {
         return prev.map((line) =>
           line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
@@ -821,6 +873,26 @@ export default function CaptainOrders() {
     addItem(item)
     setShortCode('')
     showToast(`Added ${item.name}`)
+  }
+
+  async function cancelKot(id: string, reason: string) {
+    if (!encryptedOutletId) return
+  // Cancelling a KOT has to happen on the server too. Only hiding it here would
+  // leave it cooking on the kitchen screen and out of the dashboard's Leakage
+  // "Cancelled" count. A ticket the server never saw (a `kot-...` id) has
+  // nothing to cancel there.
+    try {
+      if (isServerBackedKotId(id)) {
+        await updateKotApi(encryptedOutletId, id, { status: 'Cancelled', reason })
+      }
+      removeKotTicket(id)
+      setKotTickets(loadAllKotTickets())
+      showToast('KOT cancelled')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Could not cancel the KOT',
+      )
+    }
   }
 
   function changeQty(lineId: string, qty: number) {
@@ -917,6 +989,24 @@ export default function CaptainOrders() {
     setResumeOrderId(null)
   }
 
+  // Emptying the cart of a resumed held bill (Delete All, or removing the last item)
+  // discards it: drop the held copy and the customer / note it carried, so the next
+  // hold starts clean and the held list no longer shows it.
+  useEffect(() => {
+    if (lines.length > 0 || !activeDraftId) return
+    if (encryptedOutletId) {
+      deleteDraftBillApi(encryptedOutletId, activeDraftId)
+        .catch(() => undefined)
+        .finally(() => void refreshDraftCount())
+    }
+    setActiveDraftId(null)
+    setCustomer(EMPTY_CUSTOMER)
+    setCustomerErrors({})
+    setShowCustomerErrors(false)
+    setOrderNote('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines.length, activeDraftId])
+
   async function refreshDraftCount() {
     if (!encryptedOutletId) return
     try {
@@ -929,7 +1019,7 @@ export default function CaptainOrders() {
 
   async function saveCurrentAsDraft(customerName: string) {
     if (lines.length === 0) {
-      showToast('Add items before saving a draft')
+      showToast('Add items before putting a bill on hold')
       return
     }
     if (!encryptedOutletId) {
@@ -949,28 +1039,39 @@ export default function CaptainOrders() {
         name: customerName,
       },
     })
+    const createDraft = () =>
+      saveDraftBillApi(encryptedOutletId, {
+        ...payload,
+        client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      })
     try {
-      const saved = activeDraftId
-        ? await updateDraftBillApi(encryptedOutletId, activeDraftId, payload)
-        : await saveDraftBillApi(encryptedOutletId, {
-            ...payload,
-            client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          })
+      let saved
+      if (activeDraftId) {
+        try {
+          saved = await updateDraftBillApi(encryptedOutletId, activeDraftId, payload)
+        } catch (error) {
+          // The held bill this cart came from is gone: hold it again as a new one.
+          if (!(error instanceof Error) || !/not found/i.test(error.message)) throw error
+          saved = await createDraft()
+        }
+      } else {
+        saved = await createDraft()
+      }
       setActiveDraftId(saved.id)
       await refreshDraftCount()
       setSaveDraftOpen(false)
       clearBillForNextCustomer()
-      showToast(`Draft saved for ${customerName}`)
+      showToast(`Bill put on hold for ${customerName}`)
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : 'Failed to save the draft',
+        error instanceof Error ? error.message : 'Failed to put the bill on hold',
       )
     }
   }
 
   function startSaveDraft() {
     if (lines.length === 0) {
-      showToast('Add items before saving a draft')
+      showToast('Add items before putting a bill on hold')
       return
     }
     setSaveDraftOpen(true)
@@ -991,16 +1092,21 @@ export default function CaptainOrders() {
     setResumeOrderId(null)
     showToast(
       draft.tableNo !== 'No table'
-        ? `Draft resumed · Table ${draft.tableNo}`
-        : 'Draft resumed',
+        ? `Held bill resumed · Table ${draft.tableNo}`
+        : 'Held bill resumed',
     )
   }
 
   function newOrder() {
-    setPinnedKotId(null)
-    setFocusKotNo(null)
-    setResumeOrderId(null)
-    navigate('/table-view?from=captain')
+    startNewOrder({
+      captain: true,
+      onNavigate: () => {
+        setPinnedKotId(null)
+        setFocusKotNo(null)
+        setResumeOrderId(null)
+        clearBillForNextCustomer()
+      },
+    })
   }
 
   const tableKotTickets = useMemo(
@@ -1029,21 +1135,23 @@ export default function CaptainOrders() {
       })),
     })
 
+    // A ticket whose bill is already paid (`billed`) is finished business:
+    // the KOT view hides it, so the bill must not keep adding it up either.
     if (hasTableSelected) {
-      const base = tableKotTickets.map(toSummary)
+      const base = tableKotTickets.filter((t) => !t.billed).map(toSummary)
       if (
         pinnedKotId &&
         !base.some((row) => row.id === pinnedKotId)
       ) {
         const pinned = kotTickets.find((t) => t.id === pinnedKotId)
-        if (pinned) return [...base, toSummary(pinned)]
+        if (pinned && !pinned.billed) return [...base, toSummary(pinned)]
       }
       return base
     }
 
     if (pinnedKotId) {
       const pinned = kotTickets.find((t) => t.id === pinnedKotId)
-      return pinned ? [toSummary(pinned)] : []
+      return pinned && !pinned.billed ? [toSummary(pinned)] : []
     }
     return []
   }, [hasTableSelected, tableKotTickets, pinnedKotId, kotTickets])
@@ -1461,6 +1569,7 @@ export default function CaptainOrders() {
           discount: discountAmt,
           grand_total: billTotal,
           received_amount: amount,
+          tip: money?.tip && money.tip > 0 ? money.tip : undefined,
           settlement_by: billerName || undefined,
         })
       } catch (error) {
@@ -1554,6 +1663,7 @@ export default function CaptainOrders() {
           // due the API never booked.
           grandTotal: Math.round((amount + due) * 100) / 100,
           receivedAmount: amount,
+          tip: money?.tip,
           customerName: customer.name,
           customerPhone: customer.mobile,
           paymentLabel: paymentTypeLabel(payment, otherPayment?.type),
@@ -1800,7 +1910,7 @@ export default function CaptainOrders() {
       return
     }
 
-    if (action === 'Draft') {
+    if (action === 'Hold') {
       startSaveDraft()
       return
     }
@@ -1843,6 +1953,14 @@ export default function CaptainOrders() {
           )
         }}
       />
+
+      {optionsItem ? (
+        <ItemOptionsModal
+          item={optionsItem}
+          onClose={() => setOptionsItem(null)}
+          onConfirm={(priced) => addConfiguredItem(optionsItem, priced)}
+        />
+      ) : null}
 
       <OpenItemModal
         open={openItemModalOpen}
@@ -2035,6 +2153,7 @@ export default function CaptainOrders() {
               )
             }
           }}
+          onCancelKot={cancelKot}
           onDismiss={(id) => {
             setKotTickets((prev) => {
               const next = prev.filter((t) => t.id !== id)
@@ -2079,8 +2198,9 @@ export default function CaptainOrders() {
                   result.otherType,
                 ),
                 customerName: result.customerName || settled[0]?.customerName || '',
-                customerPhone: '',
+                customerPhone: result.customerPhone,
                 settlementBy: billerName || undefined,
+                tip: result.tip,
                 grandTotal: result.settlementAmount,
               })
             } catch (error) {
@@ -2114,7 +2234,11 @@ export default function CaptainOrders() {
           }}
         />
       ) : (
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <div
+        className={`flex min-h-0 flex-1 flex-col ${
+          menuOnRight ? 'lg:flex-row-reverse' : 'lg:flex-row'
+        }`}
+      >
         {/* Mobile / tablet: Menu | Bill switcher */}
         <div className="flex shrink-0 gap-1 border-b border-line bg-card p-2 lg:hidden">
           <button
@@ -2281,6 +2405,7 @@ export default function CaptainOrders() {
           <BillPanel
               canSettle={hasPermission(SETTLE_CODENAME)}
             lines={lines}
+            menuOnRight={menuOnRight}
             tableKots={tableKotSummary}
             focusKotNo={focusKotNo}
             taxSource={taxSource}
@@ -2348,7 +2473,9 @@ export default function CaptainOrders() {
               refreshDraftCount()
               setDraftsOpen(true)
             }}
-            draftCount={draftCount}
+            // A held bill that is open in the cart has been taken off hold, so it
+          // is not counted until it is put back on hold.
+          draftCount={Math.max(0, draftCount - (activeDraftId ? 1 : 0))}
           />
         </div>
       </div>

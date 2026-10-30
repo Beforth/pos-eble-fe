@@ -1,4 +1,5 @@
 import { apiRequest } from './apiClient'
+import { downloadXlsx } from './menuService'
 import { AUTH_TOKEN_KEY } from '../auth/storage'
 import type { CurrentOrderRow, CurrentOrderItem } from '../mocks/currentOrdersData'
 import type { KotRow } from '../mocks/kotData'
@@ -49,6 +50,8 @@ export interface OrderDto {
   print_count: number
   settlement_by: string
   settlement_counter: string
+  /** Table of the order's first KOT that names one; blank for a counter order. */
+  table_no?: string
   created_at: string
   settled_at: string | null
   items: OrderItemDto[]
@@ -93,9 +96,18 @@ export interface LiveOrdersSummary {
   rows: LiveOrderChannelRow[]
 }
 
+export interface RunningTableRow {
+  tableNo: string
+  orders: number
+  kots: number
+  amount: number
+  openedAt: string | null
+}
+
 export interface RunningTablesSummary {
   activeTables: number
   revenueEstimated: number
+  list: RunningTableRow[]
 }
 
 export interface LiveOrderChannelDto {
@@ -114,6 +126,13 @@ export interface LiveOrdersRunningDto {
 export interface RunningTablesDto {
   activeTables: number
   revenueEstimated: string
+  list: Array<{
+    tableNo: string
+    orders: number
+    kots: number
+    amount: string
+    openedAt: string | null
+  }>
 }
 
 export interface LiveOrdersDto {
@@ -137,11 +156,14 @@ export interface KotItemDto {
   qty?: number
   quantity?: number
   unit_price?: number
+  note?: string
 }
 
 export interface KotDto {
   id: string
   kot_no: number
+  /** The bill this ticket is on (blank when it has no order). */
+  bill_no?: string
   order_type: KotOrderType
   source: KotSource
   table_id: string
@@ -254,6 +276,9 @@ export interface AdvanceOrderDto {
   source: string
   created_by: string
   created_at: string
+  /** The bill that fulfilled this booking; blank until it is completed. */
+  order_no?: string
+  bill_no?: string
   items: AdvanceOrderItemDto[]
 }
 
@@ -277,6 +302,8 @@ export interface CreateOrderPayload {
   tax?: number
   tax_breakdown?: TaxBreakdownLine[]
   round_off?: number
+  /** Guest tip on top of the bill; saved on settle, never part of grand_total. */
+  tip?: number
   discount?: number
   grand_total?: number
   sub_order_type?: string
@@ -292,11 +319,16 @@ export interface SettleOrderPayload {
   tax?: number
   tax_breakdown?: TaxBreakdownLine[]
   round_off?: number
+  /** Guest tip on top of the bill; saved on settle, never part of grand_total. */
+  tip?: number
   discount?: number
   grand_total?: number
   received_amount?: number
   settlement_by?: string
   settlement_counter?: string
+  /** Collected on the settle screen when a due is taken; omitted = unchanged. */
+  customer_name?: string
+  customer_phone?: string
 }
 
 export interface CreateKotPayload {
@@ -337,6 +369,8 @@ export interface UpdateOrderPayload {
   tax?: number
   tax_breakdown?: TaxBreakdownLine[]
   round_off?: number
+  /** Guest tip on top of the bill; saved on settle, never part of grand_total. */
+  tip?: number
   discount?: number
   grand_total?: number
   received_amount?: number
@@ -438,6 +472,14 @@ export async function liveOrdersApi(outletId: string): Promise<LiveOrdersDto> {
   return jsonRequest<LiveOrdersDto>(ordersPath(outletId, '/live/'), 'GET')
 }
 
+export function toRunningTables(dto: RunningTablesDto): RunningTablesSummary {
+  return {
+    activeTables: dto.activeTables,
+    revenueEstimated: Number(dto.revenueEstimated),
+    list: (dto.list ?? []).map((row) => ({ ...row, amount: Number(row.amount) })),
+  }
+}
+
 export function toLiveOrdersBoard(dto: LiveOrdersRunningDto): LiveOrdersSummary {
   return {
     totalOrders: dto.totalOrders,
@@ -472,6 +514,8 @@ export interface LiveBoardOrderRecord {
   itemCount: number
   total: number
   items: LiveBoardOrderItemDto[]
+  /** When the order was created (ms), for the Live View order setting. */
+  createdAt: number
 }
 
 export interface LiveBoardKotRecord {
@@ -484,6 +528,10 @@ export interface LiveBoardKotRecord {
   itemCount: number
   total: number
   items: LiveBoardOrderItemDto[]
+  /** The ticket's bill is already paid (the kitchen may still be cooking it). */
+  billed: boolean
+  /** When the ticket was sent (ms), for the Live View order setting. */
+  createdAt: number
 }
 
 export type LiveBoardRecord = LiveBoardOrderRecord | LiveBoardKotRecord
@@ -499,6 +547,7 @@ export function toLiveBoardOrderRecord(order: OrderDto): LiveBoardOrderRecord {
     itemCount: order.items.reduce((sum, i) => sum + Number(i.qty || 0), 0),
     total: Number(order.grand_total || 0),
     items: order.items,
+    createdAt: Date.parse(order.created_at) || 0,
   }
 }
 
@@ -516,6 +565,8 @@ export function toLiveBoardKotRecord(kot: KotDto): LiveBoardKotRecord {
       0,
     ),
     items: kot.items as LiveBoardOrderItemDto[],
+    billed: Boolean(kot.billed),
+    createdAt: Date.parse(kot.created) || 0,
   }
 }
 
@@ -567,7 +618,7 @@ export async function listOrdersApi(
   if (options.page_size) query.set('page_size', String(options.page_size))
   const qs = query.toString()
   return jsonRequest<OrdersPage>(
-    ordersPath(outletId, `/orders/${qs ? `?${qs}` : ''}/`),
+    ordersPath(outletId, `/orders/${qs ? `?${qs}` : ''}`),
     'GET',
   )
 }
@@ -595,11 +646,15 @@ export async function settleOrderApi(
   )
 }
 
-export async function cancelOrderApi(outletId: string, id: string): Promise<OrderDto> {
+export async function cancelOrderApi(
+  outletId: string,
+  id: string,
+  reason = '',
+): Promise<OrderDto> {
   return jsonRequest<OrderDto>(
     ordersPath(outletId, `/orders/${id}/cancel/`),
     'POST',
-    {},
+    reason ? { reason } : {},
   )
 }
 
@@ -804,6 +859,29 @@ export async function updateAdvanceOrderApi(
   )
 }
 
+export async function getAdvanceOrderApi(
+  outletId: string,
+  id: string,
+): Promise<AdvanceOrderDto> {
+  return jsonRequest<AdvanceOrderDto>(
+    ordersPath(outletId, `/advance-orders/${id}/`),
+    'GET',
+  )
+}
+
+/** Close a booking as fulfilled on `orderId`, the bill that collected its balance. */
+export async function completeAdvanceOrderApi(
+  outletId: string,
+  id: string,
+  orderId: string,
+): Promise<AdvanceOrderDto> {
+  return jsonRequest<AdvanceOrderDto>(
+    ordersPath(outletId, `/advance-orders/${id}/complete/`),
+    'POST',
+    { order_id: orderId },
+  )
+}
+
 export async function cancelAdvanceOrderApi(
   outletId: string,
   id: string,
@@ -823,6 +901,8 @@ export interface ListKotsOptions {
   source?: string
   from?: string
   to?: string
+  /** Only tickets created after the outlet's last Day End. */
+  sinceDayEnd?: boolean
   page?: number
   page_size?: number
 }
@@ -838,10 +918,11 @@ export async function listKotsApi(
   if (options.source) params.push(`source=${encodeURIComponent(options.source)}`)
   if (options.from) params.push(`from=${encodeURIComponent(options.from)}`)
   if (options.to) params.push(`to=${encodeURIComponent(options.to)}`)
+  if (options.sinceDayEnd) params.push('since_day_end=1')
   if (options.page) params.push(`page=${options.page}`)
   if (options.page_size) params.push(`page_size=${options.page_size}`)
   const qs = params.length ? `?${params.join('&')}` : ''
-  return jsonRequest<KotsPage>(ordersPath(outletId, `/kots/${qs}/`), 'GET')
+  return jsonRequest<KotsPage>(ordersPath(outletId, `/kots/${qs}`), 'GET')
 }
 
 export async function getKotApi(outletId: string, id: string): Promise<KotDto> {
@@ -892,6 +973,21 @@ export async function closeDayApi(
     ordersPath(outletId, '/day-end/close/'),
     'POST',
     {},
+  )
+}
+
+/**
+ * Download the Day End Excel report (4 sheets) for one closed day.
+ * ``closureId`` is the encrypted id of the row; ``dayKey`` is ``YYYY-MM-DD``.
+ */
+export async function downloadDayEndReportApi(
+  outletId: string,
+  closureId: string,
+  dayKey: string,
+): Promise<void> {
+  await downloadXlsx(
+    ordersPath(outletId, `/day-end/${closureId}/export/`),
+    `day-end-summary-${dayKey}.xlsx`,
   )
 }
 
@@ -1098,19 +1194,15 @@ function kotTableNoFallback(orderType: KotOrderType | undefined): string {
 
 function parseKotCreated(value: string | undefined): number {
   if (!value) return Date.now()
+  // The server sends `created` as a UTC wall clock with no zone marker
+  // (`2026-10-21 06:53:00`). Read as local time it put every server-sourced
+  // ticket hours in the past (5:30 already elapsed on a new KOT in IST).
   const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/.exec(
     value.trim(),
   )
   if (match) {
     const [, y, mo, d, h, mi, s] = match
-    return new Date(
-      Number(y),
-      Number(mo) - 1,
-      Number(d),
-      Number(h),
-      Number(mi),
-      Number(s),
-    ).getTime()
+    return Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s))
   }
   const parsed = new Date(value).getTime()
   return Number.isFinite(parsed) ? parsed : Date.now()
@@ -1124,6 +1216,9 @@ function kotEventItems(dto: KotDto | KotEventData): KotViewItem[] {
     name: entry.name ?? entry.item_name ?? 'Item',
     qty: entry.qty ?? entry.quantity ?? 1,
     price: Number(entry.unit_price) || 0,
+    // The kitchen needs the cook's note ("Extra spicy"); it was dropped here,
+    // so a ticket that arrived from the server lost it.
+    ...(entry.note ? { note: entry.note } : {}),
   }))
 }
 
@@ -1147,6 +1242,7 @@ export function kotEventToTicket(dto: KotDto | KotEventData): KotTicket {
     status: dto.status === 'Ready' ? 'ready' : 'active',
     customerName: dto.customer_name?.trim() || undefined,
     billed: Boolean(dto.billed),
+    billNo: dto.bill_no?.trim() || undefined,
   }
 }
 
@@ -1221,6 +1317,7 @@ export function toAllOrderRow(dto: OrderDto | OrderEventData): AllOrderRow {
     orderNo: dto.order_no ?? '',
     orderType: ALL_ORDER_TYPES[dto.order_type as OrderType] ?? 'DINE IN',
     customerName: dto.customer_name ?? '',
+    customerPhone: ('customer_phone' in dto ? dto.customer_phone : '') ?? '',
     assignTo: '',
     items: allOrderItemsText(dto.items),
     myAmount: Number(dto.my_amount ?? 0),
@@ -1233,5 +1330,9 @@ export function toAllOrderRow(dto: OrderDto | OrderEventData): AllOrderRow {
       ? formatOrderListTimestamp(dto.created_at)
       : formatOrderListTimestamp(new Date().toISOString()),
     balanceDue: Number(dto.balance_due ?? 0),
+    createdAt: dto.created_at ? new Date(dto.created_at).getTime() : Date.now(),
+    paymentType: (dto.payment_type ?? '').trim(),
+    source: (dto.source ?? '').trim().toLowerCase(),
+    tableNo: (dto.table_no ?? '').trim(),
   }
 }

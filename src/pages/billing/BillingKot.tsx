@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PencilLine, Search } from 'lucide-react'
+import { ChevronDown, ChevronLeft, PencilLine, Search } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
-import { KotTable } from '../../components/kot/KotTable'
+import { BillingKotTable } from '../../components/kot/BillingKotTable'
 import { ViewKotModal } from '../../components/kot/ViewKotModal'
 import { EditKotModal } from '../../components/kot/EditKotModal'
 import { KotOrderDetailsDrawer } from '../../components/kot/KotOrderDetailsDrawer'
@@ -13,6 +13,7 @@ import {
   parseKotItems,
   type KotRow,
 } from '../../utils/kotListStore'
+import { KOT_LEGEND } from '../../utils/billingKotStatus'
 import { downloadCsv } from '../../utils/exportCsv'
 import { showToast } from '../../utils/toast'
 import { useAuth } from '../../auth/AuthContext'
@@ -24,6 +25,7 @@ import {
   type KotEventData,
   type KotRowStatus,
 } from '../../services/orderService'
+import { useNewOrder } from '../../state/useNewOrder'
 
 const PAGE_SIZE = 15
 
@@ -46,12 +48,14 @@ const STATUS_OPTIONS = [
 
 export default function BillingKot() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId, token } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [rows, setRows] = useState<KotRow[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const [draftStart, setDraftStart] = useState('')
   const [draftEnd, setDraftEnd] = useState('')
@@ -271,7 +275,7 @@ export default function BillingKot() {
       <BillingHeader
         billNo={billNo}
         onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view')}
+        onNewOrder={() => startNewOrder()}
         onViewKot={() => navigate('/billing?kot=1')}
       />
 
@@ -296,15 +300,52 @@ export default function BillingKot() {
       />
 
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-ink">KOT</h1>
-          <ExportExcelMenu
-            onExportPage={() => exportRows(rows, 'page')}
-            onExportAll={() => exportAll()}
-          />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-ink">KOT Listing</h1>
+            <p className="mt-0.5 text-sm text-muted">
+              Every kitchen ticket and where it stands.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <ExportExcelMenu
+              onExportPage={() => exportRows(rows, "page")}
+              onExportAll={() => exportAll()}
+            />
+            <button
+              type="button"
+              onClick={() => navigate("/billing/operations")}
+              className="inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page"
+            >
+              <ChevronLeft size={14} />
+              Back
+            </button>
+          </div>
         </div>
 
-        <div className="mb-4 rounded-xl border border-line bg-card p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setSearchOpen((open) => !open)}
+            aria-expanded={searchOpen}
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-3.5 text-sm font-medium text-ink hover:bg-page"
+          >
+            <Search size={14} />
+            Search
+            <ChevronDown size={14} className={searchOpen ? "rotate-180" : ""} />
+          </button>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
+            {KOT_LEGEND.map((entry) => (
+              <span key={entry.label} className="inline-flex items-center gap-1.5">
+                <span className={`size-2.5 rounded-full ${entry.dot}`} />
+                {entry.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {searchOpen ? (
+          <div className="mb-4 rounded-xl border border-line bg-card p-4">
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1 text-xs text-muted">
               Start Date
@@ -352,7 +393,8 @@ export default function BillingKot() {
               Clear Filter
             </button>
           </div>
-        </div>
+          </div>
+        ) : null}
 
         {loading ? (
           <div className="flex min-h-[300px] flex-col items-center justify-center gap-2 rounded-xl border border-line bg-card text-center">
@@ -365,16 +407,14 @@ export default function BillingKot() {
             </p>
           </div>
         ) : (
-          <div className="rounded-xl border border-line bg-card">
-            <div className="overflow-x-auto">
-              <KotTable
-                rows={rows}
-                onView={setViewKot}
-                onEdit={setEditKot}
-                onDetails={setDetailsKot}
-                onOpenInBilling={(row) => navigate(billingUrlForKot(row))}
-              />
-            </div>
+          <div className="overflow-hidden rounded-xl border border-line bg-card">
+            <BillingKotTable
+              rows={rows}
+              onView={setViewKot}
+              onEdit={setEditKot}
+              onDetails={setDetailsKot}
+              onOpenInBilling={(row) => navigate(billingUrlForKot(row))}
+            />
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-2.5">
               <div className="flex items-center gap-3">

@@ -36,6 +36,7 @@ import {
   loadReadyProgress,
   markKotItemsReady,
   pruneReadyProgress,
+  setKotReadyItems,
 } from '../../utils/kotPrepStore'
 import { EditScreenModal } from '../../components/screens/EditScreenModal'
 import { subscribeToRail } from '../../services/liveRailClient'
@@ -50,7 +51,7 @@ import { useAuth } from '../../auth/AuthContext'
 
 const POLL_INTERVAL_MS = 1500
 const TICK_INTERVAL_MS = 1000
-const SYNC_INTERVAL_MS = 15000
+const SYNC_INTERVAL_MS = 5000
 
 function formatElapsed(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000))
@@ -167,6 +168,11 @@ export default function ScreenDisplay() {
     return subscribeToRail({
       outletId: encryptedOutletId,
       token,
+      // The rail has no backlog: tickets sent while it was down never arrive as
+      // events, so catch up the moment it (re)connects.
+      onStatus: (status) => {
+        if (status === 'open') void syncTicketsFromServer()
+      },
       onEvent: (event, data) => {
         if (event === 'kot.prep' || event === 'kot.modified') {
           upsertKotTicketFromServer(kotEventToTicket(data as KotEventData))
@@ -188,7 +194,7 @@ export default function ScreenDisplay() {
 
       },
     })
-  }, [encryptedOutletId, token, refreshTickets])
+  }, [encryptedOutletId, token, refreshTickets, syncTicketsFromServer])
 
   useEffect(() => {
     if (!encryptedOutletId || !token) return
@@ -196,8 +202,22 @@ export default function ScreenDisplay() {
     const interval = window.setInterval(() => {
       void syncTicketsFromServer()
     }, SYNC_INTERVAL_MS)
-    return () => window.clearInterval(interval)
-  }, [encryptedOutletId, token, syncTicketsFromServer])
+    // A screen left in a background tab has its timers throttled or frozen;
+    // bring it up to date the moment it is looked at again.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshTickets()
+        void syncTicketsFromServer()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [encryptedOutletId, token, syncTicketsFromServer, refreshTickets])
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), TICK_INTERVAL_MS)
@@ -225,20 +245,32 @@ export default function ScreenDisplay() {
     return entries
   }, [tickets, screen, readyByTicket])
 
-  function handleComplete(ticketId: string, itemIds: string[]) {
+  async function handleComplete(ticketId: string, itemIds: string[]) {
+    const previousProgress = loadReadyProgress()[ticketId] ?? []
     markKotItemsReady(ticketId, itemIds)
     const ticket = loadAllKotTickets().find((row) => row.id === ticketId)
     const fullyReady = Boolean(ticket && isKotFullyReady(ticket))
     if (fullyReady) {
-      updateKotTicketStatus(ticketId, 'ready')
-      // localStorage alone never reached the server, so the ticket stayed
-      // Pending on the boards forever and never reached Running Orders. The
-      // id is a server-encrypted token for a saved ticket; client-created
-      // tickets use a `kot-…` synthetic id, and those have no server row to
-      // update, so skip them rather than firing a request that 404s.
+      // Tell the server first and keep "done" only if it accepted. Marking the
+      // ticket ready locally and swallowing a failed request left the kitchen
+      // saying "ready" while Billing / Live Orders still said Pending, with no
+      // sign anything went wrong. A client-created `kot-...` id has no server
+      // row to update, so that case stays local.
       if (encryptedOutletId && isServerBackedKotId(ticketId)) {
-        void markKotReadyApi(encryptedOutletId, ticketId).catch(() => {})
+        try {
+          await markKotReadyApi(encryptedOutletId, ticketId)
+        } catch (error) {
+          setKotReadyItems(ticketId, previousProgress)
+          refreshTickets()
+          showToast(
+            error instanceof Error
+              ? `Could not mark the order ready: ${error.message}`
+              : 'Could not mark the order ready. Try again.',
+          )
+          return
+        }
       }
+      updateKotTicketStatus(ticketId, 'ready')
     }
     refreshTickets()
     showToast(
@@ -543,21 +575,28 @@ export default function ScreenDisplay() {
                       {items.map((item) => (
                         <li
                           key={`${ticket.id}-${item.id}`}
-                          className="flex items-start justify-between gap-2 border-b border-line/40 pb-1 last:border-b-0"
+                          className="border-b border-line/40 pb-1 last:border-b-0"
                         >
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <span
-                              className={`size-1.5 shrink-0 rounded-full ${
-                                isReady ? 'bg-success' : 'bg-primary'
-                              }`}
-                            />
-                            <span className="min-w-0 truncate text-sm font-semibold text-ink">
-                              {item.name}
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span
+                                className={`size-1.5 shrink-0 rounded-full ${
+                                  isReady ? 'bg-success' : 'bg-primary'
+                                }`}
+                              />
+                              <span className="min-w-0 truncate text-sm font-semibold text-ink">
+                                {item.name}
+                              </span>
                             </span>
-                          </span>
-                          <span className="shrink-0 text-sm font-bold tabular-nums text-ink">
-                            ×{item.qty}
-                          </span>
+                            <span className="shrink-0 text-sm font-bold tabular-nums text-ink">
+                              ×{item.qty}
+                            </span>
+                          </div>
+                          {item.note ? (
+                            <p className="mt-0.5 pl-3 text-xs font-medium italic text-accent">
+                              Note: {item.note}
+                            </p>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

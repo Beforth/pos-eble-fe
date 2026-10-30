@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader, Plus, Search, Tv, Users } from 'lucide-react'
+import { ChevronLeft, Loader, Pencil, Plus, Search, Tv } from 'lucide-react'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import {
   CustomerHistoryModal,
@@ -19,6 +19,7 @@ import {
   type CustomerDto,
   type CustomerHistoryDto,
 } from '../../services/customerService'
+import { useNewOrder } from '../../state/useNewOrder'
 
 type CustomerFilter = 'all' | 'due'
 
@@ -47,6 +48,7 @@ function formatHistoryDate(value: string): string {
 
 export default function Customers() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { encryptedOutletId } = useAuth()
   const [billNo, setBillNo] = useState('')
   const [search, setSearch] = useState('')
@@ -193,14 +195,13 @@ export default function Customers() {
       <BillingHeader
         billNo={billNo}
         onBillNoChange={setBillNo}
-        onNewOrder={() => navigate('/table-view')}
+        onNewOrder={() => startNewOrder()}
         onViewKot={() => navigate('/billing?kot=1')}
       />
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-card px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-card px-5 py-3">
         <div className="flex items-center gap-2 text-ink">
-          <Users size={18} className="text-primary" />
-          <h1 className="text-sm font-semibold">Customers</h1>
+          <h1 className="text-lg font-semibold">Customer Listing</h1>
           <span className="text-xs text-muted">({customers.length})</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -228,7 +229,7 @@ export default function Customers() {
             onClick={() => navigate('/configuration')}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary bg-card px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
           >
-            <ArrowLeft size={14} />
+            <ChevronLeft size={14} />
             Back
           </button>
         </div>
@@ -271,19 +272,19 @@ export default function Customers() {
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto rounded border border-line">
+        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-line shadow-sm">
           <table className="w-full min-w-[980px] border-collapse text-sm">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-page text-left text-xs font-semibold text-ink">
-                <th className="border-b border-line px-3 py-2.5">Name</th>
-                <th className="border-b border-line px-3 py-2.5">Phone</th>
-                <th className="border-b border-line px-3 py-2.5">Email</th>
-                <th className="border-b border-line px-3 py-2.5">GSTIN</th>
-                <th className="border-b border-line px-3 py-2.5">Address</th>
-                <th className="border-b border-line px-3 py-2.5 text-right">
+              <tr className="bg-page text-left text-sm font-semibold text-ink">
+                <th className="border-b border-line px-3 py-3.5">Mobile</th>
+                <th className="border-b border-line px-3 py-3.5">Email</th>
+                <th className="border-b border-line px-3 py-3.5">Name</th>
+                <th className="border-b border-line px-3 py-3.5">GSTIN</th>
+                <th className="border-b border-line px-3 py-3.5">Address</th>
+                <th className="border-b border-line px-3 py-3.5 text-right">
                   Due (₹)
                 </th>
-                <th className="border-b border-line px-3 py-2.5">Action</th>
+                <th className="border-b border-line px-3 py-3.5">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -313,23 +314,23 @@ export default function Customers() {
                   const dueAmount = Number(dues[customer.id] ?? '0') || 0
                   return (
                     <tr key={customer.id} className="hover:bg-page/70">
-                      <td className="border-b border-line px-3 py-2 font-semibold text-ink">
-                        {customer.name}
-                      </td>
-                      <td className="border-b border-line px-3 py-2 text-ink">
+                      <td className="border-b border-line px-3 py-4 text-ink">
                         {customer.phone}
                       </td>
-                      <td className="border-b border-line px-3 py-2 text-ink">
-                        {customer.email || '—'}
+                      <td className="border-b border-line px-3 py-4 text-ink">
+                        {customer.email}
                       </td>
-                      <td className="border-b border-line px-3 py-2 text-ink">
-                        {customer.gstin || '—'}
+                      <td className="border-b border-line px-3 py-4 uppercase text-ink">
+                        {customer.name}
                       </td>
-                      <td className="border-b border-line px-3 py-2 text-ink">
-                        {customer.address || '—'}
+                      <td className="border-b border-line px-3 py-4 text-ink">
+                        {customer.gstin}
+                      </td>
+                      <td className="border-b border-line px-3 py-4 text-ink">
+                        {customer.address}
                       </td>
                       <td
-                        className={`border-b border-line px-3 py-2 text-right tabular-nums ${
+                        className={`border-b border-line px-3 py-4 text-right tabular-nums ${
                           dueAmount > 0
                             ? 'font-semibold text-primary'
                             : 'text-ink'
@@ -337,25 +338,26 @@ export default function Customers() {
                       >
                         {money(dueAmount)}
                       </td>
-                      <td className="border-b border-line px-3 py-2">
-                        <div className="flex flex-wrap items-center gap-x-1 text-sm">
+                      <td className="border-b border-line px-3 py-3">
+                        <div className="flex items-center gap-2 text-sm">
                           <button
                             type="button"
-                            onClick={() => openHistory(customer)}
-                            className="font-semibold text-primary underline decoration-primary/40 hover:text-primary-hover"
-                          >
-                            History
-                          </button>
-                          <span className="text-muted">|</span>
-                          <button
-                            type="button"
+                            data-tooltip="Edit customer"
+                            aria-label="Edit customer"
                             onClick={() => {
                               setEditing(customer)
                               setFormOpen(true)
                             }}
-                            className="font-semibold text-primary underline decoration-primary/40 hover:text-primary-hover"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-page text-muted hover:text-primary"
                           >
-                            Edit
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openHistory(customer)}
+                            className="h-9 rounded-md border border-line bg-card px-4 font-medium text-ink hover:border-primary hover:text-primary"
+                          >
+                            History
                           </button>
                         </div>
                       </td>

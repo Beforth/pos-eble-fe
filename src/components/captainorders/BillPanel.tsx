@@ -19,6 +19,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
+import { KOT_STORE_EVENT, loadTableStatuses } from '../../utils/tableStatusStore'
 import type { BillingTableRow } from '../../utils/diningTables'
 import { roundSettlementAmount } from '../../utils/settlementRound'
 import {
@@ -51,6 +52,8 @@ import { DeleteReasonModal } from './DeleteReasonModal'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { OTHER_PAYMENT_TYPES } from './OtherPaymentModal'
 import { PrimaryButton } from '../menu/MenuActionButtons'
+import { QtyInput } from '../common/QtyInput'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
 
 const SEED_CUSTOMER_HISTORY: Record<string, CustomerHistoryOrder[]> = {
   '1234567899': [
@@ -99,6 +102,8 @@ export interface CartLine {
   price: number
   qty: number
   note?: string
+  /** The variation / add-ons chosen for this line; lines merge only when equal. */
+  optionKey?: string
 }
 
 export interface CustomerDetails {
@@ -111,6 +116,8 @@ export interface CustomerDetails {
 
 interface BillPanelProps {
   lines: CartLine[]
+  /** Menu is on the right, so the divider line sits on the panel's right edge. */
+  menuOnRight?: boolean
   /** KOTs already sent for the selected table (merged into final bill). */
   tableKots?: {
     id: string
@@ -218,6 +225,7 @@ function fieldClass(error?: boolean) {
 
 export function BillPanel({
   lines,
+  menuOnRight = false,
   tableKots = [],
   focusKotNo = null,
   taxSource,
@@ -230,8 +238,6 @@ export function BillPanel({
   guests,
   complimentary,
   itsPaid,
-  loyalty,
-  feedbackSms,
   customer,
   customerFormOpen,
   customerErrors,
@@ -241,8 +247,6 @@ export function BillPanel({
   onGuestsChange,
   onComplimentaryChange,
   onItsPaidChange,
-  onLoyaltyChange,
-  onFeedbackSmsChange,
   onQtyChange,
   onRemoveLine,
   onLineNoteChange,
@@ -271,6 +275,19 @@ export function BillPanel({
   const [clearAllOpen, setClearAllOpen] = useState(false)
   const [clearCustomerOpen, setClearCustomerOpen] = useState(false)
   const selectedTable = tables.find((t) => t.id === tableId)
+  // Occupied = anything but a blank table on the floor plan. Re-read when the
+  // picker opens and whenever tickets change, so it matches the table view.
+  const [tableStatuses, setTableStatuses] = useState(loadTableStatuses)
+  useEffect(() => {
+    const refresh = () => setTableStatuses(loadTableStatuses())
+    refresh()
+    window.addEventListener(KOT_STORE_EVENT, refresh)
+    window.addEventListener('storage', refresh)
+    return () => {
+      window.removeEventListener(KOT_STORE_EVENT, refresh)
+      window.removeEventListener('storage', refresh)
+    }
+  }, [tablePickerOpen])
   const dineInFieldsLocked = orderType === 'delivery'
   const previousOrderType = useRef(orderType)
 
@@ -340,7 +357,8 @@ export function BillPanel({
 
   const deliveryValue = Number(deliveryCharge) || 0
   const containerValue = Number(containerCharge) || 0
-  const tipValue = Number(tip) || 0
+  const { showTip } = useDisplaySettings()
+  const tipValue = showTip ? Number(tip) || 0 : 0
   const paidValue = Number(customerPaid) || 0
 
   // Tax is priced over the live cart *and* the KOT lines already sent to the
@@ -543,7 +561,11 @@ export function BillPanel({
   }
 
   return (
-    <aside className="flex h-full w-full min-h-0 shrink-0 flex-col border-line bg-card lg:border-l">
+    <aside
+      className={`flex h-full w-full min-h-0 shrink-0 flex-col border-line bg-card ${
+        menuOnRight ? 'lg:border-r' : 'lg:border-l'
+      }`}
+    >
       <AppliedDiscountModal
         open={discountOpen}
         billTotal={total}
@@ -818,8 +840,8 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          data-tooltip="Draft bills"
-          aria-label="Draft bills"
+          data-tooltip="Held bills"
+          aria-label="Held bills"
           onClick={() => {
             setTablePickerOpen(false)
             setGuestsPickerOpen(false)
@@ -875,11 +897,11 @@ export function BillPanel({
         ) : null}
 
         {tablePickerOpen ? (
-          <div className="absolute left-2 top-12 z-20 w-56 overflow-hidden rounded-lg border border-line bg-card shadow-lg">
-            <p className="border-b border-line px-3 py-2 text-xs font-semibold text-muted">
+          <div className="absolute left-2 top-12 z-20 w-72 overflow-hidden rounded-xl border border-line bg-card shadow-lg">
+            <p className="border-b border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
               Select table
             </p>
-            <ul className="max-h-48 overflow-y-auto py-1">
+            <ul className="max-h-72 overflow-y-auto py-1">
               <li>
                 <button
                   type="button"
@@ -888,9 +910,9 @@ export function BillPanel({
                     onGuestsChange(0)
                     setTablePickerOpen(false)
                   }}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-page ${
+                  className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-page ${
                     !tableId
-                      ? 'font-semibold text-primary'
+                      ? 'bg-primary/5 font-semibold text-primary'
                       : 'text-ink'
                   }`}
                 >
@@ -906,14 +928,26 @@ export function BillPanel({
                       onGuestsChange(table.persons)
                       setTablePickerOpen(false)
                     }}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-page ${
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-page ${
                       table.id === tableId
-                        ? 'font-semibold text-primary'
+                        ? 'bg-primary/5 text-primary'
                         : 'text-ink'
                     }`}
                   >
-                    <span>Table {table.tableNo}</span>
-                    <span className="text-xs text-muted">{table.areaName}</span>
+                    <span className="min-w-0">
+                      <span className="block whitespace-nowrap text-sm font-semibold">
+                        Table {table.tableNo}
+                      </span>
+                      <span className="block truncate text-xs text-muted">
+                        {table.areaName}
+                      </span>
+                    </span>
+                    {(tableStatuses[table.id] ?? 'blank') !== 'blank' &&
+                    table.id !== tableId ? (
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-secondary/40 px-2 py-0.5 text-[11px] font-semibold text-deep">
+                        Occupied
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -1070,7 +1104,7 @@ export function BillPanel({
         <>
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-b border-line bg-page px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
             <span>Items</span>
-            <span className="w-16 text-center">Qty</span>
+            <span className="w-24 text-center">Qty</span>
             <span className="w-14 text-right">Price</span>
             <span className="w-7" />
           </div>
@@ -1233,7 +1267,7 @@ export function BillPanel({
                               </span>
                             ) : null}
                           </span>
-                          <div className="flex w-16 items-center justify-center gap-1">
+                          <div className="flex w-24 items-center justify-center gap-1">
                             <button
                               type="button"
                               aria-label="Decrease quantity"
@@ -1243,9 +1277,11 @@ export function BillPanel({
                             >
                               <Minus size={12} />
                             </button>
-                            <span className="w-5 text-center text-sm font-semibold text-ink">
-                              {line.qty}
-                            </span>
+                            <QtyInput
+                                value={line.qty}
+                                label={`Quantity for ${line.name}`}
+                                onCommit={(qty) => onQtyChange(line.id, qty)}
+                              />
                             <button
                               type="button"
                               aria-label="Increase quantity"
@@ -1421,6 +1457,7 @@ export function BillPanel({
                 {money(returnToCustomer)}
               </span>
             </div>
+{showTip ? (
             <label className="flex items-center justify-between gap-3 text-sm text-ink">
               <span>Tip</span>
               <input
@@ -1432,6 +1469,7 @@ export function BillPanel({
                 className="h-8 w-24 rounded-md border border-line bg-white px-2 text-right text-sm outline-none focus:border-primary"
               />
             </label>
+) : null}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
               <button
@@ -1531,7 +1569,7 @@ export function BillPanel({
           </div>
 
           {canSettle ? (
-            <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
               {PAYMENTS.map((method) => (
                 <label
                   key={method.id}
@@ -1589,6 +1627,7 @@ export function BillPanel({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            {/* Loyalty and Send Feedback SMS are switched off for now:
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
               <input
                 type="checkbox"
@@ -1607,6 +1646,7 @@ export function BillPanel({
               />
               Send Feedback SMS
             </label>
+            */}
           </div>
 
           <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
@@ -1623,30 +1663,29 @@ export function BillPanel({
                 // { id: 'Save & eBill', label: 'Save & eBill' },
                 { id: 'KOT', label: 'KOT' },
                 { id: 'KOT & Print', label: 'KOT & Print' },
-                { id: 'Draft', label: 'Draft', icon: true },
+                { id: 'Hold', label: 'Hold' },
               ] as const
             ).map((action) => (
               <button
                 key={action.id}
                 type="button"
                 aria-label={
-                  action.id === 'Draft'
-                    ? 'Save current order as draft'
+                  action.id === 'Hold'
+                    ? 'Put current order on hold'
                     : action.label
                 }
                 data-tooltip={
-                  action.id === 'Draft'
-                    ? 'Save current order as draft'
+                  action.id === 'Hold'
+                    ? 'Put current order on hold'
                     : action.label
                 }
                 onClick={() => onAction(action.id, chargesSnapshot())}
                 className={`inline-flex h-10 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[11px] font-semibold leading-tight sm:text-xs ${
-                  action.id === 'Draft'
+                  action.id === 'Hold'
                     ? 'border border-primary bg-card text-primary hover:bg-primary/5'
                     : 'bg-primary text-white hover:bg-primary-hover'
                 }`}
               >
-                {action.id === 'Draft' ? <FilePenLine size={13} /> : null}
                 {action.label}
               </button>
             ))}

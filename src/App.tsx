@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import {
   BrowserRouter,
   Navigate,
@@ -16,6 +16,8 @@ import { MenuChannelsProvider } from './state/MenuChannelsContext'
 import { MenuReferenceProvider } from './state/MenuReferenceContext'
 import { ChromeProvider } from './state/ChromeContext'
 import { GlobalNavigationShortcuts } from './components/layout/GlobalNavigationShortcuts'
+import { OnlineOrdersProvider } from './state/OnlineOrdersContext'
+import AcceptOnlineOrders from './pages/AcceptOnlineOrders'
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
 import EditProfile from './pages/EditProfile'
@@ -63,6 +65,20 @@ import ParcelMenu from './pages/ParcelMenu'
 import Configuration from './pages/Configuration'
 import CurrentOrders from './pages/configuration/CurrentOrders'
 import Customers from './pages/customer-screen/Customers'
+import Feedback from './pages/Feedback'
+import BillingSettings from './pages/billing/BillingSettings'
+import BillingCashFlow from './pages/billing/BillingCashFlow'
+import AssigneeWiseSummaryReport from './pages/reports/AssigneeWiseSummaryReport'
+import NcItemSummaryReport from './pages/reports/NcItemSummaryReport'
+import SettlementSummaryReport from './pages/reports/SettlementSummaryReport'
+import CaptainWiseSummaryReport from './pages/reports/CaptainWiseSummaryReport'
+import LocalitySummaryReport from './pages/reports/LocalitySummaryReport'
+import TipSummaryReport from './pages/reports/TipSummaryReport'
+import ReportsHub from './pages/reports/ReportsHub'
+import NotificationListing from './pages/billing/NotificationListing'
+import BillerProfiles from './pages/billing/BillerProfiles'
+import InventoryManagement from './pages/configuration/InventoryManagement'
+import BillingLedDisplay from './pages/billing/BillingLedDisplay'
 import CustomerDisplay from './pages/customer-screen/CustomerDisplay'
 import CoverSizeReport from './pages/reports/CoverSizeReport'
 import TableView from './pages/TableView'
@@ -75,6 +91,7 @@ import ScheduleChannelMenu from './pages/ScheduleChannelMenu'
 import PhysicalMenu from './pages/PhysicalMenu'
 import InventoryDashboard from './pages/inventory/InventoryDashboard'
 import InventorySettings from './pages/inventory/InventorySettings'
+import InventoryPlaceholder from './pages/inventory/InventoryPlaceholder'
 import InventoryOldDashboard from './pages/inventory/InventoryOldDashboard'
 import StockPurchase, {
   PurchaseOrder,
@@ -233,6 +250,25 @@ import BillingAllOrders from './pages/billing/BillingAllOrders'
 import BillingLiveOrders from './pages/billing/BillingLiveOrders'
 import BillingKot from './pages/billing/BillingKot'
 import BillingDayEnd from './pages/billing/BillingDayEnd'
+import BillingPrinters from './pages/billing/BillingPrinters'
+import BillingExpenses from './pages/billing/BillingExpenses'
+import BillingExpenseDate from './pages/billing/BillingExpenseDate'
+import BillingExpenseDetails from './pages/billing/BillingExpenseDetails'
+import BillingWithdrawals from './pages/billing/BillingWithdrawals'
+import BillingWithdrawalDetails from './pages/billing/BillingWithdrawalDetails'
+import BillingTaxes from './pages/billing/BillingTaxes'
+import BillingDiscounts from './pages/billing/BillingDiscounts'
+import BillingDuePayments from './pages/billing/BillingDuePayments'
+import BillingOnlineOrders from './pages/billing/BillingOnlineOrders'
+import BillingAdvanceOrders from './pages/billing/BillingAdvanceOrders'
+import BillingCustomOrderStatus from './pages/billing/BillingCustomOrderStatus'
+import BillingDeliveryBoys from './pages/billing/BillingDeliveryBoys'
+import BillingDeliveryBoyForm from './pages/billing/BillingDeliveryBoyForm'
+import BillingCurrencyConversion from './pages/billing/BillingCurrencyConversion'
+import BillingComingSoon from './pages/billing/BillingComingSoon'
+import BillingOperations from './pages/billing/BillingOperations'
+import BillingLiveView from './pages/billing/BillingLiveView'
+import BillingReports from './pages/billing/BillingReports'
 import ZomatoMenu from './pages/ZomatoMenu'
 import TablesAreasManagement from './pages/TablesAreasManagement'
 import TaxesManagement from './pages/TaxesManagement'
@@ -240,6 +276,12 @@ import VariantsManagement from './pages/VariantsManagement'
 
 function RouteErrorBoundary({ children }: { children: ReactNode }) {
   const location = useLocation()
+  // Dialogs lock the page scroll while open and put it back when they close; two
+  // dialogs closed in the other order leave it locked. A new page always starts
+  // scrollable, so that never carries over.
+  useEffect(() => {
+    document.body.style.overflow = ''
+  }, [location.pathname])
   return (
     <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
   )
@@ -260,6 +302,7 @@ export default function App() {
           <MenuReferenceProvider>
           <BrowserRouter>
           <ChromeProvider>
+          <OnlineOrdersProvider>
           <GlobalNavigationShortcuts />
           <TooltipHost />
           <ToastHost />
@@ -515,6 +558,14 @@ export default function App() {
             }
           />
           <Route
+            path="/online-orders/accept"
+            element={
+              <ProtectedRoute>
+                <AcceptOnlineOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/kot"
             element={
               <ProtectedRoute>
@@ -555,10 +606,178 @@ export default function App() {
             }
           />
           <Route
+            path="/billing/printers"
+            element={
+              <ProtectedRoute>
+                <BillingPrinters />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/expenses"
+            element={
+              <ProtectedRoute>
+                <BillingExpenses />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/expenses/add"
+            element={
+              <ProtectedRoute>
+                <BillingExpenseDate />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/expenses/:date"
+            element={
+              <ProtectedRoute>
+                <BillingExpenseDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/withdrawals"
+            element={
+              <ProtectedRoute>
+                <BillingWithdrawals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/withdrawals/:date"
+            element={
+              <ProtectedRoute>
+                <BillingWithdrawalDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/menu"
+            element={
+              <ProtectedRoute>
+                <MenuManagement standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/settings/calculations"
+            element={
+              <ProtectedRoute>
+                <CalculationSettings standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/settings/connected-services"
+            element={
+              <ProtectedRoute>
+                <ConnectedServicesSettings standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/settings/print"
+            element={
+              <ProtectedRoute>
+                <PrintSettings standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/settings/customer"
+            element={
+              <ProtectedRoute>
+                <CustomerSettings standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/settings/online-order"
+            element={
+              <ProtectedRoute>
+                <OnlineOrderConfiguration standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/settings/billing-system"
+            element={
+              <ProtectedRoute>
+                <BillingSystemSettings standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/settings/display"
+            element={
+              <ProtectedRoute>
+                <DisplaySettings standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/settings"
+            element={
+              <ProtectedRoute>
+                <BillingSettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/menu-on-off"
+            element={
+              <ProtectedRoute>
+                <MenuOnOff standalone />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/taxes"
+            element={
+              <ProtectedRoute>
+                <BillingTaxes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/discounts"
+            element={
+              <ProtectedRoute>
+                <BillingDiscounts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/due-payments"
+            element={
+              <ProtectedRoute>
+                <BillingDuePayments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/online-orders"
+            element={
+              <ProtectedRoute>
+                <BillingOnlineOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/advance-orders"
+            element={
+              <ProtectedRoute>
+                <BillingAdvanceOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/billing/live-orders"
             element={
               <ProtectedRoute>
-                <BillingLiveOrders />
+                <BillingLiveView />
               </ProtectedRoute>
             }
           />
@@ -571,10 +790,155 @@ export default function App() {
             }
           />
           <Route
+            path="/billing/live-summary"
+            element={
+              <ProtectedRoute>
+                <BillingLiveOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/operations"
+            element={
+              <ProtectedRoute>
+                <BillingOperations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/custom-order-status"
+            element={
+              <ProtectedRoute>
+                <BillingCustomOrderStatus />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/delivery-boys"
+            element={
+              <ProtectedRoute>
+                <BillingDeliveryBoys />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/delivery-boys/new"
+            element={
+              <ProtectedRoute>
+                <BillingDeliveryBoyForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/delivery-boys/:id/edit"
+            element={
+              <ProtectedRoute>
+                <BillingDeliveryBoyForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/cashflow"
+            element={
+              <ProtectedRoute>
+                <BillingCashFlow />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/cash-top-up"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon title="Cash Top-Up" description="Add cash to the till." />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/currency-conversion"
+            element={
+              <ProtectedRoute>
+                <BillingCurrencyConversion />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/feedback"
+            element={
+              <ProtectedRoute>
+                <Feedback />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/biller-profiles"
+            element={
+              <ProtectedRoute>
+                <BillerProfiles />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/led-display"
+            element={
+              <ProtectedRoute>
+                <BillingLedDisplay />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/manual-sync"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon
+                  title="Manual Sync"
+                  description="Pull the latest menu and settings now."
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/alerts"
+            element={
+              <ProtectedRoute>
+                <NotificationListing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/shortcuts"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon
+                  title="Shortcuts"
+                  description="Keyboard shortcuts for the billing screen."
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/language-profiles"
+            element={
+              <ProtectedRoute>
+                <BillingComingSoon
+                  title="Language Profiles"
+                  description="Choose the language used on bills and screens."
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/billing/day-end"
             element={
               <ProtectedRoute>
                 <BillingDayEnd />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/reports/:slug"
+            element={
+              <ProtectedRoute>
+                <BillingReports />
               </ProtectedRoute>
             }
           />
@@ -647,6 +1011,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <InventorySettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory"
+            element={
+              <ProtectedRoute>
+                <InventoryManagement />
               </ProtectedRoute>
             }
           />
@@ -1235,6 +1607,473 @@ export default function App() {
             }
           />
           <Route
+            path="/billing/inventory/old"
+            element={
+              <ProtectedRoute>
+                <InventoryOldDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/purchase"
+            element={
+              <ProtectedRoute>
+                <StockPurchase />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/purchase/new"
+            element={
+              <ProtectedRoute>
+                <AddPurchase />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/purchase-order"
+            element={
+              <ProtectedRoute>
+                <PurchaseOrder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/purchase-order/new"
+            element={
+              <ProtectedRoute>
+                <AddPurchaseOrder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/purchase-return"
+            element={
+              <ProtectedRoute>
+                <PurchaseReturn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/purchase-return/new"
+            element={
+              <ProtectedRoute>
+                <AddPurchaseReturn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/available-stock"
+            element={
+              <ProtectedRoute>
+                <AvailableStock />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/closing-stock"
+            element={
+              <ProtectedRoute>
+                <ClosingStock />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/sales"
+            element={
+              <ProtectedRoute>
+                <Sales />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/sales/new"
+            element={
+              <ProtectedRoute>
+                <AddSales />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/transfer"
+            element={
+              <ProtectedRoute>
+                <Transfer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/transfer/new"
+            element={
+              <ProtectedRoute>
+                <AddTransfer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/wastage"
+            element={
+              <ProtectedRoute>
+                <Wastage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/wastage/new"
+            element={
+              <ProtectedRoute>
+                <AddWastage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/sales-return"
+            element={
+              <ProtectedRoute>
+                <SalesReturn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/sales-return/new"
+            element={
+              <ProtectedRoute>
+                <AddSalesReturn />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/production-master"
+            element={
+              <ProtectedRoute>
+                <ProductionMaster />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/production-master/new"
+            element={
+              <ProtectedRoute>
+                <AddProduction />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/production-execution"
+            element={
+              <ProtectedRoute>
+                <ProductionExecution />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/barcode-generation"
+            element={
+              <ProtectedRoute>
+                <BarcodeGeneration />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/barcode-generation/configuration"
+            element={
+              <ProtectedRoute>
+                <BarcodeConfiguration />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/current-stock"
+            element={
+              <ProtectedRoute>
+                <CurrentStockReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/stock-summary"
+            element={
+              <ProtectedRoute>
+                <StockSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/orderwise-consumption"
+            element={
+              <ProtectedRoute>
+                <OrderwiseConsumptionReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports"
+            element={
+              <ProtectedRoute>
+                <OtherReports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/consumption-summary"
+            element={
+              <ProtectedRoute>
+                <ConsumptionSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/opening-closing"
+            element={
+              <ProtectedRoute>
+                <OpeningClosingStockReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/food-costing"
+            element={
+              <ProtectedRoute>
+                <FoodCostingReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/recipe-costing"
+            element={
+              <ProtectedRoute>
+                <RecipeCostingReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/material-purchase"
+            element={
+              <ProtectedRoute>
+                <MaterialPurchaseReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/supplier-payment"
+            element={
+              <ProtectedRoute>
+                <SupplierPaymentReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/material-transfer"
+            element={
+              <ProtectedRoute>
+                <MaterialTransferReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/transfer-payment"
+            element={
+              <ProtectedRoute>
+                <TransferPaymentReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/purchase-sales-return"
+            element={
+              <ProtectedRoute>
+                <PurchaseSalesReturnReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/manual-stock-entry"
+            element={
+              <ProtectedRoute>
+                <ManualStockEntryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/stock-report-timewise"
+            element={
+              <ProtectedRoute>
+                <StockReportTimewise />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/sales-transfer-variance"
+            element={
+              <ProtectedRoute>
+                <SalesTransferVarianceReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/raised-po-variance"
+            element={
+              <ProtectedRoute>
+                <RaisedPoVarianceReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/purchase-order-received"
+            element={
+              <ProtectedRoute>
+                <PurchaseOrderReceivedReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/semi-finished-food-costing"
+            element={
+              <ProtectedRoute>
+                <SemiFinishedFoodCostingReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/payment-ledger"
+            element={
+              <ProtectedRoute>
+                <PaymentLedgerReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/other-reports/expiry-batchwise"
+            element={
+              <ProtectedRoute>
+                <ExpiryBatchwiseInsightReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/raw-materials"
+            element={
+              <ProtectedRoute>
+                <RawMaterials />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/raw-materials/new"
+            element={
+              <ProtectedRoute>
+                <AddRawMaterial />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/raw-materials/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddRawMaterial />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/item-recipes"
+            element={
+              <ProtectedRoute>
+                <ItemRecipes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/item-recipes/new"
+            element={
+              <ProtectedRoute>
+                <AddRecipe />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/item-recipes/:id/edit"
+            element={
+              <ProtectedRoute>
+                <EditRecipe />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/suppliers"
+            element={
+              <ProtectedRoute>
+                <SuppliersThirdParty />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/suppliers/new"
+            element={
+              <ProtectedRoute>
+                <AddSupplier />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/purchase-bill-payments"
+            element={
+              <ProtectedRoute>
+                <PurchaseBillPayments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/units"
+            element={
+              <ProtectedRoute>
+                <Units />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/units/new"
+            element={
+              <ProtectedRoute>
+                <AddUnit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/units/:id/edit"
+            element={
+              <ProtectedRoute>
+                <AddUnit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/categories"
+            element={
+              <ProtectedRoute>
+                <InventoryPlaceholder
+                  activeItem="categories"
+                  title="Categories"
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/invoice-templates"
+            element={
+              <ProtectedRoute>
+                <InvoiceTemplates />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/invoice-templates/fullscreen/:tab"
+            element={
+              <ProtectedRoute>
+                <InvoiceTemplateFullscreen />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/menu"
             element={
               <ProtectedRoute>
@@ -1575,6 +2414,10 @@ export default function App() {
             }
           />
           <Route
+            path="/configuration/inventory"
+            element={<Navigate to="/billing/inventory" replace />}
+          />
+          <Route
             path="/configuration/customers"
             element={
               <ProtectedRoute>
@@ -1598,11 +2441,68 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/logs" element={<Navigate to="/billing/logs" replace />} />
           <Route
-            path="/logs"
+            path="/billing/logs"
             element={
               <ProtectedRoute>
                 <LogsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <ReportsHub />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/tip-summary"
+            element={
+              <ProtectedRoute>
+                <TipSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/locality-summary"
+            element={
+              <ProtectedRoute>
+                <LocalitySummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/captain-wise-summary"
+            element={
+              <ProtectedRoute>
+                <CaptainWiseSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/settlement-summary"
+            element={
+              <ProtectedRoute>
+                <SettlementSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/nc-item-summary"
+            element={
+              <ProtectedRoute>
+                <NcItemSummaryReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/assignee-wise-summary"
+            element={
+              <ProtectedRoute>
+                <AssigneeWiseSummaryReport />
               </ProtectedRoute>
             }
           />
@@ -2275,6 +3175,7 @@ export default function App() {
           <Route path="*" element={<HomeRedirect />} />
         </Routes>
         </RouteErrorBoundary>
+          </OnlineOrdersProvider>
           </ChromeProvider>
       </BrowserRouter>
           </MenuReferenceProvider>

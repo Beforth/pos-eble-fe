@@ -106,6 +106,29 @@ function taxLabel(tax: TaxSummary): string {
   return tax.online_display_name?.trim() || tax.title?.trim() || 'Tax'
 }
 
+/**
+ * The menu rows the engine prices lines with. An open item (typed in by the
+ * cashier, id `open-...`) has no menu row, so it takes the outlet's own taxes
+ * instead of going untaxed.
+ */
+export class OpenItemAwareTaxSource extends Map<string, TaxableItem> {
+  private readonly openItemTaxes: TaxSummary[]
+
+  constructor(openItemTaxes: TaxSummary[]) {
+    super()
+    this.openItemTaxes = openItemTaxes
+  }
+
+  override get(key: string): TaxableItem | undefined {
+    return (
+      super.get(key) ??
+      (key.startsWith('open-')
+        ? { taxes: this.openItemTaxes, ignoreTax: false }
+        : undefined)
+    )
+  }
+}
+
 /** Active, applicable slabs for a line (ignoring a line with no menu row). */
 function activeTaxes(
   line: TaxableLine,

@@ -1,5 +1,6 @@
-import { apiRequest, multipartApiRequest } from './apiClient'
-import { AUTH_TOKEN_KEY } from '../auth/storage'
+import { ApiError, apiRequest, multipartApiRequest } from './apiClient'
+import { AUTH_TOKEN_KEY, clearAuthStorage } from '../auth/storage'
+import { API_BASE_URL } from '../config/api'
 
 export interface OutletMembershipSummary {
   outlet_id: number
@@ -294,10 +295,13 @@ export async function updateOutletSettingsMultipartApi(
 }
 
 export interface OutletDocumentRecord {
-  id: number
+  /** Encrypted id. */
+  id: string
   name: string
   is_custom: boolean
+  /** Login-protected download path (not a public link), or null. */
   file: string | null
+  file_name: string | null
 }
 
 export interface OutletDocumentInput {
@@ -313,6 +317,38 @@ export async function getOutletDocumentsApi(
     `/api/v1/outlets/${encryptedId}/documents/`,
     { method: 'GET', token: authToken() },
   )
+}
+
+/**
+ * Download one document's file. The route needs the login token, which a
+ * plain `<img>` / `<iframe>` / link cannot send, so it is fetched here and
+ * shown from a blob URL.
+ */
+export async function fetchOutletDocumentFileApi(path: string): Promise<Blob> {
+  const token = authToken()
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+  } catch {
+    throw new ApiError('Unable to reach the server. Check that the API is running.', 0)
+  }
+  if (response.status === 401) {
+    clearAuthStorage()
+    if (window.location.pathname !== '/login') window.location.replace('/login')
+  }
+  if (!response.ok) {
+    let message = `Could not open the document (${response.status})`
+    try {
+      const body = (await response.json()) as { message?: string }
+      if (body.message) message = body.message
+    } catch {
+      // not JSON - keep the generic message
+    }
+    throw new ApiError(message, response.status)
+  }
+  return response.blob()
 }
 
 export interface OutletDocumentsUploadPayload {
@@ -482,5 +518,124 @@ export async function deleteFloorPlanApi(
   return apiRequest<unknown>(
     `/api/v1/outlets/${encryptedId}/floor-plans/${planId}/`,
     { method: 'DELETE', token: authToken() },
+  )
+}
+export type PrinterType = 'general' | 'ebill'
+export type PrinterJob = 'Bill' | 'KOT' | 'Report'
+
+export interface PrinterRecord {
+  id: string
+  name: string
+  printer_type: PrinterType
+  assigned_for: PrinterJob[]
+  created_at: string
+  updated_at: string
+}
+
+export type PrinterPayload = Partial<
+  Pick<PrinterRecord, 'name' | 'printer_type' | 'assigned_for'>
+>
+
+/** List an outlet's printers (a biller may read this). */
+export async function listPrintersApi(
+  encryptedId: string,
+): Promise<PrinterRecord[]> {
+  return apiRequest<PrinterRecord[]>(
+    `/api/v1/outlets/${encryptedId}/printers/`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function createPrinterApi(
+  encryptedId: string,
+  payload: PrinterPayload,
+): Promise<PrinterRecord> {
+  return apiRequest<PrinterRecord>(`/api/v1/outlets/${encryptedId}/printers/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token: authToken(),
+  })
+}
+
+/** Rename, change type, or set what the printer prints (`assigned_for`). */
+export async function updatePrinterApi(
+  encryptedId: string,
+  printerId: string,
+  payload: PrinterPayload,
+): Promise<PrinterRecord> {
+  return apiRequest<PrinterRecord>(
+    `/api/v1/outlets/${encryptedId}/printers/${printerId}/`,
+    { method: 'PATCH', body: JSON.stringify(payload), token: authToken() },
+  )
+}
+
+export async function deletePrinterApi(
+  encryptedId: string,
+  printerId: string,
+): Promise<unknown> {
+  return apiRequest<unknown>(
+    `/api/v1/outlets/${encryptedId}/printers/${printerId}/`,
+    { method: 'DELETE', token: authToken() },
+  )
+}
+
+export type CustomStatusStage = 'accepted' | 'food_ready' | 'dispatched'
+
+export interface CustomOrderStatusRecord {
+  after_stage: CustomStatusStage
+  name: string
+  position: number
+}
+
+/** Read the outlet's custom order statuses (a biller may read this). */
+export async function getCustomOrderStatusesApi(
+  encryptedId: string,
+): Promise<{ statuses: CustomOrderStatusRecord[] }> {
+  return apiRequest<{ statuses: CustomOrderStatusRecord[] }>(
+    `/api/v1/outlets/${encryptedId}/custom-order-statuses/`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+/** Replace the whole set; position follows array order within each step. */
+export async function saveCustomOrderStatusesApi(
+  encryptedId: string,
+  statuses: Array<Pick<CustomOrderStatusRecord, 'after_stage' | 'name'>>,
+): Promise<{ statuses: CustomOrderStatusRecord[] }> {
+  return apiRequest<{ statuses: CustomOrderStatusRecord[] }>(
+    `/api/v1/outlets/${encryptedId}/custom-order-statuses/`,
+    { method: 'PUT', body: JSON.stringify({ statuses }), token: authToken() },
+  )
+}
+
+export interface CurrencyRateRecord {
+  code: string
+  /** Units of `code` one unit of the base currency buys; null when not set. */
+  rate: number | null
+  print_on_bill: boolean
+}
+
+export interface CurrencyRates {
+  base_currency: string
+  max_printed_on_bill: number
+  currencies: CurrencyRateRecord[]
+}
+
+/** Every supported currency with its saved rate (a biller may read this). */
+export async function getCurrencyRatesApi(encryptedId: string): Promise<CurrencyRates> {
+  return apiRequest<CurrencyRates>(
+    `/api/v1/outlets/${encryptedId}/currency-rates/`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+/** Replace the whole set; entries without a rate are not saved. */
+export async function saveCurrencyRatesApi(
+  encryptedId: string,
+  currencies: CurrencyRateRecord[],
+): Promise<CurrencyRates> {
+  return apiRequest<CurrencyRates>(
+    `/api/v1/outlets/${encryptedId}/currency-rates/`,
+    { method: 'PUT', body: JSON.stringify({ currencies }), token: authToken() },
   )
 }

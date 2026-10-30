@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Plus, Tag, Trash2 } from 'lucide-react'
 import { SearchableSelect } from '../inventory/SearchableSelect'
 import { PrimaryButton } from './MenuActionButtons'
+import { ItemVariationRows } from './ItemVariationRows'
+import { newVariationRow, type VariationRowState } from '../../utils/itemVariationRows'
 import { showError } from '../../utils/toast'
 import type {
   AddonGroup,
@@ -154,12 +156,6 @@ const inputClass =
 
 const REQUIRED_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'short_code', label: 'Short Code' },
-  { key: 'short_code_2', label: 'Short Code 2' },
-  { key: 'item_unit', label: 'Item Unit' },
-  { key: 'description', label: 'Description' },
-  { key: 'long_description', label: 'Long Description' },
-  { key: 'sap_code', label: 'SAP Code' },
-  { key: 'fsn_code', label: 'FSN Code' },
 ]
 
 function FieldError({ message }: { message?: string }) {
@@ -194,6 +190,8 @@ function CheckboxList({
   options,
   selected,
   onToggle,
+  id,
+  highlight = false,
   onAddNew,
   addNewLabel = '+ Add New',
 }: {
@@ -201,12 +199,20 @@ function CheckboxList({
   options: Array<{ id: string; label: string }>
   selected: string[]
   onToggle: (id: string) => void
+  /** DOM id, so a tag can scroll to this list. */
+  id?: string
+  highlight?: boolean
   onAddNew?: () => void
   addNewLabel?: string
 }) {
   const selectedSet = useMemo(() => new Set(selected), [selected])
   return (
-    <div>
+    <div
+      id={id}
+      className={`rounded-lg transition-shadow ${
+        highlight ? 'ring-2 ring-primary ring-offset-4 ring-offset-card' : ''
+      }`}
+    >
       <div className="mb-1.5 flex items-center justify-between">
         <p className="text-sm font-medium text-ink">{label}</p>
         {onAddNew ? (
@@ -341,8 +347,34 @@ export function MenuItemForm({
   const [taxIds, setTaxIds] = useState<string[]>(
     item?.taxes?.map((tax) => tax.id) ?? [],
   )
-  const [variationIds, setVariationIds] = useState<string[]>([])
-  const [addonGroupIds, setAddonGroupIds] = useState<string[]>([])
+  // The item API returns the linked variations and add-on groups, so an edit
+  // starts with them ticked (inactive ones are not returned).
+  const [variationRows, setVariationRows] = useState<VariationRowState[]>(() =>
+    (item?.item_variations ?? []).map((row) => ({
+      ...newVariationRow(),
+      variationId: row.variation_id,
+      price: row.price ?? '',
+      containerCharge: row.container_charge,
+      sapCode: row.sap_code,
+      profitMargin: row.profit_margin ?? '',
+      allowAddon: row.addon_group_ids.length > 0,
+      addonGroupIds: row.addon_group_ids,
+    })),
+  )
+  const [variationEnabled, setVariationEnabled] = useState(variationRows.length > 0)
+  const [considerAddon, setConsiderAddon] = useState(
+    Boolean(item?.flags?.consider_addon_on_variations),
+  )
+  const [showVariationErrors, setShowVariationErrors] = useState(false)
+  // Only the rows of a ticked Variation switch count.
+  const activeVariationRows = useMemo(
+    () => (variationEnabled ? variationRows : []),
+    [variationEnabled, variationRows],
+  )
+  const [flashList, setFlashList] = useState<'variations' | 'addons' | null>(null)
+  const [addonGroupIds, setAddonGroupIds] = useState<string[]>(
+    () => item?.addon_groups?.map((group) => group.id) ?? [],
+  )
   const [variationsTouched, setVariationsTouched] = useState(false)
   const [addonsTouched, setAddonsTouched] = useState(false)
   const [channelPrices, setChannelPrices] = useState(() =>
@@ -363,12 +395,13 @@ export function MenuItemForm({
   const activeTags = useMemo(() => {
     const active: string[] = []
     const hasVariations =
-      variationIds.length > 0 ||
+      activeVariationRows.length > 0 ||
       (mode === 'edit' &&
         !variationsTouched &&
         initialTags.some((tag) => tag === 'V+' || tag === 'V'))
     const hasAddons =
       addonGroupIds.length > 0 ||
+      (considerAddon && activeVariationRows.some((row) => row.addonGroupIds.length > 0)) ||
       (mode === 'edit' && !addonsTouched && initialTags.includes('A'))
     if (hasVariations) active.push('V+', 'V')
     if (hasAddons) active.push('A')
@@ -391,7 +424,8 @@ export function MenuItemForm({
   }, [
     mode,
     initialTags,
-    variationIds,
+    activeVariationRows,
+    considerAddon,
     variationsTouched,
     addonGroupIds,
     addonsTouched,
@@ -413,12 +447,6 @@ export function MenuItemForm({
 
   const requiredFieldValues: Record<string, string> = {
     short_code: shortCode,
-    short_code_2: shortCode2,
-    item_unit: itemUnit,
-    description,
-    long_description: longDescription,
-    sap_code: sapCode,
-    fsn_code: fsnCode,
   }
 
   function hasFieldError(key: string) {
@@ -521,6 +549,26 @@ export function MenuItemForm({
     setChoice((prev) => (prev === target ? 'veg' : target))
   }
 
+  /** V+ / A: take the user to the picker that adds variations / add-ons. */
+  function jumpToPicker(kind: 'variations' | 'addons') {
+    const options = kind === 'variations' ? variationOptions : addonOptions
+    if (options.length === 0) {
+      showError(
+        kind === 'variations'
+          ? 'No variations yet. Create them under Menu > Variants first.'
+          : 'No add-on groups yet. Create them under Menu > Addons first.',
+      )
+      return
+    }
+    const box = document.getElementById(`item-form-${kind}`)
+    box?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    box?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus({
+      preventScroll: true,
+    })
+    setFlashList(kind)
+    window.setTimeout(() => setFlashList(null), 1800)
+  }
+
   function toggleBehaviorTag(tag: string) {
     if (tag === 'F') {
       toggleFlag('set_as_favorite')
@@ -563,6 +611,15 @@ export function MenuItemForm({
       return
     }
     setMissingRequired([])
+    if (activeVariationRows.some((row) => !row.variationId)) {
+      setShowVariationErrors(true)
+      showError('Choose a variation for every variation row')
+      document
+        .getElementById('item-form-variations')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    const numberOrNull = (value: string) => (value.trim() === '' ? null : Number(value))
     const payload: ItemPayload = {
       category_id: categoryId,
       name: name.trim(),
@@ -580,7 +637,7 @@ export function MenuItemForm({
       stock_status: stockStatus,
       rank: Number(rank) || 0,
       is_active: isActive,
-      flags: { ...flags },
+      flags: { ...flags, consider_addon_on_variations: variationEnabled && considerAddon },
       sap_code: sapCode.trim(),
       hsn_code: hsnCode.trim(),
       fsn_code: fsnCode.trim(),
@@ -588,15 +645,24 @@ export function MenuItemForm({
         profitMargin.trim() === '' ? null : Number(profitMargin),
       weight: weight.trim() === '' ? null : Number(weight),
       tax_ids: taxIds,
-      ...(mode === 'edit'
+      // Variation rows carry their own price and add-ons and replace the old
+      // plain variation list; an edit that touched neither leaves them as saved.
+      ...(mode !== 'edit' || variationsTouched
         ? {
-            ...(variationsTouched ? { variation_ids: variationIds } : {}),
-            ...(addonsTouched ? { addon_group_ids: addonGroupIds } : {}),
+            item_variations: activeVariationRows.map((row) => ({
+              variation_id: row.variationId,
+              price: numberOrNull(row.price),
+              container_charge: Number(row.containerCharge) || 0,
+              sap_code: row.sapCode.trim(),
+              profit_margin: numberOrNull(row.profitMargin),
+              addon_group_ids:
+                considerAddon && row.allowAddon ? row.addonGroupIds : [],
+            })),
           }
-        : {
-            variation_ids: variationIds,
-            addon_group_ids: addonGroupIds,
-          }),
+        : {}),
+      ...(mode === 'edit'
+        ? { ...(addonsTouched ? { addon_group_ids: addonGroupIds } : {}) }
+        : { addon_group_ids: addonGroupIds }),
       area_prices: channels.map((channel) => ({
         outlet_channel_id: channel.id,
         price:
@@ -625,7 +691,13 @@ export function MenuItemForm({
             <input
               type="text"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                const next = event.target.value
+                if (onlineDisplayName === '' || onlineDisplayName === name) {
+                  setOnlineDisplayName(next)
+                }
+                setName(next)
+              }}
               placeholder="e.g. Masala Dabeli"
               className={inputClass}
             />
@@ -664,7 +736,7 @@ export function MenuItemForm({
             <FieldError message={serverErrors.short_code} />
           </div>
           <div>
-            <FieldLabel required>Short Code 2</FieldLabel>
+            <FieldLabel>Short Code 2</FieldLabel>
             <input
               type="text"
               value={shortCode2}
@@ -683,11 +755,11 @@ export function MenuItemForm({
               type="text"
               value={onlineDisplayName}
               onChange={(event) => setOnlineDisplayName(event.target.value)}
-              placeholder="Defaults to item name"
+              placeholder="Same as item name"
               className={inputClass}
             />
             <p className="mt-1 text-xs text-muted">
-              If left blank, the item name will be used.
+              Follows the item name until you change it.
             </p>
           </div>
           <div>
@@ -702,7 +774,7 @@ export function MenuItemForm({
             />
           </div>
           <div>
-            <FieldLabel required>Item Unit</FieldLabel>
+            <FieldLabel>Item Unit</FieldLabel>
             <input
               type="text"
               value={itemUnit}
@@ -729,7 +801,7 @@ export function MenuItemForm({
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <FieldLabel required>Description</FieldLabel>
+            <FieldLabel>Description</FieldLabel>
             <textarea
               value={description}
               onChange={(event) => {
@@ -745,7 +817,7 @@ export function MenuItemForm({
             <FieldError message={serverErrors.description} />
           </div>
           <div>
-            <FieldLabel required>Long Description</FieldLabel>
+            <FieldLabel>Long Description</FieldLabel>
             <textarea
               value={longDescription}
               onChange={(event) => {
@@ -859,6 +931,22 @@ export function MenuItemForm({
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-line bg-card text-muted'
               }`
+              if (tag === 'V+' || tag === 'A') {
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    aria-label={`${TAG_META[tag]} - jump to the list`}
+                    data-tooltip={`${TAG_META[tag]} (click to choose)`}
+                    onClick={() =>
+                      jumpToPicker(tag === 'V+' ? 'variations' : 'addons')
+                    }
+                    className={`${baseClasses} cursor-pointer hover:border-muted`}
+                  >
+                    {tag}
+                  </button>
+                )
+              }
               if (reflect) {
                 return (
                   <span
@@ -886,8 +974,9 @@ export function MenuItemForm({
           </div>
           <p className="mt-2 max-w-md text-xs text-muted">
             F favourites, D dine-in QR, O online order, NV non-veg and E egg
-            switch the saved flag and channel availability. V+, V and A reflect
-            the variations and add-ons assigned below.
+            switch the saved flag and channel availability. Click V+ to choose
+            variations and A to choose add-ons; V shows that the item has
+            variations.
           </p>
         </div>
       </Section>
@@ -923,7 +1012,7 @@ export function MenuItemForm({
       <Section icon={<span className="text-xs font-bold">§</span>} title="Codes & Margins">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div>
-            <FieldLabel required>SAP Code</FieldLabel>
+            <FieldLabel>SAP Code</FieldLabel>
             <input
               type="text"
               value={sapCode}
@@ -949,7 +1038,7 @@ export function MenuItemForm({
             <FieldError message={serverErrors.hsn_code} />
           </div>
           <div>
-            <FieldLabel required>FSN Code</FieldLabel>
+            <FieldLabel>FSN Code</FieldLabel>
             <input
               type="text"
               value={fsnCode}
@@ -987,7 +1076,7 @@ export function MenuItemForm({
       </Section>
 
       {/* ── Assignments ── */}
-      <Section icon={<span className="text-xs font-bold">A</span>} title="Taxes, Variations & Addons">
+      <Section icon={<span className="text-xs font-bold">T</span>} title="Taxes & Addons">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <CheckboxList
             label="Taxes"
@@ -999,40 +1088,49 @@ export function MenuItemForm({
             }}
             addNewLabel="+ Add Tax"
           />
-          <CheckboxList
-            label="Variations"
-            options={variationOptions}
-            selected={variationIds}
-            onToggle={(id) => {
-              setVariationsTouched(true)
-              toggleArray(setVariationIds, id)
-            }}
-            onAddNew={() => {
-              window.location.href = '/menu/variants/new'
-            }}
-            addNewLabel="+ Add Variation"
-          />
-          <CheckboxList
-            label="Addon Groups"
-            options={addonOptions}
-            selected={addonGroupIds}
-            onToggle={(id) => {
-              setAddonsTouched(true)
-              toggleArray(setAddonGroupIds, id)
-            }}
-            onAddNew={() => {
-              window.location.href = '/menu/addons/new'
-            }}
-            addNewLabel="+ Add Addon Group"
-          />
+          {/* With add-ons per variation, each variation row picks its own groups below. */}
+          {!(variationEnabled && considerAddon) ? (
+            <CheckboxList
+              id="item-form-addons"
+              highlight={flashList === 'addons'}
+              label="Addon Groups"
+              options={addonOptions}
+              selected={addonGroupIds}
+              onToggle={(id) => {
+                setAddonsTouched(true)
+                toggleArray(setAddonGroupIds, id)
+              }}
+              onAddNew={() => {
+                window.location.href = '/menu/addons/new'
+              }}
+              addNewLabel="+ Add Addon Group"
+            />
+          ) : null}
         </div>
-        {mode === 'edit' && variationOptions.length > 0 ? (
-          <p className="mt-3 text-xs text-muted">
-            Variation and addon selections are not returned by the item detail
-            endpoint, so they start unselected. Changes to these lists are only
-            sent to the API after you toggle them here.
-          </p>
-        ) : null}
+      </Section>
+
+      <Section icon={<span className="text-xs font-bold">V</span>} title="Variation / Addon">
+        <ItemVariationRows
+          variationEnabled={variationEnabled}
+          onVariationEnabledChange={(enabled) => {
+            setVariationsTouched(true)
+            setVariationEnabled(enabled)
+          }}
+          considerAddon={considerAddon}
+          onConsiderAddonChange={(consider) => {
+            setVariationsTouched(true)
+            setConsiderAddon(consider)
+          }}
+          rows={variationRows}
+          onRowsChange={(rows) => {
+            setVariationsTouched(true)
+            setVariationRows(rows)
+          }}
+          variationOptions={variationOptions}
+          addonOptions={addonOptions}
+          showErrors={showVariationErrors}
+          highlight={flashList === 'variations'}
+        />
       </Section>
 
       {/* ── Channel Pricing & Availability ── */}

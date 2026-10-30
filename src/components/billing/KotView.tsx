@@ -32,6 +32,8 @@ interface KotViewProps {
   onBack: () => void
   onFoodReady: (id: string) => void
   onDismiss: (id: string) => void
+  /** Really cancel a ticket (server-side), with the reason the cashier typed. */
+  onCancelKot: (id: string, reason: string) => void
   /**
    * Price a ticket set with the page's tax engine. The settle modal must be
    * handed the same tax-inclusive `grand_total` the settle call will send — a
@@ -144,7 +146,7 @@ function KotCard({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col px-3 py-2.5">
+      <div className="flex min-h-0 flex-1 flex-col px-3 py-2.5">
         <p className="mb-1 inline-flex items-center gap-1.5 text-xs text-muted">
           <UserRound size={13} />
           {ticket.biller}
@@ -156,6 +158,12 @@ function KotCard({
         ) : (
           <div className="mb-2" />
         )}
+
+        {ticket.note ? (
+          <p className="mb-2 text-xs leading-relaxed text-ink">
+            <span className="font-semibold">Special Note:</span> {ticket.note}
+          </p>
+        ) : null}
 
         <div className="mb-1 grid grid-cols-[1fr_auto] gap-2 border-b border-line pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
           <span>Item</span>
@@ -179,12 +187,6 @@ function KotCard({
             </li>
           ))}
         </ul>
-
-        {ticket.note ? (
-          <div className="mt-2 rounded border border-line bg-page px-2.5 py-2 text-xs leading-relaxed text-ink">
-            {ticket.note}
-          </div>
-        ) : null}
       </div>
 
       <footer className="flex items-center gap-2 border-t border-line px-3 py-2.5">
@@ -221,6 +223,7 @@ export function KotView({
   onBack,
   onFoodReady,
   onDismiss,
+  onCancelKot,
   priceTickets,
   onOpenInBilling,
   onSettleSave,
@@ -274,9 +277,9 @@ export function KotView({
         open={Boolean(cancelTicket)}
         kotNo={cancelTicket?.kotNo ?? 0}
         onClose={() => setCancelTicket(null)}
-        onConfirm={() => {
+        onConfirm={(reason) => {
           if (!cancelTicket) return
-          onDismiss(cancelTicket.id)
+          onCancelKot(cancelTicket.id, reason)
           setCancelTicket(null)
         }}
       />

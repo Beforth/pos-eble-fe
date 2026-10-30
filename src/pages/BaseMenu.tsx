@@ -12,13 +12,16 @@ import {
   Plus,
   ReceiptText,
   Search,
+  Send,
   Trash2,
   Upload,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { useMenuReference } from '../state/MenuReferenceContext'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import {
   ActionDropdown,
+  OutlineButton,
   PrimaryButton,
   RowActionButton,
 } from '../components/menu/MenuActionButtons'
@@ -29,6 +32,7 @@ import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { AddNewItemsModal } from '../components/menu/AddNewItemsModal'
 import { AddItemsGridModal } from '../components/menu/AddItemsGridModal'
 import { ImportSheetCsvModal } from '../components/menu/ImportSheetCsvModal'
+import { PushMenuModal } from '../components/menu/PushMenuModal'
 import { MenuItemDetailsModal } from '../components/menu/MenuItemDetailsModal'
 import { PublishDateModal } from '../components/menu/PublishDateModal'
 import { UpdateAreaWisePriceModal } from '../components/menu/UpdateAreaWisePriceModal'
@@ -51,6 +55,7 @@ import {
   cancelScheduledPublishApi,
 } from '../services/menuService'
 import {
+  fetchAllItemsCached,
   fetchCategoryItemsCached,
   invalidateMenuItems,
 } from '../state/menuItemsCache'
@@ -65,6 +70,7 @@ import type {
 import { showToast } from '../utils/toast'
 
 const PAGE_SIZE = 11
+const ALL_CATEGORY_ID = '__all__'
 
 const ACTION_OPTIONS = [
   'Available',
@@ -140,11 +146,52 @@ interface RowItem {
   shortCode: string
   onlineDisplayName: string
   price: number
+  /** What the price box shows while typing, so "60." and "60.0" are not eaten. */
+  priceDraft?: string
   description: string
   available: boolean
   tags: string[]
   hasImage: boolean
   rank?: number
+}
+
+/**
+ * Whether the item is on sale on this one menu: in stock overall and not
+ * switched off for `channelId`. Each menu (Base, Zomato, Swiggy ...) keeps its
+ * own switch, so turning an item off on one never touches the others.
+ */
+function isAvailableOnChannel(item: Item, channelId: string): boolean {
+  if (!item.is_active) return false
+  if (!channelId) return true
+  const entry = item.availability?.find(
+    (a) => a.outlet_channel_id === channelId,
+  )
+  return entry ? entry.is_available : true
+}
+
+/**
+ * Patch that sets this menu's availability only. The server replaces the whole
+ * availability list, so the other menus' rows are sent back unchanged. Turning
+ * a menu on also lifts a global out-of-stock flag; turning it off never sets one.
+ */
+function availabilityPatch(
+  item: Item,
+  channelId: string,
+  available: boolean,
+): Partial<ItemPayload> {
+  const others = (item.availability ?? [])
+    .filter((a) => a.outlet_channel_id !== channelId)
+    .map((a) => ({
+      outlet_channel_id: a.outlet_channel_id,
+      is_available: a.is_available,
+    }))
+  return {
+    availability: [
+      ...others,
+      { outlet_channel_id: channelId, is_available: available },
+    ],
+    ...(available && !item.is_active ? { is_active: true } : {}),
+  }
 }
 
 function adaptItem(item: Item, currentChannelId: string): RowItem {
@@ -165,7 +212,7 @@ function adaptItem(item: Item, currentChannelId: string): RowItem {
         ? Number(item.base_price) || 0
         : item.base_price),
     description: item.description,
-    available: item.is_active,
+    available: isAvailableOnChannel(item, currentChannelId),
     tags: item.tags ?? [],
     hasImage: item.has_image,
     rank: item.rank,
@@ -207,7 +254,8 @@ export default function BaseMenu({
   }
 
   const [categoriesApi, setCategoriesApi] = useState<Category[]>([])
-  const [categoryId, setCategoryId] = useState('')
+  const [categoryId, setCategoryId] = useState(ALL_CATEGORY_ID)
+  const isAllCategories = categoryId === ALL_CATEGORY_ID
   const [query, setQuery] = useState('')
   const [rankWise, setRankWise] = useState(false)
   const [hideEmpty, setHideEmpty] = useState(false)
@@ -223,6 +271,10 @@ export default function BaseMenu({
   const [addItemsOpen, setAddItemsOpen] = useState(false)
   const [addGridOpen, setAddGridOpen] = useState(false)
   const [importSheetOpen, setImportSheetOpen] = useState(false)
+  const [pushOpen, setPushOpen] = useState(false)
+  // Zomato and Swiggy menus can be sent to the aggregator through Wera.
+  const pushPlatform =
+    channelId === 'zomato' || channelId === 'swiggy' ? channelId : null
   const [detailsItem, setDetailsItem] = useState<Item | null>(null)
   const [areaPriceItem, setAreaPriceItem] = useState<Item | null>(null)
   const [nutritionItem, setNutritionItem] = useState<Item | null>(null)
@@ -269,10 +321,10 @@ export default function BaseMenu({
   useEffect(() => {
     if (
       categoriesApi.length > 0 &&
-      (categoryId === '' ||
-        !categoriesApi.some((c) => c.id === categoryId))
+      categoryId !== ALL_CATEGORY_ID &&
+      !categoriesApi.some((c) => c.id === categoryId)
     ) {
-      setCategoryId(categoriesApi[0].id)
+      setCategoryId(ALL_CATEGORY_ID)
     }
   }, [categoriesApi, categoryId])
 
@@ -283,11 +335,10 @@ export default function BaseMenu({
 
     async function loadItems() {
       try {
-        const allItems = await fetchCategoryItemsCached(
-          outletId,
-          categoryId,
-          { force: refreshKey > 0 },
-        )
+        const force = { force: refreshKey > 0 }
+        const allItems = isAllCategories
+          ? await fetchAllItemsCached(outletId, force)
+          : await fetchCategoryItemsCached(outletId, categoryId, force)
         if (cancelled) return
         setItems(allItems.map((item) => adaptItem(item, currentChannelId)))
         setRawItemsMap(
@@ -295,7 +346,11 @@ export default function BaseMenu({
         )
         setCategoryHasItems((prev) => {
           const next = new Set(prev)
-          if (allItems.length > 0) next.add(categoryId)
+          if (isAllCategories) {
+            for (const item of allItems) {
+              if (item.category_id) next.add(item.category_id)
+            }
+          } else if (allItems.length > 0) next.add(categoryId)
           else next.delete(categoryId)
           return next
         })
@@ -308,12 +363,26 @@ export default function BaseMenu({
     return () => {
       cancelled = true
     }
-  }, [encryptedOutletId, categoryId, refreshKey, currentChannelId])
+  }, [encryptedOutletId, categoryId, isAllCategories, refreshKey, currentChannelId])
+
+  // New categories created by an import / bulk add must show up without a
+  // page refresh: reload this page's list and the shared one (Billing etc.).
+  const { reload: reloadMenuReference } = useMenuReference(['categories'])
+  const reloadCategories = useCallback(() => {
+    if (!encryptedOutletId) return
+    listCategoriesApi(encryptedOutletId)
+      .then(setCategoriesApi)
+      .catch(() => showToast('Failed to load categories'))
+    void reloadMenuReference('categories', { force: true })
+  }, [encryptedOutletId, reloadMenuReference])
 
   const invalidateAndRefresh = useCallback(() => {
-    invalidateMenuItems(encryptedOutletId ?? '', categoryId)
+    invalidateMenuItems(
+      encryptedOutletId ?? '',
+      isAllCategories ? undefined : categoryId,
+    )
     setRefreshKey((k) => k + 1)
-  }, [encryptedOutletId, categoryId])
+  }, [encryptedOutletId, categoryId, isAllCategories])
 
   const categories = useMemo(() => {
     if (!hideEmpty) return categoriesApi
@@ -325,7 +394,7 @@ export default function BaseMenu({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     const result = items.filter((item) => {
-      if (item.categoryId !== categoryId) return false
+      if (!isAllCategories && item.categoryId !== categoryId) return false
       if (!q) return true
       return (
         item.name.toLowerCase().includes(q) ||
@@ -341,7 +410,7 @@ export default function BaseMenu({
       })
     }
     return result
-  }, [categoryId, items, query, rankWise])
+  }, [categoryId, isAllCategories, items, query, rankWise])
 
   const totalRecords = filtered.length
   const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE))
@@ -376,19 +445,28 @@ export default function BaseMenu({
   function setSelectedAvailable(available: boolean) {
     requireSelection(async () => {
       if (!encryptedOutletId) return
+      if (!currentChannelId) {
+        showToast('Channels are still loading, try again')
+        return
+      }
       try {
-        await Promise.all(
-          [...selected].map((id) =>
-            updateItemApi(encryptedOutletId!, id, {
-              is_active: available,
-            }),
-          ),
-        )
+        // Sequential on purpose: parallel PATCHes lock the SQLite database and
+        // leave only some of the items updated.
+        for (const id of selected) {
+          const raw = rawItemsMap.get(id)
+          if (!raw) continue
+          await updateItemApi(
+            encryptedOutletId!,
+            id,
+            availabilityPatch(raw, currentChannelId, available),
+          )
+        }
         showToast(available ? 'Marked in stock' : 'Marked out of stock')
         setSelected(new Set())
         invalidateAndRefresh()
       } catch {
         showToast('Failed to update items')
+        invalidateAndRefresh()
       }
     })
   }
@@ -498,20 +576,31 @@ export default function BaseMenu({
 
   async function toggleCategoryAvailable() {
     if (!encryptedOutletId) return
+    if (!currentChannelId) {
+      showToast('Channels are still loading, try again')
+      return
+    }
     const next = !categoryAvailable
     const ids = filtered.map((row) => row.id)
     try {
-      await Promise.all(
-        ids.map((id) =>
-          updateItemApi(encryptedOutletId!, id, { is_active: next }),
-        ),
-      )
+      // Sequential on purpose: parallel PATCHes lock the SQLite database and
+      // leave only some of the items updated.
+      for (const id of ids) {
+        const raw = rawItemsMap.get(id)
+        if (!raw) continue
+        await updateItemApi(
+          encryptedOutletId!,
+          id,
+          availabilityPatch(raw, currentChannelId, next),
+        )
+      }
       showToast(
         next ? 'Category marked available' : 'Category marked unavailable',
       )
       invalidateAndRefresh()
     } catch {
       showToast('Failed to update category availability')
+      invalidateAndRefresh()
     }
   }
 
@@ -531,7 +620,7 @@ export default function BaseMenu({
         rawPrice !== row.price ||
         raw.description !== row.description ||
         raw.rank !== row.rank ||
-        raw.is_active !== row.available
+        isAvailableOnChannel(raw, currentChannelId) !== row.available
       )
     })
     if (changed.length === 0) {
@@ -567,8 +656,10 @@ export default function BaseMenu({
             online_display_name: row.onlineDisplayName,
             description: row.description,
             rank: row.rank,
-            is_active: row.available,
             area_prices,
+            ...(isAvailableOnChannel(raw, currentChannelId) !== row.available
+              ? availabilityPatch(raw, currentChannelId, row.available)
+              : {}),
           }
           return updateItemApi(encryptedOutletId!, row.id, patch)
         }),
@@ -588,7 +679,8 @@ export default function BaseMenu({
       if (!raw) continue
       const rawPrice = resolveChannelPrice(raw)
       const priceChanged = rawPrice !== row.price
-      const availabilityChanged = raw.is_active !== row.available
+      const availabilityChanged =
+        isAvailableOnChannel(raw, currentChannelId) !== row.available
       if (!priceChanged && !availabilityChanged) continue
       lines.push({
         item_id: row.id,
@@ -912,6 +1004,13 @@ export default function BaseMenu({
           Add Items
         </PrimaryButton>
 
+        {pushPlatform && encryptedOutletId && (
+          <OutlineButton onClick={() => setPushOpen(true)}>
+            <Send size={15} />
+            Push to {pushPlatform === 'zomato' ? 'Zomato' : 'Swiggy'}
+          </OutlineButton>
+        )}
+
         <button
           type="button"
           role="switch"
@@ -951,6 +1050,18 @@ export default function BaseMenu({
               </button>
             </label>
             <ul className="menu-panel-categories-list space-y-0.5">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryId(ALL_CATEGORY_ID)
+                    setSelected(new Set())
+                  }}
+                  className={`menu-panel-category-btn cursor-pointer ${isAllCategories ? 'is-active' : ''}`}
+                >
+                  All categories
+                </button>
+              </li>
               {categories.map((category) => {
                 const active = category.id === categoryId
                 return (
@@ -981,6 +1092,7 @@ export default function BaseMenu({
                 }}
                 className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
               >
+                <option value={ALL_CATEGORY_ID}>All categories</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
@@ -1130,14 +1242,18 @@ export default function BaseMenu({
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={row.price}
-                          onChange={(event) =>
+                          value={row.priceDraft ?? String(row.price)}
+                          onChange={(event) => {
+                            const text = event.target.value
+                            // Digits with at most two decimals, as the API stores.
+                            if (!/^\d*\.?\d{0,2}$/.test(text)) return
                             setItems((prev) =>
                               updateRow(prev, row.id, {
-                                price: Number(event.target.value) || 0,
+                                price: Number(text) || 0,
+                                priceDraft: text,
                               }),
                             )
-                          }
+                          }}
                           className="h-8 w-20 rounded border border-line px-2 text-sm outline-none focus:border-primary"
                         />
                       </td>
@@ -1343,23 +1459,33 @@ export default function BaseMenu({
         onAddCombo={() => navigate('/menu/add-combo')}
         onSheet={() => setImportSheetOpen(true)}
       />
+      {pushPlatform && encryptedOutletId && (
+        <PushMenuModal
+          open={pushOpen}
+          platform={pushPlatform}
+          outletId={encryptedOutletId}
+          onClose={() => setPushOpen(false)}
+        />
+      )}
       <ImportSheetCsvModal
         open={importSheetOpen}
         onClose={() => setImportSheetOpen(false)}
         categories={categoriesApi}
-        initialCategoryId={categoryId}
+        initialCategoryId={isAllCategories ? (categoriesApi[0]?.id ?? '') : categoryId}
         onSaved={() => {
           setPage(1)
+          reloadCategories()
           invalidateAndRefresh()
         }}
       />
       <AddItemsGridModal
         open={addGridOpen}
         categories={categoriesApi}
-        initialCategoryId={categoryId}
+        initialCategoryId={isAllCategories ? (categoriesApi[0]?.id ?? '') : categoryId}
         onClose={() => setAddGridOpen(false)}
         onSaved={() => {
           setPage(1)
+          reloadCategories()
           invalidateAndRefresh()
         }}
       />

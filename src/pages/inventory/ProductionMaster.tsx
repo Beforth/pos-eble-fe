@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/downloadFile'
-import { useNavigate } from 'react-router-dom'
 import { ChevronDown, Eye, FilePenLine, FileText, Info, Plus, Search, Trash2 } from 'lucide-react'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'

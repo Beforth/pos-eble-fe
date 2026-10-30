@@ -6,8 +6,11 @@ import {
   type SelectDropdownOption,
 } from '../common/SelectDropdown'
 import type { PaymentMethod } from './BillPanel'
-import { OTHER_PAYMENT_TYPES, type OtherPaymentType } from './OtherPaymentModal'
+import { type OtherPaymentType } from './OtherPaymentModal'
+import { usePaymentTypeOptions } from '../../services/usePaymentTypeOptions'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
 import { showToast } from '../../utils/toast'
+import { isValidMobile, normalizeMobileDigits } from '../../utils/phone'
 
 const PAYMENT_OPTIONS: { id: PaymentMethod; label: string }[] = [
   { id: 'cash', label: 'Cash' },
@@ -16,10 +19,6 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string }[] = [
   { id: 'other', label: 'Other' },
   { id: 'part', label: 'Part' },
 ]
-
-const OTHER_PAYMENT_OPTIONS: SelectDropdownOption[] = OTHER_PAYMENT_TYPES.map(
-  (type) => ({ value: type, label: type }),
-)
 
 type PartMethod = 'cash' | 'card' | 'upi' | 'other' | 'due'
 
@@ -46,6 +45,8 @@ export interface SettleSaveResult {
   returnToCustomer: number
   due: number
   customerName: string
+  /** 10-digit mobile; required (and sent) when a due is booked. */
+  customerPhone: string
   otherType?: string
   partEntries?: PartEntry[]
 }
@@ -55,6 +56,7 @@ interface SettleSaveModalProps {
   label: string
   billAmount: number
   customerName?: string
+  customerPhone?: string
   onClose: () => void
   onConfirm: (result: SettleSaveResult) => void
 }
@@ -71,6 +73,7 @@ export function SettleSaveModal({
   label,
   billAmount,
   customerName,
+  customerPhone,
   onClose,
   onConfirm,
 }: SettleSaveModalProps) {
@@ -86,41 +89,56 @@ export function SettleSaveModal({
     () => Math.round(Number(billAmount) * 100) / 100,
     [billAmount],
   )
+  // Display Settings > settlement options
+  const { settleAmountBox, settleMandatory, allowLowerSettle, showTip, tipSelection, tipValues } =
+    useDisplaySettings()
   const [payment, setPayment] = useState<PaymentMethod>('cash')
   const [customerPaid, setCustomerPaid] = useState('')
   const [tip, setTip] = useState('0')
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
+  const [phone, setPhone] = useState('')
+  const [phoneError, setPhoneError] = useState('')
+  const paymentTypeOptions = usePaymentTypeOptions()
+  // The popup resets to the first choice each time it opens, without re-running on every load.
+  const defaultOtherType = useRef(paymentTypeOptions[0])
+  defaultOtherType.current = paymentTypeOptions[0]
+  const otherPaymentOptions: SelectDropdownOption[] = paymentTypeOptions.map(
+    (type) => ({ value: type, label: type }),
+  )
   const [otherType, setOtherType] = useState<OtherPaymentType>(
-    OTHER_PAYMENT_TYPES[0],
+    paymentTypeOptions[0],
   )
   const [partEntries, setPartEntries] = useState<PartEntry[]>([])
   const [pendingPart, setPendingPart] = useState<PartEntry | null>(null)
   const [partMethod, setPartMethod] = useState<PartMethod>('cash')
   const [partAmount, setPartAmount] = useState('')
   const [partOtherType, setPartOtherType] = useState<string>(
-    OTHER_PAYMENT_TYPES[0],
+    paymentTypeOptions[0],
   )
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const phoneInputRef = useRef<HTMLInputElement>(null)
   const wasOpen = useRef(false)
   const customerPaidTouched = useRef(false)
 
   useEffect(() => {
     if (open && !wasOpen.current) {
       setPayment('cash')
-      setCustomerPaid(String(exactBill))
+      setCustomerPaid(settleMandatory && settleAmountBox ? '' : String(exactBill))
       setTip('0')
       setName((customerName ?? '').trim())
       setNameError('')
-      setOtherType(OTHER_PAYMENT_TYPES[0])
+      setPhone(normalizeMobileDigits(customerPhone ?? ''))
+      setPhoneError('')
+      setOtherType(defaultOtherType.current)
       setPartEntries([])
       setPartMethod('cash')
       setPartAmount(String(exactBill || ''))
-      setPartOtherType(OTHER_PAYMENT_TYPES[0])
+      setPartOtherType(defaultOtherType.current)
       customerPaidTouched.current = false
     }
     wasOpen.current = open
-  }, [open, customerName, billAmount, exactBill])
+  }, [open, customerName, customerPhone, billAmount, exactBill, settleMandatory, settleAmountBox])
 
   /**
    * Both terminals feed one kitchen, so another KOT can land on this table while
@@ -129,9 +147,9 @@ export function SettleSaveModal({
    * short and silently book a due.
    */
   useEffect(() => {
-    if (!open || customerPaidTouched.current) return
+    if (!open || customerPaidTouched.current || (settleMandatory && settleAmountBox)) return
     setCustomerPaid(String(exactBill))
-  }, [open, exactBill])
+  }, [open, exactBill, settleMandatory, settleAmountBox])
 
   useEffect(() => {
     if (!open) return
@@ -185,7 +203,7 @@ const onKey = (event: KeyboardEvent) => {
     return raw >= exactBill ? exactBill : raw
   }, [customerPaid, exactBill, payment, partPaid])
 
-  const tipValue = Number(tip) || 0
+  const tipValue = showTip ? Number(tip) || 0 : 0
   const paidValue =
     payment === 'part' ? partPaid : Number(customerPaid) || 0
   const returnToCustomer = Math.max(
@@ -196,17 +214,21 @@ const onKey = (event: KeyboardEvent) => {
     0,
     Math.round((Number(billAmount) - settlementValue) * 100) / 100,
   )
+  /** A due (chosen, or left by a short payment) must be filed under a named, reachable customer. */
+  const needsCustomerDetails = payment === 'due' || balanceDue > 0
 
   function handlePaymentSelect(method: PaymentMethod) {
     if (method === 'other') {
       setPayment('other')
       setPartEntries([])
       setNameError('')
+      setPhoneError('')
       return
     }
     if (method === 'part') {
       setPayment('part')
       setNameError('')
+      setPhoneError('')
       if (partEntries.length === 0) {
         setPartAmount(String(exactBill || ''))
       }
@@ -219,19 +241,21 @@ const onKey = (event: KeyboardEvent) => {
       if (!name.trim()) {
         setNameError('Customer name is required for Due payment')
       }
-      showToast('Due payment — enter customer name')
+      showToast('Due payment — enter customer name and mobile number')
       return
     }
     if (method === 'card') {
       setPayment('card')
       setPartEntries([])
       setNameError('')
+      setPhoneError('')
       showToast('Card payment selected')
       return
     }
     setPayment(method)
     setPartEntries([])
     setNameError('')
+    setPhoneError('')
   }
 
   function addPartEntry() {
@@ -278,11 +302,21 @@ const onKey = (event: KeyboardEvent) => {
         showToast('Enter the amount the customer paid')
         return
       }
+      if (payment !== 'due' && !allowLowerSettle && paid < exactBill - 0.001) {
+        showToast(`Settle the full amount of ₹${money(exactBill)}; a lower amount is not allowed`)
+        return
+      }
     }
 
     if ((payment === 'due' || balanceDue > 0) && name.trim() === '') {
       setNameError('Required — a due balance needs a customer name')
       nameInputRef.current?.focus()
+      return
+    }
+
+    if (needsCustomerDetails && !isValidMobile(phone)) {
+      setPhoneError('Required — enter a valid 10-digit mobile number')
+      phoneInputRef.current?.focus()
       return
     }
 
@@ -294,6 +328,7 @@ const onKey = (event: KeyboardEvent) => {
       returnToCustomer: payment === 'part' ? 0 : returnToCustomer,
       due: balanceDue,
       customerName: name.trim(),
+      customerPhone: isValidMobile(phone) ? normalizeMobileDigits(phone) : '',
       otherType: payment === 'other' ? otherType : undefined,
       partEntries: payment === 'part' ? partEntries : undefined,
     })
@@ -362,7 +397,7 @@ const onKey = (event: KeyboardEvent) => {
             {payment === 'due' ? (
               <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
                 <Clock3 size={13} />
-                Due payment — customer name is required
+                Due payment — customer name and mobile number are required
               </p>
             ) : null}
             {payment === 'card' ? (
@@ -376,8 +411,8 @@ const onKey = (event: KeyboardEvent) => {
                 <span className="text-sm font-semibold text-ink">Paid via</span>
                 <SelectDropdown
                   value={otherType}
-                  options={OTHER_PAYMENT_OPTIONS}
-                  onChange={(next) => setOtherType(next as OtherPaymentType)}
+                  options={otherPaymentOptions}
+                  onChange={(next) => setOtherType(next)}
                   caption="Paid via"
                   searchable={false}
                   triggerClassName="w-full"
@@ -409,6 +444,37 @@ const onKey = (event: KeyboardEvent) => {
             <p className="pl-[152px] text-xs font-medium text-amber-600">
               {nameError}
             </p>
+          ) : null}
+
+          {needsCustomerDetails ? (
+            <>
+              <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
+                <span>
+                  Mobile No <span className="text-primary">*</span>
+                </span>
+                <input
+                  ref={phoneInputRef}
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(normalizeMobileDigits(e.target.value))
+                    if (phoneError) setPhoneError('')
+                  }}
+                  maxLength={10}
+                  placeholder="10-digit mobile (required)"
+                  aria-required
+                  className={`h-10 rounded-md border bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary ${
+                    phoneError ? 'border-amber-500' : 'border-line'
+                  }`}
+                />
+              </label>
+              {phoneError ? (
+                <p className="pl-[152px] text-xs font-medium text-amber-600">
+                  {phoneError}
+                </p>
+              ) : null}
+            </>
           ) : null}
 
           {payment === 'part' ? (
@@ -449,7 +515,7 @@ const onKey = (event: KeyboardEvent) => {
                   onChange={(e) => setPartOtherType(e.target.value)}
                   className="h-9 w-full rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-primary"
                 >
-                  {OTHER_PAYMENT_TYPES.map((option) => (
+                  {paymentTypeOptions.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>
@@ -512,6 +578,7 @@ const onKey = (event: KeyboardEvent) => {
             </div>
           ) : (
             <>
+              {settleAmountBox ? (
               <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
                 Customer Paid
                 <input
@@ -524,30 +591,58 @@ const onKey = (event: KeyboardEvent) => {
                     setCustomerPaid(e.target.value)
                   }}
                   autoFocus
+                  placeholder={settleMandatory ? 'Required' : undefined}
                   className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
                 />
               </label>
+              ) : null}
 
+              {settleAmountBox ? (
               <div className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
                 Return to Customer
                 <span className="text-base font-bold text-primary">
                   {money(returnToCustomer)}
                 </span>
               </div>
+              ) : null}
             </>
           )}
 
-          <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
-            Tip
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={tip}
-              onChange={(e) => setTip(e.target.value)}
-              className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
-            />
-          </label>
+          {showTip ? (
+            <>
+              <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
+                Tip
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={tip}
+                  onChange={(e) => setTip(e.target.value)}
+                  className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
+                />
+              </label>
+              {tipSelection !== 'None' && tipValues.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 pl-[152px]">
+                  {tipValues.map((value) => {
+                    const amount =
+                      tipSelection === 'Percentage'
+                        ? Math.round(exactBill * value) / 100
+                        : value
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setTip(String(amount))}
+                        className="inline-flex h-8 cursor-pointer items-center rounded-md border border-line bg-white px-2.5 text-xs font-semibold text-ink hover:bg-page"
+                      >
+                        {tipSelection === 'Percentage' ? `${value}%` : `₹${value}`}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </>
+          ) : null}
 
           <label className="grid grid-cols-[140px_1fr] items-center gap-3 text-sm font-semibold text-ink">
             Settlement Amount

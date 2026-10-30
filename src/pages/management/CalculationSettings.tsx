@@ -21,6 +21,7 @@ import {
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
 import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
+import { BillingSettingsShell } from '../../components/billing/BillingSettingsShell'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { useOutletSettings } from '../../services/useOutletSettings'
 import type { OutletSettingsRecord } from '../../services/outletService'
@@ -92,7 +93,12 @@ function CheckRow({
   )
 }
 
-export default function CalculationSettings() {
+/**
+ * Calculations. `standalone` puts the very same screen on a billing page
+ * (`/billing/settings/<name>`) under the billing header; Back / Cancel / Save then
+ * return to Outlet Settings in billing instead of the admin configuration.
+ */
+export default function CalculationSettings({ standalone = false }: { standalone?: boolean }) {
   const navigate = useNavigate()
 
   const [roundOff, setRoundOff] = useState('Normal')
@@ -231,7 +237,7 @@ export default function CalculationSettings() {
 
 
   function goBack() {
-    navigate('/management/configuration/outlet')
+    navigate(standalone ? '/billing/settings' : '/management/configuration/outlet')
   }
 
   function toggleList(
@@ -309,11 +315,17 @@ export default function CalculationSettings() {
   }
 
   if (loading && !data) {
-    return <SettingsPageLoading />
+    return standalone ? (
+      <BillingSettingsShell current="Calculations">
+        <div className="py-12 text-center text-sm text-muted">Loading settings…</div>
+      </BillingSettingsShell>
+    ) : (
+      <SettingsPageLoading />
+    )
   }
 
-  return (
-    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Calculations" />} activeItem="config-outlet">
+  const content = (
+    <>
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         The Following Settings Are Used To Configure Calculation Of Certain
@@ -726,6 +738,16 @@ export default function CalculationSettings() {
       </ConfigSectionCard>
 
       <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
+    </>
+  )
+
+  if (standalone) {
+    return <BillingSettingsShell current="Calculations">{content}</BillingSettingsShell>
+  }
+
+  return (
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Calculations" />} activeItem="config-outlet">
+      {content}
     </ReportsPageShell>
   )
 }

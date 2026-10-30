@@ -1,124 +1,282 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Download, Printer } from 'lucide-react'
-import { BillingHeader } from '../../components/billing/BillingHeader'
-import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
-import {
-  listDayEndClosuresApi,
-  toDayEndSummaryRow,
-} from '../../services/orderService'
 import { useAuth } from '../../auth/AuthContext'
+import {
+  LoadState,
+  PairList,
+  ReportCard,
+  ReportFilterBar,
+  ReportShell,
+  StatGrid,
+  StatTile,
+} from '../../components/reports/ReportShell'
+import { TD, TH, reportSubtitle } from '../../components/reports/reportStyles'
+import {
+  fetchOrderSummaryApi,
+  type OrderSummaryResult,
+} from '../../services/reportService'
+import { downloadCsv } from '../../utils/exportCsv'
+import { formatINR } from '../../utils/format'
+import { todayIso } from '../../utils/reportDates'
+import { showToast } from '../../utils/toast'
 
-const PAGE_SIZE = 10
+function money(value: string | number): string {
+  const n = Number(value)
+  return Number.isFinite(n) ? formatINR(n, 2) : String(value)
+}
+
+function EmptyRow({ cols }: { cols: number }) {
+  return (
+    <tr>
+      <td colSpan={cols} className="px-4 py-6 text-center text-sm text-muted">
+        Records not available
+      </td>
+    </tr>
+  )
+}
 
 export default function OrderSummaryReport() {
-  const navigate = useNavigate()
-  const { encryptedOutletId } = useAuth()
-  const [billNo, setBillNo] = useState('')
-  const [page, setPage] = useState(1)
-  const [rows, setRows] = useState<DayEndSummaryRow[]>([])
+  const { encryptedOutletId, user } = useAuth()
+  const [from, setFrom] = useState(todayIso)
+  const [to, setTo] = useState(todayIso)
+  const [data, setData] = useState<OrderSummaryResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!encryptedOutletId || !from || !to) return
     let cancelled = false
-    if (!encryptedOutletId) return
-    listDayEndClosuresApi(encryptedOutletId)
-      .then((dtos) => {
-        if (!cancelled) setRows(dtos.map(toDayEndSummaryRow))
+    setLoading(true)
+    setError('')
+    fetchOrderSummaryApi(encryptedOutletId, { from, to })
+      .then((result) => {
+        if (!cancelled) setData(result)
       })
-      .catch(() => {
-        if (!cancelled) setRows([])
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setData(null)
+        setError(err instanceof Error ? err.message : 'Could not load the report')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [encryptedOutletId])
+  }, [encryptedOutletId, from, to])
 
-  const totalOrders = rows.reduce((s, r) => s + r.orders, 0)
-  const totalRevenue = rows.reduce((s, r) => s + r.total, 0)
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-
-  function handleExport() {
-    const header = 'Date,Orders,Revenue'
-    const lines = [header, ...rows.map((r) => `${r.createdDate},${r.orders},${r.total}`)]
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'order-summary.csv'; a.click()
-    URL.revokeObjectURL(url)
+  function setRange(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom)
+    setTo(nextTo)
   }
 
+  function exportCsv() {
+    if (!data) {
+      showToast('Nothing to export')
+      return
+    }
+    const rows: (string | number)[][] = []
+    const add = (section: string, ...cells: (string | number)[]) =>
+      rows.push([section, ...cells])
+    data.status.forEach((r) => add('Order Status', r.status, r.my_amount, r.total, r.orders))
+    add('Order Status', 'Total', data.status_total.my_amount, data.status_total.total, data.status_total.orders)
+    data.success.lines.forEach((l) => add('Success Orders', l.label, l.amount))
+    add('Cancelled Orders', 'Count', data.cancelled.count)
+    add('Cancelled Orders', 'Amount', data.cancelled.amount)
+    add('Performance Indicator', 'Average Per Bill', data.performance.avg_per_bill)
+    add('Performance Indicator', 'Average Discount Per Order', data.performance.avg_discount_per_order)
+    data.order_types.forEach((r) => add('Order Type', r.type, r.count, r.total, r.net))
+    data.payments.forEach((r) => add('Payment Mode', r.mode, r.total))
+    data.online.rows.forEach((r) => add('Online Orders', r.source, r.my_amount, r.total, r.orders))
+    downloadCsv(`order-report_${from}_${to}.csv`, ['Section', 'Label', 'Value 1', 'Value 2', 'Value 3'], rows)
+  }
+
+  const grandTotal = data?.success.lines.find((line) => line.label === 'Grand Total')?.amount
+  const paymentsMax = Math.max(0, ...(data?.payments ?? []).map((row) => Number(row.total) || 0))
+
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader billNo={billNo} onBillNoChange={setBillNo} onNewOrder={() => navigate('/table-view')} onViewKot={() => navigate('/billing?kot=1')} />
-      <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-ink">Order Summary</h1>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={handleExport} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Download size={14} className="text-muted" /> Export CSV
-            </button>
-            <button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Printer size={14} className="text-muted" /> Print
-            </button>
-          </div>
-        </div>
+    <ReportShell
+      title="Order Report"
+      subtitle={reportSubtitle(from, to, user?.outlet || undefined)}
+    >
+      <ReportFilterBar from={from} to={to} onRange={setRange} onExport={exportCsv} />
 
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Days</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{rows.length}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Orders</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{totalOrders}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Revenue</p>
-            <p className="mt-1 text-xl font-extrabold text-accent">₹{totalRevenue.toLocaleString('en-IN')}</p>
-          </div>
-        </div>
+      {loading && !data ? (
+        <LoadState loading error="" />
+      ) : error ? (
+        <LoadState loading={false} error={error} />
+      ) : data ? (
+        <>
+          <StatGrid>
+            <StatTile
+              primary
+              label="Grand total"
+              value={grandTotal !== undefined ? money(grandTotal) : '—'}
+              hint={`${data.success.orders} successful order${data.success.orders === 1 ? '' : 's'}`}
+            />
+            <StatTile
+              label="Average per bill"
+              value={money(data.performance.avg_per_bill)}
+              hint={`Avg discount ${money(data.performance.avg_discount_per_order)}`}
+            />
+            <StatTile
+              label="Orders"
+              value={data.status_total.orders}
+              hint={`Total ${money(data.status_total.total)}`}
+            />
+            <StatTile
+              label="Cancelled"
+              value={data.cancelled.count}
+              hint={money(data.cancelled.amount)}
+            />
+          </StatGrid>
 
-        <div className="rounded-xl border border-line bg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[400px] border-collapse text-sm">
-              <thead>
-                <tr className="bg-page/60">
-                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-muted">Date</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Orders</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {pageRows.map((r) => (
-                  <tr key={r.id} className="hover:bg-page/40">
-                    <td className="px-4 py-2.5 font-medium text-ink">{r.createdDate}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink">{r.orders}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-accent">₹{r.total.toLocaleString('en-IN')}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-line bg-page/60 font-bold">
-                  <td className="px-4 py-2.5 text-ink">Total</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-ink">{totalOrders}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-accent">₹{totalRevenue.toLocaleString('en-IN')}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          {totalPages > 1 ? (
-            <div className="flex items-center justify-between border-t border-line px-4 py-2.5">
-              <span className="text-xs text-muted">Page {safePage} of {totalPages}</span>
-              <div className="flex gap-1">
-                <button type="button" disabled={safePage <= 1} onClick={() => setPage((p) => p - 1)} className="h-8 rounded-lg border border-line bg-card px-3 text-xs font-medium text-ink hover:bg-page disabled:opacity-40">Prev</button>
-                <button type="button" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)} className="h-8 rounded-lg border border-line bg-card px-3 text-xs font-medium text-ink hover:bg-page disabled:opacity-40">Next</button>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <ReportCard title="Order Status" flush>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-primary/5 text-left">
+                      <th className={TH}>Status</th>
+                      <th className={`${TH} text-right`}>My Amount (₹)</th>
+                      <th className={`${TH} text-right`}>Total (₹)</th>
+                      <th className={`${TH} text-right`}>Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.status.map((row) => (
+                      <tr key={row.status} className="border-t border-line">
+                        <td className={`${TD} font-medium`}>{row.status}</td>
+                        <td className={`${TD} text-right tabular-nums`}>{money(row.my_amount)}</td>
+                        <td className={`${TD} text-right tabular-nums`}>{money(row.total)}</td>
+                        <td className={`${TD} text-right tabular-nums`}>{row.orders}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                      <td className={TD}>Total</td>
+                      <td className={`${TD} text-right tabular-nums`}>
+                        {money(data.status_total.my_amount)}
+                      </td>
+                      <td className={`${TD} text-right tabular-nums`}>
+                        {money(data.status_total.total)}
+                      </td>
+                      <td className={`${TD} text-right tabular-nums`}>{data.status_total.orders}</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-            </div>
-          ) : null}
-        </div>
-      </main>
-    </div>
+            </ReportCard>
+
+            <ReportCard title="Success Orders" aside={`${data.success.orders} orders`}>
+              <PairList
+                rows={data.success.lines.map((line) => ({
+                  label: line.label,
+                  value: money(line.amount),
+                  bold: line.label === 'Grand Total',
+                }))}
+              />
+            </ReportCard>
+
+            <ReportCard title="Order Type" flush>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-primary/5 text-left">
+                      <th className={TH}>Type</th>
+                      <th className={`${TH} text-right`}>Count</th>
+                      <th className={`${TH} text-right`}>Total (₹)</th>
+                      <th className={`${TH} text-right`}>Net Sales (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.order_types.length === 0 ? (
+                      <EmptyRow cols={4} />
+                    ) : (
+                      data.order_types.map((row) => (
+                        <tr key={row.type} className="border-t border-line">
+                          <td className={`${TD} font-medium`}>{row.type}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{row.count}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{money(row.total)}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{money(row.net)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </ReportCard>
+
+            <ReportCard title="Payment Mode">
+              {data.payments.length === 0 ? (
+                <p className="py-2 text-center text-sm text-muted">Records not available</p>
+              ) : (
+                <ul className="space-y-3">
+                  {data.payments.map((row) => (
+                    <li key={row.mode}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-ink">{row.mode}</span>
+                        <span className="tabular-nums text-ink">{money(row.total)}</span>
+                      </div>
+                      <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-line">
+                        <span
+                          className="block h-full rounded-full bg-primary"
+                          style={{
+                            width: `${paymentsMax > 0 ? Math.min(100, ((Number(row.total) || 0) / paymentsMax) * 100) : 0}%`,
+                          }}
+                        />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </ReportCard>
+
+            <ReportCard title="Online Orders" flush>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-primary/5 text-left">
+                      <th className={TH}>Source</th>
+                      <th className={`${TH} text-right`}>My Amount (₹)</th>
+                      <th className={`${TH} text-right`}>Total (₹)</th>
+                      <th className={`${TH} text-right`}>Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.online.rows.length === 0 ? (
+                      <EmptyRow cols={4} />
+                    ) : (
+                      data.online.rows.map((row) => (
+                        <tr key={row.source} className="border-t border-line">
+                          <td className={`${TD} font-medium`}>{row.source}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{money(row.my_amount)}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{money(row.total)}</td>
+                          <td className={`${TD} text-right tabular-nums`}>{row.orders}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {data.online.rows.length > 0 ? (
+                    <tfoot>
+                      <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                        <td className={TD}>Total</td>
+                        <td className={`${TD} text-right tabular-nums`}>
+                          {money(data.online.total.my_amount)}
+                        </td>
+                        <td className={`${TD} text-right tabular-nums`}>
+                          {money(data.online.total.total)}
+                        </td>
+                        <td className={`${TD} text-right tabular-nums`}>{data.online.total.orders}</td>
+                      </tr>
+                    </tfoot>
+                  ) : null}
+                </table>
+              </div>
+            </ReportCard>
+          </div>
+        </>
+      ) : null}
+    </ReportShell>
   )
 }

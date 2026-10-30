@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Heart } from 'lucide-react'
+import { Heart, Plus } from 'lucide-react'
 import type { MenuItemRow } from '../../utils/menuAdapter'
 import { getDietType } from '../../utils/dietType'
 import {
@@ -23,40 +23,47 @@ interface ItemGridProps {
   selectedQtyByItemId?: Record<string, number>
   /** Show pink heart on cards (Favorite Items section). */
   showFavoriteHeart?: boolean
+  /**
+   * When given, every card carries a heart button; clicking it adds the item
+   * to Favorite Items, or removes it when it is already there.
+   */
+  onToggleFavorite?: (item: MenuItemRow) => void
+  /**
+   * Every id currently in Favorite Items, marked by hand or an automatic best
+   * seller: those hearts are solid red, all others a grey outline. Without
+   * it, only items marked by hand count.
+   */
+  favoriteIds?: Set<string>
   /** Show Open Item tile at the end (Favorite Items section). */
   showOpenItem?: boolean
   onOpenItemClick?: () => void
+  /** Display Settings: show the price chip on each card. */
+  showPrice?: boolean
+  /** Display Settings: show the item picture on each card. */
+  showImages?: boolean
+  /** Display Settings: show the Search Item box. */
+  showSearch?: boolean
+  /** Display Settings: a tap adds the item (off: first tap selects, then Add). */
+  autoAdd?: boolean
 }
 
 type DietType = 'veg' | 'non-veg' | 'egg'
 
-const DietMark = ({ type }: { type: DietType }) => {
-  const styles =
-    type === 'egg'
-      ? {
-          box: 'border-secondary',
-          dot: 'bg-secondary',
-          label: 'Egg',
-        }
-      : type === 'non-veg'
-        ? {
-            box: 'border-primary',
-            dot: 'bg-primary',
-            label: 'Non-veg',
-          }
-        : {
-            box: 'border-success',
-            dot: 'bg-success',
-            label: 'Veg',
-          }
+const DIET_DOT: Record<DietType, { box: string; dot: string; label: string }> = {
+  veg: { box: 'border-success', dot: 'bg-success', label: 'Veg' },
+  'non-veg': { box: 'border-primary', dot: 'bg-primary', label: 'Non-veg' },
+  egg: { box: 'border-secondary', dot: 'bg-secondary', label: 'Egg' },
+}
 
+function DietMark({ type }: { type: DietType }) {
+  const d = DIET_DOT[type]
   return (
     <span
-      title={styles.label}
-      aria-label={styles.label}
-      className={`inline-flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border ${styles.box}`}
+      aria-label={d.label}
+      data-tooltip={d.label}
+      className={`inline-flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border ${d.box}`}
     >
-      <span className={`size-1.5 rounded-full ${styles.dot}`} />
+      <span className={`size-1.5 rounded-full ${d.dot}`} />
     </span>
   )
 }
@@ -75,8 +82,14 @@ export function ItemGrid({
   onAddItem,
   selectedQtyByItemId = {},
   showFavoriteHeart = false,
+  onToggleFavorite,
+  favoriteIds,
   showOpenItem = false,
   onOpenItemClick,
+  showPrice = true,
+  showImages = false,
+  showSearch = true,
+  autoAdd = true,
 }: ItemGridProps) {
   const hasItems = items.length > 0
   const showEmpty = !hasItems && !showOpenItem
@@ -91,6 +104,8 @@ export function ItemGrid({
     ],
     [categoryOptions],
   )
+  // Without auto add the first tap only picks a card; its Add button adds it.
+  const [pickedId, setPickedId] = useState<string | null>(null)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -106,6 +121,15 @@ export function ItemGrid({
       key: (prev?.id === item.id ? prev.key : 0) + 1,
     }))
     clickTimerRef.current = setTimeout(() => setTapFlash(null), 320)
+    if (!autoAdd) {
+      setPickedId(item.id)
+      return
+    }
+    onAddItem(item)
+  }
+
+  function addPicked(item: MenuItemRow) {
+    setPickedId(null)
     onAddItem(item)
   }
 
@@ -127,6 +151,7 @@ export function ItemGrid({
           />
         </div>
         <div className="flex w-full min-w-0 flex-1 flex-col gap-2.5 sm:min-w-[260px] sm:flex-row sm:items-center sm:gap-2">
+          {showSearch ? (
           <input
             type="search"
             value={search}
@@ -140,6 +165,7 @@ export function ItemGrid({
             placeholder="Search item (Enter to add)"
             className="box-border h-12 min-h-12 w-full min-w-0 appearance-none rounded-lg border border-line bg-card px-3 py-3 text-base leading-normal text-ink outline-none placeholder:text-muted focus:border-primary sm:h-9 sm:min-h-9 sm:flex-1 sm:py-0 sm:text-sm"
           />
+          ) : null}
           <input
             type="search"
             value={shortCode}
@@ -151,6 +177,7 @@ export function ItemGrid({
               }
             }}
             placeholder="Short Code (Enter)"
+            data-vk="shortcode"
             className="box-border h-12 min-h-12 w-full min-w-0 appearance-none rounded-lg border border-line bg-card px-3 py-3 text-base leading-normal text-ink outline-none placeholder:text-muted focus:border-primary sm:h-9 sm:min-h-9 sm:flex-1 sm:py-0 sm:text-sm"
           />
         </div>
@@ -162,22 +189,28 @@ export function ItemGrid({
             No items match your filters
           </div>
         ) : (
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 xl:grid-cols-4 2xl:grid-cols-5">
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
             {items.map((item) => {
               const diet = getDietType(item.tags, item.name)
               const selectedQty = selectedQtyByItemId[item.id] ?? 0
               const selected = selectedQty > 0
+              const picked = !autoAdd && pickedId === item.id
+              // solid red = in Favorite Items (by hand or best seller);
+              // grey outline = not a favorite.
+              const inFavorites = favoriteIds
+                ? favoriteIds.has(item.id)
+                : Boolean(item.isFavorite)
               return (
-                <li key={item.id}>
+                <li key={item.id} className="group relative flex">
                   <button
                     type="button"
                     disabled={!item.available}
                     onClick={() => handleItemClick(item)}
                     aria-pressed={selected}
-                    className={`billing-item-card relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border px-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-                      selected
+                    className={`billing-item-card relative flex min-h-[92px] w-full flex-col justify-between gap-2 overflow-hidden rounded-xl border p-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all disabled:cursor-not-allowed disabled:bg-page disabled:opacity-60 disabled:grayscale ${
+                      selected || picked
                         ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                        : 'border-line bg-card hover:border-primary/40'
+                        : 'border-line bg-card hover:-translate-y-px hover:border-primary/40 hover:shadow-md'
                     }`}
                   >
                     {tapFlash?.id === item.id ? (
@@ -187,67 +220,107 @@ export function ItemGrid({
                         aria-hidden
                       />
                     ) : null}
-                    <span className="relative flex min-w-0 flex-1 items-center gap-2">
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={`line-clamp-2 text-sm font-semibold leading-snug ${
-                            selected ? 'text-primary' : 'text-ink'
-                          }`}
-                        >
-                          {item.name}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-muted">
-                          ₹{item.price}
-                          {item.shortCode ? ` · ${item.shortCode}` : ''}
-                        </span>
+                    {showImages && item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt=""
+                        loading="lazy"
+                        className="-mx-2.5 -mt-2.5 h-20 w-[calc(100%+1.25rem)] max-w-none object-cover"
+                      />
+                    ) : null}
+                    <span className="relative flex items-start justify-between gap-2">
+                      <span
+                        className={`min-w-0 break-words text-[13px] font-semibold leading-snug ${
+                          selected ? 'text-primary' : 'text-ink'
+                        }`}
+                      >
+                        {item.name}
                       </span>
-                      <span className="flex shrink-0 flex-col items-center justify-center gap-1">
+                      <span className="mt-0.5">
                         <DietMark type={diet} />
-                        {showFavoriteHeart ? (
-                          <span aria-hidden className="text-primary">
-                            <Heart
-                              size={14}
-                              className="fill-primary text-primary"
-                              strokeWidth={1.5}
-                            />
-                          </span>
-                        ) : null}
-                        {selected ? (
-                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-white">
-                            {selectedQty}
-                          </span>
-                        ) : null}
                       </span>
                     </span>
+                    <span className="relative flex items-center gap-1.5 pr-7">
+                      {showPrice ? (
+                        <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-xs font-bold tabular-nums text-accent">
+                          ₹{item.price}
+                        </span>
+                      ) : null}
+                      {item.shortCode ? (
+                        <span className="rounded-md bg-page px-1.5 py-0.5 text-[11px] font-medium text-muted">
+                          {item.shortCode}
+                        </span>
+                      ) : null}
+                      {!item.available ? (
+                        <span className="rounded-md bg-line px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+                          Unavailable
+                        </span>
+                      ) : null}
+                    </span>
                   </button>
+                  {picked ? (
+                    <button
+                      type="button"
+                      onClick={() => addPicked(item)}
+                      className="absolute inset-x-2 bottom-2 z-10 inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-primary text-xs font-bold text-white shadow hover:bg-primary-hover"
+                    >
+                      <Plus size={14} />
+                      Add
+                    </button>
+                  ) : null}
+                  {selected ? (
+                    <span className="pointer-events-none absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold leading-none text-white shadow">
+                      {selectedQty}
+                    </span>
+                  ) : null}
+                  {onToggleFavorite ? (
+                    <button
+                      type="button"
+                      onClick={() => onToggleFavorite(item)}
+                      aria-pressed={inFavorites}
+                      aria-label={
+                        inFavorites
+                          ? `Remove ${item.name} from Favorite Items`
+                          : `Add ${item.name} to Favorite Items`
+                      }
+                      data-tooltip={
+                        inFavorites
+                          ? 'Remove from Favorite Items'
+                          : 'Add to Favorite Items'
+                      }
+                      className={`absolute bottom-1.5 right-1.5 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-page focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                        inFavorites ? 'text-primary' : 'text-muted hover:text-primary'
+                      }`}
+                    >
+                      <Heart
+                        size={15}
+                        strokeWidth={1.75}
+                        className={inFavorites ? 'fill-primary' : 'fill-transparent'}
+                      />
+                    </button>
+                  ) : showFavoriteHeart ? (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute bottom-2 right-2 text-primary"
+                    >
+                      <Heart size={13} className="fill-primary" strokeWidth={1.5} />
+                    </span>
+                  ) : null}
                 </li>
               )
             })}
 
             {showOpenItem ? (
-              <li>
+              <li className="flex">
                 <button
                   type="button"
                   onClick={onOpenItemClick}
-                  className="relative flex h-[72px] w-full items-center overflow-hidden rounded-xl border border-line bg-card px-3 text-left"
+                  className="relative flex min-h-[92px] w-full flex-col justify-between gap-2 overflow-hidden rounded-xl border border-line bg-card p-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all hover:-translate-y-px hover:border-primary/40 hover:shadow-md"
                 >
-                  <span className="relative flex min-w-0 flex-1 items-center gap-2">
-                    <span className="min-w-0 flex-1">
-                      <span className="text-sm font-semibold text-ink">
-                        Open Item
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted">
-                        00
-                      </span>
-                    </span>
-                    <span aria-hidden className="shrink-0 text-primary">
-                      <Heart
-                        size={14}
-                        className="fill-primary text-primary"
-                        strokeWidth={1.5}
-                      />
-                    </span>
+                  <span className="text-[13px] font-semibold leading-snug text-ink">
+                    Open Item
                   </span>
+                  <span className="text-[11px] text-muted">Custom name &amp; price</span>
                 </button>
               </li>
             ) : null}

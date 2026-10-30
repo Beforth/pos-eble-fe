@@ -25,6 +25,11 @@ const GROUPS: SearchGroupDef[] = [
       ['Live Orders', '/live-orders', ['live']],
       ['All Orders', '/all-orders', ['orders', 'order history']],
       ['Online Orders', '/online-orders', ['online', 'aggregator', 'portal']],
+      [
+        'Accept Online Orders',
+        '/online-orders/accept',
+        ['accept', 'reject', 'zomato', 'swiggy', 'new orders'],
+      ],
       ['KOT', '/kot', ['kitchen order ticket', 'cooking', 'kot tickets']],
       [
         'Due Payment Settlement',
@@ -400,7 +405,7 @@ const GROUPS: SearchGroupDef[] = [
       ['Variation Summary', '/reports/variation-summary', ['variation summary']],
       ['Tax Summary', '/reports/tax-summary', ['tax summary']],
       ['Counter Summary', '/reports/counter-summary', ['counter summary']],
-      ['Logs', '/logs', ['logs', 'activity log']],
+      ['Logs', '/billing/logs', ['logs', 'activity log']],
     ],
   },
   {

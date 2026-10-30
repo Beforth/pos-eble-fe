@@ -9,6 +9,8 @@ export interface NavItemDef {
   badge?: string
   /** Visual shortcut hint, e.g. 'Ctrl+B'. */
   shortcut?: string
+  /** `alert` draws the badge as a red count pill instead of a label chip. */
+  badgeTone?: 'alert'
   /** Show a right chevron (expandable section). */
   chevron?: boolean
   /** Nested items shown when this row is expanded. */
@@ -183,7 +185,13 @@ export function SidebarNavItem({
         <>
           <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
           {item.badge ? (
-            <span className="shrink-0 rounded-md bg-[#e8e0f5] px-1.5 py-0.5 text-[10px] font-semibold text-[#5b4fcf]">
+            <span
+              className={
+                item.badgeTone === 'alert'
+                  ? 'inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold leading-5 text-white'
+                  : 'shrink-0 rounded-md bg-[#e8e0f5] px-1.5 py-0.5 text-[10px] font-semibold text-[#5b4fcf]'
+              }
+            >
               {item.badge}
             </span>
           ) : null}

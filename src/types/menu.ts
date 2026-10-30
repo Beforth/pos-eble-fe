@@ -129,9 +129,13 @@ export interface ItemFlags {
   ignore_tax: boolean
   ignore_discount: boolean
   set_as_favorite: boolean
+  /** Removed from Favorite Items by the cashier: best sellers must not re-add it. */
+  exclude_from_auto_favorites?: boolean
   open_item: boolean
   open_quantity_popup: boolean
   create_self_recipe: boolean
+  /** Add-ons are chosen per variation row instead of for the whole item. */
+  consider_addon_on_variations?: boolean
 }
 
 export interface TaxSummary {
@@ -183,6 +187,45 @@ export interface Item {
   availability: ItemAvailability[]
   images: ItemImage[]
   taxes: TaxSummary[]
+  /** Variations linked to the item (active only), grouped, with per-menu prices. */
+  variation_groups?: ItemVariationGroup[]
+  /** Add-on groups linked to the item (active only), with rules and per-menu prices. */
+  addon_groups?: ItemAddonGroupRead[]
+  /** Every variation row of the item with its own terms, for the item form. */
+  item_variations?: ItemVariationRow[]
+}
+
+/** An item's own terms for one variation. */
+export interface ItemVariationRow {
+  variation_id: EncId
+  variation_name: string
+  department_name: string
+  price: string | null
+  container_charge: string
+  sap_code: string
+  profit_margin: string | null
+  addon_group_ids: EncId[]
+}
+
+export interface ItemVariationInput {
+  variation_id: EncId
+  price: number | null
+  container_charge: number
+  sap_code: string
+  profit_margin: number | null
+  addon_group_ids: EncId[]
+}
+
+export interface ItemVariationGroup {
+  id: EncId
+  department_name: string
+  online_display_name: string
+  variations: Variation[]
+}
+
+export interface ItemAddonGroupRead extends AddonGroup {
+  /** The item makes picking from this group compulsory. */
+  is_required: boolean
 }
 
 export interface ItemPayload {
@@ -213,6 +256,8 @@ export interface ItemPayload {
   availability?: ItemAvailabilityInput[]
   tax_ids?: EncId[]
   variation_ids?: EncId[]
+  /** The item's variation rows with their own price, add-ons ...; wins over `variation_ids`. */
+  item_variations?: ItemVariationInput[]
   addon_group_ids?: EncId[]
 }
 
@@ -234,6 +279,12 @@ export interface Variation {
   online_display_name: string
   is_active: boolean
   area_prices: VariationAreaPrice[]
+  created_at?: string
+  updated_at?: string
+  /** On an item's variation_groups: the item's own price for it, on every menu (null = use the menu price). */
+  item_price?: string | null
+  /** On an item's variation_groups: add-on groups offered on this variation. */
+  item_addon_group_ids?: EncId[]
 }
 
 export interface VariationInput {
@@ -267,18 +318,28 @@ export interface AddonAreaPrice extends ChannelPriceInput {
   channel_slug: string
 }
 
+export type AddonChoice = 'veg' | 'non-veg' | 'egg'
+
+export type AddonSelectionMode = 'single' | 'multiple'
+
 export interface Addon {
   id: EncId
   name: string
   base_price: number | string
+  sap_code: string
+  choice: AddonChoice
   is_active: boolean
   position: number
   area_prices: AddonAreaPrice[]
 }
 
 export interface AddonInput {
+  /** Sent for an existing add-on so the edit updates it in place. */
+  id?: EncId
   name: string
   base_price?: number | string
+  sap_code?: string
+  choice?: AddonChoice
   is_active?: boolean
   area_prices?: ChannelPriceInput[]
 }
@@ -289,6 +350,16 @@ export interface AddonGroup {
   online_display_name: string
   is_active: boolean
   position: number
+  /** How many add-ons a guest must / may pick (max 0 = no limit). */
+  addon_min: number
+  addon_max: number
+  /** POS only. */
+  selection_mode: AddonSelectionMode
+  /** Zomato only: how many times the same add-on may be picked. */
+  max_selection_per_addon: number
+  show_in_online: boolean
+  show_in_dinein_qr: boolean
+  allow_open_quantity: boolean
   addons: Addon[]
 }
 
@@ -297,6 +368,13 @@ export interface AddonGroupPayload {
   online_display_name?: string
   is_active?: boolean
   position?: number
+  addon_min?: number
+  addon_max?: number
+  selection_mode?: AddonSelectionMode
+  max_selection_per_addon?: number
+  show_in_online?: boolean
+  show_in_dinein_qr?: boolean
+  allow_open_quantity?: boolean
   addons?: AddonInput[]
 }
 

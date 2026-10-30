@@ -46,6 +46,14 @@ export function markKotItemsReady(ticketId: string, itemIds: string[]): string[]
   return next
 }
 
+/** Put a ticket's ready progress back to an earlier value (an empty list clears it). */
+export function setKotReadyItems(ticketId: string, itemIds: string[]): void {
+  const map = loadReadyProgress()
+  if (itemIds.length === 0) delete map[ticketId]
+  else map[ticketId] = itemIds
+  saveReadyProgress(map)
+}
+
 export function isKotFullyReady(ticket: KotTicket): boolean {
   if (ticket.status === 'ready') return true
   if (ticket.items.length === 0) return false

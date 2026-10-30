@@ -17,21 +17,19 @@ import {
   PrimaryButton,
   RowActionButton,
 } from '../components/menu/MenuActionButtons'
-import { EditVariationModal, VariationModal } from '../components/menu/EditVariationModal'
+import { VariationItemModal } from '../components/menu/VariationItemModal'
 import { MenuSectionNav } from '../components/menu/MenuSectionNav'
 import { ShowChangesModal } from '../components/menu/ShowChangesModal'
-import { PaginationControls } from '../components/common/PaginationControls'
 import { useAuth } from '../auth/AuthContext'
 import { updateVariationGroupApi } from '../services/menuService'
-import type { VariationGroup } from '../types/menu'
+import type { Variation, VariationGroup } from '../types/menu'
+import { groupVariationsPayload } from '../utils/variationGroupPayload'
 import { useMenuReference } from '../state/MenuReferenceContext'
 
 const SEARCH_BY_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
-  { value: 'assigned', label: 'Assigned' },
-  { value: 'not-assigned', label: 'Not Assigned' },
 ] as const
 
 type SearchByValue = (typeof SEARCH_BY_OPTIONS)[number]['value']
@@ -146,9 +144,22 @@ function SearchByDropdown({
   )
 }
 
+interface VariantRow {
+  group: VariationGroup
+  variation: Variation
+}
+
+/** "2 Oct 2026" for the Created / Modified columns. */
+function shortDate(iso?: string): string {
+  if (!iso) return '—'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export default function VariantsManagement() {
   const { encryptedOutletId } = useAuth()
-  const [variations, setVariations] = useState<VariationGroup[]>([])
+  const [groups, setGroups] = useState<VariationGroup[]>([])
   const [nameQuery, setNameQuery] = useState('')
   const [searchBy, setSearchBy] = useState<SearchByValue>('all')
   const [appliedName, setAppliedName] = useState('')
@@ -156,10 +167,8 @@ export default function VariantsManagement() {
     useState<SearchByValue>('all')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [changesName, setChangesName] = useState<string | null>(null)
-  const [editing, setEditing] = useState<VariationGroup | null>(null)
+  const [editing, setEditing] = useState<VariantRow | null>(null)
   const [adding, setAdding] = useState(false)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
 
   const { variationGroups: refVariationGroups, reload } = useMenuReference([
     'variationGroups',
@@ -170,77 +179,59 @@ export default function VariantsManagement() {
   }, [encryptedOutletId, reload])
 
   useEffect(() => {
-    setVariations(refVariationGroups)
+    setGroups(refVariationGroups)
   }, [refVariationGroups])
+
+  // One row per variation, with the department (group) it sits in.
+  const allRows = useMemo<VariantRow[]>(
+    () =>
+      groups.flatMap((group) =>
+        group.variations.map((variation) => ({ group, variation })),
+      ),
+    [groups],
+  )
 
   const rows = useMemo(() => {
     const q = appliedName.trim().toLowerCase()
-    return variations.filter((row) => {
+    return allRows.filter(({ group, variation }) => {
       const matchesName =
         !q ||
-        row.department_name.toLowerCase().includes(q) ||
-        row.online_display_name.toLowerCase().includes(q)
-
+        variation.name.toLowerCase().includes(q) ||
+        variation.online_display_name.toLowerCase().includes(q) ||
+        group.department_name.toLowerCase().includes(q)
       const matchesFilter =
         appliedSearchBy === 'all'
           ? true
           : appliedSearchBy === 'active'
-            ? row.is_active === true
-            : appliedSearchBy === 'inactive'
-              ? row.is_active === false
-              : appliedSearchBy === 'assigned'
-                ? row.variations.length > 0
-                : row.variations.length === 0
-
+            ? variation.is_active
+            : !variation.is_active
       return matchesName && matchesFilter
     })
-  }, [appliedName, appliedSearchBy, variations])
-
-  const totalRecords = rows.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const pageRows = useMemo(
-    () => rows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [rows, currentPage, pageSize],
-  )
+  }, [allRows, appliedName, appliedSearchBy])
 
   const allSelected =
-    pageRows.length > 0 && pageRows.every((row) => selected.has(row.id))
+    rows.length > 0 && rows.every((row) => selected.has(row.variation.id))
 
   async function setSelectedStatus(status: 'Active' | 'Inactive') {
     if (selected.size === 0 || !encryptedOutletId) return
     const isActive = status === 'Active'
-    const selectedRows = variations.filter((row) => selected.has(row.id))
+    // The group API replaces a group's variation list: one call per group touched.
+    const touched = groups.filter((group) =>
+      group.variations.some((variation) => selected.has(variation.id)),
+    )
     const results = await Promise.allSettled(
-      selectedRows.map((row) =>
-        updateVariationGroupApi(encryptedOutletId, row.id, {
-          is_active: isActive,
+      touched.map((group) =>
+        updateVariationGroupApi(encryptedOutletId, group.id, {
+          variations: groupVariationsPayload(group, (variation) =>
+            selected.has(variation.id) ? { is_active: isActive } : undefined,
+          ),
         }),
       ),
     )
-    const succeeded = results.filter((r) => r.status === 'fulfilled')
-    const failed = results.filter((r) => r.status === 'rejected')
-
-    if (succeeded.length > 0) {
-      setVariations((prev) =>
-        prev.map((row) => {
-          if (!selected.has(row.id)) return row
-          const match = succeeded.find(
-            (r) => r.status === 'fulfilled' && r.value.id === row.id,
-          )
-          if (match && match.status === 'fulfilled') return match.value
-          return row
-        }),
-      )
-    }
-
-    if (failed.length > 0) {
-      showToast(`Failed to update ${failed.length} variation(s)`)
-    }
-    if (succeeded.length > 0) {
-      showToast(
-        `${succeeded.length} variation(s) updated to ${status}`,
-      )
+    const failed = results.filter((r) => r.status === 'rejected').length
+    if (failed > 0) showToast(`Failed to update ${failed} department(s)`)
+    if (failed < results.length) {
+      showToast(`${selected.size} variation(s) updated to ${status}`)
     }
     void reload('variationGroups', { force: true })
   }
@@ -248,7 +239,6 @@ export default function VariantsManagement() {
   function handleSearch() {
     setAppliedName(nameQuery)
     setAppliedSearchBy(searchBy)
-    setPage(1)
   }
 
   function handleShowAll() {
@@ -256,7 +246,6 @@ export default function VariantsManagement() {
     setAppliedName('')
     setSearchBy('all')
     setAppliedSearchBy('all')
-    setPage(1)
     showToast('Filters cleared')
   }
 
@@ -314,7 +303,7 @@ export default function VariantsManagement() {
           <div className="flex flex-wrap items-end gap-2">
             <OutlineButton onClick={handleSearch}>Search</OutlineButton>
             <OutlineButton variant="gray" onClick={handleShowAll}>
-              Clear Filter
+              Show All
             </OutlineButton>
             <OutlineButton>Update Variation</OutlineButton>
           </div>
@@ -328,7 +317,7 @@ export default function VariantsManagement() {
 
       <div className="overflow-x-auto rounded-lg border border-line bg-card">
         <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-line bg-page text-sm font-semibold text-ink">
+          <thead className="border-b border-line bg-primary/5 text-sm font-semibold text-ink">
             <tr>
               <th className="w-10 px-3 py-3">
                 <input
@@ -336,7 +325,9 @@ export default function VariantsManagement() {
                   checked={allSelected}
                   onChange={() =>
                     setSelected(
-                      allSelected ? new Set() : new Set(pageRows.map((r) => r.id)),
+                      allSelected
+                        ? new Set()
+                        : new Set(rows.map((row) => row.variation.id)),
                     )
                   }
                   className="cursor-pointer accent-primary"
@@ -344,106 +335,91 @@ export default function VariantsManagement() {
               </th>
               <th className="px-3 py-3">Name</th>
               <th className="px-3 py-3">Online Display Name</th>
-              <th className="px-3 py-3">Variations</th>
+              <th className="px-3 py-3">Department Name</th>
               <th className="px-3 py-3">Status</th>
+              <th className="px-3 py-3">Created</th>
+              <th className="px-3 py-3">Modified</th>
               <th className="px-3 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {pageRows.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-12 text-center text-sm text-muted">
-                  No variations found
+                <td colSpan={8} className="px-3 py-10 text-center text-sm text-muted">
+                  No variations found.
                 </td>
               </tr>
-            ) : (
-              pageRows.map((row) => (
+            ) : null}
+            {rows.map((row) => {
+              const { group, variation } = row
+              return (
                 <tr
-                  key={row.id}
+                  key={variation.id}
                   className="border-b border-line last:border-b-0 hover:bg-page/80"
                 >
                   <td className="px-3 py-3.5">
                     <input
                       type="checkbox"
-                      checked={selected.has(row.id)}
+                      checked={selected.has(variation.id)}
                       onChange={() =>
                         setSelected((prev) => {
                           const next = new Set(prev)
-                          if (next.has(row.id)) next.delete(row.id)
-                          else next.add(row.id)
+                          if (next.has(variation.id)) next.delete(variation.id)
+                          else next.add(variation.id)
                           return next
                         })
                       }
                       className="cursor-pointer accent-primary"
                     />
                   </td>
-                  <td className="px-3 py-3.5 font-medium text-ink">
-                    {row.department_name}
-                  </td>
+                  <td className="px-3 py-3.5 font-medium text-ink">{variation.name}</td>
                   <td className="px-3 py-3.5 text-muted">
-                    {row.online_display_name || '—'}
+                    {variation.online_display_name || '—'}
                   </td>
-                  <td className="px-3 py-3.5 text-ink">
-                    {row.variations.length}
+                  <td className="px-3 py-3.5 text-ink">{group.department_name}</td>
+                  <td className="px-3 py-3.5">
+                    <span
+                      className={`inline-flex rounded-md px-2.5 py-0.5 text-xs font-semibold ${
+                        variation.is_active
+                          ? 'bg-success/10 text-success'
+                          : 'bg-page text-muted'
+                      }`}
+                    >
+                      {variation.is_active ? 'Active' : 'Inactive'}
+                    </span>
                   </td>
-                  <td
-                    className={`px-3 py-3.5 font-medium ${
-                      row.is_active ? 'text-success' : 'text-muted'
-                    }`}
-                  >
-                    {row.is_active ? 'Active' : 'Inactive'}
-                  </td>
+                  <td className="px-3 py-3.5 text-ink">{shortDate(variation.created_at)}</td>
+                  <td className="px-3 py-3.5 text-ink">{shortDate(variation.updated_at)}</td>
                   <td className="px-3 py-3.5">
                     <div className="flex items-center gap-1">
-                      <RowActionButton
-                        label="Edit"
-                        onClick={() => setEditing(row)}
-                      >
+                      <RowActionButton label="Edit" onClick={() => setEditing(row)}>
                         <Pencil size={16} />
                       </RowActionButton>
                       <RowActionButton
                         label="Show Changes"
-                        onClick={() => setChangesName(row.department_name)}
+                        onClick={() => setChangesName(variation.name)}
                       >
                         <ClipboardList size={16} />
                       </RowActionButton>
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
+              )
+            })}
           </tbody>
         </table>
-        <PaginationControls
-          totalRecords={totalRecords}
-          currentPage={currentPage}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
       </div>
 
-      <VariationModal
-        open={adding}
-        mode="add"
-        variation={null}
+      <VariationItemModal
+        open={adding || editing !== null}
         outletId={encryptedOutletId ?? ''}
-        onClose={() => setAdding(false)}
-        onSave={(created) => {
-          setVariations((prev) => [created, ...prev])
+        groups={groups}
+        editing={editing}
+        onClose={() => {
+          setAdding(false)
+          setEditing(null)
         }}
-      />
-
-      <EditVariationModal
-        open={Boolean(editing)}
-        variation={editing}
-        outletId={encryptedOutletId ?? ''}
-        onClose={() => setEditing(null)}
-        onSave={(updated) => {
-          setVariations((prev) =>
-            prev.map((row) => (row.id === updated.id ? updated : row)),
-          )
-        }}
+        onSaved={() => void reload('variationGroups', { force: true })}
       />
 
       <ShowChangesModal

@@ -9,6 +9,7 @@ import { invalidateMenuItemCache } from '../state/menuItemsCache'
 import { createItemApi } from '../services/menuService'
 import { ApiError } from '../services/apiClient'
 import { showToast } from '../utils/toast'
+import { PrimaryButton } from '../components/menu/MenuActionButtons'
 import type { ItemPayload } from '../types/menu'
 
 const CHANNEL_SLUG_BY_ID: Record<string, string> = {
@@ -62,6 +63,12 @@ export default function AddMenuItem() {
     refStatus.taxes === 'error' ||
     refStatus.variationGroups === 'error' ||
     refStatus.addonGroups === 'error'
+
+  // `categories` is empty both while loading and when the outlet really has
+  // none, so the status decides: an empty, finished load must not read as
+  // "loading" forever (it left a brand-new outlet unable to add its first item).
+  const categoriesLoading =
+    refStatus.categories === 'idle' || refStatus.categories === 'loading'
 
   const prevLoadFailedRef = useRef(loadFailed)
   useEffect(() => {
@@ -127,25 +134,22 @@ export default function AddMenuItem() {
         <p className="text-sm text-muted">
           No outlet selected. Please switch to an outlet from the header.
         </p>
-      ) : refStatus.categories === 'idle' || refStatus.categories === 'loading' ? (
-        <p className="text-sm text-muted">Loading menu data…</p>
       ) : loadFailed ? (
         <p className="text-sm text-muted">
           Could not load menu data. Check the API connection and try again.
         </p>
+      ) : categoriesLoading ? (
+        <p className="text-sm text-muted">Loading menu data…</p>
       ) : categories.length === 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
-          <h3 className="font-semibold text-base">No Menu Categories Found</h3>
-          <p className="mt-1 text-sm text-amber-800">
-            Every menu item must belong to a Category (e.g. Starters, Main Course, Beverages, Snacks). No categories exist in this outlet yet.
+        <div className="max-w-md space-y-3">
+          <p className="text-base font-semibold text-ink">No categories yet</p>
+          <p className="text-sm text-muted">
+            Every item belongs to a category, so add a category first and then
+            come back to add the item.
           </p>
-          <button
-            type="button"
-            onClick={() => navigate('/menu/categories/new')}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white shadow hover:bg-amber-700 cursor-pointer"
-          >
-            + Create New Category →
-          </button>
+          <PrimaryButton onClick={() => navigate('/menu/categories/new')}>
+            Add a category
+          </PrimaryButton>
         </div>
       ) : (
         <MenuItemForm

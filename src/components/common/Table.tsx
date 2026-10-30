@@ -23,6 +23,8 @@ interface TableProps<T> {
   sortKey?: string | null
   sortDir?: SortDirection
   onSort?: (key: string) => void
+  /** Extra classes for a row, e.g. a status tint. */
+  rowClassName?: (row: T) => string
 }
 
 const alignClasses = {
@@ -41,6 +43,7 @@ export function Table<T>({
   sortKey = null,
   sortDir = 'asc',
   onSort,
+  rowClassName,
 }: TableProps<T>) {
   return (
     <div className="w-full overflow-x-auto">
@@ -76,7 +79,7 @@ export function Table<T>({
           {rows.map((row) => (
             <tr
               key={rowKey(row)}
-              className="border-b border-line last:border-0 hover:bg-page/60"
+              className={`border-b border-line last:border-0 hover:bg-page/60 ${rowClassName?.(row) ?? ''}`}
             >
               {columns.map((column) => (
                 <td

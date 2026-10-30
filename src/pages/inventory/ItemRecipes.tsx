@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/downloadFile'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import {
   ChevronDown,
   ChevronLeft,

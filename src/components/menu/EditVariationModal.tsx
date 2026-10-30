@@ -605,138 +605,141 @@ export function VariationModal({
             Status
           </label>
 
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-5">
-              <label className="text-sm font-medium text-ink">Variations</label>
-              <button
-                type="button"
-                onClick={() =>
-                  setVariationInputs((prev) => [
-                    ...prev,
-                    {
-                      name: '',
-                      online_display_name: '',
-                      is_active: true,
-                      area_prices: [],
-                    },
-                  ])
-                }
-                className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-line bg-card px-3 text-xs font-medium text-primary hover:bg-page"
-              >
-                <Plus size={13} />
-                Add Variation
-              </button>
-            </div>
+          {/* Variation lines are managed when editing a group; a new group starts with just its name. */}
+          {mode === 'edit' ? (
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-5">
+                <label className="text-sm font-medium text-ink">Variations</label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVariationInputs((prev) => [
+                      ...prev,
+                      {
+                        name: '',
+                        online_display_name: '',
+                        is_active: true,
+                        area_prices: [],
+                      },
+                    ])
+                  }
+                  className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-line bg-card px-3 text-xs font-medium text-primary hover:bg-page"
+                >
+                  <Plus size={13} />
+                  Add Variation
+                </button>
+              </div>
 
-            {variationInputs.length === 0 ? (
-              <p className="mt-3 rounded-md border border-dashed border-line py-5 text-center text-sm text-muted">
-                No variations yet — click “Add Variation” to create options
-                (e.g. Regular, Large).
-              </p>
-            ) : (
-              <div className="mt-3 space-y-3">
-                {variationInputs.map((row, index) => (
-                  <div
-                    key={row.id ?? `new-${index}`}
-                    className="rounded-md border border-line p-3"
-                  >
-                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-ink">
-                          Name <span className="text-primary">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={row.name}
-                          onChange={(event) => {
-                            updateVariation(index, {
-                              name: event.target.value,
-                            })
-                            setVariationNameErrors((prev) => {
-                              const next = new Set(prev)
-                              next.delete(index)
-                              return next
-                            })
-                          }}
-                          className={`h-9 w-full rounded-md border px-3 text-sm text-ink outline-none focus:border-primary ${
-                            variationNameErrors.has(index)
-                              ? 'border-error'
-                              : 'border-line'
-                          }`}
-                        />
-                        {variationNameErrors.has(index) ? (
-                          <p className="mt-1 text-xs text-error">
-                            Name is required.
-                          </p>
-                        ) : null}
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-ink">
-                          Online Display Name
-                        </label>
-                        <input
-                          type="text"
-                          value={row.online_display_name ?? ''}
-                          onChange={(event) =>
-                            updateVariation(index, {
-                              online_display_name: event.target.value,
-                            })
-                          }
-                          className="h-9 w-full rounded-md border border-line px-3 text-sm text-ink outline-none focus:border-primary"
-                        />
-                      </div>
-                      <div className="flex items-end pb-1.5">
-                        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
+              {variationInputs.length === 0 ? (
+                <p className="mt-3 rounded-md border border-dashed border-line py-5 text-center text-sm text-muted">
+                  No variations yet — click “Add Variation” to create options
+                  (e.g. Regular, Large).
+                </p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {variationInputs.map((row, index) => (
+                    <div
+                      key={row.id ?? `new-${index}`}
+                      className="rounded-md border border-line p-3"
+                    >
+                      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-ink">
+                            Name <span className="text-primary">*</span>
+                          </label>
                           <input
-                            type="checkbox"
-                            checked={row.is_active ?? true}
+                            type="text"
+                            value={row.name}
+                            onChange={(event) => {
+                              updateVariation(index, {
+                                name: event.target.value,
+                              })
+                              setVariationNameErrors((prev) => {
+                                const next = new Set(prev)
+                                next.delete(index)
+                                return next
+                              })
+                            }}
+                            className={`h-9 w-full rounded-md border px-3 text-sm text-ink outline-none focus:border-primary ${
+                              variationNameErrors.has(index)
+                                ? 'border-error'
+                                : 'border-line'
+                            }`}
+                          />
+                          {variationNameErrors.has(index) ? (
+                            <p className="mt-1 text-xs text-error">
+                              Name is required.
+                            </p>
+                          ) : null}
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-ink">
+                            Online Display Name
+                          </label>
+                          <input
+                            type="text"
+                            value={row.online_display_name ?? ''}
                             onChange={(event) =>
                               updateVariation(index, {
-                                is_active: event.target.checked,
+                                online_display_name: event.target.value,
                               })
                             }
-                            className="size-4 cursor-pointer accent-primary"
+                            className="h-9 w-full rounded-md border border-line px-3 text-sm text-ink outline-none focus:border-primary"
                           />
-                          Active
-                        </label>
+                        </div>
+                        <div className="flex items-end pb-1.5">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
+                            <input
+                              type="checkbox"
+                              checked={row.is_active ?? true}
+                              onChange={(event) =>
+                                updateVariation(index, {
+                                  is_active: event.target.checked,
+                                })
+                              }
+                              className="size-4 cursor-pointer accent-primary"
+                            />
+                            Active
+                          </label>
+                        </div>
+                        <div className="flex items-end pb-1.5">
+                          <button
+                            type="button"
+                            aria-label={`Remove variation ${row.name || index + 1}`}
+                            data-tooltip={`Remove variation ${row.name || index + 1}`}
+                            onClick={() => setPendingRemove({ index, name: row.name })}
+                            className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-line text-muted hover:border-error hover:text-error"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-end pb-1.5">
-                        <button
-                          type="button"
-                          aria-label={`Remove variation ${row.name || index + 1}`}
-                          data-tooltip={`Remove variation ${row.name || index + 1}`}
-                          onClick={() => setPendingRemove({ index, name: row.name })}
-                          className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-line text-muted hover:border-error hover:text-error"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
 
-                    <VariationRowPrices
-                      areaPrices={row.area_prices ?? []}
-                      channels={channels}
-                      errorChannelIds={priceErrorChannels[index] ?? []}
-                      onPriceChange={(channelId, patch) =>
-                        updateVariationAreaPrice(index, channelId, patch)
-                      }
-                      onClearPriceError={(channelId) =>
-                        setPriceErrorChannels((prev) => {
-                          const next = { ...prev }
-                          const list = (next[index] ?? []).filter(
-                            (id) => id !== channelId,
-                          )
-                          if (list.length > 0) next[index] = list
-                          else delete next[index]
-                          return next
-                        })
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                      <VariationRowPrices
+                        areaPrices={row.area_prices ?? []}
+                        channels={channels}
+                        errorChannelIds={priceErrorChannels[index] ?? []}
+                        onPriceChange={(channelId, patch) =>
+                          updateVariationAreaPrice(index, channelId, patch)
+                        }
+                        onClearPriceError={(channelId) =>
+                          setPriceErrorChannels((prev) => {
+                            const next = { ...prev }
+                            const list = (next[index] ?? []).filter(
+                              (id) => id !== channelId,
+                            )
+                            if (list.length > 0) next[index] = list
+                            else delete next[index]
+                            return next
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-line px-5 py-4">

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Loader2, RefreshCw, X } from 'lucide-react'
 import { formatINR, formatNumber } from '../../utils/format'
 import {
@@ -6,6 +6,7 @@ import {
   liveBoardOrdersApi,
   type LiveBoardRecord,
 } from '../../services/orderService'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
 
 interface LiveOrdersDetailModalProps {
   open: boolean
@@ -69,6 +70,17 @@ export function LiveOrdersDetailModal({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [reload, setReload] = useState(0)
+  // The running board lists orders (Order Live View); the kitchen board lists
+  // tickets (KOT Live View). Each follows its own Display Setting.
+  const { orderLiveView, kotLiveView } = useDisplaySettings()
+  const direction = board === 'running' ? orderLiveView : kotLiveView
+  const ordered = useMemo(
+    () =>
+      [...records].sort((a, b) =>
+        direction === 'asc' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt,
+      ),
+    [records, direction],
+  )
 
   useEffect(() => {
     if (!open || !outletId) return
@@ -175,7 +187,7 @@ export function LiveOrdersDetailModal({
             </div>
           ) : (
             <ul className="space-y-3">
-              {records.map((record) => {
+              {ordered.map((record) => {
                 if (record.kind === 'order') {
                   return (
                     <li key={record.id}>
@@ -236,9 +248,11 @@ export function LiveOrdersDetailModal({
                 return (
                   <li key={record.id}>
                     <CardShell
-                      interactive={Boolean(onOpenKot)}
+                      interactive={Boolean(onOpenKot) && !record.billed}
                       label={`Open KOT ${record.kotNo} in billing`}
-                      onClick={() => onOpenKot?.(record.id)}
+                      onClick={() => {
+                        if (!record.billed) onOpenKot?.(record.id)
+                      }}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
@@ -250,6 +264,11 @@ export function LiveOrdersDetailModal({
                           >
                             {record.status}
                           </span>
+                          {record.billed ? (
+                            <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
+                              Bill paid
+                            </span>
+                          ) : null}
                         </div>
                         <p className="shrink-0 text-sm font-bold text-ink tabular-nums">
                           {formatINR(record.total, 2)}
@@ -280,11 +299,16 @@ export function LiveOrdersDetailModal({
                           </li>
                         ))}
                       </ul>
-                      {onOpenKot && (
+                      {record.billed ? (
+                        <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
+                          The bill is already paid, so there is nothing to open in
+                          billing. The kitchen still has to serve this.
+                        </p>
+                      ) : onOpenKot ? (
                         <p className="mt-3 border-t border-line pt-2 text-xs font-semibold text-primary">
                           Open in billing →
                         </p>
-                      )}
+                      ) : null}
                     </CardShell>
                   </li>
                 )

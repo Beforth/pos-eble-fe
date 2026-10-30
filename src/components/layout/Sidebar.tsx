@@ -1,30 +1,61 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  ArrowLeftRight,
   BadgePercent,
+  Banknote,
   BarChart3,
+  Bell,
   BookOpen,
+  Building2,
   Calculator,
+  CheckCheck,
   ChefHat,
   ChevronsLeft,
   ChevronsRight,
+  CirclePlus,
+  ClipboardCheck,
   Clock3,
+  Coins,
   CookingPot,
+  CreditCard,
   FileCheck,
   FileText,
   Globe,
+  PackageCheck,
+  HandCoins,
   History,
   IndianRupee,
+  Info,
+  Layers,
   LayoutDashboard,
+  LayoutGrid,
+  LifeBuoy,
+  Lightbulb,
   LogOut,
+  Mail,
+  MapPin,
+  MonitorSmartphone,
   Package,
+  Percent,
+  Receipt,
+  ReceiptText,
+  Route,
+  ScrollText,
   Settings,
   ShoppingBag,
   SlidersHorizontal,
+  Smartphone,
+  Store,
+  ToggleRight,
   Truck,
   Upload,
+  UserCog,
+  Users,
   UtensilsCrossed,
+  Wallet,
   X,
+  Zap,
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { isCashierUser } from '../../auth/routePermissions'
@@ -33,6 +64,10 @@ import { brand } from '../../theme/brand'
 import { BrandLogo } from '../brand/BrandLogo'
 import { SidebarNavItem, type NavItemDef } from './SidebarNavItem'
 import { useChrome } from '../../state/ChromeContext'
+import {
+  ACCEPT_ORDERS_PATH,
+  useOnlineOrders,
+} from '../../state/OnlineOrdersContext'
 
 interface NavGroupDef {
   title: string
@@ -129,6 +164,7 @@ const NAV: NavEntry[] = [
           icon: Globe,
           shortcut: 'Ctrl+O',
         },
+        { id: 'accept-orders', label: 'Accept Orders', icon: PackageCheck },
         { id: 'kot', label: 'KOT', icon: CookingPot, shortcut: 'Ctrl+K' },
         {
           id: 'due-payments',
@@ -239,26 +275,32 @@ const NAV: NavEntry[] = [
             {
               id: 'config-outlet',
               label: 'Outlet Configuration',
+              icon: Building2,
             },
             {
               id: 'config-sub-order-type',
               label: 'Sub Order Type',
+              icon: Layers,
             },
             {
               id: 'config-delivery-distance',
               label: 'Delivery Distance',
+              icon: Route,
             },
             {
               id: 'config-area-locality-delivery',
               label: 'Area/Locality Wise Delivery Charges',
+              icon: MapPin,
             },
             {
               id: 'config-floor-plan',
               label: 'Floor Plan',
+              icon: LayoutGrid,
             },
             {
               id: 'config-email-template',
               label: 'Email Template Settings',
+              icon: Mail,
             },
           ],
         },
@@ -271,117 +313,143 @@ const NAV: NavEntry[] = [
             {
               id: 'acct-payments',
               label: 'Payments',
+              icon: CreditCard,
               chevron: true,
               children: [
                 {
                   id: 'acct-payment-information',
                   label: 'Payment Information',
+                  icon: Info,
                 },
                 {
                   id: 'acct-virtual-wallet',
                   label: 'Virtual Wallet',
+                  icon: Wallet,
                 },
               ],
             },
             {
               id: 'acct-online-order-reconciliation',
               label: 'Online Order Reconciliation',
+              icon: ArrowLeftRight,
             },
             {
               id: 'acct-gst-information',
               label: 'GST Information',
+              icon: Percent,
             },
             {
               id: 'acct-utility-bills',
               label: 'Utility Bills',
+              icon: Lightbulb,
             },
             {
               id: 'acct-expense-withdrawal',
               label: 'Expense & Withdrawal',
+              icon: HandCoins,
             },
             {
               id: 'acct-service-payment-history',
               label: 'Service Payment History',
+              icon: ReceiptText,
             },
             {
               id: 'acct-denomination',
               label: 'Denomination',
+              icon: Coins,
             },
           ],
         },
         {
           id: 'mgmt-user-management',
           label: 'User Management',
+          icon: Users,
           chevron: true,
           children: [
             {
               id: 'user-mgmt-biller-app',
               label: 'Biller App',
+              icon: Smartphone,
             },
             {
               id: 'user-mgmt-roles',
               label: 'Roles',
+              icon: UserCog,
             },
           ],
         },
         {
           id: 'mgmt-user-logs',
           label: 'User Logs',
+          icon: ScrollText,
           chevron: true,
           children: [
             {
               id: 'user-logs-online-store',
               label: 'Online Store Logs',
+              icon: Globe,
             },
             {
               id: 'user-logs-online-item-on-off',
               label: 'Online Item On/Off Logs',
+              icon: ToggleRight,
             },
             {
               id: 'user-logs-auto-accept-change',
               label: 'Auto Accept Change Logs',
+              icon: CheckCheck,
             },
             {
               id: 'user-logs-support-mgmt',
               label: 'Support Management',
+              icon: LifeBuoy,
             },
             {
               id: 'user-logs-notification',
               label: 'Notification',
+              icon: Bell,
             },
             {
               id: 'user-logs-menu-trigger',
               label: 'Menu Trigger Logs',
+              icon: Zap,
             },
             {
               id: 'user-logs-closing-hour',
               label: 'Closing Hour Logs',
+              icon: Clock3,
             },
             {
               id: 'user-logs-expense',
               label: 'Expense Logs',
+              icon: Receipt,
             },
             {
               id: 'user-logs-withdrawal',
               label: 'Withdrawal Logs',
+              icon: Banknote,
             },
             {
               id: 'user-logs-cash-top-up',
               label: 'Cash Top-Up Logs',
+              icon: CirclePlus,
             },
           ],
         },
         {
           id: 'mgmt-marketplace-setting',
           label: 'Marketplace Settings',
+          icon: Store,
         },
         {
           id: 'mgmt-audit-trail',
           label: 'Audit Trail',
+          icon: ClipboardCheck,
         },
         {
           id: 'mgmt-device-mapping',
           label: 'Device Mapping',
+          icon: MonitorSmartphone,
         },
       ],
     },
@@ -396,6 +464,7 @@ const ROUTES: Record<string, string> = {
   'live-orders': '/live-orders',
   'all-orders': '/all-orders',
   'online-orders': '/online-orders',
+  'accept-orders': ACCEPT_ORDERS_PATH,
   kot: '/kot',
   'due-payments': '/due-payments',
   'menu-discounts': '/menu',
@@ -512,6 +581,7 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate()
   const { logout, canAccess, user } = useAuth()
+  const { pending: pendingOnlineOrders } = useOnlineOrders()
   const {
     expanded,
     toggleExpanded: toggleExpandedInStore,
@@ -694,7 +764,18 @@ export function Sidebar({
                     </p>
                   )}
                   <ul className="space-y-0.5">
-                    {group.items.map((item) => (
+                    {group.items.map((entryItem) => {
+                      // A quiet count of orders waiting to be answered; the page
+                      // itself never pops up.
+                      const item =
+                        entryItem.id === 'accept-orders' && pendingOnlineOrders.length > 0
+                          ? {
+                              ...entryItem,
+                              badge: String(pendingOnlineOrders.length),
+                              badgeTone: 'alert' as const,
+                            }
+                          : entryItem
+                      return (
                       <SidebarNavItem
                         key={item.id}
                         item={item}
@@ -704,7 +785,8 @@ export function Sidebar({
                         nested
                         onClick={handleNavigate}
                       />
-                    ))}
+                      )
+                    })}
                   </ul>
                 </li>
               )

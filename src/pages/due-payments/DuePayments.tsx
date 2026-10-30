@@ -20,6 +20,7 @@ import {
   MONTH_OPTIONS,
   YEAR_OPTIONS,
   clientDue,
+  latestBill,
   monthlyPaid,
   monthlyTaken,
   type DueClient,
@@ -33,6 +34,8 @@ const SORT_OPTIONS = [
   { value: 'name-desc', label: 'Name Z-A' },
   { value: 'due-desc', label: 'Highest Due' },
   { value: 'due-asc', label: 'Lowest Due' },
+  { value: 'date-desc', label: 'Newest First' },
+  { value: 'date-asc', label: 'Oldest First' },
 ]
 
 /** Dues only move when someone settles a bill — possibly at another counter —
@@ -132,6 +135,9 @@ export default function DuePayments() {
       if (sortBy === 'name-desc') return b.name.localeCompare(a.name)
       if (sortBy === 'due-desc') return clientDue(b) - clientDue(a)
       if (sortBy === 'due-asc') return clientDue(a) - clientDue(b)
+      const dateDiff = (latestBill(b)?.dateMs ?? 0) - (latestBill(a)?.dateMs ?? 0)
+      if (sortBy === 'date-desc') return dateDiff || a.name.localeCompare(b.name)
+      if (sortBy === 'date-asc') return -dateDiff || a.name.localeCompare(b.name)
       return a.name.localeCompare(b.name)
     })
   }, [clients, search, sortBy])
@@ -159,6 +165,13 @@ export default function DuePayments() {
       key: 'phone',
       header: 'Phone',
       render: (row) => <span className="text-ink">{row.phone}</span>,
+    },
+    {
+      key: 'lastBill',
+      header: 'Last Bill',
+      render: (row) => (
+        <span className="text-ink">{latestBill(row)?.date ?? '—'}</span>
+      ),
     },
     {
       key: 'taken',

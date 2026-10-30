@@ -21,7 +21,11 @@ import {
   MutedHelp,
 } from '../../components/management/ConfigSectionCard'
 import { SettingsPageLoading } from '../../components/management/SettingsPageLoading'
+import { BillingSettingsShell } from '../../components/billing/BillingSettingsShell'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
+import { useAuth } from '../../auth/AuthContext'
+import { listCategoriesApi } from '../../services/menuService'
+import type { Category } from '../../types/menu'
 import { useOutletSettings } from '../../services/useOutletSettings'
 import type { OutletSettingsRecord } from '../../services/outletService'
 import { brand } from '../../theme/brand'
@@ -141,7 +145,44 @@ function CheckGroup({
   )
 }
 
-export default function ConnectedServicesSettings() {
+function CategoryPicker({
+  categories,
+  selected,
+  onToggle,
+}: {
+  categories: readonly Category[]
+  selected: string[]
+  onToggle: (id: string) => void
+}) {
+  if (categories.length === 0) {
+    return <p className="text-sm text-muted">No menu categories yet.</p>
+  }
+  return (
+    <div className="flex flex-wrap gap-x-5 gap-y-2">
+      {categories.map((category) => (
+        <label
+          key={category.id}
+          className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(category.id)}
+            onChange={() => onToggle(category.id)}
+            className="size-4 cursor-pointer accent-primary"
+          />
+          {category.name}
+        </label>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Connected Services. `standalone` puts the very same screen on a billing page
+ * (`/billing/settings/<name>`) under the billing header; Back / Cancel / Save then
+ * return to Outlet Settings in billing instead of the admin configuration.
+ */
+export default function ConnectedServicesSettings({ standalone = false }: { standalone?: boolean }) {
   const navigate = useNavigate()
 
   const [manualDayEnd, setManualDayEnd] = useState(false)
@@ -178,6 +219,12 @@ export default function ConnectedServicesSettings() {
   const [multiItemBarcode, setMultiItemBarcode] = useState(false)
 
   const [restrictExpenseToday, setRestrictExpenseToday] = useState(false)
+
+  // Day End Excel report: which menu categories count as M.S / M.P sales.
+  const { encryptedOutletId } = useAuth()
+  const [categories, setCategories] = useState<Category[]>([])
+  const [reportMsCategories, setReportMsCategories] = useState<string[]>([])
+  const [reportMpCategories, setReportMpCategories] = useState<string[]>([])
 
   const { loading, data, save } = useOutletSettings('connected-services')
 
@@ -224,11 +271,30 @@ export default function ConnectedServicesSettings() {
       setMultiItemBarcode(Boolean(value.allow_multiple_items_barcode))
     if (value.restrict_expense_current_date != null)
       setRestrictExpenseToday(Boolean(value.restrict_expense_current_date))
+    if (Array.isArray(value.day_end_report_ms_categories))
+      setReportMsCategories(value.day_end_report_ms_categories as string[])
+    if (Array.isArray(value.day_end_report_mp_categories))
+      setReportMpCategories(value.day_end_report_mp_categories as string[])
   }, [data])
+
+  useEffect(() => {
+    if (!encryptedOutletId) return
+    let cancelled = false
+    listCategoriesApi(encryptedOutletId)
+      .then((rows) => {
+        if (!cancelled) setCategories(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [encryptedOutletId])
 
 
   function goBack() {
-    navigate('/management/configuration/outlet')
+    navigate(standalone ? '/billing/settings' : '/management/configuration/outlet')
   }
 
   function toggleIn(
@@ -241,6 +307,20 @@ export default function ConnectedServicesSettings() {
         ? list.filter((item) => item !== value)
         : [...list, value],
     )
+  }
+
+  /** A category belongs to M.S or M.P, never both: ticking one clears the other. */
+  function toggleReportCategory(id: string, partner: 'ms' | 'mp') {
+    const [mine, setMine, other, setOther] =
+      partner === 'ms'
+        ? ([reportMsCategories, setReportMsCategories, reportMpCategories, setReportMpCategories] as const)
+        : ([reportMpCategories, setReportMpCategories, reportMsCategories, setReportMsCategories] as const)
+    if (mine.includes(id)) {
+      setMine(mine.filter((item) => item !== id))
+      return
+    }
+    setMine([...mine, id])
+    if (other.includes(id)) setOther(other.filter((item) => item !== id))
   }
 
   async function handleSave() {
@@ -267,6 +347,8 @@ export default function ConnectedServicesSettings() {
       barcode_weight_denominator: weightDenominator,
       allow_multiple_items_barcode: multiItemBarcode,
       restrict_expense_current_date: restrictExpenseToday,
+      day_end_report_ms_categories: reportMsCategories,
+      day_end_report_mp_categories: reportMpCategories,
     }
     try {
       await save(payload)
@@ -279,11 +361,17 @@ export default function ConnectedServicesSettings() {
   }
 
   if (loading && !data) {
-    return <SettingsPageLoading />
+    return standalone ? (
+      <BillingSettingsShell current="Connected Services">
+        <div className="py-12 text-center text-sm text-muted">Loading settings…</div>
+      </BillingSettingsShell>
+    ) : (
+      <SettingsPageLoading />
+    )
   }
 
-  return (
-    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Connected Services" />} activeItem="config-outlet">
+  const content = (
+    <>
 
       <p className="-mt-1 mb-5 text-sm text-muted">
         The Following Settings Can Be Used To Configure All The Connected
@@ -316,6 +404,33 @@ export default function ConnectedServicesSettings() {
             onChange={setRestrictEditAfterDayEnd}
             label="Restrict editing the order once the manual day end operation has been completed"
           />
+        </div>
+      </ConfigSectionCard>
+
+      <ConfigSectionCard
+        icon={<ReceiptText size={16} />}
+        title="Day End Excel Report"
+        description="Choose which menu categories count towards each partner's sales (M.S and M.P columns) in the Day End Excel report."
+      >
+        <div className="space-y-4">
+          <ConfigFormRow label="M.S categories">
+            <CategoryPicker
+              categories={categories}
+              selected={reportMsCategories}
+              onToggle={(id) => toggleReportCategory(id, 'ms')}
+            />
+          </ConfigFormRow>
+          <ConfigFormRow label="M.P categories">
+            <CategoryPicker
+              categories={categories}
+              selected={reportMpCategories}
+              onToggle={(id) => toggleReportCategory(id, 'mp')}
+            />
+          </ConfigFormRow>
+          <MutedHelp>
+            Sales are matched to categories by item name. Categories left
+            unticked are not counted for either partner.
+          </MutedHelp>
         </div>
       </ConfigSectionCard>
 
@@ -557,6 +672,16 @@ export default function ConnectedServicesSettings() {
       </ConfigSectionCard>
 
       <ConfigSaveBar onCancel={goBack} onSave={handleSave} />
+    </>
+  )
+
+  if (standalone) {
+    return <BillingSettingsShell current="Connected Services">{content}</BillingSettingsShell>
+  }
+
+  return (
+    <ReportsPageShell title={<ConfigBreadcrumb onNavigate={goBack} current="Connected Services" />} activeItem="config-outlet">
+      {content}
     </ReportsPageShell>
   )
 }

@@ -1,3 +1,10 @@
+import { useNavigate } from 'react-router-dom'
+import { Globe } from 'lucide-react'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  ACCEPT_ORDERS_PATH,
+  useOnlineOrders,
+} from '../../state/OnlineOrdersContext'
 import type { OnlineOrdersData } from '../../types'
 import { formatINR, formatNumber } from '../../utils/format'
 import { Card } from '../common/Card'
@@ -23,6 +30,9 @@ export function OnlineOrdersPanel({
   onCustomRange,
   className = '',
 }: OnlineOrdersPanelProps) {
+  const navigate = useNavigate()
+  const { canAccess } = useAuth()
+  const { pending } = useOnlineOrders()
   const splitTotal = Math.max(data.prepaidRevenue + data.codRevenue, 1)
   const prepaidPct = Math.round((data.prepaidRevenue / splitTotal) * 100)
   const codPct = 100 - prepaidPct
@@ -40,6 +50,21 @@ export function OnlineOrdersPanel({
               {formatNumber(data.totalOrders)} orders
             </p>
           </div>
+          {canAccess(ACCEPT_ORDERS_PATH) && (
+            <button
+              type="button"
+              onClick={() => navigate(ACCEPT_ORDERS_PATH)}
+              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-primary px-3 text-xs font-semibold text-primary hover:bg-primary/5"
+            >
+              <Globe size={14} />
+              Accept Orders
+              {pending.length > 0 && (
+                <span className="rounded-full bg-primary px-1.5 text-[11px] font-bold leading-5 text-white">
+                  {pending.length} new
+                </span>
+              )}
+            </button>
+          )}
           {options && value && onSelect && (
             <DatePickerPill
               options={options}

@@ -1,132 +1,189 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Download, Printer } from 'lucide-react'
-import { BillingHeader } from '../../components/billing/BillingHeader'
-import { ListSearch } from '../../components/common/ListSearch'
-import { SortableTh } from '../../components/common/SortableTh'
-import { useListQuery } from '../../hooks/useListQuery'
-import { OUTLET_ITEM_WISE_ROWS } from '../../mocks/outletItemWiseData'
+import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  GroupedTable,
+  type GroupedBlock,
+  type GroupedColumn,
+} from '../../components/reports/GroupedTable'
+import {
+  ColumnsMenu,
+  LoadState,
+  ReportCard,
+  ReportFilterBar,
+  ReportShell,
+  SearchField,
+  StatGrid,
+  StatTile,
+} from '../../components/reports/ReportShell'
+import { decimal, reportSubtitle } from '../../components/reports/reportStyles'
+import { fetchReportApi, type ReportResult } from '../../services/reportService'
+import { downloadCsv } from '../../utils/exportCsv'
+import { formatINR } from '../../utils/format'
+import { todayIso } from '../../utils/reportDates'
+import { showToast } from '../../utils/toast'
+
+const TOGGLEABLE = [
+  { key: 'code', label: 'Code', text: true },
+  { key: 'qty', label: 'Qty.' },
+  { key: 'amount', label: 'Total (₹)' },
+]
 
 export default function VariationSummaryReport() {
-  const navigate = useNavigate()
-  const [billNo, setBillNo] = useState('')
+  const { encryptedOutletId } = useAuth()
+  const [from, setFrom] = useState(todayIso)
+  const [to, setTo] = useState(todayIso)
+  const [search, setSearch] = useState('')
+  const [data, setData] = useState<ReportResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
-  const groupedRows = useMemo(() => {
-    const grouped: Record<string, { qty: number; revenue: number; tax: number }> = {}
-    for (const item of OUTLET_ITEM_WISE_ROWS) {
-      const variation = item.item
-      if (!grouped[variation]) grouped[variation] = { qty: 0, revenue: 0, tax: 0 }
-      grouped[variation].qty += item.qty
-      grouped[variation].revenue += item.grossSales
-      grouped[variation].tax += item.tax
+  useEffect(() => {
+    if (!encryptedOutletId || !from || !to) return
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    fetchReportApi(encryptedOutletId, 'variation-wise', { from, to })
+      .then((result) => {
+        if (!cancelled) setData(result)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setData(null)
+        setError(err instanceof Error ? err.message : 'Could not load the report')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-    return Object.entries(grouped).map(([variation, data]) => ({
-      variation,
-      qty: data.qty,
-      revenue: data.revenue,
-      tax: data.tax,
-    }))
-  }, [])
+  }, [encryptedOutletId, from, to])
 
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      groupedRows,
-      (row) => [row.variation, row.qty, row.revenue, row.tax],
-      (row, key) => {
-        if (key === 'qty') return row.qty
-        if (key === 'revenue') return row.revenue
-        if (key === 'tax') return row.tax
-        return row.variation
-      },
+  const blocks = useMemo<GroupedBlock[]>(() => {
+    const q = search.trim().toLowerCase()
+    const byVariation = new Map<string, GroupedBlock>()
+    for (const row of data?.rows ?? []) {
+      const variation = String(row.variation)
+      if (
+        q &&
+        !String(row.item).toLowerCase().includes(q) &&
+        !variation.toLowerCase().includes(q)
+      ) {
+        continue
+      }
+      let block = byVariation.get(variation)
+      if (!block) {
+        block = { name: variation, rows: [], sums: {} }
+        byVariation.set(variation, block)
+      }
+      block.rows.push(row)
+      block.sums.qty = (block.sums.qty ?? 0) + (Number(row.qty) || 0)
+      block.sums.amount = (block.sums.amount ?? 0) + (Number(row.amount) || 0)
+    }
+    return [...byVariation.values()]
+  }, [data, search])
+
+  const columns: GroupedColumn[] = TOGGLEABLE.filter((col) => !hidden.has(col.key))
+  const totals = data?.totals ?? {}
+  const itemCount = blocks.reduce((sum, block) => sum + block.rows.length, 0)
+
+  function toggleHidden(key: string) {
+    setHidden((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function toggleGroup(name: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  function setRange(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom)
+    setTo(nextTo)
+  }
+
+  function exportCsv() {
+    if (blocks.length === 0) {
+      showToast('Nothing to export')
+      return
+    }
+    const body = blocks.flatMap((block) =>
+      block.rows.map((row) => [
+        row.variation,
+        row.item,
+        ...columns.map((col) => row[col.key] ?? ''),
+      ]),
     )
-
-  const rows = visible
-
-  const totalQty = rows.reduce((s, r) => s + r.qty, 0)
-  const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0)
-  const totalTax = rows.reduce((s, r) => s + r.tax, 0)
-
-  function handleExport() {
-    const header = 'Variation,Qty,Tax,Revenue'
-    const lines = [header, ...rows.map((r) => `${r.variation},${r.qty},${r.tax.toFixed(2)},${r.revenue.toFixed(2)}`)]
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'variation-summary.csv'; a.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(
+      `variation-report_${from}_${to}.csv`,
+      ['Variation', 'Item', ...columns.map((col) => col.label)],
+      body,
+    )
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page">
-      <BillingHeader billNo={billNo} onBillNoChange={setBillNo} onNewOrder={() => navigate('/table-view')} onViewKot={() => navigate('/billing?kot=1')} />
-      <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-ink">Variation Summary</h1>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={handleExport} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Download size={14} className="text-muted" /> Export CSV
-            </button>
-            <button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-ink hover:bg-page">
-              <Printer size={14} className="text-muted" /> Print
-            </button>
-          </div>
-        </div>
+    <ReportShell
+      title="Variation Report"
+      subtitle={reportSubtitle(
+        from,
+        to,
+        data ? `${itemCount} item${itemCount === 1 ? '' : 's'} in ${blocks.length} variation${blocks.length === 1 ? '' : 's'}` : undefined,
+      )}
+    >
+      <ReportFilterBar from={from} to={to} onRange={setRange} onExport={exportCsv}>
+        <SearchField value={search} onChange={setSearch} placeholder="Search item or variation" />
+        <ColumnsMenu
+          options={TOGGLEABLE.map((col) => ({ key: col.key, label: col.label }))}
+          hidden={hidden}
+          onToggle={toggleHidden}
+        />
+      </ReportFilterBar>
 
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Variations</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{rows.length}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Qty</p>
-            <p className="mt-1 text-xl font-extrabold text-ink">{totalQty}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Revenue</p>
-            <p className="mt-1 text-xl font-extrabold text-accent">₹{totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-          </div>
-        </div>
+      {data && blocks.length > 0 ? (
+        <StatGrid>
+          <StatTile primary label="Total sales" value={formatINR(Number(totals.amount) || 0, 2)} />
+          <StatTile label="Quantity sold" value={decimal(totals.qty)} />
+          <StatTile label="Variations" value={blocks.length} />
+          <StatTile label="Items" value={itemCount} />
+        </StatGrid>
+      ) : null}
 
-        <div className="rounded-xl border border-line bg-card">
-          <div className="border-b border-line p-3">
-            <ListSearch
-              value={search}
-              onChange={setSearch}
-              placeholder="Search variations"
-            />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[480px] border-collapse text-sm">
-              <thead>
-                <tr className="bg-page/60">
-                  <SortableTh columnKey="variation" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Variation</SortableTh>
-                  <SortableTh columnKey="qty" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Qty</SortableTh>
-                  <SortableTh columnKey="tax" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Tax</SortableTh>
-                  <SortableTh columnKey="revenue" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted">Revenue</SortableTh>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {rows.map((r) => (
-                  <tr key={r.variation} className="hover:bg-page/40">
-                    <td className="px-4 py-2.5 font-medium text-ink">{r.variation}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink">{r.qty}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink">₹{r.tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-accent">₹{r.revenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-line bg-page/60 font-bold">
-                  <td className="px-4 py-2.5 text-ink">Total</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-ink">{totalQty}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-ink">₹{totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-accent">₹{totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      </main>
-    </div>
+      <ReportCard title="Variation-wise sales" flush>
+        {loading && !data ? (
+          <LoadState loading error="" />
+        ) : error ? (
+          <LoadState loading={false} error={error} />
+        ) : blocks.length === 0 ? (
+          <p className="p-10 text-center text-sm text-muted">
+            No variation sales found for this date range.
+          </p>
+        ) : (
+          <GroupedTable
+            itemLabel="Item"
+            itemKey="item"
+            columns={columns}
+            blocks={blocks}
+            totals={totals}
+            collapsed={collapsed}
+            onToggle={toggleGroup}
+            summaryKeys={[
+              { key: 'qty', label: 'Qty' },
+              { key: 'amount', label: 'Total', money: true },
+            ]}
+            barKey="amount"
+          />
+        )}
+      </ReportCard>
+    </ReportShell>
   )
 }

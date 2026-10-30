@@ -6,10 +6,10 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
 import { Download, Info, Trash2, Upload, X } from 'lucide-react'
 
 import { showToast } from '../../utils/toast'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SortableTh } from '../../components/common/SortableTh'
 import { useListQuery } from '../../hooks/useListQuery'

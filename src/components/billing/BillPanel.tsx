@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import {
+  Banknote,
+  Ellipsis,
   ChevronDown,
+  CircleCheck,
+  CreditCard,
+  HandCoins,
   ChevronUp,
   Clock3,
   FilePenLine,
@@ -19,6 +24,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
+import { KOT_STORE_EVENT, loadTableStatuses } from '../../utils/tableStatusStore'
 import type { BillingTableRow } from '../../utils/diningTables'
 import { roundSettlementAmount } from '../../utils/settlementRound'
 import {
@@ -31,6 +37,8 @@ import {
 import type { SpecialNote, TaxSummary } from '../../types/menu'
 import { useAuth } from '../../auth/AuthContext'
 import { listSpecialNotesApi } from '../../services/menuService'
+import { BillingAdvanceOrderModal } from './BillingAdvanceOrderModal'
+import { MorePaymentDrawer } from './MorePaymentDrawer'
 import { SelectDropdown } from '../common/SelectDropdown'
 import { TooltipWrapper } from '../common/TooltipWrapper'
 import {
@@ -49,8 +57,14 @@ import {
 import { CustomerGstModal } from './CustomerGstModal'
 import { DeleteReasonModal } from './DeleteReasonModal'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { OTHER_PAYMENT_TYPES } from './OtherPaymentModal'
+import { type OtherPaymentType } from './OtherPaymentModal'
+import {
+  usePaymentCardOptions,
+  usePaymentTypeOptions,
+} from '../../services/usePaymentTypeOptions'
 import { PrimaryButton } from '../menu/MenuActionButtons'
+import { QtyInput } from '../common/QtyInput'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
 
 const SEED_CUSTOMER_HISTORY: Record<string, CustomerHistoryOrder[]> = {
   '1234567899': [
@@ -89,6 +103,8 @@ export interface BillChargesSnapshot {
   /** Settlement rounding only (not tax / discount residuals). */
   roundOff: number
   settlementTotal: number
+  /** The rounded amount payable for the whole bill. */
+  billTotal: number
 }
 export type PaymentMethod = 'cash' | 'card' | 'due' | 'other' | 'part'
 
@@ -99,6 +115,8 @@ export interface CartLine {
   price: number
   qty: number
   note?: string
+  /** The variation / add-ons chosen for this line; lines merge only when equal. */
+  optionKey?: string
 }
 
 export interface CustomerDetails {
@@ -111,6 +129,8 @@ export interface CustomerDetails {
 
 interface BillPanelProps {
   lines: CartLine[]
+  /** Menu is on the right, so the divider line sits on the panel's right edge. */
+  menuOnRight?: boolean
   /** KOTs already sent for the selected table (merged into final bill). */
   tableKots?: {
     id: string
@@ -153,6 +173,9 @@ interface BillPanelProps {
   guests: number
   complimentary: boolean
   itsPaid: boolean
+  /** Advance already paid on an advance booking opened in Billing (0 otherwise). */
+  advancePaid?: number
+  advanceNo?: string
   loyalty: boolean
   feedbackSms: boolean
   customer: CustomerDetails
@@ -160,6 +183,12 @@ interface BillPanelProps {
   customerErrors?: Partial<Record<keyof CustomerDetails, boolean>>
   onOrderTypeChange: (type: OrderType) => void
   onPaymentChange: (method: PaymentMethod) => void
+  /** Platform chosen when the payment method is Other. */
+  otherPaymentType?: string
+  /** The card option (bank / card type) picked for a Card payment. */
+  cardOption?: string
+  onCardOptionChange?: (option: string) => void
+  onOtherPaymentTypeChange?: (type: OtherPaymentType) => void
   onTableIdChange: (id: string) => void
   onGuestsChange: (n: number) => void
   onComplimentaryChange: (value: boolean) => void
@@ -191,21 +220,15 @@ interface BillPanelProps {
 
 const ORDER_TYPES: { id: OrderType; label: string }[] = [
   { id: 'dine-in', label: 'Dine In' },
-  { id: 'delivery', label: 'Delivery' },
-  { id: 'pick-up', label: 'Pick Up' },
+  { id: 'pick-up', label: 'Parcel' },
 ]
 
-const PAYMENTS: { id: PaymentMethod; label: string }[] = [
-  { id: 'cash', label: 'Cash' },
-  { id: 'card', label: 'Card' },
-  { id: 'due', label: 'Due' },
-  { id: 'other', label: 'Other' },
-  { id: 'part', label: 'Part' },
+const PAYMENTS: { id: PaymentMethod; label: string; icon: typeof Banknote }[] = [
+  { id: 'cash', label: 'Cash', icon: Banknote },
+  { id: 'card', label: 'Card', icon: CreditCard },
+  { id: 'due', label: 'Due', icon: HandCoins },
+  { id: 'other', label: 'Other', icon: Wallet },
 ]
-
-function RequiredMark() {
-  return <span className="ml-0.5 text-primary">*</span>
-}
 
 function fieldClass(error?: boolean) {
   return `h-9 w-full rounded-lg border bg-card px-3 text-sm text-ink outline-none transition-colors placeholder:text-muted ${
@@ -229,6 +252,7 @@ function sanitizeCustomerName(value: string): string {
 
 export function BillPanel({
   lines,
+  menuOnRight = false,
   tableKots = [],
   focusKotNo = null,
   hideSentKotRows = false,
@@ -240,21 +264,21 @@ export function BillPanel({
   tableId,
   tables,
   guests,
-  complimentary,
   itsPaid,
-  loyalty,
-  feedbackSms,
+  advancePaid = 0,
+  advanceNo,
   customer,
   customerFormOpen,
   customerErrors,
   onOrderTypeChange,
   onPaymentChange,
+  otherPaymentType,
+  cardOption = '',
+  onCardOptionChange,
+  onOtherPaymentTypeChange,
   onTableIdChange,
   onGuestsChange,
-  onComplimentaryChange,
   onItsPaidChange,
-  onLoyaltyChange,
-  onFeedbackSmsChange,
   onQtyChange,
   onRemoveLine,
   onLineNoteChange,
@@ -269,6 +293,8 @@ export function BillPanel({
   onOpenDrafts,
   draftCount = 0,
 }: BillPanelProps) {
+  const paymentTypeOptions = usePaymentTypeOptions()
+  const cardOptions = usePaymentCardOptions()
   const { encryptedOutletId } = useAuth()
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
   const [guestsPickerOpen, setGuestsPickerOpen] = useState(false)
@@ -282,6 +308,19 @@ export function BillPanel({
   const [clearAllOpen, setClearAllOpen] = useState(false)
   const [clearCustomerOpen, setClearCustomerOpen] = useState(false)
   const selectedTable = tables.find((t) => t.id === tableId)
+  // Occupied = anything but a blank table on the floor plan. Re-read when the
+  // picker opens and whenever tickets change, so it matches the table view.
+  const [tableStatuses, setTableStatuses] = useState(loadTableStatuses)
+  useEffect(() => {
+    const refresh = () => setTableStatuses(loadTableStatuses())
+    refresh()
+    window.addEventListener(KOT_STORE_EVENT, refresh)
+    window.addEventListener('storage', refresh)
+    return () => {
+      window.removeEventListener(KOT_STORE_EVENT, refresh)
+      window.removeEventListener('storage', refresh)
+    }
+  }, [tablePickerOpen])
   const dineInFieldsLocked = orderType === 'delivery'
   const previousOrderType = useRef(orderType)
 
@@ -307,7 +346,13 @@ export function BillPanel({
     ? tableKots.filter((kot) => kot.kotNo === focusKotNo)
     : tableKots
   const [settlementInput, setSettlementInput] = useState('')
-  const [settlementError, setSettlementError] = useState<string | null>(null)
+  const [advanceOpen, setAdvanceOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  /** Cash handed over now when the bill is booked on Due; the rest stays due. */
+  const [duePaid, setDuePaid] = useState('')
+  useEffect(() => {
+    if (payment !== 'due') setDuePaid('')
+  }, [payment])
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [noteLineId, setNoteLineId] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
@@ -354,7 +399,6 @@ export function BillPanel({
   const [containerCharge, setContainerCharge] = useState('0')
   const [customerPaid, setCustomerPaid] = useState('0')
   const [tip, setTip] = useState('0')
-  const [otherPlatform, setOtherPlatform] = useState<string>(OTHER_PAYMENT_TYPES[0])
 
   const itemCount =
     lines.reduce((sum, line) => sum + line.qty, 0) +
@@ -362,7 +406,8 @@ export function BillPanel({
 
   const deliveryValue = Number(deliveryCharge) || 0
   const containerValue = Number(containerCharge) || 0
-  const tipValue = Number(tip) || 0
+  const { showTip } = useDisplaySettings()
+  const tipValue = showTip ? Number(tip) || 0 : 0
   const paidValue = Number(customerPaid) || 0
 
   // Tax is priced over the live cart *and* the KOT lines already sent to the
@@ -414,6 +459,10 @@ export function BillPanel({
   )
   const roundedTotal = roundSettlementAmount(taxableBase)
   const roundOff = Math.round((roundedTotal - taxableBase) * 100) / 100
+  // An advance booking has already collected part of the bill: only the
+  // balance is taken now.
+  const advanceApplied = Math.min(Math.max(0, advancePaid), roundedTotal)
+  const payableNow = Math.round((roundedTotal - advanceApplied) * 100) / 100
   const settlementValue =
     settlementInput.trim() === '' || Number.isNaN(Number(settlementInput))
       ? roundedTotal
@@ -426,7 +475,6 @@ export function BillPanel({
   useEffect(() => {
     if (!hasAnyItems) {
       setSettlementInput('')
-      setSettlementError(null)
       setCustomerPaid('0')
       setTip('0')
       setDeliveryCharge('0')
@@ -438,7 +486,6 @@ export function BillPanel({
       return
     }
     setSettlementInput(String(roundSettlementAmount(taxableBase)))
-    setSettlementError(null)
   }, [taxableBase, hasAnyItems])
 
   useEffect(() => {
@@ -488,6 +535,7 @@ export function BillPanel({
       taxBreakdown: tax.breakdown,
       roundOff,
       settlementTotal: settlementValue,
+      billTotal: roundedTotal,
     }
   }
 
@@ -496,41 +544,6 @@ export function BillPanel({
     value: CustomerDetails[K],
   ) {
     onCustomerChange({ ...customer, [key]: value })
-  }
-
-  function handleSettlementBlur() {
-    const raw = Number(settlementInput)
-    if (settlementInput.trim() === '' || Number.isNaN(raw) || raw < 0) {
-      setSettlementError('Enter a valid amount')
-      return
-    }
-    const rounded = roundSettlementAmount(raw)
-    setSettlementInput(String(rounded))
-    setSettlementError(null)
-  }
-
-  function handleSettleSave() {
-    const raw = Number(settlementInput)
-    if (settlementInput.trim() === '' || Number.isNaN(raw) || raw < 0) {
-      setSettlementError('Enter a valid amount')
-      return
-    }
-    if (!hasAnyItems) {
-      setSettlementError('Add items before settling')
-      return
-    }
-    const rounded = roundSettlementAmount(raw)
-    setSettlementInput(String(rounded))
-    const due = Math.max(0, Math.round((roundedTotal - rounded) * 100) / 100)
-    // A short settlement books a due balance, which is tracked per customer —
-    // so the customer name is mandatory before it can be saved.
-    if (due > 0 && !customer.name.trim()) {
-      setSettlementError('Customer name is required when a due balance remains')
-      onCustomerFormOpenChange(true)
-      return
-    }
-    setSettlementError(null)
-    onSettleSave?.(rounded, due, chargesSnapshot())
   }
 
   function money(n: number) {
@@ -565,7 +578,11 @@ export function BillPanel({
   }
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[440px] lg:border-l lg:border-t-0 xl:w-[480px]">
+    <aside
+      className={`flex w-full shrink-0 flex-col border-t border-line bg-card lg:w-[520px] lg:border-t-0 xl:w-[600px] ${
+        menuOnRight ? 'lg:border-r' : 'lg:border-l'
+      }`}
+    >
       <AppliedDiscountModal
         open={discountOpen}
         billTotal={total}
@@ -725,7 +742,7 @@ export function BillPanel({
       />
 
       {/* Order type */}
-      <div className="grid grid-cols-3 gap-1 border-b border-line p-2">
+      <div className="grid grid-cols-2 gap-1 border-b border-line p-2">
         {ORDER_TYPES.map((type) => {
           const active = orderType === type.id
           return (
@@ -844,8 +861,8 @@ export function BillPanel({
         </button>
         <button
           type="button"
-          data-tooltip="Draft bills"
-          aria-label="Draft bills"
+          data-tooltip="Held bills"
+          aria-label="Held bills"
           onClick={() => {
             setTablePickerOpen(false)
             setGuestsPickerOpen(false)
@@ -896,11 +913,11 @@ export function BillPanel({
         ) : null}
 
         {tablePickerOpen ? (
-          <div className="absolute left-2 top-12 z-20 w-56 overflow-hidden rounded-lg border border-line bg-card shadow-lg">
-            <p className="border-b border-line px-3 py-2 text-xs font-semibold text-muted">
+          <div className="absolute left-2 top-12 z-20 w-72 overflow-hidden rounded-xl border border-line bg-card shadow-lg">
+            <p className="border-b border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
               Select table
             </p>
-            <ul className="max-h-48 overflow-y-auto py-1">
+            <ul className="max-h-72 overflow-y-auto py-1">
               <li>
                 <button
                   type="button"
@@ -909,9 +926,9 @@ export function BillPanel({
                     onGuestsChange(0)
                     setTablePickerOpen(false)
                   }}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-page ${
+                  className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-page ${
                     !tableId
-                      ? 'font-semibold text-primary'
+                      ? 'bg-primary/5 font-semibold text-primary'
                       : 'text-ink'
                   }`}
                 >
@@ -927,14 +944,26 @@ export function BillPanel({
                       onGuestsChange(table.persons)
                       setTablePickerOpen(false)
                     }}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-page ${
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-page ${
                       table.id === tableId
-                        ? 'font-semibold text-primary'
+                        ? 'bg-primary/5 text-primary'
                         : 'text-ink'
                     }`}
                   >
-                    <span>Table {table.tableNo}</span>
-                    <span className="text-xs text-muted">{table.areaName}</span>
+                    <span className="min-w-0">
+                      <span className="block whitespace-nowrap text-sm font-semibold">
+                        Table {table.tableNo}
+                      </span>
+                      <span className="block truncate text-xs text-muted">
+                        {table.areaName}
+                      </span>
+                    </span>
+                    {(tableStatuses[table.id] ?? 'blank') !== 'blank' &&
+                    table.id !== tableId ? (
+                      <span className="shrink-0 whitespace-nowrap rounded-full bg-secondary/40 px-2 py-0.5 text-[11px] font-semibold text-deep">
+                        Occupied
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))}
@@ -950,8 +979,7 @@ export function BillPanel({
               <div>
                 <p className="text-sm font-semibold text-ink">Customer details</p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-                  Required for Due payment — mobile and name marked with * are
-                  compulsory
+                  Name and mobile are optional
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-page p-0.5">
@@ -1012,8 +1040,24 @@ export function BillPanel({
             <div className="space-y-3">
               <label className="block">
                 <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  Name
+                </span>
+                <input
+                  type="text"
+                  value={customer.name}
+                  onChange={(e) =>
+                    updateCustomer('name', sanitizeCustomerName(e.target.value))
+                  }
+                  maxLength={12}
+                  placeholder="Customer name"
+                  className={fieldClass(customerErrors?.name)}
+                  autoFocus
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">
                   Mobile
-                  <RequiredMark />
                 </span>
                 <div
                   className={`flex h-9 overflow-hidden rounded-lg border bg-card focus-within:border-primary ${
@@ -1035,28 +1079,8 @@ export function BillPanel({
                     maxLength={10}
                     placeholder="10-digit mobile"
                     className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-ink outline-none placeholder:text-muted"
-                    aria-required
-                    autoFocus
                   />
                 </div>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  Name
-                  <RequiredMark />
-                </span>
-                <input
-                  type="text"
-                  value={customer.name}
-                  onChange={(e) =>
-                    updateCustomer('name', sanitizeCustomerName(e.target.value))
-                  }
-                  maxLength={12}
-                  placeholder="Customer name"
-                  className={fieldClass(customerErrors?.name)}
-                  aria-required
-                />
               </label>
 
               <label className="block">
@@ -1110,7 +1134,7 @@ export function BillPanel({
         <>
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-b border-line bg-page px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
             <span>Items</span>
-            <span className="w-16 text-center">Qty</span>
+            <span className="w-24 text-center">Qty</span>
             <span className="w-14 text-right">Price</span>
             <span className="w-7" />
           </div>
@@ -1273,7 +1297,7 @@ export function BillPanel({
                                 </span>
                               ) : null}
                             </span>
-                            <div className="flex w-16 items-center justify-center gap-1">
+                            <div className="flex w-24 items-center justify-center gap-1">
                               <button
                                 type="button"
                                 aria-label="Decrease quantity"
@@ -1283,9 +1307,11 @@ export function BillPanel({
                               >
                                 <Minus size={12} />
                               </button>
-                              <span className="w-5 text-center text-sm font-semibold text-ink">
-                                {line.qty}
-                              </span>
+                              <QtyInput
+                                value={line.qty}
+                                label={`Quantity for ${line.name}`}
+                                onCommit={(qty) => onQtyChange(line.id, qty)}
+                              />
                               <button
                                 type="button"
                                 aria-label="Increase quantity"
@@ -1458,6 +1484,7 @@ export function BillPanel({
                     {money(returnToCustomer)}
                   </span>
                 </div>
+{showTip ? (
                 <label className="flex items-center justify-between gap-3 text-sm text-ink">
                   <span>Tip</span>
                   <input
@@ -1469,6 +1496,7 @@ export function BillPanel({
                     className="h-8 w-24 rounded-md border border-line bg-white px-2 text-right text-sm outline-none focus:border-primary"
                   />
                 </label>
+) : null}
               </>
             ) : null}
 
@@ -1480,13 +1508,6 @@ export function BillPanel({
               >
                 Bogo Offer
               </button>
-              <button
-                type="button"
-                onClick={() => onAction('Split')}
-                className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-              >
-                Split
-              </button>
             </div>
               </div>
             </div>
@@ -1494,51 +1515,27 @@ export function BillPanel({
         ) : null}
 
         <div className="space-y-3 bg-white p-3">
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-ink">
-                Settlement Amount
-              </span>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={settlementInput}
-                onChange={(e) => {
-                  setSettlementInput(e.target.value)
-                  if (settlementError) setSettlementError(null)
-                }}
-                onBlur={handleSettlementBlur}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleSettleSave()
-                  }
-                }}
-                className={`h-9 w-[110px] rounded-md border bg-white px-2.5 text-sm text-ink outline-none focus:border-primary ${
-                  settlementError ? 'border-primary' : 'border-line'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={handleSettleSave}
-                className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover"
-              >
-                Settle & Save
-              </button>
-              <label className="ml-auto inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
-                <input
-                  type="checkbox"
-                  checked={complimentary}
-                  onChange={(event) => onComplimentaryChange(event.target.checked)}
-                  className="size-3.5 accent-primary"
-                />
-                Complimentary
-              </label>
-            </div>
-            {settlementError ? (
-              <p className="text-xs text-primary">{settlementError}</p>
-            ) : null}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onAction('Split', chargesSnapshot())}
+              className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover"
+            >
+              Split
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (lines.length === 0) {
+                  showToast('Add items to the bill first')
+                  return
+                }
+                setAdvanceOpen(true)
+              }}
+              className="h-9 rounded-lg border border-primary bg-white px-4 text-sm font-semibold text-primary hover:bg-page"
+            >
+              Advance Order
+            </button>
           </div>
 
           <div className="flex items-end justify-between">
@@ -1563,49 +1560,169 @@ export function BillPanel({
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-            {PAYMENTS.map((method) => (
-              <label
-                key={method.id}
-                className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-ink"
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  checked={payment === method.id}
-                  onChange={() => onPaymentChange(method.id)}
-                  className="size-3.5 accent-primary"
-                />
-                {method.label}
-              </label>
-            ))}
+          {advanceApplied > 0 ? (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+              <p className="flex justify-between text-ink">
+                <span>Advance paid{advanceNo ? ` (#${advanceNo})` : ''}</span>
+                <span className="font-semibold tabular-nums">
+                  − {money(advanceApplied)}
+                </span>
+              </p>
+              <p className="mt-1 flex justify-between text-sm font-bold text-ink">
+                <span>Balance to collect</span>
+                <span className="tabular-nums">{money(payableNow)}</span>
+              </p>
+              <p className="mt-1 text-[11px] text-muted">
+                Save, Save &amp; Print or eBill books the bill with the advance
+                counted as paid; tick It&apos;s Paid and press Save to collect the
+                balance now.
+              </p>
+            </div>
+          ) : null}
+
+          <div
+            role="radiogroup"
+            aria-label="Payment method"
+            className="grid grid-cols-5 overflow-hidden rounded-lg border border-line"
+          >
+            {PAYMENTS.map((method) => {
+              const selected = payment === method.id
+              const Icon = method.icon
+              return (
+                <button
+                  key={method.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => onPaymentChange(method.id)}
+                  className={`flex h-11 select-none items-center justify-center gap-1.5 border-r border-line px-1 text-sm font-semibold transition-colors last:border-r-0 ${
+                    selected
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-card text-ink hover:bg-page'
+                  }`}
+                >
+                  <Icon
+                    size={16}
+                    className={`shrink-0 ${selected ? 'text-primary' : 'text-muted'}`}
+                  />
+                  {method.label}
+                  <CircleCheck
+                    size={14}
+                    className={`shrink-0 ${selected ? 'text-primary' : 'text-line'}`}
+                  />
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              aria-haspopup="dialog"
+              className={`flex h-11 select-none items-center justify-center gap-1.5 px-1 text-sm font-semibold transition-colors ${
+                payment === 'part'
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-card text-ink hover:bg-page'
+              }`}
+            >
+              <Ellipsis
+                size={16}
+                className={`shrink-0 ${payment === 'part' ? 'text-primary' : 'text-muted'}`}
+              />
+              More
+              <CircleCheck
+                size={14}
+                className={`shrink-0 ${payment === 'part' ? 'text-primary' : 'text-line'}`}
+              />
+            </button>
           </div>
 
+          <MorePaymentDrawer
+            open={moreOpen}
+            payment={payment}
+            otherType={otherPaymentType}
+            onSelectMethod={onPaymentChange}
+            onSelectOther={(type) => {
+              onPaymentChange('other')
+              onOtherPaymentTypeChange?.(type)
+            }}
+            onClose={() => setMoreOpen(false)}
+          />
+
+          {payment === 'card' && cardOptions.length > 0 ? (
+            <div>
+              <span className="mb-1.5 block text-sm font-semibold text-ink">
+                Card
+              </span>
+              <SelectDropdown
+                value={cardOption}
+                options={[
+                  { value: '', label: 'Any card' },
+                  ...cardOptions.map((option) => ({ value: option, label: option })),
+                ]}
+                onChange={(value) => onCardOptionChange?.(value)}
+                caption="Card"
+                searchable={false}
+                triggerClassName="h-10 w-full bg-white"
+              />
+            </div>
+          ) : null}
+
           {payment === 'other' ? (
-            <label className="block text-sm font-semibold text-ink">
-              Other Payment Type
-              <select
-                value={otherPlatform}
-                onChange={(e) => setOtherPlatform(e.target.value)}
-                className="mt-1.5 h-10 w-full rounded-md border border-line bg-white px-3 text-sm font-normal text-ink outline-none focus:border-primary"
-              >
-                {OTHER_PAYMENT_TYPES.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div>
+              <span className="mb-1.5 block text-sm font-semibold text-ink">
+                Other Payment Type
+              </span>
+              <SelectDropdown
+                value={otherPaymentType ?? paymentTypeOptions[0]}
+                options={paymentTypeOptions.map((option) => ({
+                  value: option,
+                  label: option,
+                }))}
+                onChange={(value) =>
+                  onOtherPaymentTypeChange?.(value)
+                }
+                caption="Payment platform"
+                searchable={false}
+                triggerClassName="h-10 w-full bg-white"
+              />
+            </div>
           ) : null}
 
           {payment === 'due' ? (
-            <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
-              <Clock3 size={13} />
-              Due payment — customer details required
-            </p>
+            <div className="space-y-2">
+              <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                <Clock3 size={13} />
+                Due payment — customer details required
+              </p>
+              <label className="grid grid-cols-[1fr_auto] items-center gap-3 text-sm font-semibold text-ink">
+                Amount paid now
+                <input
+                  type="number"
+                  min={0}
+                  max={payableNow}
+                  step="0.01"
+                  inputMode="decimal"
+                  value={duePaid}
+                  placeholder="0"
+                  onChange={(event) => setDuePaid(event.target.value)}
+                  className="h-10 w-36 rounded-md border border-line bg-white px-3 text-right text-sm font-normal text-ink outline-none focus:border-primary"
+                />
+              </label>
+              {(() => {
+                const paid = Math.min(payableNow, Math.max(0, Number(duePaid) || 0))
+                return (
+                  <p className="text-xs text-muted">
+                    Balance due{' '}
+                    <span className="font-semibold text-amber-600">
+                      {money(Math.round((payableNow - paid) * 100) / 100)}
+                    </span>
+                    {paid > 0 ? ' — press Save to record the payment' : ''}
+                  </p>
+                )
+              })()}
+            </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
               <input
                 type="checkbox"
@@ -1615,6 +1732,7 @@ export function BillPanel({
               />
               It&apos;s Paid
             </label>
+            {/* Loyalty and Send Feedback SMS are switched off for now:
             <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-ink">
               <input
                 type="checkbox"
@@ -1633,46 +1751,84 @@ export function BillPanel({
               />
               Send Feedback SMS
             </label>
+            */}
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+          <div className="flex gap-1.5">
             {(
               [
                 { id: 'Save', label: 'Save' },
                 { id: 'Save & Print', label: 'Save & Print' },
-                // { id: 'Save & eBill', label: 'Save & eBill' },
+                { id: 'Save & eBill', label: 'Save & eBill' },
                 { id: 'KOT', label: 'KOT' },
                 { id: 'KOT & Print', label: 'KOT & Print' },
-                { id: 'Draft', label: 'Draft', icon: true },
+                { id: 'Hold', label: 'Hold' },
               ] as const
             ).map((action) => (
               <button
                 key={action.id}
                 type="button"
                 aria-label={
-                  action.id === 'Draft'
-                    ? 'Save current order as draft'
+                  action.id === 'Hold'
+                    ? 'Put current order on hold'
                     : action.label
                 }
                 data-tooltip={
-                  action.id === 'Draft'
-                    ? 'Save current order as draft'
+                  action.id === 'Hold'
+                    ? 'Put current order on hold'
                     : action.label
                 }
-                onClick={() => onAction(action.id, chargesSnapshot())}
-                className={`inline-flex h-10 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[11px] font-semibold leading-tight sm:text-xs ${
-                  action.id === 'Draft'
+                onClick={() => {
+                  // On Due, an amount typed in "Amount paid now" is settled now and
+                  // the rest is booked as due.
+                  const duePaidNow =
+                    payment === 'due'
+                      ? Math.min(payableNow, Math.max(0, Number(duePaid) || 0))
+                      : 0
+                  if (
+                    (itsPaid || duePaidNow > 0) &&
+                    action.id === 'Save' &&
+                    onSettleSave
+                  ) {
+                    if (payment === 'due') {
+                      onSettleSave(
+                        duePaidNow,
+                        Math.round((payableNow - duePaidNow) * 100) / 100,
+                        chargesSnapshot(),
+                      )
+                      setDuePaid('')
+                    } else {
+                      // "It's Paid" + Save books the bill as paid in full.
+                      onSettleSave(payableNow, 0, chargesSnapshot())
+                    }
+                    onItsPaidChange(false)
+                    return
+                  }
+                  onAction(action.id, chargesSnapshot())
+                }}
+                className={`inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[10px] font-semibold leading-tight sm:text-xs ${
+                  action.id === 'Hold'
                     ? 'border border-primary bg-card text-primary hover:bg-primary/5'
                     : 'bg-primary text-white hover:bg-primary-hover'
                 }`}
               >
-                {action.id === 'Draft' ? <FilePenLine size={13} /> : null}
                 {action.label}
               </button>
             ))}
           </div>
         </div>
       </div>
+      <BillingAdvanceOrderModal
+        open={advanceOpen}
+        outletId={encryptedOutletId}
+        lines={lines}
+        total={roundedTotal}
+        orderType={orderType}
+        customerName={customer.name}
+        customerPhone={customer.mobile}
+        onClose={() => setAdvanceOpen(false)}
+        onSaved={() => onClearItems?.()}
+      />
     </aside>
   )
 }

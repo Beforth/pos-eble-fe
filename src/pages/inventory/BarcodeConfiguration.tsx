@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import { GripVertical, Trash2 } from 'lucide-react'
 import { showToast } from '../../utils/toast'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'

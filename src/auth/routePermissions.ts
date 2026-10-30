@@ -53,7 +53,7 @@ export function isCaptainOnly(permissions: string[]): boolean {
  * Mirrors `isAdminUser` — matches the custom role's `code`/`name` or the outlet
  * group name, case-insensitively — so it keys on the role, never on the
  * username. A user in the `Billing User` group whose name happens to contain
- * "cashier" is still a biller and still lands on `/table-view`.
+ * "cashier" is still a biller and still lands on `/billing`.
  */
 export function isCashierUser(user: AuthUser | null | undefined): boolean {
   if (!user) return false
@@ -86,16 +86,29 @@ type ScreenGate = string | { codename: string }
  */
 const PATH_URL_NAMES: Record<string, ScreenGate> = {
   '/billing/day-end': 'day-end-list',
+  '/billing/reports': 'order-report',
   '/day-end': 'day-end-list',
   '/billing/kot': 'kot-list',
   '/captain-orders/kot': 'kot-list',
   '/kot': 'kot-list',
   '/billing/live-orders': 'live-orders',
+  '/billing/live-summary': 'live-orders',
   '/captain-orders/live-orders': 'live-orders',
   '/live-orders': 'live-orders',
   '/online-orders': 'advance-order-list',
+  '/billing/advance-orders': 'advance-order-list',
+  '/billing/online-orders': 'advance-order-list',
   '/due-payments': 'order-due-collect',
-  '/billing': { codename: BILLING_RIGHT_CODENAME },
+  '/billing/due-payments': 'order-due-collect',
+  '/billing/discounts': 'menu-discounts',
+  '/billing/taxes': 'menu-taxes',
+  // The counter's own entry to the Menu On/Off screen (the /menu one is closed to cashiers).
+  '/billing/menu-on-off': 'menu-items',
+  '/billing/menu': 'menu-discounts',
+  '/billing/expenses': { codename: 'accounts.pos_expense_withdrawal_mgmt_read' },
+  '/billing/withdrawals': { codename: 'accounts.pos_expense_withdrawal_mgmt_read' },
+  // Delivery boys are users with the Delivery Boy role: the users API decides.
+  '/billing/delivery-boys': { codename: 'accounts.view_user' },  '/billing': { codename: BILLING_RIGHT_CODENAME },
   '/captain-orders': { codename: CAPTAIN_ORDER_CODENAME },
   '/all-orders': 'order-list',
   '/table-view': { codename: TABLE_VIEW_READ_CODENAME },
@@ -118,12 +131,12 @@ const PATH_URL_NAMES: Record<string, ScreenGate> = {
 /**
  * Landing screen for a freshly-fetched permission list (no React state).
  * Admins land on /dashboard, a cashier on the All Orders board, billers on
- * /table-view, a captain on the floor plan in captain mode, everyone else on
+ * /billing, a captain on the floor plan in captain mode, everyone else on
  * /profile (which is always open).
  *
  * `user` is optional so a caller holding only a permission list can still use
  * this; without it a cashier is indistinguishable from any other biller and
- * gets `/table-view`.
+ * gets `/billing`.
  */
 export function homePathFor(
   permissions: string[],
@@ -141,7 +154,8 @@ export function homePathFor(
   if (isCashierUser(user) && permissions.includes(BILLING_RIGHT_CODENAME)) {
     return ALL_ORDERS_PATH
   }
-  if (permissions.includes(BILLING_RIGHT_CODENAME)) return '/table-view'
+  // A plain biller (billing user) goes straight to the billing screen.
+  if (permissions.includes(BILLING_RIGHT_CODENAME)) return '/billing'
   return '/profile'
 }
 

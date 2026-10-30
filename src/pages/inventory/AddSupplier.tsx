@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useNavigate } from '../../utils/inventoryRouter'
 import {
   ChevronDown,
   ClipboardList,

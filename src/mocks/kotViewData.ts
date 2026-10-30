@@ -28,6 +28,8 @@ export interface KotTicket {
   createdAt: number
   status: 'active' | 'ready'
   customerName?: string
+  /** Number of the bill this ticket is on, once it has one. */
+  billNo?: string
   /** Customer-facing token (10–99). */
   displayToken?: number
   /** True once the ticket's bill is settled. The KOT view hides billed

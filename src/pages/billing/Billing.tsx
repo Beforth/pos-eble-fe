@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { showToast } from '../../utils/toast'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNewOrder } from '../../state/useNewOrder'
 import { BillingHeader } from '../../components/billing/BillingHeader'
 import {
   BillPanel,
@@ -15,19 +16,30 @@ import {
 import { AlertDialog } from '../../components/billing/AlertDialog'
 import { CategoryRail } from '../../components/billing/CategoryRail'
 import { ItemGrid } from '../../components/billing/ItemGrid'
+import { VirtualKeyboard } from '../../components/common/VirtualKeyboard'
 import { KotView } from '../../components/billing/KotView'
-import { FinalBillCustomerModal } from '../../components/billing/FinalBillCustomerModal'
 import { DummyBillModal, type DummyBillData } from '../../components/billing/DummyBillModal'
 
 import { OpenItemModal } from '../../components/billing/OpenItemModal'
-import { OtherPaymentModal, type OtherPaymentDetails } from '../../components/billing/OtherPaymentModal'
+import { ItemOptionsModal } from '../../components/billing/ItemOptionsModal'
+import { matchMenuItemId, type PricedSelection } from '../../utils/itemOptions'
+import {
+  OTHER_PAYMENT_TYPES,
+  type OtherPaymentDetails,
+  type OtherPaymentType,
+} from '../../components/billing/OtherPaymentModal'
 import { OrderNotesModal } from '../../components/billing/OrderNotesModal'
 import { DraftBillsModal } from '../../components/billing/DraftBillsModal'
 import { SaveDraftNameModal } from '../../components/billing/SaveDraftNameModal'
 import { PartPaymentView } from '../../components/billing/PartPaymentView'
 import { SplitBillModal } from '../../components/billing/SplitBillModal'
 import { KOTPrintTemplate } from '../../components/billing/KOTPrintTemplate'
-import { BillReceipt } from '../../components/billing/BillReceipt'
+import {
+  BillReceipt,
+  type ReceiptCharges,
+  type ReceiptItem,
+  type ReceiptMeta,
+} from '../../components/billing/BillReceipt'
 import {
   type MenuItemRow,
   useBillingMenu,
@@ -48,6 +60,8 @@ import {
   createOrderApi,
   deleteDraftBillApi,
   getKotApi,
+  getAdvanceOrderApi,
+  completeAdvanceOrderApi,
   getOrderApi,
   kotEventToTicket,
   listDraftBillsApi,
@@ -58,11 +72,14 @@ import {
   splitOrderApi,
   updateDraftBillApi,
   updateOrderApi,
+  type AdvanceOrderDto,
   type CreateKotPayload,
   type KotEventData,
   type KotOrderType,
   type OrderDto,
+  updateKotApi,
 } from '../../services/orderService'
+import { isServerBackedKotId } from '../../utils/kotListStore'
 import {
   getItemInitials,
   itemNameMatchesQuery,
@@ -72,6 +89,7 @@ import {
 import { recordCoverSize } from '../../utils/coverSizeStore'
 import { randomDisplayToken } from '../customer-screen/customerDisplayData'
 import {
+  toDraftBill,
   toDraftBillPayload,
   type DraftBill,
 } from '../../utils/draftBillStore'
@@ -103,11 +121,16 @@ import { syncKotStoreFromServer } from '../../utils/kotStoreSync'
 import {
   computeTax,
   DEFAULT_TAX_SETTINGS,
-  type TaxableItem,
+  OpenItemAwareTaxSource,
   type TaxBreakdownLine,
   type TaxSettings,
 } from '../../utils/taxEngine'
 import { useOutletSettings } from '../../services/useOutletSettings'
+import { useFavoriteItems } from '../../state/useFavoriteItems'
+import { useMenuReference } from '../../state/MenuReferenceContext'
+import { useDisplaySettings } from '../../services/useDisplaySettings'
+import { useMenuOnRight } from '../../state/useMenuOnRight'
+import { updateItemApi } from '../../services/menuService'
 
 const FAVORITES_ID = 'favorites'
 const ALL_CATEGORIES_ID = 'all-categories'
@@ -144,12 +167,17 @@ function orderTypeForApi(orderType: OrderType): 'dine-in' | 'delivery' | 'pick-u
   }
 }
 
-function paymentTypeLabel(method: PaymentMethod, otherType?: string): string {
+function paymentTypeLabel(
+  method: PaymentMethod,
+  otherType?: string,
+  cardOption?: string,
+): string {
   switch (method) {
     case 'cash':
       return 'Cash'
     case 'card':
-      return 'Card'
+      // The bank / card type picked in billing travels with the payment: "Card - HDFC".
+      return cardOption?.trim() ? `Card - ${cardOption.trim()}` : 'Card'
     case 'due':
       return 'Due'
     case 'part':
@@ -168,20 +196,18 @@ function normalizeCustomerMobile(value: string): string {
   return digits.slice(0, 10)
 }
 
+// Name and mobile are optional; when given they must still be well-formed.
 function isCustomerComplete(customer: CustomerDetails) {
-  const nameLen = customer.name.trim().length
-  return (
-    normalizeCustomerMobile(customer.mobile).length === 10 &&
-    nameLen >= 3 &&
-    nameLen <= 12
-  )
+  const errors = customerFieldErrors(customer)
+  return !errors.mobile && !errors.name
 }
 
 function customerFieldErrors(customer: CustomerDetails) {
   const nameLen = customer.name.trim().length
+  const mobileLen = normalizeCustomerMobile(customer.mobile).length
   return {
-    mobile: normalizeCustomerMobile(customer.mobile).length !== 10,
-    name: nameLen < 3 || nameLen > 12,
+    mobile: mobileLen !== 0 && mobileLen !== 10,
+    name: nameLen !== 0 && (nameLen < 3 || nameLen > 12),
   }
 }
 
@@ -214,8 +240,16 @@ function findBySearchQuery(
   return matches[0]
 }
 
+interface SplitReceipt {
+  meta: ReceiptMeta
+  items: ReceiptItem[]
+  charges: ReceiptCharges
+  paymentMode: string
+}
+
 export default function Billing() {
   const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
   const { user, encryptedOutletId, token } = useAuth()
   const billerName = user?.name?.trim() || user?.identifier?.trim() || ''
   const [searchParams] = useSearchParams()
@@ -229,6 +263,7 @@ export default function Billing() {
     categoriesStatus: menuCategoriesStatus,
     categoriesError: menuCategoriesError,
     reload: reloadMenu,
+    setItemFavorite,
   } = useBillingMenu()
   // Items and reference categories are two independent fetches, and the rail is
   // built from the categories list. Gating on the items status alone let a
@@ -259,13 +294,19 @@ export default function Billing() {
   }, [calcSettings])
 
   /** Menu rows keyed by item id — the tax slabs the engine prices lines with. */
+  const { taxes: outletTaxes } = useMenuReference(['taxes'])
+  const display = useDisplaySettings()
+  const { cartPosition } = display
   const taxSource = useMemo(() => {
-    const map = new Map<string, TaxableItem>()
+    // An open item has no menu row, so it is taxed with the outlet's own taxes.
+    const map = new OpenItemAwareTaxSource(
+      outletTaxes.filter((tax) => tax.is_active),
+    )
     for (const item of menuItems) {
       map.set(item.id, { taxes: item.taxes ?? [], ignoreTax: item.ignoreTax ?? false })
     }
     return map
-  }, [menuItems])
+  }, [menuItems, outletTaxes])
 
   const menuCategories = useMemo(
     () =>
@@ -379,6 +420,7 @@ export default function Billing() {
     grandTotal: number
     /** Tendered cash (may be lower than grandTotal → the balance books as due). */
     receivedAmount: number
+    tip?: number
     customerName: string
     customerPhone: string
     paymentLabel: string
@@ -422,6 +464,7 @@ export default function Billing() {
       discount: params.discount,
       grand_total: params.grandTotal,
       received_amount: params.receivedAmount,
+      tip: params.tip && params.tip > 0 ? params.tip : undefined,
       settlement_by: billerName || undefined,
     })
     return order
@@ -447,7 +490,7 @@ export default function Billing() {
   const [lines, setLines] = useState<CartLine[]>([])
   const [orderType, setOrderType] = useState<OrderType>(() => {
     const ot = searchParams.get('orderType')
-    if (ot === 'delivery' || ot === 'pick-up' || ot === 'dine-in' || ot === 'other') {
+    if (ot === 'pick-up' || ot === 'dine-in') {
       return ot
     }
     return 'dine-in'
@@ -463,6 +506,18 @@ export default function Billing() {
   const [loyalty, setLoyalty] = useState(false)
   const [feedbackSms, setFeedbackSms] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
+  /** Charges captured when Split was clicked — each split bill takes its share. */
+  const [splitCharges, setSplitCharges] = useState<BillChargesSnapshot | null>(
+    null,
+  )
+  /** Split bills saved with the Split dialog; Save & eBill prints them. */
+  const [splitBills, setSplitBills] = useState<SplitReceipt[]>([])
+  /** Split bills being printed; the first is on screen, closing it shows the next. */
+  const [splitPrintQueue, setSplitPrintQueue] = useState<SplitReceipt[]>([])
+  // Editing the cart after a split makes the saved shares stale.
+  useEffect(() => {
+    setSplitBills([])
+  }, [lines])
   const [partPaymentOpen, setPartPaymentOpen] = useState(false)
   const [dueAlertOpen, setDueAlertOpen] = useState(false)
   const [customerFormOpen, setCustomerFormOpen] = useState(false)
@@ -495,6 +550,8 @@ export default function Billing() {
   const [kotTickets, setKotTickets] = useState<KotTicket[]>(() =>
     loadAllKotTickets(),
   )
+  /** Walk-in KOTs sent since this screen opened (the remembered ones may be old). */
+  const sessionKotIds = useRef(new Set<string>())
 
   /**
    * KOTs the board shows. A settled ticket is hidden (`billed`) — the kitchen
@@ -522,12 +579,23 @@ export default function Billing() {
    * cleared once the money step closes it (print-then-settle, §21).
    */
   const [resumeOrderId, setResumeOrderId] = useState<string | null>(null)
-  const [otherPaymentOpen, setOtherPaymentOpen] = useState(false)
+  /**
+   * An advance booking opened from Advance Order: its items are in the cart and
+   * its advance is already paid, so only the balance is collected. Settling it
+   * closes the booking.
+   */
+  const [advanceBooking, setAdvanceBooking] = useState<{
+    id: string
+    advNo: string
+    advance: number
+  } | null>(null)
+  /** Order opened from Live/All Orders that is already paid — It's Paid shows ticked. */
+  const [paidOrderId, setPaidOrderId] = useState<string | null>(null)
+  // The card option (HDFC ...) chosen for a Card payment; '' = none.
+  const [cardOption, setCardOption] = useState('')
   const [otherPayment, setOtherPayment] = useState<OtherPaymentDetails | null>(
     null,
   )
-  const [paymentBeforeOther, setPaymentBeforeOther] =
-    useState<PaymentMethod>('cash')
   const [settlementAmount, setSettlementAmount] = useState<number | null>(null)
   /** Delivery extras captured when Save & Print / eBill is clicked. */
   const [pendingCharges, setPendingCharges] =
@@ -623,7 +691,7 @@ export default function Billing() {
       }
     }
     const ot = searchParams.get('orderType')
-    if (ot === 'delivery' || ot === 'pick-up' || ot === 'dine-in' || ot === 'other') {
+    if (ot === 'pick-up' || ot === 'dine-in') {
       setOrderType(ot)
     }
     if (searchParams.get('kot') === '1') {
@@ -664,6 +732,34 @@ export default function Billing() {
         }
       }
       if (cancelled || !ticket) return
+
+      // A ticket on a paid bill is not pinned (it would be billed twice); its
+      // items are loaded into the cart so the cashier can see — and re-order —
+      // what was served.
+      if (ticket.billed) {
+        const paidTicket = ticket
+        setOrderType(paidTicket.orderType)
+        setLines(
+          paidTicket.items.map((item, index) => ({
+            id: `paid-${paidTicket.id}-${index}`,
+            itemId: item.itemId ?? matchMenuItemId(item.name, menuItems),
+            name: item.name,
+            price: item.price,
+            qty: item.qty,
+            note: item.note || undefined,
+          })),
+        )
+        if (paidTicket.customerName) {
+          setCustomer((prev) =>
+            prev.name.trim()
+              ? prev
+              : { ...prev, name: paidTicket.customerName ?? '' },
+          )
+        }
+        setKotViewOpen(false)
+        navigate('/billing', { replace: true })
+        return
+      }
 
       setOrderType(ticket.orderType)
       let nextTableId = ''
@@ -716,8 +812,104 @@ export default function Billing() {
     openKotTableIdFromUrl,
     encryptedOutletId,
     tablesById,
+    menuItems,
     navigate,
   ])
+
+  /** Deep-link from the header's On Hold drawer -> resume that held (draft) bill. */
+  const resumeDraftId = searchParams.get('resumeDraft')
+  useEffect(() => {
+    if (!resumeDraftId || !encryptedOutletId) return
+    let cancelled = false
+    listDraftBillsApi(encryptedOutletId)
+      .then((rows) => {
+        if (cancelled) return
+        const draft = rows.map(toDraftBill).find((row) => row.id === resumeDraftId)
+        if (draft) resumeDraft(draft)
+        else showToast('That held bill is no longer available')
+      })
+      .catch(() => {
+        if (!cancelled) showToast('Could not open the held bill')
+      })
+      .finally(() => {
+        if (!cancelled) navigate('/billing', { replace: true })
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeDraftId, encryptedOutletId])
+
+  /** Deep-link from Advance Order → load that booking into the cart to settle it. */
+  const openAdvanceId = searchParams.get('openAdvance')
+  useEffect(() => {
+    if (!openAdvanceId || !encryptedOutletId || menuLoading) return
+
+    let cancelled = false
+
+    async function openAdvanceInBilling(id: string) {
+      // Yield so React Strict Mode's dev remount can cancel the first run cleanly.
+      await Promise.resolve()
+      if (cancelled) return
+
+      let booking: AdvanceOrderDto
+      try {
+        booking = await getAdvanceOrderApi(encryptedOutletId!, id)
+      } catch (error) {
+        if (!cancelled) {
+          showToast(
+            error instanceof Error
+              ? error.message
+              : 'Could not open the advance order in billing',
+          )
+        }
+        return
+      }
+      if (cancelled) return
+      if (booking.status !== 'booked' && booking.status !== 'confirmed') {
+        showToast(`Advance order ${booking.adv_order_no} is ${booking.status}`)
+        navigate('/billing', { replace: true })
+        return
+      }
+
+      setLines(
+        booking.items.map((item, index) => ({
+          id: `advance-${booking.id}-${index}`,
+          itemId: matchMenuItemId(item.name, menuItems),
+          name: item.name,
+          price: Number(item.unit_price || 0),
+          qty: Number(item.qty || 0),
+          note: item.note || undefined,
+        })),
+      )
+      if (booking.order_type === 'delivery' || booking.order_type === 'pick-up') {
+        setOrderType(booking.order_type)
+      } else {
+        setOrderType('dine-in')
+      }
+      setCustomer((prev) => ({
+        ...prev,
+        name: booking.customer_name || '',
+        mobile: booking.customer_phone || '',
+      }))
+      setPinnedKotId(null)
+      setFocusKotNo(null)
+      clearWalkInKotSession()
+      setResumeOrderId(null)
+      setAdvanceBooking({
+        id: booking.id,
+        advNo: booking.adv_order_no,
+        advance: Number(booking.advance_amount || 0),
+      })
+      showToast(`Opened advance order ${booking.adv_order_no} in billing`)
+      navigate('/billing', { replace: true })
+    }
+
+    void openAdvanceInBilling(openAdvanceId)
+    return () => {
+      cancelled = true
+    }
+  }, [openAdvanceId, encryptedOutletId, menuItems, menuLoading, navigate])
 
   /** Deep-link from Live Orders → load that order into the cart to settle it. */
   const openOrderId = searchParams.get('openOrder')
@@ -746,17 +938,19 @@ export default function Billing() {
         return
       }
       if (cancelled) return
+      if (order.status === 'cancelled') {
+        showToast(`Order ${order.order_no} is cancelled and cannot be opened in billing`)
+        navigate('/billing', { replace: true })
+        return
+      }
 
       // Order items are a name/qty/price snapshot with no menu FK, so the menu
       // row is matched by name to recover the tax slabs the bill panel prices
       // lines with. An unmatched item still bills, just untaxed.
-      const menuIdByName = new Map(
-        menuItems.map((item) => [item.name.trim().toLowerCase(), item.id]),
-      )
       setLines(
         order.items.map((item, index) => ({
           id: `order-${order.id}-${index}`,
-          itemId: menuIdByName.get(item.name.trim().toLowerCase()) ?? '',
+          itemId: matchMenuItemId(item.name, menuItems),
           name: item.name,
           price: Number(item.unit_price || 0),
           qty: Number(item.qty || 0),
@@ -784,6 +978,9 @@ export default function Billing() {
       setFocusKotNo(null)
       clearWalkInKotSession()
       setResumeOrderId(order.id)
+      const alreadyPaid = order.status === 'paid'
+      setPaidOrderId(alreadyPaid ? order.id : null)
+      setItsPaid(alreadyPaid)
       if (toastedOpenOrderRef.current !== id) {
         toastedOpenOrderRef.current = id
         showToast(`Opened order ${order.order_no} in billing`)
@@ -797,19 +994,73 @@ export default function Billing() {
     }
   }, [openOrderId, encryptedOutletId, menuItems, menuLoading, navigate])
 
-  const favoriteIds = useMemo(
-    () =>
-      new Set(
-        menuItems
-          .filter((i) => i.isFavorite)
-          .slice(0, 12)
-          .map((i) => i.id),
-      ),
-    [menuItems],
-  )
+  // Display settings: menu on the right of the bill (Touch Screen layout only).
+  const menuOnRight = useMenuOnRight()
+  // Manual favorites first, then best sellers fill the outlet's favorite slots.
+  const {
+    favoriteIds,
+    slots: favoriteSlots,
+    pinnedCount: pinnedFavoriteCount,
+  } = useFavoriteItems(menuItems)
+
+  /**
+   * Heart on a menu card. Red = the item is in Favorite Items, marked by hand
+   * or put there by its sales. Clicking a red heart removes it (and stops
+   * best sellers re-adding it); clicking a grey one adds it by hand.
+   */
+  async function toggleFavorite(item: MenuItemRow) {
+    if (!encryptedOutletId) return
+    const next = !favoriteIds.has(item.id)
+    if (next && pinnedFavoriteCount >= favoriteSlots) {
+      showToast(
+        `Favorite Items is full (${favoriteSlots}). Remove one, or raise "Favorite items shown" in Display settings.`,
+      )
+      return
+    }
+    const previous = {
+      favorite: Boolean(item.isFavorite),
+      excluded: Boolean(item.excludeFromAutoFavorites),
+    }
+    // Adding clears any earlier removal; removing also bars the auto picks.
+    const flags = { favorite: next, excluded: !next }
+    setItemFavorite(item.id, flags)
+    try {
+      await updateItemApi(encryptedOutletId, item.id, {
+        flags: {
+          set_as_favorite: flags.favorite,
+          exclude_from_auto_favorites: flags.excluded,
+        },
+      })
+      showToast(
+        next
+          ? `${item.name} added to Favorite Items`
+          : `${item.name} removed from Favorite Items`,
+      )
+    } catch (error) {
+      setItemFavorite(item.id, previous)
+      showToast(
+        error instanceof Error ? error.message : 'Could not update the favorite',
+      )
+    }
+  }
 
   const filteredItems = useMemo(() => {
-    return menuItems.filter((item) => {
+    // A typed short code looks across the whole menu, not just the open category.
+    const codeLookup = shortCode.trim() !== ''
+    const byName = (a: MenuItemRow, b: MenuItemRow) => a.name.localeCompare(b.name)
+    const sorted = [...menuItems]
+    // Display Settings > Item Sorting; Custom keeps the menu's own rank order.
+    if (display.itemSorting === 'A-Z') sorted.sort(byName)
+    else if (display.itemSorting === 'Z-A') sorted.sort((a, b) => byName(b, a))
+    else if (display.itemSorting === 'Category')
+      sorted.sort((a, b) => a.categoryId.localeCompare(b.categoryId) || byName(a, b))
+    else sorted.sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
+    return sorted.filter((item) => {
+      if (codeLookup) {
+        if (!matchesShortCode(item, shortCode)) return false
+        if (search.trim() && !itemNameMatchesQuery(item.name, search)) return false
+        return true
+      }
       if (railCategoryId === FAVORITES_ID) {
         if (!favoriteIds.has(item.id)) return false
       } else if (railCategoryId === ALL_CATEGORIES_ID) {
@@ -823,33 +1074,61 @@ export default function Billing() {
       if (search.trim()) {
         if (!itemNameMatchesQuery(item.name, search)) return false
       }
-      if (shortCode.trim()) {
-        if (!matchesShortCode(item, shortCode)) return false
-      }
       return true
     })
-  }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds, menuItems])
+  }, [railCategoryId, dropdownCategory, search, shortCode, favoriteIds, menuItems, display.itemSorting])
 
 
-  function addItem(item: MenuItemRow) {
-    if (!item.available) return
+  // An item with variations / add-ons waits here for the cashier's choices.
+  const [optionsItem, setOptionsItem] = useState<MenuItemRow | null>(null)
+
+  function addConfiguredItem(item: MenuItemRow, priced: PricedSelection) {
     setLines((prev) => {
-      const existing = prev.find((line) => line.itemId === item.id)
+      const existing = prev.find(
+        (line) => line.itemId === item.id && line.optionKey === priced.key,
+      )
       if (existing) {
         return prev.map((line) =>
           line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
         )
       }
-      return [
-        ...prev,
-        {
-          id: `line-${item.id}-${Date.now()}`,
-          itemId: item.id,
-          name: item.name,
-          price: item.price,
-          qty: 1,
-        },
-      ]
+      const newLine = {
+        id: `line-${item.id}-${Date.now()}`,
+        itemId: item.id,
+        name: priced.name,
+        price: priced.price,
+        qty: 1,
+        optionKey: priced.key,
+      }
+      return cartPosition === 'top' ? [newLine, ...prev] : [...prev, newLine]
+    })
+    setOptionsItem(null)
+    showToast(`Added ${priced.name}`)
+  }
+
+  function addItem(item: MenuItemRow) {
+    if (!item.available) return
+    if (item.options) {
+      setOptionsItem(item)
+      return
+    }
+    setLines((prev) => {
+      const existing = prev.find(
+        (line) => line.itemId === item.id && !line.optionKey,
+      )
+      if (existing) {
+        return prev.map((line) =>
+          line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
+        )
+      }
+      const newLine = {
+        id: `line-${item.id}-${Date.now()}`,
+        itemId: item.id,
+        name: item.name,
+        price: item.price,
+        qty: 1,
+      }
+      return cartPosition === 'top' ? [newLine, ...prev] : [...prev, newLine]
     })
   }
 
@@ -862,16 +1141,14 @@ export default function Billing() {
           line.id === existing.id ? { ...line, qty: line.qty + 1 } : line,
         )
       }
-      return [
-        ...prev,
-        {
-          id: `line-${itemId}-${Date.now()}`,
-          itemId,
-          name: item.name,
-          price: item.price,
-          qty: 1,
-        },
-      ]
+      const newLine = {
+        id: `line-${itemId}-${Date.now()}`,
+        itemId,
+        name: item.name,
+        price: item.price,
+        qty: 1,
+      }
+      return cartPosition === 'top' ? [newLine, ...prev] : [...prev, newLine]
     })
     showToast(`Added ${item.name}`)
   }
@@ -914,6 +1191,26 @@ export default function Billing() {
     showToast(`Added ${item.name}`)
   }
 
+  async function cancelKot(id: string, reason: string) {
+    if (!encryptedOutletId) return
+  // Cancelling a KOT has to happen on the server too. Only hiding it here would
+  // leave it cooking on the kitchen screen and out of the dashboard's Leakage
+  // "Cancelled" count. A ticket the server never saw (a `kot-...` id) has
+  // nothing to cancel there.
+    try {
+      if (isServerBackedKotId(id)) {
+        await updateKotApi(encryptedOutletId, id, { status: 'Cancelled', reason })
+      }
+      removeKotTicket(id)
+      setKotTickets(loadAllKotTickets())
+      showToast('KOT cancelled')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Could not cancel the KOT',
+      )
+    }
+  }
+
   function changeQty(lineId: string, qty: number) {
     if (qty < 1) {
       setLines((prev) => prev.filter((line) => line.id !== lineId))
@@ -954,8 +1251,10 @@ export default function Billing() {
       return
     }
     if (method === 'other') {
-      setPaymentBeforeOther(payment === 'other' ? 'cash' : payment)
-      setOtherPaymentOpen(true)
+      // No popup: the platform is picked from the dropdown under the bar.
+      setPayment('other')
+      setPartPaymentOpen(false)
+      setOtherPayment((prev) => prev ?? { type: OTHER_PAYMENT_TYPES[0], note: '' })
       return
     }
     if (method === 'due') {
@@ -974,6 +1273,7 @@ export default function Billing() {
       setPayment('due')
       setPartPaymentOpen(false)
       setOtherPayment(null)
+      setCardOption('')
       return
     }
     setPayment(method)
@@ -983,9 +1283,11 @@ export default function Billing() {
     setCustomerErrors({})
     setCustomer(EMPTY_CUSTOMER)
     setOtherPayment(null)
+    setCardOption('')
   }
 
   function appendWalkInKotId(id: string) {
+    sessionKotIds.current.add(id)
     setWalkInKotIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
   }
 
@@ -1005,6 +1307,7 @@ export default function Billing() {
     setGuests(0)
     setComplimentary(false)
     setItsPaid(false)
+    setAdvanceBooking(null)
     setLoyalty(false)
     setFeedbackSms(false)
     setCustomer(EMPTY_CUSTOMER)
@@ -1013,9 +1316,28 @@ export default function Billing() {
     setCustomerFormOpen(false)
     setSettlementAmount(null)
     setOtherPayment(null)
+    setCardOption('')
     setActiveDraftId(null)
     setResumeOrderId(null)
   }
+
+  // Emptying the cart of a resumed held bill (Delete All, or removing the last item)
+  // discards it: drop the held copy and the customer / note it carried, so the next
+  // hold starts clean and the held list no longer shows it.
+  useEffect(() => {
+    if (lines.length > 0 || !activeDraftId) return
+    if (encryptedOutletId) {
+      deleteDraftBillApi(encryptedOutletId, activeDraftId)
+        .catch(() => undefined)
+        .finally(() => void refreshDraftCount())
+    }
+    setActiveDraftId(null)
+    setCustomer(EMPTY_CUSTOMER)
+    setCustomerErrors({})
+    setShowCustomerErrors(false)
+    setOrderNote('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines.length, activeDraftId])
 
   async function refreshDraftCount() {
     if (!encryptedOutletId) return
@@ -1029,7 +1351,7 @@ export default function Billing() {
 
   async function saveCurrentAsDraft(customerName: string) {
     if (lines.length === 0) {
-      showToast('Add items before saving a draft')
+      showToast('Add items before putting a bill on hold')
       return
     }
     if (!encryptedOutletId) {
@@ -1049,28 +1371,40 @@ export default function Billing() {
         name: customerName,
       },
     })
+    const createDraft = () =>
+      saveDraftBillApi(encryptedOutletId, {
+        ...payload,
+        client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      })
     try {
-      const saved = activeDraftId
-        ? await updateDraftBillApi(encryptedOutletId, activeDraftId, payload)
-        : await saveDraftBillApi(encryptedOutletId, {
-            ...payload,
-            client_key: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          })
+      let saved
+      if (activeDraftId) {
+        try {
+          saved = await updateDraftBillApi(encryptedOutletId, activeDraftId, payload)
+        } catch (error) {
+          // The held bill this cart came from is gone (deleted from the Held Bills
+          // list, or resumed and billed elsewhere): hold it again as a new one.
+          if (!(error instanceof Error) || !/not found/i.test(error.message)) throw error
+          saved = await createDraft()
+        }
+      } else {
+        saved = await createDraft()
+      }
       setActiveDraftId(saved.id)
       await refreshDraftCount()
       setSaveDraftOpen(false)
       clearBillForNextCustomer()
-      showToast(`Draft saved for ${customerName}`)
+      showToast(`Bill put on hold for ${customerName}`)
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : 'Failed to save the draft',
+        error instanceof Error ? error.message : 'Failed to put the bill on hold',
       )
     }
   }
 
   function startSaveDraft() {
     if (lines.length === 0) {
-      showToast('Add items before saving a draft')
+      showToast('Add items before putting a bill on hold')
       return
     }
     setSaveDraftOpen(true)
@@ -1091,23 +1425,75 @@ export default function Billing() {
     setResumeOrderId(null)
     showToast(
       draft.tableNo !== 'No table'
-        ? `Draft resumed · Table ${draft.tableNo}`
-        : 'Draft resumed',
+        ? `Held bill resumed · Table ${draft.tableNo}`
+        : 'Held bill resumed',
     )
   }
 
+  // The bill is saved with the customer details already on the panel — no
+  // extra name/phone prompt. `finalBillOpen` is only the trigger now, set after
+  // the charges snapshot has been committed to state.
+  useEffect(() => {
+    if (!finalBillOpen) return
+    setFinalBillOpen(false)
+    void settleTableBill(finalBillAction, {
+      name: customer.name,
+      phone: customer.mobile,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per trigger
+  }, [finalBillOpen])
+
   function newOrder() {
-    setPinnedKotId(null)
-    setFocusKotNo(null)
-    clearWalkInKotSession()
-    setResumeOrderId(null)
-    navigate('/table-view')
+    // The cart is cleared only once a destination is chosen (the No Table /
+    // Table popup can be dismissed), and by hand because going to No Table
+    // lands on this same screen, which would otherwise keep the old bill.
+    // From the KOT view the destination is this same route, so the view is
+    // closed by hand or the button would appear to do nothing.
+    startNewOrder({
+      onNavigate: () => {
+        clearBillForNextCustomer()
+        setKotViewOpen(false)
+      },
+    })
   }
 
   const tableKotTickets = useMemo(
     () => ticketsForTable(kotTickets, tableId),
     [kotTickets, tableId],
   )
+
+  // Forget walk-in tickets that were paid elsewhere. Only tickets we can see
+  // *and* that are billed are dropped: a just-sent KOT may be in the session
+  // a beat before it reaches `kotTickets`, and must not be pruned.
+  useEffect(() => {
+    const paid = new Set(kotTickets.filter((t) => t.billed).map((t) => t.id))
+    if (paid.size === 0) return
+    setWalkInKotIds((prev) =>
+      prev.some((id) => paid.has(id)) ? prev.filter((id) => !paid.has(id)) : prev,
+    )
+    setPinnedKotId((prev) => (prev && paid.has(prev) ? null : prev))
+  }, [kotTickets])
+
+  // The counter sale's tickets are remembered across reloads, but a ticket that
+  // was sent in an earlier visit and has since been given its own bill (printed,
+  // not yet paid) belongs to THAT bill. Carrying it into a fresh bill showed a
+  // total over an empty cart. While a printed bill is being settled here
+  // (`resumeOrderId`) its tickets stay.
+  useEffect(() => {
+    if (resumeOrderId) return
+    const stale = new Set(
+      kotTickets
+        .filter(
+          (t) =>
+            t.billNo &&
+            walkInKotIds.includes(t.id) &&
+            !sessionKotIds.current.has(t.id),
+        )
+        .map((t) => t.id),
+    )
+    if (stale.size === 0) return
+    setWalkInKotIds((prev) => prev.filter((id) => !stale.has(id)))
+  }, [kotTickets, walkInKotIds, resumeOrderId])
 
   const hasTableSelected = Boolean(tableId)
 
@@ -1130,14 +1516,17 @@ export default function Billing() {
       })),
     })
 
+    // A ticket whose bill is already paid (`billed`) is finished business:
+    // the KOT view hides it, so the bill must not keep adding it up either —
+    // that was the amount that appeared with an empty cart.
     if (hasTableSelected) {
-      const base = tableKotTickets.map(toSummary)
+      const base = tableKotTickets.filter((t) => !t.billed).map(toSummary)
       if (
         pinnedKotId &&
         !base.some((row) => row.id === pinnedKotId)
       ) {
         const pinned = kotTickets.find((t) => t.id === pinnedKotId)
-        if (pinned) return [...base, toSummary(pinned)]
+        if (pinned && !pinned.billed) return [...base, toSummary(pinned)]
       }
       return base
     }
@@ -1147,13 +1536,13 @@ export default function Billing() {
     // and strand the rest as their own bills.
     const sessionTickets = walkInKotIds
       .map((id) => kotTickets.find((t) => t.id === id))
-      .filter((t): t is KotTicket => Boolean(t))
+      .filter((t): t is KotTicket => Boolean(t) && !t?.billed)
     if (sessionTickets.length > 0) {
       return sessionTickets.map(toSummary)
     }
     if (pinnedKotId) {
       const pinned = kotTickets.find((t) => t.id === pinnedKotId)
-      return pinned ? [toSummary(pinned)] : []
+      return pinned && !pinned.billed ? [toSummary(pinned)] : []
     }
     return []
   }, [
@@ -1251,6 +1640,11 @@ export default function Billing() {
     const kotKey = tableId || 'no-table'
     let printedOrderId: string | null = null
     let printedBillNo: number | null = null
+    // True once Save & eBill has handed the whole cart to the kitchen: the
+    // screen starts fresh, so this bill must not stay "open" for a reprint.
+    let cartHandedOff = false
+    // True once "It's Paid" closed the order on the server.
+    let paidNow = false
 
     let items: {
       name: string
@@ -1372,7 +1766,7 @@ export default function Billing() {
           order_type_label: labelForOrderType(orderType),
           customer_name: customerInfo.name.trim(),
           customer_phone: customerInfo.phone.trim(),
-          payment_type: paymentTypeLabel(payment, otherPayment?.type),
+          payment_type: paymentTypeLabel(payment, otherPayment?.type, cardOption),
           source: 'billing',
           my_amount: subtotal,
           tax,
@@ -1410,6 +1804,76 @@ export default function Billing() {
         if (action === 'Save & Print' || action === 'Save & eBill') {
           await reprintOrderApi(outletId, order.id)
         }
+        // A bill now exists for the advance booking opened in Billing: close
+        // the booking (the server records its advance as received on the bill).
+        // Best-effort, so a failure here does not undo the saved bill.
+        if (advanceBooking) {
+          try {
+            await completeAdvanceOrderApi(outletId, advanceBooking.id, order.id)
+          } catch {
+            showToast(
+              `Bill saved, but advance order ${advanceBooking.advNo} could not be closed`,
+            )
+          }
+          setAdvanceBooking(null)
+        }
+        // Save & Print / Save & eBill also send the cart to the kitchen and
+        // empty it. The ticket joins this bill's KOT session, so the later
+        // settle still bills it (the cart no longer holds those lines).
+        if (
+          (action === 'Save & Print' || action === 'Save & eBill') &&
+          lines.length > 0
+        ) {
+          const ticket = createKotFromLines(lines, orderNote)
+          if (ticket) {
+            try {
+              const saved = await sendKotViaApi(ticket)
+              setKotTickets(appendKotTicket(saved))
+              appendWalkInKotId(saved.id)
+              if (!saved.id.startsWith('kot-')) {
+                await adoptOrderKotsApi(outletId, order.id, [saved.id])
+              }
+              setLines([])
+              setOrderNote('')
+              cartHandedOff = true
+              // Test output: the kitchen ticket is what prints on eBill.
+              setPrintTicket({
+                ...saved,
+                customerName: customerInfo.name.trim() || saved.customerName,
+              })
+            } catch (kotError) {
+              showToast(
+                kotError instanceof Error
+                  ? `Bill saved, but the KOT failed: ${kotError.message}`
+                  : 'Bill saved, but the KOT failed',
+              )
+            }
+          }
+        }
+        // "It's Paid": close the order as paid in full with the chosen method.
+        if (itsPaid) {
+          try {
+            await settleOrderApi(outletId, order.id, {
+              payment_type: paymentTypeLabel(payment, otherPayment?.type, cardOption),
+              my_amount: subtotal,
+              tax,
+              tax_breakdown: taxBreakdown,
+              round_off: roundOffAmt,
+              discount: discountAmt,
+              grand_total: computedTotal,
+              received_amount: computedTotal,
+              settlement_by: billerName || undefined,
+            })
+            paidNow = true
+            setItsPaid(false)
+          } catch (payError) {
+            showToast(
+              payError instanceof Error
+                ? `Bill saved, but marking it paid failed: ${payError.message}`
+                : 'Bill saved, but marking it paid failed',
+            )
+          }
+        }
       } catch (error) {
         showToast(
           error instanceof Error ? error.message : 'Failed to save the bill',
@@ -1435,7 +1899,18 @@ export default function Billing() {
       refreshDraftCount()
     }
 
-    if (printedOrderId) setResumeOrderId(printedOrderId)
+    if (cartHandedOff) {
+      clearWalkInKotSession()
+      setPinnedKotId(null)
+      setFocusKotNo(null)
+      setCustomer(EMPTY_CUSTOMER)
+    } else if (paidNow) {
+      // Paid and closed — nothing left to resume, so the cart starts over.
+      setLines([])
+      setOrderNote('')
+    } else if (printedOrderId) {
+      setResumeOrderId(printedOrderId)
+    }
 
     if (action === 'Save & Print' || action === 'Save & eBill') {
       let billNoValue = String(bill)
@@ -1462,7 +1937,7 @@ export default function Billing() {
         tableNo: selectedTableNo,
         customerName: customerInfo.name,
         customerPhone: customerInfo.phone,
-        paymentLabel: paymentTypeLabel(payment, otherPayment?.type),
+        paymentLabel: paymentTypeLabel(payment, otherPayment?.type, cardOption),
         createdAt: Date.now(),
         items,
         kotCount,
@@ -1478,8 +1953,16 @@ export default function Billing() {
         customerPaid: customerPaidAmt,
         tip: tipAmt,
       }
-      setDummyBill(nextBill)
-      setDummyBillOpen(true)
+      // A saved split prints its bills on eBill, one per share.
+      if (action === 'Save & eBill' && splitBills.length > 0) {
+        setSplitPrintQueue(splitBills)
+        setSplitBills([])
+      }
+      // The eBill goes out silently; only a print shows the receipt preview.
+      if (action !== 'Save & eBill') {
+        setDummyBill(nextBill)
+        setDummyBillOpen(true)
+      }
       showToast(
         action === 'Save & eBill'
           ? `eBill #${billNoValue} generated · table printed`
@@ -1500,6 +1983,14 @@ export default function Billing() {
   ) {
     if (!encryptedOutletId) {
       showToast('No outlet selected — open Billing from the sidebar')
+      return
+    }
+    // A due balance must be filed under a named, reachable customer.
+    if (due > 0 && !isCustomerComplete(customer)) {
+      setCustomerFormOpen(true)
+      setShowCustomerErrors(true)
+      setCustomerErrors(customerFieldErrors(customer))
+      showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
       return
     }
     const money = charges ?? pendingCharges
@@ -1575,7 +2066,7 @@ export default function Billing() {
           items,
         })
         await settleOrderApi(encryptedOutletId, resumeOrderId, {
-          payment_type: paymentTypeLabel(payment, otherPayment?.type),
+          payment_type: paymentTypeLabel(payment, otherPayment?.type, cardOption),
           my_amount: subtotal,
           tax,
           tax_breakdown: taxBreakdown,
@@ -1583,6 +2074,7 @@ export default function Billing() {
           discount: discountAmt,
           grand_total: billTotal,
           received_amount: amount,
+          tip: money?.tip && money.tip > 0 ? money.tip : undefined,
           settlement_by: billerName || undefined,
         })
       } catch (error) {
@@ -1661,8 +2153,13 @@ export default function Billing() {
               },
             ]
           : []
+      // An advance booking was part-paid up front: the bill is the balance
+      // tendered now plus that advance, and the advance counts as received.
+      const advanceCredit = advanceBooking
+        ? Math.min(advanceBooking.advance, money?.billTotal ?? advanceBooking.advance)
+        : 0
       try {
-        await createAndSettleServerOrder({
+        const settledOrder = await createAndSettleServerOrder({
           orderType,
           items,
           subtotal,
@@ -1675,16 +2172,33 @@ export default function Billing() {
           // received_amount and wipe balance_due, so the due would never
           // reach the customer ledger (§5) - the toast below would promise a
           // due the API never booked.
-          grandTotal: Math.round((amount + due) * 100) / 100,
-          receivedAmount: amount,
+          grandTotal: Math.round((amount + due + advanceCredit) * 100) / 100,
+          receivedAmount: Math.round((amount + advanceCredit) * 100) / 100,
+          tip: money?.tip,
           customerName: customer.name,
           customerPhone: customer.mobile,
-          paymentLabel: paymentTypeLabel(payment, otherPayment?.type),
+          paymentLabel: paymentTypeLabel(payment, otherPayment?.type, cardOption),
           kots,
           adoptKotIds: tableKotSummary
             .map((kot) => kot.id)
             .filter((id) => !id.startsWith('kot-')),
         })
+        if (advanceBooking) {
+          // The bill is settled; closing the booking is best-effort, so a
+          // failure here must not look like the payment failed.
+          try {
+            await completeAdvanceOrderApi(
+              encryptedOutletId,
+              advanceBooking.id,
+              settledOrder.id,
+            )
+          } catch {
+            showToast(
+              `Bill settled, but advance order ${advanceBooking.advNo} could not be closed`,
+            )
+          }
+          setAdvanceBooking(null)
+        }
       } catch (error) {
         showToast(
           error instanceof Error ? error.message : 'Failed to save the bill',
@@ -1748,10 +2262,11 @@ export default function Billing() {
         orderTypeLabel: labelForOrderType(orderType),
         tickets: kotsSnapshot,
         tax: kotTaxTotals(kotsSnapshot),
-        paymentLabel: paymentTypeLabel(payment, otherPayment?.type),
+        paymentLabel: paymentTypeLabel(payment, otherPayment?.type, cardOption),
         customerName: customer.name,
         customerPhone: customer.mobile,
         settlementBy: billerName || undefined,
+        tip: pendingCharges?.tip,
         grandTotal: amount,
       })
     } catch (error) {
@@ -1776,7 +2291,6 @@ export default function Billing() {
     showToast(
       `Settled ₹${amount} · sent to kitchen${due > 0 ? ` · Due ₹${due}` : ''}`,
     )
-    navigate('/billing/all-orders')
   }
 
   async function startFinalBill(action: 'Save' | 'Save & Print' | 'Save & eBill') {
@@ -1789,7 +2303,7 @@ export default function Billing() {
         setCustomerFormOpen(true)
         setShowCustomerErrors(true)
         setCustomerErrors(customerFieldErrors(customer))
-        showToast('Customer details are compulsory for Due payment')
+        showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
         return
       }
       setFinalBillAction(action)
@@ -1806,7 +2320,7 @@ export default function Billing() {
       setCustomerFormOpen(true)
       setShowCustomerErrors(true)
       setCustomerErrors(customerFieldErrors(customer))
-      showToast('Customer details are compulsory for Due payment')
+      showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
       return
     }
 
@@ -1837,6 +2351,19 @@ export default function Billing() {
     action: string,
     charges?: BillChargesSnapshot,
   ) {
+    // Display Settings > No. of Persons Mandatory (dine-in, before anything is sent).
+    if (
+      display.personsMandatory &&
+      orderType === 'dine-in' &&
+      !resumeOrderId &&
+      lines.length > 0 &&
+      guests <= 0 &&
+      (tablesById[tableId]?.persons ?? 0) <= 0 &&
+      ['Save', 'Save & Print', 'Save & eBill', 'KOT', 'KOT & Print'].includes(action)
+    ) {
+      showToast('Enter the number of persons before saving')
+      return
+    }
     // A printed or Live Orders bill already exists on the server. Plain Save
     // would create a second order and strand it, so it is refused; the print
     // actions are fine, because printing an existing bill is a reprint.
@@ -1852,13 +2379,99 @@ export default function Billing() {
         showToast('No outlet selected — open Billing from the sidebar')
         return
       }
+      // "It's Paid" on an already-punched bill closes that bill as paid — it
+      // must not print it a second time.
+      if (itsPaid && charges && resumeOrderId !== paidOrderId) {
+        setItsPaid(false)
+        const payable = Number.isFinite(charges.billTotal)
+          ? charges.billTotal
+          : charges.settlementTotal
+        await finalizeTableSettlement(payable, 0, charges)
+        return
+      }
       try {
+        // The cart of a reopened bill stays editable, so items added after it
+        // was opened are written back to the order before it is printed —
+        // otherwise the printed bill and All Orders would not show them.
+        const billedKots = tableKotSummary
+        const syncItems = [
+          ...lines.map((line) => ({
+            name: line.name,
+            qty: line.qty,
+            unit_price: line.price,
+            total_price: Math.round(line.price * line.qty * 100) / 100,
+          })),
+          ...billedKots.flatMap((kot) =>
+            kot.items.map((item) => ({
+              name: item.name,
+              qty: item.qty,
+              unit_price: item.price,
+              total_price: Math.round(item.price * item.qty * 100) / 100,
+            })),
+          ),
+        ]
+        if (charges && syncItems.length > 0) {
+          const billedKotIds = billedKots
+            .map((kot) => kot.id)
+            .filter((id) => !id.startsWith('kot-'))
+          if (billedKotIds.length > 0) {
+            await adoptOrderKotsApi(encryptedOutletId, resumeOrderId, billedKotIds)
+          }
+          const subtotal = syncItems.reduce(
+            (sum, item) => sum + item.unit_price * item.qty,
+            0,
+          )
+          await updateOrderApi(encryptedOutletId, resumeOrderId, {
+            action: 'edit',
+            customer_name: customer.name.trim(),
+            customer_phone: customer.mobile.trim(),
+            my_amount: subtotal,
+            tax: charges.tax,
+            tax_breakdown: charges.taxBreakdown,
+            round_off: charges.roundOff,
+            discount: charges.discount,
+            grand_total: Number.isFinite(charges.billTotal)
+              ? charges.billTotal
+              : subtotal,
+            items: syncItems,
+          })
+        }
         const order = await allocateBillNoApi(
           encryptedOutletId,
           resumeOrderId,
           orderTypeForApi(orderType),
         )
         await reprintOrderApi(encryptedOutletId, resumeOrderId)
+        if (action === 'Save & eBill' && splitBills.length > 0) {
+          setSplitPrintQueue(splitBills)
+          setSplitBills([])
+        }
+        // eBill prints the kitchen ticket, not the bill: send the cart as a
+        // KOT on this order (same as a fresh counter eBill) instead of
+        // announcing a reprint.
+        if (action === 'Save & eBill' && lines.length > 0) {
+          const ticket = createKotFromLines(lines, orderNote)
+          if (ticket) {
+            const saved = await sendKotViaApi(ticket)
+            setKotTickets(appendKotTicket(saved))
+            if (!saved.id.startsWith('kot-')) {
+              await adoptOrderKotsApi(encryptedOutletId, resumeOrderId, [saved.id])
+            }
+            setLines([])
+            setOrderNote('')
+            clearWalkInKotSession()
+            setPinnedKotId(null)
+            setFocusKotNo(null)
+            setCustomer(EMPTY_CUSTOMER)
+            setResumeOrderId(null)
+            setPrintTicket({
+              ...saved,
+              customerName: customer.name.trim() || saved.customerName,
+            })
+            showToast(`eBill · KOT ${saved.kotNo} sent · order ${order.order_no}`)
+            return
+          }
+        }
         showToast(
           `Bill #${order.bill_no ?? ''} ready to reprint · order ${order.order_no}`,
         )
@@ -1874,6 +2487,7 @@ export default function Billing() {
         showToast('Add items before splitting the bill')
         return
       }
+      setSplitCharges(charges ?? null)
       setSplitOpen(true)
       return
     }
@@ -1887,7 +2501,7 @@ export default function Billing() {
         setCustomerFormOpen(true)
         setShowCustomerErrors(true)
         setCustomerErrors(customerFieldErrors(customer))
-        showToast('Customer details are compulsory for Due payment')
+        showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
         return
       }
 
@@ -1906,9 +2520,24 @@ export default function Billing() {
       setKotTickets(next)
       setLines([])
       setOrderNote('')
-      // No table: the new KOT joins the billable session — otherwise it is
-      // billed as its own second bill.
-      if (!hasTableSelected) appendWalkInKotId(saved.id)
+      if (!hasTableSelected) {
+        if (resumeOrderId) {
+          // A printed counter bill that was resumed already owns a server order:
+          // the new KOT joins that bill (written back below), or it would be
+          // billed as its own second bill.
+          appendWalkInKotId(saved.id)
+        } else {
+          // A plain counter KOT is settled from the KOT screen, so Billing starts
+          // fresh: nothing sent here is merged into this screen's Total, which
+          // reads 0 until new items are added. A ticket opened from the KOT
+          // screen is dropped too, or its amount would still show.
+          clearWalkInKotSession()
+          setPinnedKotId(null)
+          setFocusKotNo(null)
+          // The name belonged to that order — the next one starts blank.
+          setCustomer(EMPTY_CUSTOMER)
+        }
+      }
       // A printed counter bill already owns an order: write the KOT session
       // back into it right away, so a later reprint shows this ticket and the
       // settle adopts it instead of leaving it to be billed a second time.
@@ -1966,7 +2595,7 @@ export default function Billing() {
         setCustomerFormOpen(true)
         setShowCustomerErrors(true)
         setCustomerErrors(customerFieldErrors(customer))
-        showToast('Customer details are compulsory for Due payment')
+        showToast('Enter a valid customer name (3–12 letters) and 10-digit mobile')
         return
       }
 
@@ -1983,7 +2612,7 @@ export default function Billing() {
       return
     }
 
-    if (action === 'Draft') {
+    if (action === 'Hold') {
       startSaveDraft()
       return
     }
@@ -2027,48 +2656,22 @@ export default function Billing() {
         }}
       />
 
+      {optionsItem ? (
+        <ItemOptionsModal
+          item={optionsItem}
+          onClose={() => setOptionsItem(null)}
+          onConfirm={(priced) => addConfiguredItem(optionsItem, priced)}
+          checkAddonLimits={display.addonMinMax}
+          autoAdd={display.autoAddFromPopup}
+        />
+      ) : null}
+
+      <VirtualKeyboard />
+
       <OpenItemModal
         open={openItemModalOpen}
         onClose={() => setOpenItemModalOpen(false)}
         onSave={addOpenItem}
-      />
-
-      <OtherPaymentModal
-        open={otherPaymentOpen}
-        initial={otherPayment ?? undefined}
-        onNo={() => {
-          setOtherPaymentOpen(false)
-          if (payment !== 'other') {
-            setPayment(paymentBeforeOther)
-          }
-        }}
-        onYes={(details) => {
-          setOtherPayment(details)
-          setPayment('other')
-          setOtherPaymentOpen(false)
-          setPartPaymentOpen(false)
-          showToast(`Other payment · ${details.type}`)
-        }}
-      />
-
-      <FinalBillCustomerModal
-        open={finalBillOpen}
-          kotCount={tableKotSummary.length}
-        total={payableTotal}
-        tableNo={selectedTableNo}
-        confirmLabel={
-          finalBillAction === 'Save & eBill'
-            ? 'Generate eBill'
-            : finalBillAction === 'Save'
-              ? 'Save Bill'
-              : 'Generate Bill'
-        }
-        initial={{ name: customer.name, phone: customer.mobile }}
-        onClose={() => {
-          setFinalBillOpen(false)
-          setPendingCharges(null)
-        }}
-        onConfirm={(info) => settleTableBill(finalBillAction, info)}
       />
 
       {dummyBillOpen && dummyBill ? (
@@ -2087,6 +2690,7 @@ export default function Billing() {
                   ? `${labelForOrderType(orderType)} · ${selectedTableNo}`
                   : labelForOrderType(orderType),
               cashier: billerName,
+              customerName: dummyBill.customerName,
             }}
             items={dummyBill.items.map((item) => ({
               name: item.name,
@@ -2147,7 +2751,7 @@ export default function Billing() {
                     order_type_label: labelForOrderType(orderType),
                     customer_name: customer.name,
                     customer_phone: customer.mobile,
-                    payment_type: paymentTypeLabel(payment, otherPayment?.type),
+                    payment_type: paymentTypeLabel(payment, otherPayment?.type, cardOption),
                     items: lines
                       .filter((line) => group.includes(line.id))
                       .map((line) => ({
@@ -2172,7 +2776,83 @@ export default function Billing() {
             }
           }
           setSplitOpen(false)
-          ensureBillNo()
+          const splitBillNo = ensureBillNo()
+          // One printed bill per share: every share carries the same fraction
+          // of the taxes, discount and charges as of the bill it was cut from.
+          const round2 = (n: number) => Math.round(n * 100) / 100
+          const kotRows = tableKotSummary.flatMap((kot) =>
+            kot.items.map((item) => ({
+              name: item.name,
+              qty: item.qty,
+              price: item.price,
+            })),
+          )
+          const allRows = [...lines, ...kotRows]
+          const billSubtotal = allRows.reduce(
+            (sum, row) => sum + row.price * row.qty,
+            0,
+          )
+          if (billSubtotal > 0 && payableTotal > 0) {
+            const shares =
+              mode === 'item' && itemGroups
+                ? itemGroups.map((group) => {
+                    const rows = lines.filter((line) => group.includes(line.id))
+                    const sub = rows.reduce(
+                      (sum, row) => sum + row.price * row.qty,
+                      0,
+                    )
+                    return { rows, ratio: sub / billSubtotal, scaleRows: false }
+                  })
+                : amounts.map((amount) => ({
+                    rows: allRows,
+                    ratio: amount / payableTotal,
+                    scaleRows: true,
+                  }))
+            const c = splitCharges
+            const when = new Date()
+            const label = hasTableSelected && selectedTableNo
+              ? `${labelForOrderType(orderType)} · ${selectedTableNo}`
+              : labelForOrderType(orderType)
+            setSplitBills(
+              shares.map((share, index) => ({
+                meta: {
+                  billNo: `${splitBillNo}-${index + 1}`,
+                  date: when.toLocaleDateString('en-IN'),
+                  time: when.toLocaleTimeString('en-IN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                  }),
+                  orderType: `${label} · Split ${index + 1}/${shares.length}`,
+                  cashier: billerName,
+                  customerName: customer.name,
+                },
+                items: share.rows.map((row) => ({
+                  name: row.name,
+                  qty: row.qty,
+                  rate: share.scaleRows
+                    ? round2(row.price * share.ratio)
+                    : row.price,
+                })),
+                charges: {
+                  taxBreakdown: (c?.taxBreakdown ?? []).map((row) => ({
+                    ...row,
+                    amount: round2(row.amount * share.ratio),
+                  })),
+                  roundOff: round2((c?.roundOff ?? 0) * share.ratio),
+                  discount: round2((c?.discount ?? 0) * share.ratio),
+                  deliveryCharge: round2((c?.deliveryCharge ?? 0) * share.ratio),
+                  containerCharge: round2(
+                    (c?.containerCharge ?? 0) * share.ratio,
+                  ),
+                  customerPaid: round2((c?.customerPaid ?? 0) * share.ratio),
+                  tip: round2((c?.tip ?? 0) * share.ratio),
+                  showDeliveryExtras: orderType === 'delivery',
+                },
+                paymentMode: paymentTypeLabel(payment, otherPayment?.type, cardOption),
+              })),
+            )
+          }
           const summary = amounts.map((a) => `₹${a.toFixed(2)}`).join(' + ')
           const label =
             mode === 'portion'
@@ -2180,7 +2860,9 @@ export default function Billing() {
               : mode === 'percentage'
                 ? 'Percentage'
                 : 'Item'
-          showToast(`Bill split (${label}): ${summary}${serverNote}`)
+          showToast(
+            `Bill split saved (${label}): ${summary}${serverNote} · Save & eBill to print`,
+          )
         }}
       />
 
@@ -2260,6 +2942,7 @@ export default function Billing() {
               )
             }
           }}
+          onCancelKot={cancelKot}
           onDismiss={(id) => {
             markKotDismissed(id)
             setKotTickets((prev) => prev.filter((t) => t.id !== id))
@@ -2301,8 +2984,9 @@ export default function Billing() {
                   result.otherType,
                 ),
                 customerName: result.customerName || settled[0]?.customerName || '',
-                customerPhone: '',
+                customerPhone: result.customerPhone,
                 settlementBy: billerName || undefined,
+                tip: result.tip,
                 grandTotal: result.settlementAmount,
               })
             } catch (error) {
@@ -2332,11 +3016,14 @@ export default function Billing() {
                   : ''
               }${result.due > 0 ? ` · Due ₹${result.due}` : ''}`,
             )
-            navigate('/billing/all-orders')
           }}
         />
       ) : (
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:p-0">
+      <div
+        className={`flex min-h-0 flex-1 flex-col lg:p-0 ${
+          menuOnRight ? 'lg:flex-row-reverse' : 'lg:flex-row'
+        }`}
+      >
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-card shadow-[0_1px_0_rgba(0,0,0,0.03)]">
         {menuLoading ? (
           <div className="flex flex-1 items-center justify-center bg-page text-sm text-muted">
@@ -2381,8 +3068,14 @@ export default function Billing() {
                 name: c.name,
               }))}
               onAddItem={addItem}
+              showPrice={display.displayItemPrice}
+              showImages={display.itemImages}
+              showSearch={!display.touchLayout || display.displaySearch}
+              autoAdd={display.autoAddItems}
               selectedQtyByItemId={selectedQtyByItemId}
               showFavoriteHeart={railCategoryId === FAVORITES_ID}
+              onToggleFavorite={toggleFavorite}
+              favoriteIds={favoriteIds}
               showOpenItem={
                 railCategoryId === FAVORITES_ID ||
                 shortCode.trim() === '00' ||
@@ -2396,6 +3089,7 @@ export default function Billing() {
 
       <BillPanel
         lines={lines}
+        menuOnRight={menuOnRight}
           tableKots={tableKotSummary}
           focusKotNo={focusKotNo}
           hideSentKotRows={!hasTableSelected}
@@ -2408,6 +3102,8 @@ export default function Billing() {
           guests={guests}
           complimentary={complimentary}
           itsPaid={itsPaid}
+          advancePaid={advanceBooking?.advance ?? 0}
+          advanceNo={advanceBooking?.advNo}
           loyalty={loyalty}
           feedbackSms={feedbackSms}
           customer={customer}
@@ -2415,6 +3111,12 @@ export default function Billing() {
           customerErrors={showCustomerErrors ? customerErrors : undefined}
           onOrderTypeChange={setOrderType}
           onPaymentChange={handlePaymentChange}
+          otherPaymentType={otherPayment?.type}
+          cardOption={cardOption}
+          onCardOptionChange={setCardOption}
+          onOtherPaymentTypeChange={(type: OtherPaymentType) =>
+            setOtherPayment({ type, note: otherPayment?.note ?? '' })
+          }
           onTableIdChange={(id) => {
             setTableId(id)
             setPinnedKotId(null)
@@ -2467,7 +3169,9 @@ export default function Billing() {
             refreshDraftCount()
             setDraftsOpen(true)
           }}
-          draftCount={draftCount}
+          // A held bill that is open in the cart has been taken off hold, so it
+          // is not counted until it is put back on hold.
+          draftCount={Math.max(0, draftCount - (activeDraftId ? 1 : 0))}
         />
       </div>
       )}
@@ -2489,6 +3193,17 @@ export default function Billing() {
         onClose={() => setSaveDraftOpen(false)}
         onConfirm={saveCurrentAsDraft}
       />
+
+      {splitPrintQueue.length > 0 ? (
+        <BillReceipt
+          key={splitPrintQueue[0].meta.billNo}
+          meta={splitPrintQueue[0].meta}
+          items={splitPrintQueue[0].items}
+          charges={splitPrintQueue[0].charges}
+          paymentMode={splitPrintQueue[0].paymentMode}
+          onClose={() => setSplitPrintQueue((prev) => prev.slice(1))}
+        />
+      ) : null}
 
       {printTicket && (
         <KOTPrintTemplate

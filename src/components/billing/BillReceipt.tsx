@@ -1,3 +1,4 @@
+import { usePrintLogoUrl } from '../../services/usePrintLogo'
 import { type CSSProperties } from 'react'
 import { Printer, X } from 'lucide-react'
 import { brand } from '../../theme/brand'
@@ -28,6 +29,7 @@ export interface ReceiptMeta {
   time?: string
   orderType?: string
   cashier?: string
+  customerName?: string
 }
 
 export interface ReceiptCharges {
@@ -63,6 +65,8 @@ interface BillReceiptProps {
   charges?: ReceiptCharges
   paymentMode?: string
   footerThanks?: string
+  /** Prints the bill as CANCELLED, with the reason the cashier gave. */
+  cancelled?: { reason?: string }
   onClose?: () => void
 }
 
@@ -114,9 +118,11 @@ export function BillReceipt({
   charges,
   paymentMode = 'UPI',
   footerThanks = 'Thank you, visit again!',
+  cancelled,
   onClose,
 }: BillReceiptProps) {
   const s = { ...shopDefaults, ...shop }
+  const logoUrl = usePrintLogoUrl()
   const m = meta ?? {}
   const c = { cgstPct: 0, sgstPct: 0, roundOff: 0, ...charges }
 
@@ -184,13 +190,16 @@ export function BillReceipt({
 
       <div id="bill-receipt" style={receiptStyle}>
         <div style={headerStyle}>
+          {logoUrl ? (
+            <img src={logoUrl} alt="" style={logoStyle} />
+          ) : null}
           <div style={shopNameStyle}>{s.name}</div>
           <div style={taglineStyle}>{s.tagline}</div>
           <div style={smallStyle}>{s.address}</div>
           <div style={smallStyle}>
             Ph: {s.phone} &nbsp;|&nbsp; GSTIN: {s.gstin}
           </div>
-          <div style={billTypeStyle}>{s.billLabel}</div>
+          <div style={billTypeStyle}>{cancelled ? 'CANCELLED BILL' : s.billLabel}</div>
         </div>
 
         <div style={solidDividerStyle} />
@@ -209,6 +218,17 @@ export function BillReceipt({
           <span>Order: {m.orderType}</span>
           <span>Cashier: {m.cashier}</span>
         </div>
+        {m.customerName?.trim() ? (
+          <div style={rowStyle}>
+            <span>Customer: {m.customerName.trim()}</span>
+          </div>
+        ) : null}
+
+        {cancelled?.reason?.trim() ? (
+          <div style={rowStyle}>
+            <span>Cancel reason: {cancelled.reason.trim()}</span>
+          </div>
+        ) : null}
 
         <div style={dashedDividerStyle} />
 
@@ -423,6 +443,16 @@ const receiptStyle: CSSProperties = {
 const headerStyle: CSSProperties = {
   textAlign: 'center',
   marginBottom: 4,
+}
+
+/** The outlet's print logo, centred above the name; kept black-and-white for thermal paper. */
+const logoStyle: CSSProperties = {
+  display: 'block',
+  margin: '0 auto 6px',
+  maxWidth: '60%',
+  maxHeight: '64px',
+  objectFit: 'contain',
+  filter: 'grayscale(1) contrast(1.2)',
 }
 
 const shopNameStyle: CSSProperties = {

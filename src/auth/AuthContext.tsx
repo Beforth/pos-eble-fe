@@ -61,7 +61,7 @@ interface AuthContextValue {
   canAccess: (pathname: string) => boolean
   /**
    * First screen the user may open — admins /dashboard, cashiers the All Orders
-   * board, billers /table-view, captains the floor plan in captain mode.
+   * board, billers /billing, captains the floor plan in captain mode.
    */
   homePath: () => string
   login: (
@@ -273,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // guard: `/all-orders` is a billing screen, so a cashier stripped of the
     // billing right must not be sent somewhere ProtectedRoute would refuse.
     if (isCashierUser(user) && canAccess(ALL_ORDERS_PATH)) return ALL_ORDERS_PATH
-    for (const pathname of ['/dashboard', '/table-view', '/billing', '/profile']) {
+    for (const pathname of ['/dashboard', '/billing', '/table-view', '/profile']) {
       if (canAccess(pathname)) return pathname
     }
     return '/profile'

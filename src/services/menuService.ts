@@ -174,6 +174,29 @@ export async function deleteMenuGroupApi(outletId: string, id: EncId): Promise<u
   return jsonRequest<unknown>(menusPath(outletId, `/groups/${id}/`), 'DELETE')
 }
 
+// ── best sellers (auto-favorites) ──────────────────────────────────────────
+
+export interface BestSeller {
+  /** Encrypted menu item id — same as `Item.id`. */
+  id: EncId
+  name: string
+  /** Units sold in the window (decimal string). */
+  units: string
+  /** Average units per day since the item's first sale in the window. */
+  average_per_day: string
+}
+
+/** Best-selling menu items, best first. Read-only; never changes the menu. */
+export async function listBestSellersApi(
+  outletId: string,
+  days = 30,
+): Promise<BestSeller[]> {
+  return jsonRequest<BestSeller[]>(
+    menusPath(outletId, `/items/best-sellers/?days=${days}`),
+    'GET',
+  )
+}
+
 // ── categories ─────────────────────────────────────────────────────────────
 
 export async function listCategoriesApi(outletId: string): Promise<Category[]> {
@@ -212,7 +235,7 @@ export async function listItemsApi(outletId: string, params: ListItemsParams = {
   if (params.page) query.set('page', String(params.page))
   if (params.page_size) query.set('page_size', String(params.page_size))
   const qs = query.toString()
-  return paginatedApiRequest<Item>(menusPath(outletId, `/items/${qs ? `?${qs}` : ''}/`), {
+  return paginatedApiRequest<Item>(menusPath(outletId, `/items/${qs ? `?${qs}` : ''}`), {
     method: 'GET',
     token: authToken(),
   })
@@ -255,7 +278,7 @@ export interface SheetPreview {
  * Triggers a browser file-save; returns when the download has started.
  */
 export async function exportItemsSheetApi(outletId: string): Promise<void> {
-  await _downloadXlsx(menusPath(outletId, '/items/sheet/'), 'menu-items.xlsx')
+  await downloadXlsx(menusPath(outletId, '/items/sheet/'), 'menu-items.xlsx')
 }
 
 /**
@@ -315,7 +338,7 @@ export const SHEET_TEMPLATE_HEADERS = [
  * The server generates it so no client-side xlsx library is needed.
  */
 export async function downloadItemSheetTemplate(outletId: string): Promise<void> {
-  await _downloadXlsx(
+  await downloadXlsx(
     menusPath(outletId, '/items/sheet/?template=1'),
     'menu-items-template.xlsx',
   )
@@ -325,7 +348,7 @@ export async function downloadItemSheetTemplate(outletId: string): Promise<void>
  * Shared helper: fetch a binary xlsx from `path`, handle 401, and trigger a
  * browser file-save with `filename`. Throws `ApiError` on non-OK responses.
  */
-async function _downloadXlsx(path: string, filename: string): Promise<void> {
+export async function downloadXlsx(path: string, filename: string): Promise<void> {
   const token = authToken()
   const headers: Record<string, string> = {
     Accept:
@@ -596,7 +619,7 @@ export async function listItemCommissionsApi(outletId: string, params: { page?: 
   if (params.page) query.set('page', String(params.page))
   if (params.page_size) query.set('page_size', String(params.page_size))
   const qs = query.toString()
-  return paginatedApiRequest<ItemCommission>(menusPath(outletId, `/item-commissions/${qs ? `?${qs}` : ''}/`), {
+  return paginatedApiRequest<ItemCommission>(menusPath(outletId, `/item-commissions/${qs ? `?${qs}` : ''}`), {
     method: 'GET',
     token: authToken(),
   })
@@ -675,7 +698,7 @@ export async function listTriggerLogsApi(outletId: string, params: { page?: numb
   if (params.page) query.set('page', String(params.page))
   if (params.page_size) query.set('page_size', String(params.page_size))
   const qs = query.toString()
-  return paginatedApiRequest<MenuTriggerLog>(menusPath(outletId, `/trigger-logs/${qs ? `?${qs}` : ''}/`), {
+  return paginatedApiRequest<MenuTriggerLog>(menusPath(outletId, `/trigger-logs/${qs ? `?${qs}` : ''}`), {
     method: 'GET',
     token: authToken(),
   })

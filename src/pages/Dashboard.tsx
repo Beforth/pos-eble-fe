@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useChrome } from '../state/ChromeContext'
-import { Armchair, Bike, Package } from 'lucide-react'
+import { Armchair, Bike, Package, AlertTriangle } from 'lucide-react'
+import { useAuth } from '../auth/AuthContext'
 import type { OrderTypeKey } from '../types'
 import { ExpensesPanel } from '../components/dashboard/ExpensesPanel'
 import { ItemPerformancePanel } from '../components/dashboard/ItemPerformancePanel'
@@ -17,19 +18,16 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
 import type { DateRangeOption } from '../components/common/DatePickerPill'
+import { expenses, onlineOrders, syncStatus } from '../mocks/dashboardData'
 import {
-  channelSeries,
-  chartStatus,
-  expenses,
-  leakage,
-  lowItems,
-  onlineOrders,
-  orderTypeSummaries,
-  quickHelp,
-  salesStats,
-  syncStatus,
-  topItems,
-} from '../mocks/dashboardData'
+  getDashboardItemPerformanceApi,
+  getDashboardLeakageApi,
+  getDashboardOrderTypesApi,
+  getDashboardQuickHelpApi,
+  getDashboardSalesChartApi,
+  getDashboardTotalSalesApi,
+} from '../services/dashboardService'
+import { useDashboardMetric } from '../state/useDashboardMetric'
 import { brand } from '../theme/brand'
 import { formatDayMonth, parseInputDate } from '../utils/format'
 
@@ -50,6 +48,8 @@ function formatCustomRangeLabel(from: string, to: string): string {
 function useDatePickerState(initial = 'today') {
   const [range, setRange] = useState(initial)
   const [customLabel, setCustomLabel] = useState<string | undefined>()
+  const [customFrom, setCustomFrom] = useState<string | undefined>()
+  const [customTo, setCustomTo] = useState<string | undefined>()
 
   const handleRangeSelect = (next: string) => {
     if (next !== 'custom') setCustomLabel(undefined)
@@ -58,6 +58,8 @@ function useDatePickerState(initial = 'today') {
 
   const handleCustomRange = (from: string, to: string) => {
     setCustomLabel(formatCustomRangeLabel(from, to))
+    setCustomFrom(from)
+    setCustomTo(to)
     setRange('custom')
   }
 
@@ -67,7 +69,79 @@ function useDatePickerState(initial = 'today') {
     onSelect: handleRangeSelect,
     customLabel,
     onCustomRange: handleCustomRange,
+    customFrom,
+    customTo,
   }
+}
+
+type DatePickerState = ReturnType<typeof useDatePickerState>
+
+/**
+ * Fetch one dashboard metric and render its panel. Owns the panel's date
+ * picker state unless ``range`` is passed in; shows a skeleton while loading
+ * and an error + retry when the call fails. ``className`` is applied to the
+ * placeholders so they occupy the same grid cell as the real panel.
+ */
+function DashboardPanel<T>({
+  fetcher,
+  render,
+  label,
+  range: externalRange,
+  refreshKey,
+  className = '',
+}: {
+  fetcher: (outletId: string, from?: string, to?: string) => Promise<T>
+  render: (data: T, range: DatePickerState) => ReactNode
+  label: string
+  range?: DatePickerState
+  refreshKey?: unknown
+  className?: string
+}) {
+  const { encryptedOutletId } = useAuth()
+  const internalRange = useDatePickerState('today')
+  const range = externalRange ?? internalRange
+  const { data, loading, error, refetch } = useDashboardMetric(
+    encryptedOutletId,
+    fetcher,
+    range,
+    refreshKey,
+  )
+
+  if (loading && !data) {
+    return (
+      <section
+        aria-label={`${label} loading`}
+        className={`animate-pulse space-y-3 rounded-xl border border-line bg-card p-4 ${className}`}
+      >
+        <div className="h-4 w-1/3 rounded bg-page" />
+        <div className="h-4 w-2/3 rounded bg-page" />
+        <div className="h-4 w-1/2 rounded bg-page" />
+      </section>
+    )
+  }
+
+  if (error && !data) {
+    return (
+      <section
+        className={`flex flex-col items-center gap-2 rounded-xl border border-line bg-card p-4 text-center ${className}`}
+      >
+        <AlertTriangle size={20} className="text-danger" />
+        <p className="text-xs text-danger">
+          {label}: {error}
+        </p>
+        <button
+          type="button"
+          onClick={refetch}
+          className="inline-flex h-8 cursor-pointer items-center rounded-md border border-line bg-card px-3 text-xs font-medium text-ink hover:bg-page"
+        >
+          Retry
+        </button>
+      </section>
+    )
+  }
+
+  if (!data) return null
+  return <>{render(data, range)}</>
 }
 
 type IconTone = 'primary' | 'accent' | 'success'
@@ -87,11 +161,10 @@ export default function Dashboard() {
   const [supportOpen, setSupportOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [actionCenterOpen, setActionCenterOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const salesDatePicker = useDatePickerState('today')
   const onlineOrdersDatePicker = useDatePickerState('today')
-  const leakageDatePicker = useDatePickerState('today')
-  const itemPerfDatePicker = useDatePickerState('today')
   const expensesDatePicker = useDatePickerState('today')
 
   const closeOtherDrawers = () => {
@@ -156,7 +229,7 @@ export default function Dashboard() {
             { label: 'POS', minutesAgo: syncStatus.posSyncedMinutesAgo },
             { label: 'Orders', minutesAgo: syncStatus.ordersSyncedMinutesAgo },
           ]}
-          onRefresh={() => salesDatePicker.onSelect(salesDatePicker.value)}
+          onRefresh={() => setRefreshKey((k) => k + 1)}
         >
           {/*
             PetPooja-style grid:
@@ -166,42 +239,81 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
             <div className="space-y-4 xl:col-span-8">
               <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
-                <SalesStatCard stats={salesStats} />
-                <SalesChartCard
-                  series={channelSeries}
-                  status={chartStatus}
-                  totalOrders={salesStats.totalOrders}
+                <DashboardPanel
+                  fetcher={getDashboardTotalSalesApi}
+                  label="Total Sales"
+                  range={salesDatePicker}
+                  refreshKey={refreshKey}
+                  render={(stats) => <SalesStatCard stats={stats} />}
+                />
+                <DashboardPanel
+                  fetcher={getDashboardSalesChartApi}
+                  label="Sales"
+                  range={salesDatePicker}
+                  refreshKey={refreshKey}
                   className="lg:col-span-2"
-                  {...salesDatePicker}
+                  render={({ series, status, totalOrders }, range) => (
+                    <SalesChartCard
+                      series={series}
+                      status={status}
+                      totalOrders={totalOrders}
+                      className="lg:col-span-2"
+                      {...range}
+                    />
+                  )}
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                {orderTypeSummaries.map((summary) => {
-                  const meta = orderTypeIcons[summary.key]
-                  return (
-                    <OrderTypeCard
-                      key={summary.key}
-                      summary={summary}
-                      icon={meta.icon}
-                      iconTone={meta.tone}
-                    />
-                  )
-                })}
-              </div>
+              <DashboardPanel
+                fetcher={getDashboardOrderTypesApi}
+                label="Order Types"
+                range={salesDatePicker}
+                refreshKey={refreshKey}
+                render={(rows) => (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    {rows.map((summary) => {
+                      const meta = orderTypeIcons[summary.key as OrderTypeKey]
+                      if (!meta) return null
+                      return (
+                        <OrderTypeCard
+                          key={summary.key}
+                          summary={summary}
+                          icon={meta.icon}
+                          iconTone={meta.tone}
+                        />
+                      )
+                    })}
+                  </div>
+                )}
+              />
 
+              {/* Online Orders: no backend source yet - mock data. */}
               <OnlineOrdersPanel data={onlineOrders} {...onlineOrdersDatePicker} />
             </div>
 
             <div className="space-y-4 xl:col-span-4">
-              <LeakagePanel data={leakage} {...leakageDatePicker} />
-              <ItemPerformancePanel
-                top={topItems}
-                low={lowItems}
-                {...itemPerfDatePicker}
+              <DashboardPanel
+                fetcher={getDashboardLeakageApi}
+                label="Leakage"
+                refreshKey={refreshKey}
+                render={(data, range) => <LeakagePanel data={data} {...range} />}
               />
+              <DashboardPanel
+                fetcher={getDashboardItemPerformanceApi}
+                label="Item Performance"
+                refreshKey={refreshKey}
+                render={({ top, low }, range) => (
+                  <ItemPerformancePanel top={top} low={low} {...range} />
+                )}
+              />
+              {/* Expenses: no backend model yet - mock data. */}
               <ExpensesPanel data={expenses} {...expensesDatePicker} />
-              <QuickHelpPanel data={quickHelp} />
+              <DashboardPanel
+                fetcher={getDashboardQuickHelpApi}
+                label="Quick Help"
+                refreshKey={refreshKey}
+                render={(data) => <QuickHelpPanel data={data} />}
+              />
             </div>
           </div>
         </PageContainer>

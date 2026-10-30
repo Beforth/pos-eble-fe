@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { showToast } from '../utils/toast'
-import { Search } from 'lucide-react'
+import { ChevronLeft, Search } from 'lucide-react'
 import { Badge } from '../components/common/Badge'
+import { BillingHeader } from '../components/billing/BillingHeader'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { useAuth } from '../auth/AuthContext'
 import { useMenuChannels } from '../state/MenuChannelsContext'
+import { useNewOrder } from '../state/useNewOrder'
 import { listCategoriesApi, updateItemApi } from '../services/menuService'
 import { fetchCategoryItemsCached, invalidateMenuItems } from '../state/menuItemsCache'
 import type { Category, Item, ItemAvailability } from '../types/menu'
@@ -101,7 +104,15 @@ function toRow(item: Item): MenuItemRow {
   }
 }
 
-export default function MenuOnOff() {
+/**
+ * Menu On/Off. In the Menu section it sits inside the menu shell; `standalone`
+ * puts the very same screen on a billing page (`/billing/menu-on-off`), so the
+ * counter can use it without ever entering the Menu section.
+ */
+export default function MenuOnOff({ standalone = false }: { standalone?: boolean }) {
+  const navigate = useNavigate()
+  const { startNewOrder } = useNewOrder()
+  const [billNo, setBillNo] = useState('')
   const { encryptedOutletId } = useAuth()
   const { channels } = useMenuChannels()
 
@@ -284,46 +295,47 @@ export default function MenuOnOff() {
       prev.map((r) => (ids.has(r.id) ? { ...r, [key]: value } : r)),
     )
 
-    const results = await Promise.allSettled(
-      affected.map((row) => {
-        const raw = rawItems.get(row.id)
-        const existing = raw?.availability ?? []
-        const merged: ItemAvailability[] = [
-          ...existing
-            .filter((a) => a.channel_slug !== slug)
-            .map((a) => ({
-              outlet_channel_id: a.outlet_channel_id,
-              is_available: a.is_available,
-              channel_slug: a.channel_slug,
-            })),
-          {
-            outlet_channel_id: channel.id,
-            is_available: value,
-            channel_slug: slug,
-          },
-        ]
-        return updateItemApi(encryptedOutletId!, row.id, { availability: merged }).then(
-          () => {
-            setRawItems((prev) => {
-              const next = new Map(prev)
-              const cached = next.get(row.id)
-              if (cached) {
-                next.set(row.id, { ...cached, availability: merged })
-              }
-              return next
-            })
-          },
+    // Sequential on purpose: parallel PATCHes lock the SQLite database.
+    let failed = 0
+    for (const row of affected) {
+      const existing = rawItems.get(row.id)?.availability ?? []
+      const merged: ItemAvailability[] = [
+        ...existing
+          .filter((a) => a.channel_slug !== slug)
+          .map((a) => ({
+            outlet_channel_id: a.outlet_channel_id,
+            is_available: a.is_available,
+            channel_slug: a.channel_slug,
+          })),
+        {
+          outlet_channel_id: channel.id,
+          is_available: value,
+          channel_slug: slug,
+        },
+      ]
+      try {
+        await updateItemApi(encryptedOutletId!, row.id, { availability: merged })
+        setRawItems((prev) => {
+          const next = new Map(prev)
+          const cached = next.get(row.id)
+          if (cached) next.set(row.id, { ...cached, availability: merged })
+          return next
+        })
+      } catch {
+        failed++
+        setItems((prev) =>
+          prev.map((r) => (r.id === row.id ? { ...r, [key]: !value } : r)),
         )
-      }),
-    )
+      }
+    }
 
     invalidateMenuItems(encryptedOutletId ?? '', categoryId)
 
-    const failed = results.filter((r) => r.status === 'rejected').length
     if (failed > 0) {
       showToast(
         `${failed} item${failed === 1 ? '' : 's'} failed to update`,
       )
+      return
     }
     showToast(
       `All items ${value ? 'ON' : 'OFF'} on ${PLATFORM_LABEL[platform]}`,
@@ -346,10 +358,8 @@ export default function MenuOnOff() {
 
   const gridCols = `minmax(0,1fr) ${activePlatforms.map(() => '6.5rem').join(' ')}`
 
-  return (
-    <MenuPageShell activeItem="menu-on-off" title="Menu on / off" fillViewport>
-
-      <div className="menu-panel-viewport-fill is-fixed-height">
+  const content = (
+      <div className={standalone ? 'h-full' : 'menu-panel-viewport-fill is-fixed-height'}>
         <div className="menu-on-off-shell">
         {/* Category rail */}
         <aside className="menu-on-off-categories hidden md:flex">
@@ -424,65 +434,68 @@ export default function MenuOnOff() {
             </div>
           </div>
 
-          {/* Platform tabs + stats */}
-          <div className="menu-on-off-main-header flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-2">
-            <div className="flex items-center gap-1">
+          {/* Column picker: each chip shows/hides a platform column */}
+          <div className="menu-on-off-main-header flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2.5">
+            <span className="text-xs font-medium text-muted">Show columns</span>
+            <div className="flex flex-wrap items-center gap-2">
               {PLATFORM_TABS.map((tab) => {
                 const active = activePlatforms.includes(tab.id)
+                const onlyOne = active && activePlatforms.length === 1
                 return (
                   <button
                     key={tab.id}
                     type="button"
+                    role="switch"
+                    aria-checked={active}
+                    aria-label={`Show ${tab.label} column`}
+                    data-tooltip={
+                      onlyOne
+                        ? 'At least one column must stay visible'
+                        : active
+                          ? `Hide ${tab.label} column`
+                          : `Show ${tab.label} column`
+                    }
                     onClick={() => togglePlatform(tab.id)}
-                    className={`border-b-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
-                      active
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted hover:text-ink'
-                    }`}
+                    className={`menu-on-off-col-chip ${active ? 'is-active' : ''}`}
                   >
-                    {tab.label}
+                    <span>{tab.label}</span>
+                    <strong>
+                      {categoryStats[tab.id].on}/{categoryStats[tab.id].total}
+                    </strong>
+                    <span className="menu-on-off-col-switch" aria-hidden="true">
+                      <span className="menu-on-off-col-switch-knob" />
+                    </span>
                   </button>
                 )
               })}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {PLATFORM_TABS.filter((tab) =>
-                activePlatforms.includes(tab.id),
-              ).map((tab) => (
-                <span key={tab.id} className="menu-on-off-platform-stat">
-                  {tab.label}{' '}
-                  <strong>
-                    {categoryStats[tab.id].on}/{categoryStats[tab.id].total}
-                  </strong>
-                </span>
-              ))}
             </div>
           </div>
 
           {/* Bulk actions */}
           <div className="menu-on-off-main-header flex flex-wrap items-center gap-2 border-b border-line bg-page/50 px-4 py-2.5">
-            <span className="text-xs font-medium text-muted">Quick actions</span>
-            {activePlatforms.map((platform) => (
-              <div
-                key={platform}
-                className="flex items-center gap-1 rounded-lg border border-line bg-card p-0.5"
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleAllForCategory(platform, true)}
-                  className="menu-on-off-bulk-on rounded-md px-2 py-1 text-[11px] font-semibold transition-colors"
-                >
-                  All {PLATFORM_LABEL[platform]} ON
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleAllForCategory(platform, false)}
-                  className="menu-on-off-bulk-off rounded-md px-2 py-1 text-[11px] font-semibold transition-colors"
-                >
-                  All OFF
-                </button>
-              </div>
-            ))}
+            <span className="text-xs font-medium text-muted">Turn all items</span>
+            {PLATFORM_TABS.filter((tab) => activePlatforms.includes(tab.id)).map(
+              (tab) => {
+                const { on, total } = categoryStats[tab.id]
+                const allOn = total > 0 && on === total
+                return (
+                  <div
+                    key={tab.id}
+                    className="flex items-center gap-2 rounded-lg border border-line bg-card py-1 pl-3 pr-1.5"
+                  >
+                    <span className="text-xs font-semibold text-ink">{tab.label}</span>
+                    <span className="text-[11px] text-muted">
+                      {allOn ? 'All on' : on === 0 ? 'All off' : `${on} of ${total} on`}
+                    </span>
+                    <Toggle
+                      checked={allOn}
+                      onToggle={() => toggleAllForCategory(tab.id, !allOn)}
+                      label={`Turn all items ${allOn ? 'off' : 'on'} for ${tab.label}`}
+                    />
+                  </div>
+                )
+              },
+            )}
           </div>
 
           {/* Column headers */}
@@ -549,7 +562,7 @@ export default function MenuOnOff() {
                         label={`Toggle ${item.name} on ${tab.label}`}
                       />
                       <span className="text-[11px] text-muted">
-                        ₹{item.prices[tab.id].toFixed(1)}
+                        ₹{Number(item.prices[tab.id].toFixed(2))}
                       </span>
                     </div>
                   ))}
@@ -560,6 +573,36 @@ export default function MenuOnOff() {
         </div>
       </div>
       </div>
+  )
+
+  if (standalone) {
+    return (
+      <div className="flex h-dvh flex-col overflow-hidden bg-page">
+        <BillingHeader
+          billNo={billNo}
+          onBillNoChange={setBillNo}
+          onNewOrder={() => startNewOrder()}
+          onViewKot={() => navigate('/billing?kot=1')}
+        />
+        <div className="flex items-center justify-between border-b border-line bg-card px-5 py-3">
+          <h1 className="text-lg font-bold text-ink">Menu on / off</h1>
+          <button
+            type="button"
+            onClick={() => navigate('/billing/operations')}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-primary hover:text-primary"
+          >
+            <ChevronLeft size={14} />
+            Back
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 sm:px-5">{content}</div>
+      </div>
+    )
+  }
+
+  return (
+    <MenuPageShell activeItem="menu-on-off" title="Menu on / off" fillViewport>
+      {content}
     </MenuPageShell>
   )
 }

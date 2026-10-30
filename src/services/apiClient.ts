@@ -36,6 +36,21 @@ function handleUnauthorized(): void {
   }
 }
 
+/**
+ * Message for an answer that is not our JSON envelope: a proxy, load balancer or
+ * crashed server replied (an HTML "502 Bad Gateway" page, for example). The status
+ * says which, so the screen never shows a bare "Unexpected server response".
+ */
+export function unreadableResponseMessage(status: number): string {
+  if (status === 502 || status === 503 || status === 504) {
+    return `The server is not responding (${status}). It may be restarting or busy; try again in a moment.`
+  }
+  if (status === 413) return 'The request was too large for the server (413).'
+  if (status === 404) return 'The server could not find this endpoint (404). Check the API URL.'
+  if (status >= 500) return `The server hit an error (${status}). Try again, and tell support if it keeps happening.`
+  return `Unexpected server response (${status}).`
+}
+
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
@@ -75,7 +90,7 @@ export async function apiRequest<T>(
   try {
     envelope = (await response.json()) as ApiEnvelope<T>
   } catch {
-    throw new ApiError('Unexpected server response.', response.status)
+    throw new ApiError(unreadableResponseMessage(response.status), response.status)
   }
 
   if (!response.ok || !envelope.success) {
@@ -141,7 +156,7 @@ export async function paginatedApiRequest<T>(
   try {
     body = (await response.json()) as PaginatedBody
   } catch {
-    throw new ApiError('Unexpected server response.', response.status)
+    throw new ApiError(unreadableResponseMessage(response.status), response.status)
   }
 
   if (!response.ok || body == null || !Array.isArray(body.results)) {
@@ -197,7 +212,7 @@ export async function multipartApiRequest<T>(
   try {
     envelope = (await response.json()) as ApiEnvelope<T>
   } catch {
-    throw new ApiError('Unexpected server response.', response.status)
+    throw new ApiError(unreadableResponseMessage(response.status), response.status)
   }
 
   if (!response.ok || !envelope.success) {
