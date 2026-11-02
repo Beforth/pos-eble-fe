@@ -108,10 +108,12 @@ import {
 } from '../../utils/tableStatusStore'
 import {
   kotItemsForOrder,
+  notifyStockWarnings,
   sendKotForOrder,
   settleKotOrder,
   type KotTaxTotals,
 } from '../../services/kotOrderFlow'
+import { useSubOrderTypes } from '../../services/useSubOrderTypes'
 import { subscribeToRail } from '../../services/liveRailClient'
 import {
   isKotDismissed,
@@ -367,6 +369,7 @@ export default function Billing() {
       draft_id: activeDraftId ?? undefined,
       item_count: ticket.items.length,
       items: ticket.items.map((item) => ({
+        item_id: item.itemId,
         name: item.name,
         note: item.note,
         qty: item.qty,
@@ -388,6 +391,7 @@ export default function Billing() {
     if (ticket.tableId === 'no-table') {
       const saved = await createKotApi(encryptedOutletId, kotPayloadFromTicket(ticket))
       sent = { ...ticket, id: saved.id, kotNo: saved.kot_no }
+      notifyStockWarnings(saved.stock_warnings)
     } else {
       const result = await sendKotForOrder({
         outletId: encryptedOutletId,
@@ -396,16 +400,30 @@ export default function Billing() {
         payload: kotPayloadFromTicket(ticket),
         orderType: orderTypeForApi(ticket.orderType),
         orderTypeLabel: labelForOrderType(ticket.orderType),
+        subOrderType: subOrderTypeFor(orderTypeForApi(ticket.orderType)),
         allTableTickets: [...tableKotTickets, ticket],
         tax: kotTaxTotals([...tableKotTickets, ticket]),
       })
       sent = result.ticket
+      notifyStockWarnings(result.stockWarnings)
     }
     if (draftId) {
       setActiveDraftId(null)
       void refreshDraftCount()
     }
     return sent
+  }
+
+  /** Sub order types the biller may pick for an order type (blank = none). */
+  function subOrderTypesFor(apiOrderType: string) {
+    return activeSubOrderTypes.filter(
+      (row) => row.order_types.length === 0 || row.order_types.includes(apiOrderType as never),
+    )
+  }
+
+  /** The chosen sub order type, or undefined when it does not fit `apiOrderType`. */
+  function subOrderTypeFor(apiOrderType: string): string | undefined {
+    return subOrderTypesFor(apiOrderType).find((row) => row.name === subOrderType)?.name
   }
 
   async function createAndSettleServerOrder(params: {
@@ -439,6 +457,7 @@ export default function Billing() {
     const order = await createOrderApi(encryptedOutletId, {
       order_type: orderTypeForApi(params.orderType),
       order_type_label: labelForOrderType(params.orderType),
+      sub_order_type: subOrderTypeFor(orderTypeForApi(params.orderType)),
       customer_name: params.customerName.trim(),
       customer_phone: params.customerPhone.trim(),
       payment_type: params.paymentLabel,
@@ -495,6 +514,8 @@ export default function Billing() {
     }
     return 'dine-in'
   })
+  const [subOrderType, setSubOrderType] = useState('')
+  const activeSubOrderTypes = useSubOrderTypes()
   const [payment, setPayment] = useState<PaymentMethod>('cash')
   const [tableId, setTableId] = useState(() => searchParams.get('tableId') ?? '')
   const [guests, setGuests] = useState(() => {
@@ -1302,6 +1323,7 @@ export default function Billing() {
     setFocusKotNo(null)
     clearWalkInKotSession()
     setOrderType('dine-in')
+    setSubOrderType('')
     setPayment('cash')
     setTableId('')
     setGuests(0)
@@ -1764,6 +1786,7 @@ export default function Billing() {
         const order = await createOrderApi(outletId, {
           order_type: orderTypeForApi(orderType),
           order_type_label: labelForOrderType(orderType),
+          sub_order_type: subOrderTypeFor(orderTypeForApi(orderType)),
           customer_name: customerInfo.name.trim(),
           customer_phone: customerInfo.phone.trim(),
           payment_type: paymentTypeLabel(payment, otherPayment?.type, cardOption),
@@ -2129,6 +2152,7 @@ export default function Billing() {
       }
       const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0)
       const unsent = lines.map((line) => ({
+        itemId: line.itemId,
         name: line.name,
         qty: line.qty,
         price: line.price,
@@ -2145,6 +2169,7 @@ export default function Billing() {
                 customer_name: customer.name.trim(),
                 item_count: unsent.length,
                 items: unsent.map((item) => ({
+                  item_id: item.itemId,
                   name: item.name,
                   qty: item.qty,
                   unit_price: item.price,
@@ -2183,6 +2208,9 @@ export default function Billing() {
             .map((kot) => kot.id)
             .filter((id) => !id.startsWith('kot-')),
         })
+        for (const kot of settledOrder.kots ?? []) {
+          notifyStockWarnings(kot.stock_warnings)
+        }
         if (advanceBooking) {
           // The bill is settled; closing the booking is best-effort, so a
           // failure here must not look like the payment failed.
@@ -2260,6 +2288,7 @@ export default function Billing() {
         orderId: session?.orderId ?? null,
         orderType: orderTypeForApi(orderType),
         orderTypeLabel: labelForOrderType(orderType),
+        subOrderType: subOrderTypeFor(orderTypeForApi(orderType)),
         tickets: kotsSnapshot,
         tax: kotTaxTotals(kotsSnapshot),
         paymentLabel: paymentTypeLabel(payment, otherPayment?.type, cardOption),
@@ -3110,6 +3139,9 @@ export default function Billing() {
           customerFormOpen={customerFormOpen}
           customerErrors={showCustomerErrors ? customerErrors : undefined}
           onOrderTypeChange={setOrderType}
+          subOrderTypes={subOrderTypesFor(orderTypeForApi(orderType)).map((row) => row.name)}
+          subOrderType={subOrderTypeFor(orderTypeForApi(orderType)) ?? ''}
+          onSubOrderTypeChange={setSubOrderType}
           onPaymentChange={handlePaymentChange}
           otherPaymentType={otherPayment?.type}
           cardOption={cardOption}

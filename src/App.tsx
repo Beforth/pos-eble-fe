@@ -17,6 +17,7 @@ import { MenuReferenceProvider } from './state/MenuReferenceContext'
 import { ChromeProvider } from './state/ChromeContext'
 import { GlobalNavigationShortcuts } from './components/layout/GlobalNavigationShortcuts'
 import { OnlineOrdersProvider } from './state/OnlineOrdersContext'
+import { NotificationsProvider } from './state/NotificationsContext'
 import AcceptOnlineOrders from './pages/AcceptOnlineOrders'
 import AllOrders from './pages/AllOrders'
 import Dashboard from './pages/Dashboard'
@@ -113,6 +114,8 @@ import AddSalesReturn from './pages/inventory/AddSalesReturn'
 import ProductionMaster from './pages/inventory/ProductionMaster'
 import AddProduction from './pages/inventory/AddProduction'
 import ProductionExecution from './pages/inventory/ProductionExecution'
+import FinishedGoods from './pages/inventory/FinishedGoods'
+import MakeFinishedGood from './pages/inventory/MakeFinishedGood'
 import BarcodeGeneration from './pages/inventory/BarcodeGeneration'
 import BarcodeConfiguration from './pages/inventory/BarcodeConfiguration'
 import CurrentStockReport from './pages/inventory/CurrentStockReport'
@@ -303,6 +306,7 @@ export default function App() {
           <BrowserRouter>
           <ChromeProvider>
           <OnlineOrdersProvider>
+          <NotificationsProvider>
           <GlobalNavigationShortcuts />
           <TooltipHost />
           <ToastHost />
@@ -1271,6 +1275,22 @@ export default function App() {
             }
           />
           <Route
+            path="/inventory/finished-goods"
+            element={
+              <ProtectedRoute>
+                <FinishedGoods />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory/finished-goods/make"
+            element={
+              <ProtectedRoute>
+                <MakeFinishedGood />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inventory/production-execution"
             element={
               <ProtectedRoute>
@@ -1759,6 +1779,22 @@ export default function App() {
             }
           />
           <Route
+            path="/billing/inventory/finished-goods"
+            element={
+              <ProtectedRoute>
+                <FinishedGoods />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/inventory/finished-goods/make"
+            element={
+              <ProtectedRoute>
+                <MakeFinishedGood />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/billing/inventory/production-execution"
             element={
               <ProtectedRoute>
@@ -2147,6 +2183,14 @@ export default function App() {
           />
           <Route
             path="/menu/add-outlet"
+            element={
+              <ProtectedRoute>
+                <AddOutlet />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/menu/outlet/:outletId/edit"
             element={
               <ProtectedRoute>
                 <AddOutlet />
@@ -3175,6 +3219,7 @@ export default function App() {
           <Route path="*" element={<HomeRedirect />} />
         </Routes>
         </RouteErrorBoundary>
+          </NotificationsProvider>
           </OnlineOrdersProvider>
           </ChromeProvider>
       </BrowserRouter>

@@ -35,8 +35,11 @@ import { useAuth } from '../../auth/AuthContext'
 import { ApiError } from '../../services/apiClient'
 import {
   INV_WRITE_PERMISSION,
+  GOODS_CATEGORY_OPTIONS,
   deleteRecipeApi,
   listAllRecipesApi,
+  updateRecipeApi,
+  type GoodsCategory,
   type ItemRecipe,
 } from '../../services/inventoryService'
 
@@ -358,6 +361,25 @@ export default function ItemRecipes() {
     })
   }
 
+  async function changeGoodsCategory(row: ItemRecipe, value: GoodsCategory) {
+    if (!encryptedOutletId || value === row.goods_category) return
+    const previous = row.goods_category
+    setRows((prev) =>
+      prev.map((item) => (item.id === row.id ? { ...item, goods_category: value } : item)),
+    )
+    try {
+      await updateRecipeApi(encryptedOutletId, row.id, { goods_category: value })
+      showToast('Goods category updated')
+    } catch (err) {
+      setRows((prev) =>
+        prev.map((item) =>
+          item.id === row.id ? { ...item, goods_category: previous } : item,
+        ),
+      )
+      showToast(err instanceof ApiError ? err.message : 'Unable to update goods category')
+    }
+  }
+
   async function confirmDelete() {
     if (!pendingDelete || !encryptedOutletId) return
     try {
@@ -558,13 +580,14 @@ export default function ItemRecipes() {
                 >
                   Category
                 </SortableTh>
+                <th className="px-3 py-2.5">Goods Category</th>
                 <th className="px-3 py-2.5 text-center">Action</th>
               </tr>
             </thead>
             <tbody>
               {visible.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-16 text-center">
+                  <td colSpan={5} className="px-3 py-16 text-center">
                     <span className="relative mx-auto mb-4 inline-flex text-muted">
                       <FileText
                         size={56}
@@ -597,6 +620,23 @@ export default function ItemRecipes() {
                     <td className="px-3 py-2.5 text-ink">{row.item_name}</td>
                     <td className="px-3 py-2.5 text-ink">
                       {row.item_category_name || '—'}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <select
+                        value={row.goods_category}
+                        disabled={!canWrite}
+                        aria-label={`Goods category for ${row.item_name}`}
+                        onChange={(event) =>
+                          void changeGoodsCategory(row, event.target.value as GoodsCategory)
+                        }
+                        className="h-9 w-full min-w-[200px] rounded-md border border-line bg-card px-2.5 text-sm text-ink outline-none focus:border-primary disabled:bg-page disabled:text-muted"
+                      >
+                        {GOODS_CATEGORY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-center gap-1.5">

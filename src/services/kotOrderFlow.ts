@@ -1,6 +1,7 @@
 import type { KotTicket } from '../mocks/kotViewData'
 import type { TaxBreakdownLine } from '../utils/taxEngine'
 import { getTableSession, upsertTableSession } from '../utils/tableStatusStore'
+import { showToast } from '../utils/toast'
 import {
   adoptOrderKotsApi,
   createOrderApi,
@@ -11,6 +12,7 @@ import {
   type OrderItemPayload,
   type OrderType,
   type KotDto,
+  type StockWarning,
 } from './orderService'
 
 export interface KotOrderItems {
@@ -92,6 +94,20 @@ export function newestKotOf(order: OrderDto | undefined): KotDto | null {
 export interface SendKotResult {
   ticket: KotTicket
   orderId: string | null
+  /** Raw materials the ticket could not fully cover (it was still sent). */
+  stockWarnings: StockWarning[]
+}
+
+/** Tell the cashier which raw materials ran short. Never blocks the ticket. */
+export function notifyStockWarnings(warnings: StockWarning[] | undefined): void {
+  if (!warnings || warnings.length === 0) return
+  const lines = warnings.map((row) => {
+    if (row.message) return row.message
+    const short = Number(row.short_by)
+    const amount = Number.isFinite(short) ? String(Number(short.toFixed(3))) : row.short_by
+    return `${row.raw_material} short by ${amount} ${row.unit}`
+  })
+  showToast('Low stock', lines.join(' · '), 'warning')
 }
 
 /**
@@ -108,12 +124,15 @@ export async function sendKotForOrder(options: {
   payload: CreateKotPayload
   orderType: OrderType
   orderTypeLabel: string
+  /** Optional sub order type name (Management > Sub Order Type). */
+  subOrderType?: string
   /** Every KOT ticket on the table (including this new one). */
   allTableTickets: KotTicket[]
   /** Engine-priced tax for the running table bill. */
   tax?: KotTaxTotals
 }): Promise<SendKotResult> {
-  const { outletId, tableId, ticket, payload, orderType, orderTypeLabel } = options
+  const { outletId, tableId, ticket, payload, orderType, orderTypeLabel, subOrderType } =
+    options
   const session = getTableSession(tableId)
   const orderId = session?.orderId ?? null
   const kotPayload = payload
@@ -123,6 +142,7 @@ export async function sendKotForOrder(options: {
     const order = await updateOrderApi(outletId, orderId, {
       action: 'edit',
       ...bill,
+      ...(subOrderType ? { sub_order_type: subOrderType } : {}),
       kots: [kotPayload],
     })
     const newest = newestKotOf(order)
@@ -131,12 +151,14 @@ export async function sendKotForOrder(options: {
         ? { ...ticket, id: newest.id, kotNo: newest.kot_no }
         : { ...ticket, id: order.id, kotNo: ticket.kotNo },
       orderId: order.id,
+      stockWarnings: newest?.stock_warnings ?? [],
     }
   }
 
   const order = await createOrderApi(outletId, {
     order_type: orderType,
     order_type_label: orderTypeLabel,
+    sub_order_type: subOrderType || undefined,
     customer_name: ticket.customerName?.trim() || '',
     source: ticket.source === 'captain' ? 'captain' : 'billing',
     ...bill,
@@ -155,6 +177,7 @@ export async function sendKotForOrder(options: {
       ? { ...ticket, id: newest.id, kotNo: newest.kot_no }
       : { ...ticket, id: order.id, kotNo: ticket.kotNo },
     orderId: order.id,
+    stockWarnings: newest?.stock_warnings ?? [],
   }
 }
 
@@ -164,6 +187,8 @@ export interface SettleKotOrderOptions {
   orderId: string | null
   orderType: OrderType
   orderTypeLabel: string
+  /** Optional sub order type name (Management > Sub Order Type). */
+  subOrderType?: string
   /** The full table bill (all KOT tickets) used to run the money totals. */
   tickets: KotTicket[]
   /** Engine-priced tax for the table bill; omit for a tax-free cart. */
@@ -189,6 +214,7 @@ export async function settleKotOrder(options: SettleKotOrderOptions): Promise<vo
     orderId,
     orderType,
     orderTypeLabel,
+    subOrderType,
     tickets,
     paymentLabel,
     customerName,
@@ -230,6 +256,7 @@ export async function settleKotOrder(options: SettleKotOrderOptions): Promise<vo
     const order = await createOrderApi(outletId, {
       order_type: orderType,
       order_type_label: orderTypeLabel,
+      sub_order_type: subOrderType || undefined,
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim(),
       payment_type: paymentLabel,

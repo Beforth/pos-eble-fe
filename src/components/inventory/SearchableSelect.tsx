@@ -20,6 +20,16 @@ interface SearchableSelectProps {
   /** Opens a create shortcut for this master. Omit on enums and filters. */
   onAddNew?: () => void
   addNewLabel?: string
+  /**
+   * Lazy loading: when given, the parent owns the list. Typing calls this with
+   * the search text instead of filtering `options` here, and the parent reloads.
+   */
+  onSearchChange?: (query: string) => void
+  /** Called when the list is scrolled near its end and `hasMore` is true. */
+  onLoadMore?: () => void
+  hasMore?: boolean
+  /** Shows a "Loading…" row (first load or the next page). */
+  loadingMore?: boolean
 }
 
 export function AddNewMenuRow({
@@ -55,6 +65,10 @@ export function SearchableSelect({
   onChange,
   onAddNew,
   addNewLabel = 'Add new',
+  onSearchChange,
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -70,11 +84,17 @@ export function SearchableSelect({
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // The latest search callback, read from effects without re-running them.
+  const searchChangeRef = useRef(onSearchChange)
+  searchChangeRef.current = onSearchChange
+
   const filtered = useMemo(() => {
+    // A lazily loaded list is already filtered by the parent.
+    if (onSearchChange) return options
     const q = query.trim().toLowerCase()
     if (!q) return options
     return options.filter((option) => option.toLowerCase().includes(q))
-  }, [options, query])
+  }, [options, query, onSearchChange])
 
   const showPlaceholderRow =
     includePlaceholderOption &&
@@ -83,6 +103,7 @@ export function SearchableSelect({
   useEffect(() => {
     if (!open) {
       setQuery('')
+      searchChangeRef.current?.('')
       return
     }
     const updatePosition = () => {
@@ -209,7 +230,7 @@ export function SearchableSelect({
         {open ? createPortal(
           <div
             ref={menuRef}
-            className="fixed z-[10000] overflow-hidden rounded-md border border-line bg-card shadow-lg"
+            className="fixed z-[10000] flex flex-col overflow-hidden rounded-md border border-line bg-card shadow-lg"
             style={{
               left: menuPosition.left,
               width: menuPosition.width,
@@ -219,34 +240,56 @@ export function SearchableSelect({
                 : { top: menuPosition.top }),
             }}
           >
-            <div className="border-b border-line p-2 bg-card">
+            <div className="shrink-0 border-b border-line p-2 bg-card">
               <label className="flex h-9 items-center gap-2 rounded-md border border-line px-2.5 bg-card">
                 <Search size={14} className="shrink-0 text-muted" />
                 <input
                   ref={inputRef}
                   type="text"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value)
+                    onSearchChange?.(event.target.value)
+                  }}
                   placeholder={searchPlaceholder}
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
                 />
               </label>
             </div>
-            <ul role="listbox" className="max-h-48 overflow-y-auto py-1 bg-card">
+            <ul
+              role="listbox"
+              className="min-h-0 flex-1 overflow-y-auto py-1 bg-card"
+              onScroll={(event) => {
+                const list = event.currentTarget
+                if (
+                  onLoadMore &&
+                  hasMore &&
+                  !loadingMore &&
+                  list.scrollTop + list.clientHeight >= list.scrollHeight - 48
+                ) {
+                  onLoadMore()
+                }
+              }}
+            >
               {showPlaceholderRow ? renderOption(placeholder, true) : null}
               {filtered.map((option) => renderOption(option))}
-              {!showPlaceholderRow && filtered.length === 0 ? (
+              {loadingMore ? (
+                <li className="px-3 py-2 text-sm text-muted">Loading…</li>
+              ) : null}
+              {!showPlaceholderRow && !loadingMore && filtered.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-muted">No matches</li>
               ) : null}
             </ul>
             {onAddNew ? (
-              <AddNewMenuRow
-                label={addNewLabel}
-                onClick={() => {
-                  setOpen(false)
-                  onAddNew()
-                }}
-              />
+              <div className="shrink-0">
+                <AddNewMenuRow
+                  label={addNewLabel}
+                  onClick={() => {
+                    setOpen(false)
+                    onAddNew()
+                  }}
+                />
+              </div>
             ) : null}
           </div>,
           document.body,

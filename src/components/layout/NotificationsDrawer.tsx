@@ -1,89 +1,49 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Bell,
+  BellOff,
   CheckCheck,
   Package,
   ShoppingBag,
   Wallet,
   X,
 } from 'lucide-react'
-
-type NotificationKind = 'order' | 'inventory' | 'payment' | 'alert'
-
-interface NotificationItem {
-  id: string
-  kind: NotificationKind
-  title: string
-  body: string
-  time: string
-  unread: boolean
-}
+import { useNotifications } from '../../state/NotificationsContext'
+import type {
+  AppNotification,
+  NotificationKind,
+} from '../../services/notificationService'
 
 interface NotificationsDrawerProps {
   open: boolean
   onClose: () => void
 }
 
-const INITIAL: NotificationItem[] = [
-  {
-    id: 'n1',
-    kind: 'order',
-    title: 'New online order',
-    body: 'Swiggy order #4821 — Vegetable Grill Sandwich ×2',
-    time: '2 min ago',
-    unread: true,
-  },
-  {
-    id: 'n2',
-    kind: 'payment',
-    title: 'Due payment reminder',
-    body: '₹ 1,250 pending settlement for yesterday’s COD orders',
-    time: '18 min ago',
-    unread: true,
-  },
-  {
-    id: 'n3',
-    kind: 'inventory',
-    title: 'Low stock alert',
-    body: 'Pav buns below reorder level (12 left)',
-    time: '1 hr ago',
-    unread: true,
-  },
-  {
-    id: 'n4',
-    kind: 'alert',
-    title: 'KOT modified',
-    body: 'Bill #1093 was modified on Table 4',
-    time: '3 hr ago',
-    unread: false,
-  },
-  {
-    id: 'n5',
-    kind: 'order',
-    title: 'Order cancelled',
-    body: 'Zomato order #4790 cancelled by customer',
-    time: 'Yesterday',
-    unread: false,
-  },
-]
-
-const kindMeta: Record<
-  NotificationKind,
-  { icon: typeof Bell; tone: string }
-> = {
+const kindMeta: Record<NotificationKind, { icon: typeof Bell; tone: string }> = {
   order: { icon: ShoppingBag, tone: 'bg-primary/10 text-primary' },
   inventory: { icon: Package, tone: 'bg-accent/10 text-accent' },
   payment: { icon: Wallet, tone: 'bg-success/10 text-success' },
   alert: { icon: AlertTriangle, tone: 'bg-danger/10 text-danger' },
 }
 
-export function NotificationsDrawer({
-  open,
-  onClose,
-}: NotificationsDrawerProps) {
-  const [items, setItems] = useState(INITIAL)
-  const unreadCount = items.filter((item) => item.unread).length
+/** "just now", "5 min ago", "3 hr ago", "Yesterday", then the date. */
+function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return ''
+  const minutes = Math.floor((Date.now() - then) / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hr ago`
+  if (hours < 48) return 'Yesterday'
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+}
+
+export function NotificationsDrawer({ open, onClose }: NotificationsDrawerProps) {
+  const navigate = useNavigate()
+  const { items, unreadCount, loading, markRead, markAllRead } = useNotifications()
 
   useEffect(() => {
     if (!open) return
@@ -103,16 +63,12 @@ export function NotificationsDrawer({
     }
   }, [open])
 
-  function markAllRead() {
-    setItems((prev) => prev.map((item) => ({ ...item, unread: false })))
-  }
-
-  function markRead(id: string) {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, unread: false } : item,
-      ),
-    )
+  function openItem(item: AppNotification) {
+    markRead(item.id)
+    if (item.link) {
+      onClose()
+      navigate(item.link)
+    }
   }
 
   return (
@@ -145,9 +101,7 @@ export function NotificationsDrawer({
             <div>
               <h2 className="text-sm font-bold text-ink">Notifications</h2>
               <p className="text-[11px] text-muted">
-                {unreadCount > 0
-                  ? `${unreadCount} unread`
-                  : 'You are all caught up'}
+                {unreadCount > 0 ? `${unreadCount} unread` : 'You are all caught up'}
               </p>
             </div>
           </div>
@@ -176,21 +130,31 @@ export function NotificationsDrawer({
 
         <div className="flex-1 overflow-y-auto">
           {items.length === 0 ? (
-            <p className="px-4 py-12 text-center text-sm text-muted">
-              No notifications yet
-            </p>
+            <div className="flex flex-col items-center px-4 py-16 text-center">
+              <span className="flex size-20 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <BellOff size={40} strokeWidth={1.5} />
+              </span>
+              <p className="mt-4 text-sm font-semibold text-ink">
+                {loading ? 'Loading…' : 'No notifications yet'}
+              </p>
+              {!loading ? (
+                <p className="mt-1 text-xs text-muted">
+                  New online orders, stock alerts and cancelled bills show up here.
+                </p>
+              ) : null}
+            </div>
           ) : (
             <ul className="divide-y divide-line">
               {items.map((item) => {
-                const meta = kindMeta[item.kind]
+                const meta = kindMeta[item.kind] ?? kindMeta.alert
                 const Icon = meta.icon
                 return (
                   <li key={item.id}>
                     <button
                       type="button"
-                      onClick={() => markRead(item.id)}
+                      onClick={() => openItem(item)}
                       className={`flex w-full gap-3 px-4 py-3.5 text-left transition-colors hover:bg-page ${
-                        item.unread ? 'bg-primary/[0.03]' : ''
+                        item.read ? '' : 'bg-primary/[0.03]'
                       }`}
                     >
                       <span
@@ -203,7 +167,7 @@ export function NotificationsDrawer({
                           <span className="text-sm font-semibold text-ink">
                             {item.title}
                           </span>
-                          {item.unread && (
+                          {!item.read && (
                             <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
                           )}
                         </span>
@@ -211,7 +175,7 @@ export function NotificationsDrawer({
                           {item.body}
                         </span>
                         <span className="mt-1.5 block text-[11px] text-muted">
-                          {item.time}
+                          {timeAgo(item.created_at)}
                         </span>
                       </span>
                     </button>

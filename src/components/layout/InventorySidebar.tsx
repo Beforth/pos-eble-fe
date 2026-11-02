@@ -20,6 +20,7 @@ import {
   Layers,
   Leaf,
   LineChart,
+  Package,
   Phone,
   Settings,
   ShoppingCart,
@@ -66,6 +67,7 @@ const INVENTORY_ROUTES: Record<string, string> = {
   'sales-return': '/inventory/sales-return',
   'production-master': '/inventory/production-master',
   'production-execution': '/inventory/production-execution',
+  'finished-goods': '/inventory/finished-goods',
   'barcode-generation': '/inventory/barcode-generation',
   'current-stock': '/inventory/current-stock',
   'stock-summary': '/inventory/stock-summary',
@@ -118,6 +120,7 @@ const CONSUMPTION_MORE: NavLeaf[] = [
 const PRODUCTION_CHILDREN: NavLeaf[] = [
   { id: 'production-master', label: 'Production Master', icon: Leaf },
   { id: 'production-execution', label: 'Production Execution', icon: Layers },
+  { id: 'finished-goods', label: 'Finished Goods', icon: Package },
   { id: 'barcode-generation', label: 'Barcode Generation', icon: Barcode },
 ]
 

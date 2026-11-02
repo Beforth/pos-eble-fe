@@ -29,6 +29,8 @@ export interface AllOrderRow {
   paymentType?: string
   /** `billing` or `captain`. */
   source?: string
+  /** Sub order type name the order was taken under (blank when none). */
+  subOrderType?: string
   /** Table the order was taken at (from its KOTs); blank for a counter order. */
   tableNo?: string
   /** Outstanding balance_due — populated by toAllOrderRow; >0 enables Settle Due. */

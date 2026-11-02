@@ -106,6 +106,7 @@ export type RawMaterial = {
   gtin: string
   brand: string
   is_favourite: boolean
+  is_finished_good: boolean
   is_active: boolean
   max_stock_rows: MaxStockRow[]
   stock_qty: string
@@ -252,11 +253,18 @@ function rawPath(outletId: string, suffix = ''): string {
 
 export async function listRawMaterialsApi(
   outletId: string,
-  params?: { search?: string; categoryId?: string; page?: number },
+  params?: {
+    search?: string
+    categoryId?: string
+    page?: number
+    /** `raw` hides finished goods (the Raw Materials page). */
+    kind?: 'raw'
+  },
 ): Promise<RawMaterialListData> {
   const query = new URLSearchParams()
   if (params?.search) query.set('search', params.search)
   if (params?.categoryId) query.set('category_id', params.categoryId)
+  if (params?.kind) query.set('kind', params.kind)
   if (params?.page) query.set('page', String(params.page))
   query.set('page_size', '100')
   const qs = query.toString()
@@ -567,11 +575,20 @@ export type RecipeLine = {
   area: string
 }
 
+export type GoodsCategory = 'semi_finished' | 'finished' | 'on_the_go'
+
+export const GOODS_CATEGORY_OPTIONS: { value: GoodsCategory; label: string }[] = [
+  { value: 'semi_finished', label: 'Semi Finished Good' },
+  { value: 'finished', label: 'Finished Good' },
+  { value: 'on_the_go', label: 'No Finished Goods (On the go)' },
+]
+
 export type ItemRecipe = {
   id: string
   item_id: string
   item_name: string
   item_category_name: string
+  goods_category: GoodsCategory
   lines: RecipeLine[]
   created_at: string
   updated_at: string
@@ -579,6 +596,7 @@ export type ItemRecipe = {
 
 export type RecipePayload = {
   item_id: string
+  goods_category?: GoodsCategory
   lines?: {
     raw_material_id: string
     qty: string
@@ -591,6 +609,30 @@ export type MenuItemRef = {
   id: string
   name: string
   category_name: string
+}
+
+/** One page of menu items for a lazily loaded picker. */
+export async function listMenuItemsPageApi(
+  outletId: string,
+  params: {
+    search?: string
+    page?: number
+    pageSize?: number
+    /** Leave out items that are already a finished good. */
+    excludeStocked?: boolean
+  },
+): Promise<PaginatedList<MenuItemRef>> {
+  const query = new URLSearchParams({
+    menu_items: '1',
+    page: String(params.page ?? 1),
+    page_size: String(params.pageSize ?? 20),
+  })
+  if (params.search) query.set('search', params.search)
+  if (params.excludeStocked) query.set('exclude_stocked', '1')
+  return apiRequest<PaginatedList<MenuItemRef>>(`${recipePath(outletId)}?${query}`, {
+    method: 'GET',
+    token: authToken(),
+  })
 }
 
 export type DocListParams = {
@@ -2003,6 +2045,195 @@ export async function deleteProductionRunApi(
   id: string,
 ): Promise<void> {
   await apiRequest(runPath(outletId, `${id}/`), {
+    method: 'DELETE',
+    token: authToken(),
+  })
+}
+
+export type FinishedGoodRecipeLine = {
+  raw_material_id: string
+  raw_material_name: string
+  qty: string
+  unit_id: string
+  unit_name: string
+}
+
+/** A menu item kept in stock. `menu_item_id` is null only for older, unlinked ones. */
+export type FinishedGood = {
+  id: string
+  name: string
+  menu_item_id: string | null
+  unit_id: string
+  unit_name: string
+  category_name: string
+  min_stock_level: string
+  is_active: boolean
+  stock_qty: string
+  goods_category: GoodsCategory
+  /** The menu item's recipe for ONE unit (`batch_qty` is always 1). */
+  recipe: {
+    batch_qty: string
+    goods_category: GoodsCategory
+    lines: FinishedGoodRecipeLine[]
+  } | null
+  created_at: string
+  updated_at: string
+}
+
+export type FinishedGoodLinePayload = {
+  raw_material_id: string
+  qty: string
+  unit_id: string
+}
+
+export type FinishedGoodPayload = {
+  /** The menu item this stock stands for. On update only for an unlinked one. */
+  menu_item_id: string
+  unit_id: string
+  min_stock_level?: string
+  is_active?: boolean
+  /** `finished` (default) or `semi_finished`. */
+  goods_category?: GoodsCategory
+  /** Lines are divided by `batch_qty` and stored as the item's per-unit recipe. */
+  recipe?: { batch_qty: string; lines: FinishedGoodLinePayload[] } | null
+}
+
+export type FinishedGoodBatch = {
+  id: string
+  batch_no: string
+  finished_good_id: string
+  finished_good_name: string
+  category_name: string
+  unit_name: string
+  qty: string
+  batch_date: string
+  expiry_date: string | null
+  note: string
+  used_recipe: boolean
+  lines: {
+    raw_material_id: string
+    raw_material_name: string
+    qty: string
+    unit_id: string
+    unit_name: string
+  }[]
+  created_at: string
+  updated_at: string
+}
+
+export type FinishedGoodBatchPayload = {
+  finished_good_id: string
+  /** Leave blank to have the next BATCH-0001 style number assigned. */
+  batch_no?: string
+  qty: string
+  batch_date?: string
+  /** Optional; `null` clears it. Not before `batch_date`. */
+  expiry_date?: string | null
+  note?: string
+  /** Omit to use the saved recipe scaled to `qty`. */
+  lines?: FinishedGoodLinePayload[]
+  save_as_recipe?: boolean
+}
+
+function finishedGoodPath(outletId: string, suffix = '') {
+  return `/api/v1/inventory/${outletId}/finished-goods/${suffix}`
+}
+
+function finishedGoodBatchPath(outletId: string, suffix = '') {
+  return `/api/v1/inventory/${outletId}/finished-good-batches/${suffix}`
+}
+
+export async function listAllFinishedGoodsApi(
+  outletId: string,
+  params?: { search?: string },
+): Promise<FinishedGood[]> {
+  return loadAllPages((page) => {
+    const query = new URLSearchParams()
+    if (params?.search) query.set('search', params.search)
+    query.set('page', String(page))
+    query.set('page_size', '100')
+    return apiRequest<PaginatedList<FinishedGood>>(
+      `${finishedGoodPath(outletId)}?${query.toString()}`,
+      { method: 'GET', token: authToken() },
+    )
+  })
+}
+
+export async function createFinishedGoodApi(
+  outletId: string,
+  payload: FinishedGoodPayload,
+): Promise<FinishedGood> {
+  return apiRequest<FinishedGood>(finishedGoodPath(outletId), {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token: authToken(),
+  })
+}
+
+export async function updateFinishedGoodApi(
+  outletId: string,
+  id: string,
+  payload: Partial<FinishedGoodPayload>,
+): Promise<FinishedGood> {
+  return apiRequest<FinishedGood>(finishedGoodPath(outletId, `${id}/`), {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    token: authToken(),
+  })
+}
+
+export async function deleteFinishedGoodApi(
+  outletId: string,
+  id: string,
+): Promise<void> {
+  await apiRequest(finishedGoodPath(outletId, `${id}/`), {
+    method: 'DELETE',
+    token: authToken(),
+  })
+}
+
+export async function listFinishedGoodBatchesApi(
+  outletId: string,
+  params?: { search?: string; page?: number },
+): Promise<PaginatedList<FinishedGoodBatch>> {
+  const query = new URLSearchParams()
+  if (params?.search) query.set('search', params.search)
+  if (params?.page) query.set('page', String(params.page))
+  query.set('page_size', '100')
+  return apiRequest<PaginatedList<FinishedGoodBatch>>(
+    `${finishedGoodBatchPath(outletId)}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function createFinishedGoodBatchApi(
+  outletId: string,
+  payload: FinishedGoodBatchPayload,
+): Promise<FinishedGoodBatch> {
+  return apiRequest<FinishedGoodBatch>(finishedGoodBatchPath(outletId), {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token: authToken(),
+  })
+}
+
+export async function updateFinishedGoodBatchApi(
+  outletId: string,
+  id: string,
+  payload: Partial<Omit<FinishedGoodBatchPayload, 'finished_good_id' | 'save_as_recipe'>>,
+): Promise<FinishedGoodBatch> {
+  return apiRequest<FinishedGoodBatch>(finishedGoodBatchPath(outletId, `${id}/`), {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    token: authToken(),
+  })
+}
+
+export async function deleteFinishedGoodBatchApi(
+  outletId: string,
+  id: string,
+): Promise<void> {
+  await apiRequest(finishedGoodBatchPath(outletId, `${id}/`), {
     method: 'DELETE',
     token: authToken(),
   })

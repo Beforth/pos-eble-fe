@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft,
-  CreditCard,
   MapPin,
   MonitorSmartphone,
   Phone,
@@ -17,12 +16,21 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../components/menu/MenuActionButtons'
-import { deleteOutlet, getOutlets, type OutletData } from '../mocks/outletStore'
+import { useAuth } from '../auth/AuthContext'
+import { ConfirmDialog } from '../components/common/ConfirmDialog'
+import { TooltipWrapper } from '../components/common/TooltipWrapper'
+import { OutletDetailsModal } from '../components/menu/OutletDetailsModal'
+import {
+  deleteOutletApi,
+  getOutletApi,
+  listOutletsApi,
+  type OutletSummary,
+} from '../services/outletService'
+import { showToast } from '../utils/toast'
 import { useNewOrder } from '../state/useNewOrder'
 
 const TONE_PRIMARY = 'bg-primary/10 text-primary'
 const TONE_ACCENT = 'bg-accent/15 text-accent'
-const TONE_GREEN = 'bg-emerald-50 text-emerald-600'
 
 /**
  * Menu Management. `standalone` puts the very same screen on a billing page
@@ -32,10 +40,21 @@ export default function MenuManagement({ standalone = false }: { standalone?: bo
   const navigate = useNavigate()
   const { startNewOrder } = useNewOrder()
   const [billNo, setBillNo] = useState('')
-  const [outlets, setOutlets] = useState<OutletData[]>([])
+  const { encryptedOutletId } = useAuth()
+  const [outlets, setOutlets] = useState<OutletSummary[]>([])
+  const [viewing, setViewing] = useState<OutletSummary | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<OutletSummary | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
-  const refresh = useCallback(() => {
-    setOutlets(getOutlets())
+  const refresh = useCallback(async () => {
+    try {
+      const memberships = await listOutletsApi()
+      setOutlets(
+        await Promise.all(memberships.map((m) => getOutletApi(m.encrypted_id))),
+      )
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to load outlets.')
+    }
   }, [])
 
   useEffect(() => {
@@ -47,21 +66,28 @@ export default function MenuManagement({ standalone = false }: { standalone?: bo
     return () => window.removeEventListener('focus', refresh)
   }, [refresh])
 
+  async function confirmDelete() {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    try {
+      await deleteOutletApi(deleteTarget.id)
+      showToast('Outlet deleted successfully')
+      setDeleteTarget(null)
+      await refresh()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete outlet.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const stats = useMemo(() => {
     const allCuisines = new Set(outlets.flatMap((o) => o.cuisines))
-    const allPayments = new Set(outlets.flatMap((o) => o.paymentTypes))
     return {
       totalOutlets: outlets.length,
       totalCuisines: allCuisines.size,
-      totalPayments: allPayments.size,
     }
   }, [outlets])
-
-  function handleDelete(id: string, name: string) {
-    if (!window.confirm(`Delete outlet "${name}"?`)) return
-    deleteOutlet(id)
-    refresh()
-  }
 
   const content = (
     <>
@@ -80,7 +106,7 @@ export default function MenuManagement({ standalone = false }: { standalone?: bo
       </div>
 
       {/* ── Stats Row ── */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border border-line bg-card p-4">
           <div className="mb-3 flex items-center gap-3">
             <span className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg ${TONE_PRIMARY}`}>
@@ -101,17 +127,6 @@ export default function MenuManagement({ standalone = false }: { standalone?: bo
           </div>
           <p className="text-2xl font-bold tracking-tight text-ink">
             {stats.totalCuisines}
-          </p>
-        </div>
-        <div className="rounded-xl border border-line bg-card p-4">
-          <div className="mb-3 flex items-center gap-3">
-            <span className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg ${TONE_GREEN}`}>
-              <CreditCard size={17} />
-            </span>
-            <p className="text-sm font-medium text-muted">Payment Methods</p>
-          </div>
-          <p className="text-2xl font-bold tracking-tight text-ink">
-            {stats.totalPayments}
           </p>
         </div>
       </div>
@@ -198,12 +213,10 @@ export default function MenuManagement({ standalone = false }: { standalone?: bo
               <OutletCard
                 key={outlet.id}
                 outlet={outlet}
-                onView={() =>
-                  navigate('/menu/add-outlet', {
-                    state: { outletId: outlet.id },
-                  })
-                }
-                onDelete={() => handleDelete(outlet.id, outlet.outletName)}
+                isActive={outlet.id === encryptedOutletId}
+                onView={() => setViewing(outlet)}
+                onEdit={() => navigate(`/menu/outlet/${outlet.id}/edit`)}
+                onDelete={() => setDeleteTarget(outlet)}
               />
             ))}
             <button
@@ -217,6 +230,28 @@ export default function MenuManagement({ standalone = false }: { standalone?: bo
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete outlet"
+        target={deleteTarget?.name}
+        message="This outlet will be removed from your outlet list and the outlet switcher."
+        note="The outlet is archived, not erased. Its orders and history are kept."
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        loading={deleting}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={confirmDelete}
+      />
+
+      <OutletDetailsModal
+        outlet={viewing}
+        onClose={() => setViewing(null)}
+        onEdit={() => {
+          if (viewing) navigate(`/menu/outlet/${viewing.id}/edit`)
+        }}
+      />
     </>
   )
 
@@ -257,11 +292,15 @@ export default function MenuManagement({ standalone = false }: { standalone?: bo
 
 function OutletCard({
   outlet,
+  isActive,
   onView,
+  onEdit,
   onDelete,
 }: {
-  outlet: OutletData
+  outlet: OutletSummary
+  isActive: boolean
   onView: () => void
+  onEdit: () => void
   onDelete: () => void
 }) {
   return (
@@ -271,13 +310,13 @@ function OutletCard({
           <Store size={18} />
         </span>
         <span className="inline-flex h-6 items-center rounded-full bg-page px-2.5 text-xs font-medium text-muted">
-          {outlet.outletType}
+          {outlet.outlet_type}
         </span>
       </div>
 
-      <h3 className="text-sm font-semibold text-ink">{outlet.outletName}</h3>
-      {outlet.outletAlias ? (
-        <p className="mt-0.5 text-xs text-muted">{outlet.outletAlias}</p>
+      <h3 className="text-sm font-semibold text-ink">{outlet.name}</h3>
+      {outlet.alias ? (
+        <p className="mt-0.5 text-xs text-muted">{outlet.alias}</p>
       ) : null}
 
       <div className="mt-3 space-y-1.5">
@@ -317,17 +356,32 @@ function OutletCard({
           onClick={onView}
           className="h-8 flex-1 rounded-md border border-line bg-page text-xs font-medium text-ink transition-colors hover:bg-card"
         >
-          View Details
+          View
         </button>
         <button
           type="button"
-          aria-label="Delete menu item"
-          data-tooltip="Delete menu item"
-          onClick={onDelete}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-danger"
+          onClick={onEdit}
+          className="h-8 flex-1 rounded-md border border-line bg-page text-xs font-medium text-ink transition-colors hover:bg-card"
         >
-          <Trash2 size={14} />
+          Edit
         </button>
+        <TooltipWrapper
+          label={
+            isActive
+              ? 'Switch to another outlet to delete this one'
+              : 'Delete outlet'
+          }
+        >
+          <button
+            type="button"
+            aria-label="Delete outlet"
+            disabled={isActive}
+            onClick={onDelete}
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-danger disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted"
+          >
+            <Trash2 size={14} />
+          </button>
+        </TooltipWrapper>
       </div>
     </article>
   )

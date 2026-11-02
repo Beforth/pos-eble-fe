@@ -159,6 +159,15 @@ export interface KotItemDto {
   note?: string
 }
 
+/** A raw material a ticket could not fully cover; the ticket still went through. */
+export interface StockWarning {
+  raw_material: string
+  short_by: string
+  unit: string
+  /** A plain sentence instead of "short by" (e.g. no stock record). */
+  message?: string
+}
+
 export interface KotDto {
   id: string
   kot_no: number
@@ -181,6 +190,8 @@ export interface KotDto {
   modified: boolean
   /** True once the ticket's bill is settled (KOT view hides it; KDS keeps it). */
   billed: boolean
+  /** Raw materials short when this ticket took its recipe stock off. */
+  stock_warnings?: StockWarning[]
 }
 
 // ─── live-rail payloads (events carry a subset of the read DTOs) ─────────
@@ -619,6 +630,58 @@ export async function listOrdersApi(
   const qs = query.toString()
   return jsonRequest<OrdersPage>(
     ordersPath(outletId, `/orders/${qs ? `?${qs}` : ''}`),
+    'GET',
+  )
+}
+
+export type PaymentRowStatus = 'paid' | 'due' | 'cancelled'
+
+/** One row of the Payment Information list (one settled or cancelled order). */
+export interface PaymentRow {
+  id: string
+  order_no: string
+  bill_no: string
+  paid_at: string
+  method: string
+  detail: string
+  status: PaymentRowStatus
+  order_type: string
+  grand_total: number | string
+  received_amount: number | string
+  balance_due: number | string
+}
+
+export interface PaymentsPage {
+  results: PaymentRow[]
+  count: number
+  page: number
+  page_size: number
+  totals: { orders: number; collected: number | string; due: number | string }
+}
+
+export async function listPaymentsApi(
+  outletId: string,
+  options: {
+    from?: string
+    to?: string
+    method?: string
+    status?: PaymentRowStatus
+    search?: string
+    page?: number
+    page_size?: number
+  } = {},
+): Promise<PaymentsPage> {
+  const query = new URLSearchParams()
+  if (options.from) query.set('from', options.from)
+  if (options.to) query.set('to', options.to)
+  if (options.method) query.set('method', options.method)
+  if (options.status) query.set('status', options.status)
+  if (options.search?.trim()) query.set('search', options.search.trim())
+  if (options.page) query.set('page', String(options.page))
+  if (options.page_size) query.set('page_size', String(options.page_size))
+  const qs = query.toString()
+  return jsonRequest<PaymentsPage>(
+    ordersPath(outletId, `/payments/${qs ? `?${qs}` : ''}`),
     'GET',
   )
 }
@@ -1333,6 +1396,7 @@ export function toAllOrderRow(dto: OrderDto | OrderEventData): AllOrderRow {
     createdAt: dto.created_at ? new Date(dto.created_at).getTime() : Date.now(),
     paymentType: (dto.payment_type ?? '').trim(),
     source: (dto.source ?? '').trim().toLowerCase(),
+    subOrderType: dto.sub_order_type || undefined,
     tableNo: (dto.table_no ?? '').trim(),
   }
 }

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { useNewOrder } from '../../state/useNewOrder'
+import { useNotifications } from '../../state/NotificationsContext'
 import {
   listOutletsApi,
   type OutletMembershipSummary,
@@ -45,6 +46,7 @@ export function TopBar({
   const { logout, user, outletId, encryptedOutletId, switchOutlet, canAccess } =
     useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const { unreadCount } = useNotifications()
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [legalDoc, setLegalDoc] = useState<LegalDocKind | null>(null)
   const [outletOpen, setOutletOpen] = useState(false)
@@ -276,8 +278,8 @@ export function TopBar({
           <Monitor size={18} />
         </IconButton>
         <IconButton
-          label="Notifications"
-          badgeDot
+          label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+          badgeDot={unreadCount > 0}
           onClick={onNotificationsClick}
         >
           <Bell size={18} />

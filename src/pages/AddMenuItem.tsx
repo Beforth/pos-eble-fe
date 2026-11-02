@@ -31,9 +31,18 @@ function mapServerErrors(errors: unknown): Record<string, string> {
   return next
 }
 
+/** Only an in-app path may be returned to (never another site). */
+function safeReturnPath(value: string | null): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+  return value
+}
+
 export default function AddMenuItem() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  // Pages that send people here to add an item (e.g. Finished Goods) say where
+  // to come back to; the new item's id and name ride back on the address.
+  const returnTo = safeReturnPath(searchParams.get('returnTo'))
   const defaultCategoryParam = searchParams.get('categoryId') ?? ''
   const { encryptedOutletId } = useAuth()
   const { channels } = useMenuChannels()
@@ -79,7 +88,7 @@ export default function AddMenuItem() {
   }, [loadFailed])
 
   function goBack() {
-    navigate('/menu/base-menu')
+    navigate(returnTo ?? '/menu/base-menu')
   }
 
   function handleSave(payload: ItemPayload) {
@@ -91,10 +100,13 @@ export default function AddMenuItem() {
     setSaveError('')
     setServerFieldErrors({})
     createItemApi(encryptedOutletId, payload)
-      .then(() => {
+      .then((created) => {
         showToast('Item created successfully')
         invalidateMenuItemCache(encryptedOutletId, payload)
-        window.setTimeout(() => navigate('/menu/base-menu'), 800)
+        const target = returnTo
+          ? `${returnTo}${returnTo.includes('?') ? '&' : '?'}menuItem=${encodeURIComponent(created.id)}&menuItemName=${encodeURIComponent(created.name)}`
+          : '/menu/base-menu'
+        window.setTimeout(() => navigate(target), 800)
       })
       .catch((error: unknown) => {
         setServerFieldErrors(
@@ -111,7 +123,7 @@ export default function AddMenuItem() {
 
   return (
     <MenuPageShell
-      backTo="/menu/base-menu"
+      backTo={returnTo ?? '/menu/base-menu'}
       title={
         <span className="flex flex-wrap items-center gap-1 text-sm! font-medium! sm:text-sm!">
           <span

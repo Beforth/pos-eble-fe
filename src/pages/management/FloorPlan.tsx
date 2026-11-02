@@ -20,11 +20,13 @@ import {
 import { useAuth } from '../../auth/AuthContext'
 import {
   createFloorPlanApi,
+  deleteFloorPlanApi,
   listFloorPlansApi,
   updateFloorPlanApi,
   type FloorPlanRecord,
 } from '../../services/outletService'
 import { TooltipWrapper } from '../../components/common/TooltipWrapper'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 
 type ShapeKind =
   | 'circle'
@@ -232,6 +234,8 @@ export default function FloorPlan() {
   const [items, setItems] = useState<FloorItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
+  const [confirmDeletePlan, setConfirmDeletePlan] = useState(false)
+  const [deletingPlan, setDeletingPlan] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{
     id: string
@@ -375,6 +379,35 @@ export default function FloorPlan() {
     }
   }
 
+  /** Delete the open plan; the next most recent one (if any) is shown after. */
+  async function handleDeletePlan() {
+    if (!planId || !encryptedOutletId || deletingPlan) return
+    setDeletingPlan(true)
+    try {
+      await deleteFloorPlanApi(encryptedOutletId, planId)
+      const remaining = await listFloorPlansApi(encryptedOutletId)
+      if (remaining.length > 0) {
+        const latest = [...remaining].sort((a, b) =>
+          String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')),
+        )[0]
+        applyPlan(latest)
+      } else {
+        setPlanId(null)
+        setPlanName('Floor Plan')
+        setItems([])
+      }
+      setSelectedId(null)
+      setConfirmDeletePlan(false)
+      showToast('Floor plan deleted')
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : 'Failed to delete floor plan',
+      )
+    } finally {
+      setDeletingPlan(false)
+    }
+  }
+
   function openEditor() {
     setEditing(true)
     reloadPlan()
@@ -425,12 +458,34 @@ export default function FloorPlan() {
         title="Floor Plan"
         activeItem="config-floor-plan"
         actions={
-          <PrimaryButton onClick={openEditor}>
-            <Plus size={15} />
-            {planId ? 'Edit Floor Plan' : 'Create Floor Plan'}
-          </PrimaryButton>
+          <div className="flex flex-wrap items-center gap-2">
+            {planId ? (
+              <OutlineButton variant="gray" onClick={() => setConfirmDeletePlan(true)}>
+                <Trash2 size={15} />
+                Delete Floor Plan
+              </OutlineButton>
+            ) : null}
+            <PrimaryButton onClick={openEditor}>
+              <Plus size={15} />
+              {planId ? 'Edit Floor Plan' : 'Create Floor Plan'}
+            </PrimaryButton>
+          </div>
         }
       >
+        <ConfirmDialog
+          open={confirmDeletePlan}
+          title="Delete floor plan"
+          target={planName}
+          message="The tables and items on this floor plan will no longer appear."
+          note="Archived, not erased."
+          confirmLabel={deletingPlan ? 'Deleting…' : 'Delete'}
+          loading={deletingPlan}
+          onClose={() => {
+            if (!deletingPlan) setConfirmDeletePlan(false)
+          }}
+          onConfirm={() => void handleDeletePlan()}
+        />
+
         {planId && items.length > 0 ? (
           <div className="rounded-xl border border-line bg-card">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">

@@ -73,6 +73,8 @@ export interface OnlineOrderQuery {
   status?: OnlineOrderStatus[]
   platform?: string
   search?: string
+  /** Longer history, 1-90 days; the server default is 3. */
+  days?: number
 }
 
 function authToken(): string | undefined {
@@ -91,6 +93,7 @@ export function listOnlineOrdersApi(
   if (query.status?.length) params.set('status', query.status.join(','))
   if (query.platform) params.set('platform', query.platform)
   if (query.search?.trim()) params.set('search', query.search.trim())
+  if (query.days) params.set('days', String(query.days))
   const qs = params.toString()
   return apiRequest<OnlineOrderList>(`${ordersPath(outletId)}${qs ? `?${qs}` : ''}`, {
     method: 'GET',

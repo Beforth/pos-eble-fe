@@ -7,8 +7,11 @@ function authToken(): string | undefined {
 import type {
   ChartPoint,
   ChartStatus,
+  ExpenseType,
+  ExpensesData,
   ItemRow,
   LeakageData,
+  OnlineOrdersData,
   OrderTypeSummary,
   QuickHelpData,
   SalesStats,
@@ -186,4 +189,72 @@ export async function getDashboardQuickHelpApi(outletId: string): Promise<QuickH
     method: 'GET',
     token: authToken(),
   })
+}
+
+interface OnlineOrdersDto {
+  totalOrders: number
+  totalRevenue: string
+  prepaidOrders: number
+  prepaidRevenue: string
+  codOrders: number
+  codRevenue: string
+  platforms: {
+    platform: string
+    orders: number
+    prepaidRevenue: string
+    codRevenue: string
+    revenue: string
+  }[]
+}
+
+/** Online orders panel: accepted Swiggy / Zomato orders, prepaid vs COD. */
+export async function getDashboardOnlineOrdersApi(
+  outletId: string,
+  from?: string,
+  to?: string,
+): Promise<OnlineOrdersData> {
+  const dto = await apiRequest<OnlineOrdersDto>(
+    dashboardPath(outletId, 'online-orders', from, to),
+    { method: 'GET', token: authToken() },
+  )
+  return {
+    totalOrders: dto.totalOrders,
+    totalRevenue: toNumber(dto.totalRevenue),
+    prepaidOrders: dto.prepaidOrders,
+    prepaidRevenue: toNumber(dto.prepaidRevenue),
+    codOrders: dto.codOrders,
+    codRevenue: toNumber(dto.codRevenue),
+    platforms: dto.platforms.map((row) => ({
+      platform: row.platform,
+      orders: row.orders,
+      prepaidRevenue: toNumber(row.prepaidRevenue),
+      codRevenue: toNumber(row.codRevenue),
+      revenue: toNumber(row.revenue),
+    })),
+  }
+}
+
+interface ExpensesDto {
+  totalOutflow: string
+  lines: { label: string; amount: string; type: ExpenseType }[]
+}
+
+/** Expenses & Withdrawals panel: what was paid out in the range. */
+export async function getDashboardExpensesApi(
+  outletId: string,
+  from?: string,
+  to?: string,
+): Promise<ExpensesData> {
+  const dto = await apiRequest<ExpensesDto>(
+    dashboardPath(outletId, 'expenses', from, to),
+    { method: 'GET', token: authToken() },
+  )
+  return {
+    totalOutflow: toNumber(dto.totalOutflow),
+    lines: dto.lines.map((line) => ({
+      label: line.label,
+      amount: toNumber(line.amount),
+      type: line.type,
+    })),
+  }
 }

@@ -90,6 +90,7 @@ import {
   upsertKotTicketFromServer,
 } from '../../utils/tableStatusStore'
 import {
+  notifyStockWarnings,
   sendKotForOrder,
   settleKotOrder,
   type KotTaxTotals,
@@ -286,6 +287,7 @@ export default function CaptainOrders() {
       draft_id: activeDraftId ?? undefined,
       item_count: ticket.items.length,
       items: ticket.items.map((item) => ({
+        item_id: item.itemId,
         name: item.name,
         note: item.note,
         qty: item.qty,
@@ -335,6 +337,7 @@ export default function CaptainOrders() {
     if (ticket.tableId === 'no-table') {
       const saved = await createKotApi(encryptedOutletId, kotPayloadFromTicket(ticket))
       sent = { ...ticket, id: saved.id, kotNo: saved.kot_no }
+      notifyStockWarnings(saved.stock_warnings)
     } else {
       const result = await sendKotForOrder({
         outletId: encryptedOutletId,
@@ -347,6 +350,7 @@ export default function CaptainOrders() {
         tax: kotTaxTotals([...tableKotTickets, ticket]),
       })
       sent = result.ticket
+      notifyStockWarnings(result.stockWarnings)
     }
     if (draftId) {
       setActiveDraftId(null)

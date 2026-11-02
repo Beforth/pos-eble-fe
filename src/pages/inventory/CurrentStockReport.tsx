@@ -231,7 +231,11 @@ export default function CurrentStockReport() {
                     <td className="px-3 py-2.5 text-ink">
                       {row.consumption_unit_name || '—'}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-medium text-ink">
+                    <td
+                      className={`px-3 py-2.5 text-right font-medium ${
+                        Number(row.stock_qty) < 0 ? 'text-danger' : 'text-ink'
+                      }`}
+                    >
                       {row.stock_qty}
                     </td>
                     <td className="px-3 py-2.5 text-right text-ink">
