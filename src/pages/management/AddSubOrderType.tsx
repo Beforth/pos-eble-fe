@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -7,7 +7,15 @@ import {
   OutlineButton,
   PrimaryButton,
 } from '../../components/menu/MenuActionButtons'
-import { addRow, findRow, updateRow } from './subOrderTypeStore'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  createSubOrderTypeApi,
+  listSubOrderTypesApi,
+  updateSubOrderTypeApi,
+  type SubOrderTypeKind,
+  type SubOrderTypeOrderType,
+} from '../../services/outletService'
+import { ORDER_TYPE_LABEL, ORDER_TYPE_OPTIONS } from './subOrderTypeLabels'
 
 const inputClass =
   'h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary'
@@ -41,9 +49,38 @@ export default function AddSubOrderType() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEdit = Boolean(id)
-  const existing = id ? findRow(id) : undefined
-  const [name, setName] = useState(existing?.name ?? '')
-  const [status, setStatus] = useState(existing?.active ?? true)
+  const { encryptedOutletId } = useAuth()
+  const [name, setName] = useState('')
+  const [status, setStatus] = useState(true)
+  const [orderTypes, setOrderTypes] = useState<SubOrderTypeOrderType[]>(['dine-in'])
+  const [kind, setKind] = useState<SubOrderTypeKind>('manual')
+  const [loading, setLoading] = useState(Boolean(id))
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!id || !encryptedOutletId) return
+    let cancelled = false
+    listSubOrderTypesApi(encryptedOutletId)
+      .then((rows) => {
+        const row = rows.find((item) => item.id === id)
+        if (cancelled || !row) return
+        setName(row.name)
+        setStatus(row.is_active)
+        setOrderTypes(row.order_types)
+        setKind(row.kind)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showToast(error instanceof Error ? error.message : 'Failed to load')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id, encryptedOutletId])
 
   const title = useMemo(
     () => (isEdit ? 'Edit Sub Order Type' : 'Add Sub Order Type'),
@@ -55,31 +92,47 @@ export default function AddSubOrderType() {
     navigate('/management/configuration/sub-order-type')
   }
 
-  function handleSave() {
+  function toggleOrderType(type: SubOrderTypeOrderType) {
+    setOrderTypes((prev) =>
+      prev.includes(type) ? prev.filter((item) => item !== type) : [...prev, type],
+    )
+  }
+
+  async function handleSave() {
     if (!name.trim()) {
       showToast('Name is required')
       return
     }
-    if (isEdit && id) {
-      updateRow(id, { name: name.trim(), active: status })
-      showToast('Sub order type updated')
-    } else {
-      addRow({
-        id: `sot-${Date.now()}`,
-        name: name.trim(),
-        type: 'Manual',
-        orderTypes: '',
-        active: status,
-        created: new Date().toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        }),
-        editable: true,
-      })
-      showToast('Sub order type saved')
+    if (orderTypes.length === 0) {
+      showToast('Pick at least one order type')
+      return
     }
-    window.setTimeout(goBack, 700)
+    if (!encryptedOutletId || saving) return
+    setSaving(true)
+    try {
+      if (isEdit && id) {
+        await updateSubOrderTypeApi(
+          encryptedOutletId,
+          id,
+          kind === 'manual'
+            ? { name: name.trim(), order_types: orderTypes, is_active: status }
+            : { is_active: status },
+        )
+        showToast('Sub order type updated')
+      } else {
+        await createSubOrderTypeApi(encryptedOutletId, {
+          name: name.trim(),
+          order_types: orderTypes,
+          is_active: status,
+        })
+        showToast('Sub order type saved')
+      }
+      window.setTimeout(goBack, 700)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -92,8 +145,26 @@ export default function AddSubOrderType() {
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
+              disabled={loading || kind !== 'manual'}
               className={inputClass}
             />
+          </FormRow>
+
+          <FormRow label="Order Type" required align="start">
+            <div className="flex flex-wrap gap-4">
+              {ORDER_TYPE_OPTIONS.map((type) => (
+                <label key={type} className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={orderTypes.includes(type)}
+                    onChange={() => toggleOrderType(type)}
+                    disabled={loading || kind !== 'manual'}
+                    className="size-4 cursor-pointer accent-primary"
+                  />
+                  {ORDER_TYPE_LABEL[type]}
+                </label>
+              ))}
+            </div>
           </FormRow>
 
           <FormRow label="Status">
@@ -120,7 +191,9 @@ export default function AddSubOrderType() {
           <OutlineButton variant="gray" onClick={goBack}>
             Cancel
           </OutlineButton>
-          <PrimaryButton onClick={handleSave}>Save Changes</PrimaryButton>
+          <PrimaryButton onClick={() => void handleSave()} disabled={saving || loading}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </PrimaryButton>
         </div>
       </div>
     </ReportsPageShell>

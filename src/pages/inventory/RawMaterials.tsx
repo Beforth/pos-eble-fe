@@ -74,11 +74,11 @@ function toListRow(row: RawMaterial): ListRow {
 }
 
 async function loadAllRawMaterials(outletId: string): Promise<RawMaterial[]> {
-  const first = await listRawMaterialsApi(outletId, { page: 1 })
+  const first = await listRawMaterialsApi(outletId, { page: 1, kind: 'raw' })
   const rows = [...first.results]
   let page = 2
   while (rows.length < first.count) {
-    const next = await listRawMaterialsApi(outletId, { page })
+    const next = await listRawMaterialsApi(outletId, { page, kind: 'raw' })
     if (next.results.length === 0) break
     rows.push(...next.results)
     page += 1
@@ -792,7 +792,11 @@ export default function RawMaterials() {
                         )}
                       />
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold text-ink">
+                    <td
+                      className={`px-3 py-2 text-right font-semibold ${
+                        row.stockQty < 0 ? 'text-danger' : 'text-ink'
+                      }`}
+                    >
                       {row.stockQty} {row.unitName}
                     </td>
                     <td className="px-3 py-2 text-center">

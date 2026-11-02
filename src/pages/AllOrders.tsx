@@ -55,6 +55,7 @@ import {
 } from '../services/orderService'
 import { subscribeToRail } from '../services/liveRailClient'
 import { useAuth } from '../auth/AuthContext'
+import { useSubOrderTypes } from '../services/useSubOrderTypes'
 import { brand } from '../theme/brand'
 import { formatDayMonth, formatINR, formatNumber } from '../utils/format'
 import { downloadCsv } from '../utils/exportCsv'
@@ -70,16 +71,6 @@ const ORDER_TYPE_OPTIONS = [
   { value: 'PICK UP', label: 'PICK UP' },
 ]
 
-const SUB_ORDER_TYPE_OPTIONS = [
-  { value: 'swiggy', label: 'Swiggy' },
-  { value: 'zomato', label: 'Zomato' },
-  { value: 'home-website', label: 'Home Website' },
-  { value: 'parcel-menu', label: 'Parcel Menu' },
-  { value: 'qr-code', label: 'QR Code' },
-  { value: 'parcel', label: 'Parcel' },
-  { value: 'dine-in', label: 'Dine In' },
-  ...ORDER_TYPE_OPTIONS,
-]
 
 const PAYMENT_TYPE_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -182,6 +173,10 @@ export default function AllOrders() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [subOrderTypes, setSubOrderTypes] = useState<string[]>([])
+  const subOrderTypeOptions = useSubOrderTypes().map((row) => ({
+    value: row.name,
+    label: row.name,
+  }))
   const [paymentType, setPaymentType] = useState('all')
   const [orderStatus, setOrderStatus] = useState('all')
   const [otherStatus, setOtherStatus] = useState('all')
@@ -316,6 +311,11 @@ export default function AllOrders() {
     return orders.filter((row) => {
       const typeOk =
         orderTypes.length === 0 || orderTypes.includes(row.orderType)
+      const subOk =
+        subOrderTypes.length === 0 ||
+        subOrderTypes.some(
+          (name) => name.toLowerCase() === (row.subOrderType ?? '').toLowerCase(),
+        )
       const idOk =
         !orderId.trim() ||
         row.orderNo.includes(orderId.trim()) ||
@@ -346,11 +346,12 @@ export default function AllOrders() {
         }
       }
 
-      return typeOk && idOk && nameOk && paymentOk && statusOk && totalOk
+      return typeOk && subOk && idOk && nameOk && paymentOk && statusOk && totalOk
     })
   }, [
     orders,
     orderTypes,
+    subOrderTypes,
     orderId,
     customerName,
     paymentType,
@@ -931,7 +932,7 @@ export default function AllOrders() {
                       </label>
                       <CheckboxMultiSelect
                         label="Sub Order Type"
-                        options={SUB_ORDER_TYPE_OPTIONS}
+                        options={subOrderTypeOptions}
                         value={subOrderTypes}
                         onChange={setSubOrderTypes}
                       />

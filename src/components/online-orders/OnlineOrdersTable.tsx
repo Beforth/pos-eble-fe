@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Clipboard, History, ReceiptText } from 'lucide-react'
-import type { OnlineOrderRow, OnlineOrderStatus } from '../../mocks/onlineOrdersData'
+import type { OnlineOrderRow, OnlineOrderStatus } from '../../utils/onlineOrderRows'
 import { SortableTh } from '../common/SortableTh'
 import { useListQuery } from '../../hooks/useListQuery'
 import { OnlineOrderActivityDrawer } from './OnlineOrderActivityDrawer'
@@ -12,10 +12,12 @@ interface OnlineOrdersTableProps {
 }
 
 const statusStyles: Record<OnlineOrderStatus, string> = {
-  Delivered: 'bg-success text-white',
+  Received: 'bg-ink/80 text-white',
   Accepted: 'bg-primary text-white',
   'Food Ready': 'bg-accent text-white',
   Dispatched: 'bg-secondary text-deep',
+  Delivered: 'bg-success text-white',
+  Rejected: 'bg-danger text-white',
   Cancelled: 'bg-danger text-white',
 }
 
@@ -100,7 +102,7 @@ export function OnlineOrdersTable({ rows }: OnlineOrdersTableProps) {
       row.created,
       row.total,
       row.status,
-      row.atCount,
+      row.prepTime ?? 0,
     ],
     (row, key) => {
       if (key === 'outlet') return `${row.outletName} ${row.channelLabel}`
@@ -110,7 +112,7 @@ export function OnlineOrdersTable({ rows }: OnlineOrdersTableProps) {
       if (key === 'dateTime') return row.created
       if (key === 'total') return row.total
       if (key === 'status') return row.status
-      if (key === 'at') return row.atCount
+      if (key === 'at') return row.prepTime ?? 0
       return row.orderNo
     },
   )
@@ -202,7 +204,7 @@ export function OnlineOrdersTable({ rows }: OnlineOrdersTableProps) {
                 align="center"
                 className="px-3 py-2.5"
               >
-                At
+                Prep (min)
               </SortableTh>
               <th className="px-3 py-2.5">Actions</th>
             </tr>
@@ -287,7 +289,7 @@ export function OnlineOrdersTable({ rows }: OnlineOrdersTableProps) {
                 </td>
 
                 <td className="px-3 py-3 text-center align-top">
-                  <span className="tabular-nums text-ink">{row.atCount}</span>
+                  <span className="tabular-nums text-ink">{row.prepTime ?? '—'}</span>
                 </td>
 
                 <td className="px-3 py-3 align-top">

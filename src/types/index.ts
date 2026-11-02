@@ -68,7 +68,8 @@ export interface OrderTypeSummary {
 
 export interface PlatformRow {
   platform: string
-  brands: number
+  /** Only shown when the source knows it (online orders carry no brand). */
+  brands?: number
   orders: number
   prepaidRevenue: number
   codRevenue: number

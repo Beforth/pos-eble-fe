@@ -1,9 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { ChevronDown, Eye, FileCog, FileText, Pencil, Plus, ScanLine, Trash2 } from 'lucide-react'
+import {
+  ChevronDown,
+  Eye,
+  FileCog,
+  FileText,
+  Hourglass,
+  Pencil,
+  Plus,
+  Receipt,
+  ScanLine,
+  Trash2,
+  Wallet,
+} from 'lucide-react'
 import { useNavigate } from '../../utils/inventoryRouter'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
+import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { ScanPurchaseModal } from '../../components/inventory/ScanPurchaseModal'
 import { PurchaseOrderSettingsDrawer } from '../../components/inventory/PurchaseOrderSettingsDrawer'
 import { ConfirmDeleteModal } from '../../components/common/ConfirmDeleteModal'
@@ -137,6 +150,105 @@ function toReturnRow(row: PurchaseOrder): ListRow {
   }
 }
 
+const SOURCE_OPTIONS = [
+  { value: 'all', label: 'All sources' },
+  { value: 'supplier', label: 'Supplier' },
+  { value: 'restaurant', label: 'Restaurant' },
+]
+
+const UPDATE_STOCK_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'yes', label: 'Stock updated' },
+  { value: 'no', label: 'Stock not updated' },
+]
+
+function paymentOptions(kind: Kind) {
+  const returns = kind === 'return'
+  return [
+    { value: 'all', label: 'All' },
+    { value: 'paid', label: returns ? 'Refunded' : 'Paid' },
+    { value: 'partial', label: returns ? 'Partially refunded' : 'Partially paid' },
+    { value: 'unpaid', label: returns ? 'Pending' : 'Unpaid' },
+  ]
+}
+
+function labelOf(options: { value: string; label: string }[], value: string) {
+  return options.find((option) => option.value === value)?.label ?? options[0].label
+}
+
+function valueOf(options: { value: string; label: string }[], label: string) {
+  return options.find((option) => option.label === label)?.value ?? options[0].value
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  hint,
+  tone = 'default',
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+  hint?: string
+  tone?: 'default' | 'warn'
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3">
+      <span
+        className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
+          tone === 'warn' ? 'bg-accent/10 text-accent' : 'bg-primary/10 text-primary'
+        }`}
+      >
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
+        <p className="truncate text-lg font-bold text-ink">{value}</p>
+        {hint ? <p className="truncate text-xs text-muted">{hint}</p> : null}
+      </div>
+    </div>
+  )
+}
+
+function Badge({
+  tone,
+  children,
+}: {
+  tone: 'success' | 'warn' | 'danger' | 'neutral'
+  children: ReactNode
+}) {
+  const toneClass = {
+    success: 'bg-success/10 text-success',
+    warn: 'bg-accent/10 text-accent',
+    danger: 'bg-danger/10 text-danger',
+    neutral: 'bg-page text-muted',
+  }[tone]
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${toneClass}`}
+    >
+      {children}
+    </span>
+  )
+}
+
+function PaymentBadge({ status, kind }: { status?: string; kind: Kind }) {
+  if (!status) return <span className="text-muted">—</span>
+  const returns = kind === 'return'
+  if (status === 'paid') return <Badge tone="success">{returns ? 'Refunded' : 'Paid'}</Badge>
+  if (status === 'partial')
+    return <Badge tone="warn">{returns ? 'Partially refunded' : 'Partially paid'}</Badge>
+  return <Badge tone="danger">{returns ? 'Pending' : 'Unpaid'}</Badge>
+}
+
 interface PurchaseListPageProps {
   kind: Kind
   title: string
@@ -262,6 +374,38 @@ function PurchaseListPage({
     }
   }, [encryptedOutletId, kind, applied])
 
+  const stats = useMemo(() => {
+    let total = 0
+    let outstandingCount = 0
+    let outstandingValue = 0
+    for (const row of rows) {
+      const amount = Number(row.total) || 0
+      total += amount
+      if (row.paymentStatus && row.paymentStatus !== 'paid') {
+        outstandingCount += 1
+        outstandingValue += amount
+      }
+    }
+    return { total, outstandingCount, outstandingValue }
+  }, [rows])
+
+  const showPayment = kind !== 'order'
+  const showStock = kind === 'purchase'
+  const columnCount = 5 + (showPayment ? 1 : 0) + (showStock ? 1 : 0)
+  const [singular, plural] =
+    kind === 'order'
+      ? ['purchase order', 'purchase orders']
+      : kind === 'return'
+        ? ['return', 'returns']
+        : ['purchase', 'purchases']
+  const noun = rows.length === 1 ? singular : plural
+  const today = new Date().toISOString().slice(0, 10)
+  const upcomingDeliveries = rows.filter((row) => row.date >= today).length
+  const numberLabel =
+    kind === 'purchase' ? 'Invoice no' : kind === 'return' ? 'Return no' : 'PO no'
+  const dateLabel =
+    kind === 'order' ? 'Delivery date' : kind === 'return' ? 'Return date' : 'Invoice date'
+
   async function confirmDelete() {
     if (!pendingDelete || !encryptedOutletId) return
     try {
@@ -282,7 +426,12 @@ function PurchaseListPage({
   return (
     <InventoryPageShell activeItem={activeItem}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-bold text-ink">{title}</h1>
+        <div>
+          <h1 className="text-lg font-bold text-ink">{title}</h1>
+          <p className="text-sm text-muted">
+            {loading ? 'Loading…' : `${rows.length} ${noun} found`}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {canWrite ? (
             <PrimaryButton onClick={() => navigate(createPath)}>
@@ -328,158 +477,182 @@ function PurchaseListPage({
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-ink">
-            Start Date
-          </label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-            className="h-9 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+      <div
+        className={`mb-4 grid gap-3 sm:grid-cols-2 ${
+          'xl:grid-cols-3'
+        }`}
+      >
+        <StatCard
+          icon={<Receipt size={20} />}
+          label={kind === 'order' ? 'Purchase orders' : kind === 'return' ? 'Returns' : 'Purchases'}
+          value={String(rows.length)}
+          hint="Matching the current filters"
+        />
+        <StatCard
+          icon={<Wallet size={20} />}
+          label="Total value"
+          value={formatMoney(stats.total)}
+          hint="Sum of all listed documents"
+        />
+        {showPayment ? (
+          <StatCard
+            icon={<Hourglass size={20} />}
+            label={kind === 'return' ? 'Refund pending' : 'Payment pending'}
+            value={formatMoney(stats.outstandingValue)}
+            hint={`${stats.outstandingCount} document${stats.outstandingCount === 1 ? '' : 's'} not fully settled`}
+            tone="warn"
           />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-ink">
-            End Date
-          </label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-            className="h-9 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+        ) : (
+          <StatCard
+            icon={<Hourglass size={20} />}
+            label="Upcoming deliveries"
+            value={String(upcomingDeliveries)}
+            hint="Delivery date is today or later"
+            tone="warn"
           />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-ink">
-            From
-          </label>
-          <select
-            value={from}
-            onChange={(event) => setFrom(event.target.value)}
-            className="h-9 min-w-[120px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
-          >
-            <option value="all">All</option>
-            <option value="supplier">Supplier</option>
-            <option value="restaurant">Restaurant</option>
-          </select>
-        </div>
-        <div className="min-w-[160px] flex-1">
-          <label className="mb-1.5 block text-xs font-semibold text-ink">
-            {kind === 'order'
-              ? 'PO No.'
-              : kind === 'return'
-                ? 'Return / Debit Note No.'
-                : 'Invoice No.'}
-          </label>
-          <input
-            type="text"
-            value={invoiceNo}
-            onChange={(event) => setInvoiceNo(event.target.value)}
-            className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-primary"
-          />
-        </div>
-        {kind !== 'order' ? (
-          <OutlineButton
-            variant="gray"
-            onClick={() => setMoreFiltersOpen((prev) => !prev)}
-          >
-            {moreFiltersOpen ? 'Hide Filters' : 'More Filters'}
-          </OutlineButton>
-        ) : null}
-        <OutlineButton
-          onClick={() =>
-            setApplied({
-              startDate,
-              endDate,
-              from,
-              invoiceNo: invoiceNo.trim(),
-              paymentStatus,
-              updateStockFilter,
-            })
-          }
-        >
-          Search
-        </OutlineButton>
-        <OutlineButton
-          variant="gray"
-          onClick={() => {
-            setFrom('all')
-            setInvoiceNo('')
-            setStartDate('')
-            setEndDate('')
-            setPaymentStatus('all')
-            setUpdateStockFilter('all')
-            setMoreFiltersOpen(false)
-            setApplied({
-              startDate: '',
-              endDate: '',
-              from: 'all',
-              invoiceNo: '',
-              paymentStatus: 'all',
-              updateStockFilter: 'all',
-            })
-          }}
-        >
-          Clear
-        </OutlineButton>
+        )}
       </div>
 
-      {kind !== 'order' && moreFiltersOpen ? (
-        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-line bg-page/40 p-4">
+      <div className="mb-4 rounded-xl border border-line bg-card p-4">
+        <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold text-ink">
-              Payment Status
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+              Start date
             </label>
-            <select
-              value={paymentStatus}
-              onChange={(event) => setPaymentStatus(event.target.value)}
-              className="h-9 min-w-[140px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
-            >
-              <option value="all">All</option>
-              <option value="paid">{kind === 'return' ? 'Refunded' : 'Paid'}</option>
-              <option value="partial">
-                {kind === 'return' ? 'Partially Refunded' : 'Partially Paid'}
-              </option>
-              <option value="unpaid">{kind === 'return' ? 'Pending' : 'Unpaid'}</option>
-            </select>
+            <input
+              type="date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(event) => setStartDate(event.target.value)}
+              className="h-10 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+            />
           </div>
-          {kind === 'purchase' ? <div>
-            <label className="mb-1.5 block text-xs font-semibold text-ink">
-              Update Stock
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+              End date
             </label>
-            <select
-              value={updateStockFilter}
-              onChange={(event) => setUpdateStockFilter(event.target.value)}
-              className="h-9 min-w-[140px] rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
+            <input
+              type="date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(event) => setEndDate(event.target.value)}
+              className="h-10 rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
+            />
+          </div>
+          <div className="w-44">
+            <SearchableSelect
+              label={<span className="text-xs font-semibold uppercase tracking-wide text-muted">From</span>}
+              value={labelOf(SOURCE_OPTIONS, from)}
+              options={SOURCE_OPTIONS.map((option) => option.label)}
+              onChange={(label) => setFrom(valueOf(SOURCE_OPTIONS, label))}
+            />
+          </div>
+          <div className="min-w-[200px] flex-1">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+              {kind === 'order'
+                ? 'PO No.'
+                : kind === 'return'
+                  ? 'Return / Debit Note No.'
+                  : 'Invoice No.'}
+            </label>
+            <input
+              type="text"
+              value={invoiceNo}
+              onChange={(event) => setInvoiceNo(event.target.value)}
+              placeholder="Search by number"
+              className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm text-ink outline-none placeholder:text-muted focus:border-primary"
+            />
+          </div>
+          {kind !== 'order' ? (
+            <OutlineButton
+              variant="gray"
+              onClick={() => setMoreFiltersOpen((prev) => !prev)}
             >
-              <option value="all">All</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </div> : null}
+              {moreFiltersOpen ? 'Hide filters' : 'More filters'}
+            </OutlineButton>
+          ) : null}
+          <OutlineButton
+            onClick={() =>
+              setApplied({
+                startDate,
+                endDate,
+                from,
+                invoiceNo: invoiceNo.trim(),
+                paymentStatus,
+                updateStockFilter,
+              })
+            }
+          >
+            Search
+          </OutlineButton>
+          <OutlineButton
+            variant="gray"
+            onClick={() => {
+              setFrom('all')
+              setInvoiceNo('')
+              setStartDate('')
+              setEndDate('')
+              setPaymentStatus('all')
+              setUpdateStockFilter('all')
+              setMoreFiltersOpen(false)
+              setApplied({
+                startDate: '',
+                endDate: '',
+                from: 'all',
+                invoiceNo: '',
+                paymentStatus: 'all',
+                updateStockFilter: 'all',
+              })
+            }}
+          >
+            Clear
+          </OutlineButton>
         </div>
-      ) : null}
+
+        {kind !== 'order' && moreFiltersOpen ? (
+          <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-line pt-4">
+            <div className="w-52">
+              <SearchableSelect
+                label={<span className="text-xs font-semibold uppercase tracking-wide text-muted">Payment status</span>}
+                value={labelOf(paymentOptions(kind), paymentStatus)}
+                options={paymentOptions(kind).map((option) => option.label)}
+                onChange={(label) => setPaymentStatus(valueOf(paymentOptions(kind), label))}
+              />
+            </div>
+            {kind === 'purchase' ? (
+              <div className="w-52">
+                <SearchableSelect
+                  label={<span className="text-xs font-semibold uppercase tracking-wide text-muted">Stock update</span>}
+                  value={labelOf(UPDATE_STOCK_OPTIONS, updateStockFilter)}
+                  options={UPDATE_STOCK_OPTIONS.map((option) => option.label)}
+                  onChange={(label) =>
+                    setUpdateStockFilter(valueOf(UPDATE_STOCK_OPTIONS, label))
+                  }
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <div className="overflow-hidden rounded-xl border border-line bg-card">
         <div className="overflow-x-auto">
-          <table className="min-w-[720px] w-full text-left text-sm">
-            <thead className="border-b border-line bg-page text-xs font-semibold text-ink">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
               <tr>
-                <th className="px-3 py-2.5">Date</th>
-                <th className="px-3 py-2.5">Counterparty</th>
-                <th className="px-3 py-2.5">
-                  {kind === 'purchase' ? 'Invoice No' : 'PO No'}
-                </th>
-                <th className="px-3 py-2.5">Total</th>
-                <th className="px-3 py-2.5 text-center">Actions</th>
+                <th className="px-4 py-3">{dateLabel}</th>
+                <th className="px-4 py-3">Counterparty</th>
+                <th className="px-4 py-3">{numberLabel}</th>
+                <th className="px-4 py-3 text-right">Total</th>
+                {showPayment ? <th className="px-4 py-3">Payment</th> : null}
+                {showStock ? <th className="px-4 py-3">Stock</th> : null}
+                <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-16 text-center">
+                  <td colSpan={columnCount} className="px-4 py-16 text-center">
                     <span className="relative mb-4 inline-flex text-muted">
                       <FileText
                         size={56}
@@ -493,18 +666,35 @@ function PurchaseListPage({
                   </td>
                 </tr>
               ) : (
-                pagedRows.map((row, index) => (
+                pagedRows.map((row) => (
                   <tr
                     key={row.id}
-                    className={`border-b border-line last:border-b-0 ${
-                      index % 2 === 1 ? 'bg-page/50' : 'bg-card'
-                    }`}
+                    className="border-b border-line transition-colors last:border-b-0 hover:bg-surface-tint/20"
                   >
-                    <td className="px-3 py-2.5 text-ink">{row.date}</td>
-                    <td className="px-3 py-2.5 text-ink">{row.counterparty}</td>
-                    <td className="px-3 py-2.5 text-ink">{row.number}</td>
-                    <td className="px-3 py-2.5 text-ink">{row.total}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="whitespace-nowrap px-4 py-3 text-ink">{row.date}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-ink">{row.counterparty}</p>
+                      {row.sourceType ? (
+                        <p className="text-xs capitalize text-muted">{row.sourceType}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-ink">{row.number}</td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-ink">
+                      {formatMoney(Number(row.total) || 0)}
+                    </td>
+                    {showPayment ? (
+                      <td className="px-4 py-3">
+                        <PaymentBadge status={row.paymentStatus} kind={kind} />
+                      </td>
+                    ) : null}
+                    {showStock ? (
+                      <td className="px-4 py-3">
+                        <Badge tone={row.updateStock ? 'success' : 'neutral'}>
+                          {row.updateStock ? 'Updated' : 'Not updated'}
+                        </Badge>
+                      </td>
+                    ) : null}
+                    <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1.5">
                         <RowActionButton
                           boxed

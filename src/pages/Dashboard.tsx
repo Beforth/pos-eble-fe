@@ -18,10 +18,12 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { SupportAgentDrawer } from '../components/layout/SupportAgentDrawer'
 import { TopBar } from '../components/layout/TopBar'
 import type { DateRangeOption } from '../components/common/DatePickerPill'
-import { expenses, onlineOrders, syncStatus } from '../mocks/dashboardData'
+import { syncStatus } from '../mocks/dashboardData'
 import {
+  getDashboardExpensesApi,
   getDashboardItemPerformanceApi,
   getDashboardLeakageApi,
+  getDashboardOnlineOrdersApi,
   getDashboardOrderTypesApi,
   getDashboardQuickHelpApi,
   getDashboardSalesChartApi,
@@ -287,8 +289,13 @@ export default function Dashboard() {
                 )}
               />
 
-              {/* Online Orders: no backend source yet - mock data. */}
-              <OnlineOrdersPanel data={onlineOrders} {...onlineOrdersDatePicker} />
+              <DashboardPanel
+                fetcher={getDashboardOnlineOrdersApi}
+                label="Online orders"
+                range={onlineOrdersDatePicker}
+                refreshKey={refreshKey}
+                render={(data, range) => <OnlineOrdersPanel data={data} {...range} />}
+              />
             </div>
 
             <div className="space-y-4 xl:col-span-4">
@@ -306,8 +313,13 @@ export default function Dashboard() {
                   <ItemPerformancePanel top={top} low={low} {...range} />
                 )}
               />
-              {/* Expenses: no backend model yet - mock data. */}
-              <ExpensesPanel data={expenses} {...expensesDatePicker} />
+              <DashboardPanel
+                fetcher={getDashboardExpensesApi}
+                label="Expenses & Withdrawals"
+                range={expensesDatePicker}
+                refreshKey={refreshKey}
+                render={(data, range) => <ExpensesPanel data={data} {...range} />}
+              />
               <DashboardPanel
                 fetcher={getDashboardQuickHelpApi}
                 label="Quick Help"

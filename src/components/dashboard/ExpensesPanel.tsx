@@ -1,12 +1,16 @@
-import { useMemo, useState } from 'react'
-
-import { showToast } from '../../utils/toast'
+import { useNavigate } from 'react-router-dom'
 import { Pencil } from 'lucide-react'
 import type { ExpenseType, ExpensesData } from '../../types'
 import { formatINR } from '../../utils/format'
 import { Card } from '../common/Card'
 import { DatePickerPill, type DateRangeOption } from '../common/DatePickerPill'
-import { EditExpenseLineModal } from './EditExpenseLineModal'
+
+/** Where each line is recorded; the dashboard only reports what was saved there. */
+const RECORD_PATHS: Record<ExpenseType, string> = {
+  expense: '/billing/expenses',
+  withdrawal: '/billing/withdrawals',
+  topup: '/billing/cash-top-up',
+}
 
 interface ExpensesPanelProps {
   data: ExpensesData
@@ -27,35 +31,7 @@ export function ExpensesPanel({
   onCustomRange,
   className = '',
 }: ExpensesPanelProps) {
-  const [lines, setLines] = useState(data.lines)
-  const [editing, setEditing] = useState<ExpenseType | null>(null)
-
-  const totalOutflow = useMemo(
-    () =>
-      lines
-        .filter((line) => line.type === 'expense' || line.type === 'withdrawal')
-        .reduce((sum, line) => sum + line.amount, 0),
-    [lines],
-  )
-
-
-  function handleSave(amount: number) {
-    if (!editing) return
-    setLines((prev) =>
-      prev.map((line) =>
-        line.type === editing
-          ? { ...line, amount: line.amount + amount }
-          : line,
-      ),
-    )
-    const label =
-      editing === 'expense'
-        ? 'Expense saved'
-        : editing === 'withdrawal'
-          ? 'Withdrawal saved'
-          : 'Cash top up saved'
-    showToast(label)
-  }
+  const navigate = useNavigate()
 
   return (
     <>
@@ -76,12 +52,12 @@ export function ExpensesPanel({
         divider={false}
       >
         <p className="text-2xl font-bold tracking-tight text-ink tabular-nums">
-          {formatINR(totalOutflow)}
+          {formatINR(data.totalOutflow)}
         </p>
         <p className="mt-0.5 text-xs text-muted">Total outflow</p>
 
         <ul className="mt-4 divide-y divide-line">
-          {lines.map((line) => (
+          {data.lines.map((line) => (
             <li
               key={line.label}
               className="flex items-center justify-between gap-2 py-2.5 first:pt-0"
@@ -93,9 +69,9 @@ export function ExpensesPanel({
                 </span>
                 <button
                   type="button"
-                  aria-label={`Edit ${line.label}`}
-                  data-tooltip={`Edit ${line.label}`}
-                  onClick={() => setEditing(line.type)}
+                  aria-label={`Record ${line.label}`}
+                  data-tooltip={`Record ${line.label}`}
+                  onClick={() => navigate(RECORD_PATHS[line.type])}
                   className="rounded p-1 text-muted transition-colors hover:bg-page hover:text-ink"
                 >
                   <Pencil size={13} />
@@ -105,12 +81,6 @@ export function ExpensesPanel({
           ))}
         </ul>
       </Card>
-
-      <EditExpenseLineModal
-        type={editing}
-        onClose={() => setEditing(null)}
-        onSave={handleSave}
-      />
 
     </>
   )

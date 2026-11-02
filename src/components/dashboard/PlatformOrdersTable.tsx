@@ -18,7 +18,7 @@ export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
   const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
     useListQuery(
       platforms,
-      (row) => [row.platform, row.brands, row.orders, row.prepaidRevenue, row.codRevenue, row.revenue],
+      (row) => [row.platform, row.brands ?? 0, row.orders, row.prepaidRevenue, row.codRevenue, row.revenue],
       (row, key) => {
         if (key === 'orders') return row.orders
         if (key === 'prepaid') return row.prepaidRevenue
@@ -50,9 +50,11 @@ export function PlatformOrdersTable({ platforms }: PlatformOrdersTableProps) {
           />
           <span>
             <span className="block font-medium text-ink">{row.platform}</span>
-            <span className="text-[11px] text-muted">
-              {row.brands} brand{row.brands === 1 ? '' : 's'}
-            </span>
+            {row.brands ? (
+              <span className="text-[11px] text-muted">
+                {row.brands} brand{row.brands === 1 ? '' : 's'}
+              </span>
+            ) : null}
           </span>
         </span>
       ),

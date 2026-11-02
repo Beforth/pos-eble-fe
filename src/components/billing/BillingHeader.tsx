@@ -36,6 +36,7 @@ import { isCashierUser } from '../../auth/routePermissions'
 import { BrandLogo } from '../brand/BrandLogo'
 import { HoldIcon } from '../icons/HoldIcon'
 import { BillingNotificationsDrawer } from './BillingNotificationsDrawer'
+import { useNotifications } from '../../state/NotificationsContext'
 import { HoldDrawer } from './HoldDrawer'
 import { RecentOrdersDrawer } from './RecentOrdersDrawer'
 import { StoreStatusDrawer } from './StoreStatusDrawer'
@@ -82,6 +83,7 @@ export function BillingHeader({
   const [recentOpen, setRecentOpen] = useState(false)
   const [holdOpen, setHoldOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const { unreadCount } = useNotifications()
   const [reportsOpen, setReportsOpen] = useState(() =>
     pathname.startsWith(BILLING_REPORTS_PATH),
   )
@@ -247,23 +249,31 @@ export function BillingHeader({
                     },
                   ]
                 : []),
-              { icon: Bell, label: 'Notifications', onClick: () => setNotificationsOpen(true) },
-              { icon: Settings, label: 'Settings', onClick: () => setBillingSettingsOpen(true) },
+              {
+                icon: Bell,
+                label: unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications',
+                dot: unreadCount > 0,
+                onClick: () => setNotificationsOpen(true),
+              },
             ] as {
               icon: typeof BookOpen
               label: string
+              dot?: boolean
               onClick?: () => void
             }[]
-          ).map(({ icon: Icon, label, onClick }) => (
+          ).map(({ icon: Icon, label, dot, onClick }) => (
             <button
               key={label}
               type="button"
               aria-label={label}
               data-tooltip={label}
               onClick={onClick}
-              className="hidden size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink sm:inline-flex lg:size-9"
+              className="relative hidden size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink sm:inline-flex lg:size-9"
             >
               <Icon size={16} />
+              {dot ? (
+                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-card" />
+              ) : null}
             </button>
           ))}
 
@@ -518,19 +528,32 @@ export function BillingHeader({
                   },
                 )}
 
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeDrawer()
-                      setBillingSettingsOpen(true)
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-ink hover:bg-page"
-                  >
-                    <Settings size={18} className="text-muted" />
-                    Settings
-                  </button>
-                </li>
+                {canAccess('/billing/settings') ? (
+                  <li>
+                    <Link
+                      to="/billing/settings"
+                      onClick={closeDrawer}
+                      aria-current={
+                        pathname.startsWith('/billing/settings') ? 'page' : undefined
+                      }
+                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${
+                        pathname.startsWith('/billing/settings')
+                          ? 'bg-primary/10 font-semibold text-primary'
+                          : 'text-ink hover:bg-page'
+                      }`}
+                    >
+                      <Settings
+                        size={18}
+                        className={
+                          pathname.startsWith('/billing/settings')
+                            ? 'text-primary'
+                            : 'text-muted'
+                        }
+                      />
+                      Outlet Settings
+                    </Link>
+                  </li>
+                ) : null}
 
                 <li>
                   <button

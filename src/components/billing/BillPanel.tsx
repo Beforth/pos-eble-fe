@@ -182,6 +182,10 @@ interface BillPanelProps {
   customerFormOpen: boolean
   customerErrors?: Partial<Record<keyof CustomerDetails, boolean>>
   onOrderTypeChange: (type: OrderType) => void
+  /** Active sub order types allowed for the chosen order type (names). */
+  subOrderTypes?: string[]
+  subOrderType?: string
+  onSubOrderTypeChange?: (name: string) => void
   onPaymentChange: (method: PaymentMethod) => void
   /** Platform chosen when the payment method is Other. */
   otherPaymentType?: string
@@ -271,6 +275,9 @@ export function BillPanel({
   customerFormOpen,
   customerErrors,
   onOrderTypeChange,
+  subOrderTypes = [],
+  subOrderType = '',
+  onSubOrderTypeChange,
   onPaymentChange,
   otherPaymentType,
   cardOption = '',
@@ -761,6 +768,24 @@ export function BillPanel({
           )
         })}
       </div>
+
+      {subOrderTypes.length > 0 && onSubOrderTypeChange ? (
+        <div className="border-b border-line px-2 py-2">
+          <select
+            value={subOrderType}
+            onChange={(event) => onSubOrderTypeChange(event.target.value)}
+            aria-label="Sub order type"
+            className="h-9 w-full rounded-lg border border-line bg-card px-2.5 text-sm text-ink outline-none focus:border-primary"
+          >
+            <option value="">Sub order type (optional)</option>
+            {subOrderTypes.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       {/* Quick tools */}
       <div className="relative flex items-center gap-1.5 border-b border-line px-2 py-2">

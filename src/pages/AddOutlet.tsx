@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { showToast } from '../utils/toast'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   Check,
   ChevronDown,
@@ -17,7 +17,15 @@ import {
 } from 'lucide-react'
 import { MenuPageShell } from '../components/layout/MenuPageShell'
 import { PrimaryButton } from '../components/menu/MenuActionButtons'
-import { addOutlet } from '../mocks/outletStore'
+import {
+  createOutletApi,
+  getOutletApi,
+  getOutletSettingsApi,
+  getOutletTimingsApi,
+  updateOutletApi,
+  updateOutletSettingsApi,
+  updateOutletTimingsApi,
+} from '../services/outletService'
 
 const OUTLET_TYPES = [
   'QSR',
@@ -359,9 +367,18 @@ function ToggleChip({
   )
 }
 
+/**
+ * One form, two modes: add (`/menu/add-outlet`) and edit
+ * (`/menu/outlet/:id/edit`). Edit loads the master record, the weekday timings
+ * and the payment types from the API. Viewing is a popup on Menu Management.
+ */
 export default function AddOutlet() {
   const navigate = useNavigate()
+  const { outletId } = useParams()
+  const isEdit = Boolean(outletId)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(Boolean(outletId))
 
   const [outletName, setOutletName] = useState('')
   const [outletAlias, setOutletAlias] = useState('')
@@ -384,7 +401,7 @@ export default function AddOutlet() {
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
 
-  const [open24x7, setOpen24x7] = useState(true)
+  const [open24x7, setOpen24x7] = useState(false)
   const [daySlots, setDaySlots] = useState<
     Record<string, { from: string; to: string }[]>
   >(() =>
@@ -413,7 +430,7 @@ export default function AddOutlet() {
   type OutletTab = 'basic' | 'address' | 'timings' | 'payment' | 'tax' | 'invoice'
   const [activeTab, setActiveTab] = useState<OutletTab>('basic')
 
-  const TABS: { id: OutletTab; label: string; icon: ReactNode }[] = [
+  const ALL_TABS: { id: OutletTab; label: string; icon: ReactNode }[] = [
     { id: 'basic', label: 'Basic Info', icon: <Store size={14} /> },
     { id: 'address', label: 'Address', icon: <MapPin size={14} /> },
     { id: 'timings', label: 'Timings', icon: <Clock size={14} /> },
@@ -421,6 +438,71 @@ export default function AddOutlet() {
     { id: 'tax', label: 'Tax & License', icon: <Receipt size={14} /> },
     { id: 'invoice', label: 'Invoice', icon: <FileText size={14} /> },
   ]
+  const TABS = ALL_TABS
+
+  // Payment-type rows as saved, so Edit keeps rows the chips do not show
+  // (custom names, disabled rows) and their order.
+  const paymentRowsRef = useRef<
+    { name: string; is_enabled: boolean; position: number }[]
+  >([])
+
+  useEffect(() => {
+    if (!outletId) return
+    let cancelled = false
+    Promise.all([
+      getOutletApi(outletId),
+      getOutletTimingsApi(outletId),
+      getOutletSettingsApi(outletId, 'payment'),
+    ])
+      .then(([outlet, timings, payment]) => {
+        if (cancelled) return
+        setOpen24x7(outlet.open_24x7)
+        setCurrency(outlet.currency)
+        setDaySlots(
+          Object.fromEntries(DAYS.map((day) => [day, timings.day_slots[day] ?? []])),
+        )
+        setHolidays(timings.holidays)
+        const rows = (payment.payment_types ?? []) as typeof paymentRowsRef.current
+        paymentRowsRef.current = rows
+        setPaymentTypes(rows.filter((row) => row.is_enabled).map((row) => row.name))
+        setOutletName(outlet.name)
+        setOutletAlias(outlet.alias)
+        setOutletType(outlet.outlet_type)
+        setPhone(outlet.phone)
+        setEmail(outlet.email)
+        setTimezone(outlet.timezone)
+        setSeatingCapacity(outlet.seating_capacity)
+        setOnlineChannels(outlet.online_channels)
+        setCuisines(outlet.cuisines)
+        setAddressLine1(outlet.address_line1)
+        setAddressLine2(outlet.address_line2)
+        setLandmark(outlet.landmark)
+        setArea(outlet.area)
+        setCity(outlet.city)
+        setState(outlet.state)
+        setZipCode(outlet.zip_code)
+        setLatitude(outlet.latitude)
+        setLongitude(outlet.longitude)
+        setGstin(outlet.gstin)
+        setFssai(outlet.fssai_no)
+        setPanNumber(outlet.pan_number)
+        setTaxAuthority(outlet.tax_authority)
+        setInvoicePrefix(outlet.invoice_prefix)
+        setStartingNumber(outlet.starting_invoice_number)
+        setTermsConditions(outlet.invoice_terms_conditions)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load outlet.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [outletId])
 
 
   function togglePaymentType(type: string) {
@@ -466,6 +548,35 @@ export default function AddOutlet() {
     }))
   }
 
+  /** Give every day without hours the default 09:00-22:00 slot. */
+  function enableAllDays() {
+    setDaySlots((prev) =>
+      Object.fromEntries(
+        DAYS.map((day) => [
+          day,
+          (prev[day] ?? []).length > 0
+            ? prev[day]
+            : [{ from: '09:00', to: '22:00' }],
+        ]),
+      ),
+    )
+  }
+
+  /** Copy the first listed day's hours onto every other day. */
+  function copyFirstDayToAll() {
+    setDaySlots((prev) => {
+      const source = prev[DAYS[0]] ?? []
+      return Object.fromEntries(
+        DAYS.map((day) => [day, source.map((slot) => ({ ...slot }))]),
+      )
+    })
+  }
+
+  /** Remove every slot of one day (the day then shows as closed). */
+  function clearDay(day: string) {
+    setDaySlots((prev) => ({ ...prev, [day]: [] }))
+  }
+
   function removeDaySlot(day: string, index: number) {
     setDaySlots((prev) => ({
       ...prev,
@@ -473,7 +584,8 @@ export default function AddOutlet() {
     }))
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (saving) return
     if (!outletName.trim()) {
       setError('Outlet name is required')
       return
@@ -499,41 +611,99 @@ export default function AddOutlet() {
       return
     }
     setError('')
-    addOutlet({
-      outletName,
-      outletAlias,
-      outletType,
-      phone,
-      email,
-      timezone,
-      seatingCapacity,
-      onlineChannels,
-      cuisines,
-      addressLine1,
-      addressLine2,
-      landmark,
-      area,
-      city,
-      state,
-      country,
-      zipCode,
-      latitude,
-      longitude,
-      open24x7,
-      daySlots,
-      holidays,
-      currency,
-      paymentTypes,
-      gstin,
-      fssai,
-      panNumber,
-      taxAuthority,
-      invoicePrefix,
-      startingNumber,
-      termsConditions,
-    })
-    showToast('Outlet created successfully')
-    window.setTimeout(() => navigate('/menu'), 800)
+    setSaving(true)
+    try {
+      if (outletId) {
+        await updateOutletApi(outletId, {
+          name: outletName.trim(),
+          open_24x7: open24x7,
+          currency,
+          alias: outletAlias,
+          outlet_type: outletType,
+          phone,
+          email,
+          timezone,
+          seating_capacity: seatingCapacity,
+          online_channels: onlineChannels,
+          cuisines,
+          address_line1: addressLine1,
+          address_line2: addressLine2,
+          landmark,
+          area,
+          city,
+          state,
+          zip_code: zipCode,
+          latitude,
+          longitude,
+          gstin,
+          fssai_no: fssai,
+          pan_number: panNumber,
+          tax_authority: taxAuthority,
+          invoice_prefix: invoicePrefix,
+          starting_invoice_number: startingNumber,
+          invoice_terms_conditions: termsConditions,
+        })
+        await updateOutletTimingsApi(outletId, {
+          day_slots: daySlots,
+          holidays: holidays.filter(Boolean),
+        })
+        const known = paymentRowsRef.current
+        const rows = known.map((row) => ({
+          ...row,
+          is_enabled: PAYMENT_TYPE_OPTIONS.includes(row.name)
+            ? paymentTypes.includes(row.name)
+            : row.is_enabled,
+        }))
+        for (const name of paymentTypes) {
+          if (!known.some((row) => row.name === name)) {
+            rows.push({ name, is_enabled: true, position: rows.length })
+          }
+        }
+        await updateOutletSettingsApi(outletId, 'payment', { payment_types: rows })
+        showToast('Outlet updated successfully')
+        window.setTimeout(() => navigate('/menu'), 800)
+        return
+      }
+      await createOutletApi({
+        name: outletName.trim(),
+        alias: outletAlias,
+        outlet_type: outletType,
+        phone,
+        email,
+        timezone,
+        seating_capacity: seatingCapacity,
+        online_channels: onlineChannels,
+        cuisines,
+        address_line1: addressLine1,
+        address_line2: addressLine2,
+        landmark,
+        area,
+        city,
+        state,
+        country,
+        zip_code: zipCode,
+        latitude,
+        longitude,
+        open_24x7: open24x7,
+        day_slots: daySlots,
+        holidays,
+        currency,
+        payment_types: paymentTypes,
+        gstin,
+        fssai_no: fssai,
+        pan_number: panNumber,
+        tax_authority: taxAuthority,
+        invoice_prefix: invoicePrefix,
+        starting_invoice_number: startingNumber,
+        invoice_terms_conditions: termsConditions,
+      })
+      showToast('Outlet created successfully')
+      window.setTimeout(() => navigate('/menu'), 800)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create outlet.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -553,7 +723,9 @@ export default function AddOutlet() {
             Menu Management
           </span>
           <span className="font-normal text-muted">&gt;</span>
-          <span className="font-semibold text-ink">Add Outlet</span>
+          <span className="font-semibold text-ink">
+            {isEdit ? 'Edit Outlet' : 'Add Outlet'}
+          </span>
         </span>
       }
     >
@@ -584,6 +756,9 @@ export default function AddOutlet() {
         </div>
       </div>
 
+      {loading ? <p className="mb-3 text-sm text-muted">Loading outlet…</p> : null}
+
+      <fieldset disabled={loading} className="m-0 min-w-0 border-0 p-0">
       {activeTab === 'basic' ? (
         <SectionCard icon={<Store size={16} />} title="Basic Information">
           <div className="grid gap-4 md:grid-cols-2">
@@ -761,6 +936,22 @@ export default function AddOutlet() {
 
           {!open24x7 ? (
             <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={enableAllDays}
+                  className="inline-flex h-8 items-center rounded-md border border-line bg-card px-2.5 text-xs font-medium text-ink hover:bg-page"
+                >
+                  Enable all days
+                </button>
+                <button
+                  type="button"
+                  onClick={copyFirstDayToAll}
+                  className="inline-flex h-8 items-center rounded-md border border-line bg-card px-2.5 text-xs font-medium text-ink hover:bg-page"
+                >
+                  Copy Mon hours to all days
+                </button>
+              </div>
               {DAYS.map((day) => (
                 <div key={day} className="flex flex-wrap items-center gap-3">
                   <span className="w-10 text-sm font-medium text-ink">
@@ -807,6 +998,17 @@ export default function AddOutlet() {
                     >
                       <Plus size={14} />
                     </button>
+                    {(daySlots[day] ?? []).length > 0 ? (
+                      <button
+                        type="button"
+                        aria-label={`Clear ${day} hours`}
+                        data-tooltip={`Clear ${day} hours`}
+                        onClick={() => clearDay(day)}
+                        className="inline-flex size-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-page hover:text-danger"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : null}
                 </div>
               ))}
             </div>
@@ -956,6 +1158,7 @@ export default function AddOutlet() {
           </div>
         </SectionCard>
       ) : null}
+      </fieldset>
 
       {error ? <p className="mb-3 text-sm text-primary">{error}</p> : null}
 
@@ -967,7 +1170,9 @@ export default function AddOutlet() {
         >
           Cancel
         </button>
-        <PrimaryButton onClick={handleSave}>Save Outlet</PrimaryButton>
+        <PrimaryButton onClick={handleSave} disabled={saving || loading}>
+          {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save Outlet'}
+        </PrimaryButton>
       </div>
     </MenuPageShell>
   )

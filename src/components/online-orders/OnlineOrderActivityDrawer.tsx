@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
-import type { OnlineOrderRow } from '../../mocks/onlineOrdersData'
+import type { OnlineOrderRow } from '../../utils/onlineOrderRows'
 
 interface OnlineOrderActivityDrawerProps {
   open: boolean
@@ -36,61 +36,31 @@ function toIsoLike(value: string): string {
   return `${yyyy}-${mm}-${dd} ${time}`
 }
 
-function shiftSeconds(value: string, seconds: number): string {
-  const match = value.match(
-    /^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/,
-  )
-  if (!match) return value
-  const [, dd, mm, yyyy, hh, mi, ss] = match
-  const date = new Date(
-    Number(yyyy),
-    Number(mm) - 1,
-    Number(dd),
-    Number(hh),
-    Number(mi),
-    Number(ss) + seconds,
-  )
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-}
-
+/** Only moments the system actually recorded; nothing is estimated. */
 function buildLifecycle(order: OnlineOrderRow): LifecycleEvent[] {
   const events: LifecycleEvent[] = [
+    { title: 'Order Placed', at: order.created, tone: 'placed' },
     {
-      title: 'Order Placed',
-      at: order.created,
-      tone: 'placed',
-    },
-    {
-      title: 'Order Placed',
+      title: 'Order Received',
       at: order.received,
       requestFrom: 'Thirdparty',
-      riderStatus: 'CONFIRMED',
       tone: 'placed',
-    },
-    {
-      title: 'Prepared (Bill)',
-      at: order.accepted,
-      requestFrom: 'POS',
-      tone: 'prepared',
-    },
-    {
-      title: 'Prepared (Bill)',
-      at: shiftSeconds(order.accepted, 49),
-      requestFrom: 'Thirdparty',
-      riderStatus: 'ARRIVED',
-      tone: 'prepared',
     },
   ]
 
-  if (
-    order.status === 'Food Ready' ||
-    order.status === 'Dispatched' ||
-    order.status === 'Delivered'
-  ) {
+  if (order.accepted !== '—') {
+    events.push({
+      title: 'Order Accepted',
+      at: order.accepted,
+      requestFrom: 'POS',
+      tone: 'prepared',
+    })
+  }
+
+  if (order.foodReady !== '—') {
     events.push({
       title: 'Food Is Ready',
-      at: shiftSeconds(order.accepted, 22 * 60),
+      at: order.foodReady,
       requestFrom: 'POS',
       tone: 'ready',
     })
@@ -98,34 +68,21 @@ function buildLifecycle(order: OnlineOrderRow): LifecycleEvent[] {
 
   if (order.status === 'Dispatched' || order.status === 'Delivered') {
     events.push({
-      title: 'Dispatched',
-      at: shiftSeconds(order.accepted, 24 * 60),
-      requestFrom: 'Thirdparty',
-      riderStatus: 'PICKEDUP',
-      tone: 'dispatched',
-    })
-  }
-
-  if (order.status === 'Delivered') {
-    events.push({
-      title: 'Delivered',
+      title: order.status,
       at: order.updated,
       requestFrom: 'Thirdparty',
-      tone: 'delivered',
+      riderStatus: order.riderStatus || undefined,
+      tone: order.status === 'Delivered' ? 'delivered' : 'dispatched',
     })
   }
 
-  if (order.status === 'Cancelled') {
+  if (order.status === 'Rejected' || order.status === 'Cancelled') {
     events.push({
-      title: 'Cancelled',
+      title: order.status,
       at: order.updated,
       requestFrom: 'Thirdparty',
       tone: 'placed',
     })
-  }
-
-  if (order.status === 'Accepted') {
-    // Keep early lifecycle only
   }
 
   return events

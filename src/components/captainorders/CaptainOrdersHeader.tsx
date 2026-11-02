@@ -25,6 +25,8 @@ import { useAuth } from '../../auth/AuthContext'
 import { isCashierUser } from '../../auth/routePermissions'
 import { BrandLogo } from '../brand/BrandLogo'
 import { StoreStatusDrawer } from '../billing/StoreStatusDrawer'
+import { NotificationsDrawer } from '../layout/NotificationsDrawer'
+import { useNotifications } from '../../state/NotificationsContext'
 import { brand } from '../../theme/brand'
 import type { DayEndSummaryRow } from '../../mocks/dayEndSummaryData'
 import {
@@ -68,6 +70,8 @@ export function CaptainOrdersHeader({
   const [storeInfoOpen, setStoreInfoOpen] = useState(false)
   const [quickReportsOpen, setQuickReportsOpen] = useState(false)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const { unreadCount } = useNotifications()
   const [recentDayEnd, setRecentDayEnd] = useState<DayEndSummaryRow[]>([])
 
   useEffect(() => {
@@ -240,23 +244,32 @@ export function CaptainOrdersHeader({
                     },
                   ]
                 : []),
-              { icon: Bell, label: 'Notifications', onClick: () => alert('Notifications — coming soon') },
+              {
+                icon: Bell,
+                label: unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications',
+                dot: unreadCount > 0,
+                onClick: () => setNotificationsOpen(true),
+              },
               { icon: Settings, label: 'Settings', onClick: () => setBillingSettingsOpen(true) },
             ] as {
               icon: typeof BookOpen
               label: string
+              dot?: boolean
               onClick?: () => void
             }[]
-          ).map(({ icon: Icon, label, onClick }) => (
+          ).map(({ icon: Icon, label, dot, onClick }) => (
             <button
               key={label}
               type="button"
               data-tooltip={label}
               aria-label={label}
               onClick={onClick}
-              className="hidden size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink sm:inline-flex lg:size-9"
+              className="relative hidden size-8 items-center justify-center rounded-lg text-muted hover:bg-page hover:text-ink sm:inline-flex lg:size-9"
             >
               <Icon size={16} />
+              {dot ? (
+                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-card" />
+              ) : null}
             </button>
           ))}
 
@@ -465,6 +478,7 @@ export function CaptainOrdersHeader({
       ) : null}
 
       <StoreStatusDrawer open={storeInfoOpen} onClose={() => setStoreInfoOpen(false)} />
+      <NotificationsDrawer open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
 
       {/* ─── MODAL: Quick Reports ─── */}
       {quickReportsOpen ? (

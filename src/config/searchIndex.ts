@@ -164,6 +164,16 @@ const GROUPS: SearchGroupDef[] = [
         '/inventory/production-execution',
         ['production execution', 'execute'],
       ],
+      [
+        'Finished Goods',
+        '/inventory/finished-goods',
+        ['finished goods', 'finished good', 'bread', 'made item'],
+      ],
+      [
+        'Make Finished Goods',
+        '/inventory/finished-goods/make',
+        ['make finished goods', 'add production', 'batch', 'made'],
+      ],
       ['Barcode Generation', '/inventory/barcode-generation', ['barcode', 'label']],
       [
         'Barcode Configuration',

@@ -149,6 +149,41 @@ export async function createOutletApi(
   })
 }
 
+export interface OutletTimings {
+  day_slots: Record<string, { from: string; to: string }[]>
+  holidays: string[]
+}
+
+/** Weekday opening windows and holidays (view_outlet). */
+export async function getOutletTimingsApi(
+  encryptedId: string,
+): Promise<OutletTimings> {
+  return apiRequest<OutletTimings>(`/api/v1/outlets/${encryptedId}/timings/`, {
+    method: 'GET',
+    token: authToken(),
+  })
+}
+
+/** Full-replace the weekday windows and holidays (change_outlet). */
+export async function updateOutletTimingsApi(
+  encryptedId: string,
+  payload: OutletTimings,
+): Promise<OutletTimings> {
+  return apiRequest<OutletTimings>(`/api/v1/outlets/${encryptedId}/timings/`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+    token: authToken(),
+  })
+}
+
+/** Delete an outlet (soft delete). Requires the outlets.delete_outlet permission. */
+export async function deleteOutletApi(encryptedId: string): Promise<unknown> {
+  return apiRequest<unknown>(`/api/v1/outlets/${encryptedId}/`, {
+    method: 'DELETE',
+    token: authToken(),
+  })
+}
+
 /** Resolve the active outlet to an encrypted id. */
 export async function switchOutletApi(
   outletId: number,
@@ -579,7 +614,176 @@ export async function deletePrinterApi(
   )
 }
 
-export type CustomStatusStage = 'accepted' | 'food_ready' | 'dispatched'
+export type SubOrderTypeKind = 'default' | 'third_party' | 'manual'
+export type SubOrderTypeOrderType = 'dine-in' | 'delivery' | 'pick-up'
+
+export interface SubOrderTypeRecord {
+  id: string
+  name: string
+  kind: SubOrderTypeKind
+  order_types: SubOrderTypeOrderType[]
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** List an outlet's sub order types (the standard set is created on first use). */
+export async function listSubOrderTypesApi(
+  encryptedId: string,
+): Promise<SubOrderTypeRecord[]> {
+  return apiRequest<SubOrderTypeRecord[]>(
+    `/api/v1/outlets/${encryptedId}/sub-order-types/`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+/** Add a manual sub order type. */
+export async function createSubOrderTypeApi(
+  encryptedId: string,
+  payload: Pick<SubOrderTypeRecord, 'name' | 'order_types' | 'is_active'>,
+): Promise<SubOrderTypeRecord> {
+  return apiRequest<SubOrderTypeRecord>(
+    `/api/v1/outlets/${encryptedId}/sub-order-types/`,
+    { method: 'POST', body: JSON.stringify(payload), token: authToken() },
+  )
+}
+
+/** Standard rows accept only `is_active`; manual rows also name / order types. */
+export async function updateSubOrderTypeApi(
+  encryptedId: string,
+  id: string,
+  payload: Partial<Pick<SubOrderTypeRecord, 'name' | 'order_types' | 'is_active'>>,
+): Promise<SubOrderTypeRecord> {
+  return apiRequest<SubOrderTypeRecord>(
+    `/api/v1/outlets/${encryptedId}/sub-order-types/${id}/`,
+    { method: 'PATCH', body: JSON.stringify(payload), token: authToken() },
+  )
+}
+
+/** Delete a manual sub order type (soft delete). */
+export async function deleteSubOrderTypeApi(
+  encryptedId: string,
+  id: string,
+): Promise<unknown> {
+  return apiRequest<unknown>(
+    `/api/v1/outlets/${encryptedId}/sub-order-types/${id}/`,
+    { method: 'DELETE', token: authToken() },
+  )
+}
+
+export interface DeliveryDistanceRecord {
+  id: string
+  /** Decimal strings, e.g. "3.00". */
+  from_km: string
+  to_km: string
+  charge: string
+  created_at: string
+  updated_at: string
+}
+
+export type DeliveryDistancePayload = Pick<
+  DeliveryDistanceRecord,
+  'from_km' | 'to_km' | 'charge'
+>
+
+/** List an outlet's delivery distance bands, nearest first. */
+export async function listDeliveryDistancesApi(
+  encryptedId: string,
+): Promise<DeliveryDistanceRecord[]> {
+  return apiRequest<DeliveryDistanceRecord[]>(
+    `/api/v1/outlets/${encryptedId}/delivery-distances/`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function createDeliveryDistanceApi(
+  encryptedId: string,
+  payload: DeliveryDistancePayload,
+): Promise<DeliveryDistanceRecord> {
+  return apiRequest<DeliveryDistanceRecord>(
+    `/api/v1/outlets/${encryptedId}/delivery-distances/`,
+    { method: 'POST', body: JSON.stringify(payload), token: authToken() },
+  )
+}
+
+export async function updateDeliveryDistanceApi(
+  encryptedId: string,
+  id: string,
+  payload: Partial<DeliveryDistancePayload>,
+): Promise<DeliveryDistanceRecord> {
+  return apiRequest<DeliveryDistanceRecord>(
+    `/api/v1/outlets/${encryptedId}/delivery-distances/${id}/`,
+    { method: 'PATCH', body: JSON.stringify(payload), token: authToken() },
+  )
+}
+
+export async function deleteDeliveryDistanceApi(
+  encryptedId: string,
+  id: string,
+): Promise<unknown> {
+  return apiRequest<unknown>(
+    `/api/v1/outlets/${encryptedId}/delivery-distances/${id}/`,
+    { method: 'DELETE', token: authToken() },
+  )
+}
+
+export interface AreaDeliveryChargeRecord {
+  id: string
+  name: string
+  /** Decimal string, e.g. "40.00". */
+  charge: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type AreaDeliveryChargePayload = Pick<
+  AreaDeliveryChargeRecord,
+  'name' | 'charge' | 'is_active'
+>
+
+/** List an outlet's area / locality delivery charges, by name. */
+export async function listAreaDeliveryChargesApi(
+  encryptedId: string,
+): Promise<AreaDeliveryChargeRecord[]> {
+  return apiRequest<AreaDeliveryChargeRecord[]>(
+    `/api/v1/outlets/${encryptedId}/area-delivery-charges/`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function createAreaDeliveryChargeApi(
+  encryptedId: string,
+  payload: AreaDeliveryChargePayload,
+): Promise<AreaDeliveryChargeRecord> {
+  return apiRequest<AreaDeliveryChargeRecord>(
+    `/api/v1/outlets/${encryptedId}/area-delivery-charges/`,
+    { method: 'POST', body: JSON.stringify(payload), token: authToken() },
+  )
+}
+
+export async function updateAreaDeliveryChargeApi(
+  encryptedId: string,
+  id: string,
+  payload: Partial<AreaDeliveryChargePayload>,
+): Promise<AreaDeliveryChargeRecord> {
+  return apiRequest<AreaDeliveryChargeRecord>(
+    `/api/v1/outlets/${encryptedId}/area-delivery-charges/${id}/`,
+    { method: 'PATCH', body: JSON.stringify(payload), token: authToken() },
+  )
+}
+
+export async function deleteAreaDeliveryChargeApi(
+  encryptedId: string,
+  id: string,
+): Promise<unknown> {
+  return apiRequest<unknown>(
+    `/api/v1/outlets/${encryptedId}/area-delivery-charges/${id}/`,
+    { method: 'DELETE', token: authToken() },
+  )
+}
+
+export type CustomStatusStage ='accepted' | 'food_ready' | 'dispatched'
 
 export interface CustomOrderStatusRecord {
   after_stage: CustomStatusStage

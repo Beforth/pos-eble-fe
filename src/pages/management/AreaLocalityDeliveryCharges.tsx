@@ -1,226 +1,315 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { MapPin, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Badge } from '../../components/common/Badge'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { ListSearch } from '../../components/common/ListSearch'
 import { SortableTh } from '../../components/common/SortableTh'
 import { ReportsPageShell } from '../../components/layout/ReportsPageShell'
 import { useListQuery } from '../../hooks/useListQuery'
+import { PrimaryButton } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
 import {
-  OutlineButton,
-  PrimaryButton,
-} from '../../components/menu/MenuActionButtons'
-import { brand } from '../../theme/brand'
+  deleteAreaDeliveryChargeApi,
+  listAreaDeliveryChargesApi,
+  updateAreaDeliveryChargeApi,
+  type AreaDeliveryChargeRecord,
+} from '../../services/outletService'
+import { formatINR } from '../../utils/format'
 
-interface AreaChargeRow {
-  id: string
-  area: string
-  locality: string
-  charge: string
-  active: boolean
-}
+type StatusFilter = 'all' | 'active' | 'inactive'
 
 export default function AreaLocalityDeliveryCharges() {
   const navigate = useNavigate()
-  const [status, setStatus] = useState('All')
-  const [appliedStatus, setAppliedStatus] = useState('All')
-  const [rows, setRows] = useState<AreaChargeRow[]>([])
+  const { encryptedOutletId } = useAuth()
+  const [rows, setRows] = useState<AreaDeliveryChargeRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [deleteTarget, setDeleteTarget] = useState<AreaDeliveryChargeRecord | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!encryptedOutletId) return
+    try {
+      setRows(await listAreaDeliveryChargesApi(encryptedOutletId))
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to load delivery charges')
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount
+    void load()
+  }, [load])
 
   const filtered = useMemo(() => {
-    if (appliedStatus === 'All') return rows
-    const wantActive = appliedStatus === 'Active'
-    return rows.filter((row) => row.active === wantActive)
-  }, [rows, appliedStatus])
+    if (statusFilter === 'all') return rows
+    return rows.filter((row) => row.is_active === (statusFilter === 'active'))
+  }, [rows, statusFilter])
 
-  const { search, setSearch, sortKey, sortDir, toggleSort, visible } =
-    useListQuery(
-      filtered,
-      (row) => [row.area, row.locality, row.charge, row.active],
-      (row, key) => {
-        if (key === 'locality') return row.locality
-        if (key === 'charge') return Number(row.charge) || row.charge
-        if (key === 'status') return row.active ? 1 : 0
-        return row.area
-      },
+  const { search, setSearch, sortKey, sortDir, toggleSort, visible } = useListQuery(
+    filtered,
+    (row) => [row.name, row.charge, row.is_active],
+    (row, key) => {
+      if (key === 'charge') return Number(row.charge)
+      if (key === 'status') return row.is_active ? 1 : 0
+      return row.name
+    },
+  )
+
+  const counts = {
+    all: rows.length,
+    active: rows.filter((row) => row.is_active).length,
+    inactive: rows.filter((row) => !row.is_active).length,
+  }
+  const tabs: { key: StatusFilter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'active', label: 'Active' },
+    { key: 'inactive', label: 'Inactive' },
+  ]
+
+  /** Switch a row on or off straight from the list. */
+  async function toggleActive(row: AreaDeliveryChargeRecord) {
+    if (!encryptedOutletId) return
+    const next = !row.is_active
+    setRows((prev) =>
+      prev.map((item) => (item.id === row.id ? { ...item, is_active: next } : item)),
     )
-
-
-  function handleSearch() {
-    setAppliedStatus(status)
+    try {
+      await updateAreaDeliveryChargeApi(encryptedOutletId, row.id, { is_active: next })
+    } catch (error) {
+      setRows((prev) =>
+        prev.map((item) => (item.id === row.id ? { ...item, is_active: !next } : item)),
+      )
+      showToast(error instanceof Error ? error.message : 'Failed to update')
+    }
   }
 
-  function handleShowAll() {
-    setStatus('All')
-    setAppliedStatus('All')
-    showToast('Filters cleared')
+  async function confirmDelete() {
+    if (!deleteTarget || !encryptedOutletId || deleting) return
+    setDeleting(true)
+    try {
+      await deleteAreaDeliveryChargeApi(encryptedOutletId, deleteTarget.id)
+      showToast('Delivery charge removed')
+      setDeleteTarget(null)
+      await load()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to delete')
+    } finally {
+      setDeleting(false)
+    }
   }
 
-  function handleDelete(id: string) {
-    setRows((prev) => prev.filter((row) => row.id !== id))
-    showToast('Delivery charge removed')
-  }
+  const goAdd = () => navigate('/management/configuration/area-locality-delivery/add')
 
   return (
     <ReportsPageShell
       title="Area/Locality Wise Delivery Charges"
       activeItem="config-area-locality-delivery"
       actions={
-        <PrimaryButton
-          onClick={() =>
-            navigate('/management/configuration/area-locality-delivery/add')
-          }
-        >
+        <PrimaryButton onClick={goAdd}>
           <Plus size={15} />
-          Add Area/Locality Wise Delivery Charges
+          Add Area/Locality
         </PrimaryButton>
       }
     >
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete delivery charge"
+        target={deleteTarget?.name}
+        message="Deliveries to this area will no longer get this charge."
+        note="Archived, not erased."
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        loading={deleting}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
 
-      <div className="overflow-hidden rounded-xl border border-line bg-card">
-        <div className="border-b border-line p-4 sm:p-5">
-          <label
-            htmlFor="area-charge-status"
-            className="mb-1.5 block text-sm font-semibold text-ink"
-          >
-            Select Status
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              id="area-charge-status"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className="h-9 min-w-[160px] rounded-md border border-line bg-card px-3 text-sm text-ink outline-none focus:border-primary"
-            >
-              <option value="All">All</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-            <OutlineButton onClick={handleSearch}>Search</OutlineButton>
-            <OutlineButton variant="gray" onClick={handleShowAll}>
-              Clear Filter
-            </OutlineButton>
+      {loading && rows.length === 0 ? (
+        <div className="rounded-xl border border-line bg-card px-6 py-16 text-center text-sm text-muted">
+          Loading delivery charges…
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-dashed border-line bg-card px-6 py-16 text-center">
+          <span className="mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <MapPin size={28} />
+          </span>
+          <p className="text-base font-semibold text-ink">No area charges yet</p>
+          <p className="mt-1 max-w-sm text-sm text-muted">
+            Add an area or locality and the delivery charge for it, for example College
+            Road for ₹40.
+          </p>
+          <div className="mt-5">
+            <PrimaryButton onClick={goAdd}>
+              <Plus size={15} />
+              Add Area/Locality
+            </PrimaryButton>
           </div>
         </div>
-
-        {visible.length === 0 ? (
-          <div className="flex min-h-[360px] flex-col items-center justify-center px-6 py-16 text-center">
-            <span className="mb-4 flex size-20 items-center justify-center rounded-full bg-page">
-              <Search
-                size={48}
-                strokeWidth={1.25}
-                className="text-muted/45"
-              />
-            </span>
-            <p className="text-base font-semibold text-ink">No Results Found.</p>
-            <p className="mt-1 text-sm text-muted">
-              We couldn&apos;t find a match for your search.
-            </p>
-          </div>
-        ) : (
-          <div>
-            <div className="border-b border-line p-4">
-              <ListSearch
-                value={search}
-                onChange={setSearch}
-                placeholder="Search areas"
-              />
-            </div>
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
-                <tr>
-                  <SortableTh
-                    columnKey="area"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Area
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="locality"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Locality
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="charge"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Charge ({brand.currency})
-                  </SortableTh>
-                  <SortableTh
-                    columnKey="status"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                    onSort={toggleSort}
-                    className="px-4 py-3"
-                  >
-                    Status
-                  </SortableTh>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-line last:border-0 hover:bg-page/50"
-                  >
-                    <td className="px-4 py-3 font-medium text-ink">{row.area}</td>
-                    <td className="px-4 py-3 text-ink">{row.locality}</td>
-                    <td className="px-4 py-3 text-ink">{row.charge}</td>
-                    <td className="px-4 py-3">
-                      <Badge
-                        variant={row.active ? 'success' : 'neutral'}
-                        size="md"
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-xl border border-line bg-card">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+              <ListSearch value={search} onChange={setSearch} placeholder="Search areas" />
+              <div
+                className="inline-flex rounded-xl border border-line bg-page p-1"
+                role="tablist"
+                aria-label="Filter by status"
+              >
+                {tabs.map((tab) => {
+                  const active = statusFilter === tab.key
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setStatusFilter(tab.key)}
+                      className={`inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors ${
+                        active ? 'bg-primary text-white shadow-sm' : 'text-ink hover:bg-card'
+                      }`}
+                    >
+                      {tab.label}
+                      <span
+                        className={`rounded-full px-1.5 text-xs tabular-nums ${
+                          active ? 'bg-white/25' : 'bg-card text-muted'
+                        }`}
                       >
-                        {row.active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <button
-                          type="button"
-                          aria-label={`Edit ${row.area}`}
-                          data-tooltip={`Edit ${row.area}`}
-                          onClick={() =>
-                            navigate(
-                              `/management/configuration/area-locality-delivery/edit/${row.id}`,
-                            )
-                          }
-                          className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Delete ${row.area}`}
-                          data-tooltip={`Delete ${row.area}`}
-                          onClick={() => handleDelete(row.id)}
-                          className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-primary/10 hover:text-primary"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        {counts[tab.key]}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {visible.length === 0 ? (
+              <div className="flex min-h-[220px] flex-col items-center justify-center px-6 py-12 text-center">
+                <Search size={40} strokeWidth={1.25} className="mb-3 text-muted/40" />
+                <p className="text-base font-semibold text-ink">No Results Found.</p>
+                <p className="mt-1 text-sm text-muted">
+                  We couldn&apos;t find a match for your search.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] text-left text-sm">
+                  <thead className="border-b border-line bg-page text-xs font-semibold uppercase tracking-wide text-muted">
+                    <tr>
+                      <SortableTh
+                        columnKey="name"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                        className="px-4 py-3"
+                      >
+                        Area / Locality
+                      </SortableTh>
+                      <SortableTh
+                        columnKey="charge"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                        className="px-4 py-3"
+                      >
+                        Delivery charge
+                      </SortableTh>
+                      <SortableTh
+                        columnKey="status"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                        className="px-4 py-3"
+                      >
+                        Status
+                      </SortableTh>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="border-b border-line last:border-0 hover:bg-page/60"
+                      >
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-2 font-semibold text-ink">
+                            <span className="inline-flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                              <MapPin size={13} />
+                            </span>
+                            {row.name}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-base font-bold tabular-nums text-ink">
+                          {formatINR(Number(row.charge), 2)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-2">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={row.is_active}
+                              aria-label={`${row.name} active`}
+                              onClick={() => void toggleActive(row)}
+                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                                row.is_active ? 'bg-primary' : 'bg-line'
+                              }`}
+                            >
+                              <span
+                                className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${
+                                  row.is_active ? 'translate-x-5' : 'translate-x-0.5'
+                                }`}
+                              />
+                            </button>
+                            <span
+                              className={`text-xs font-medium ${
+                                row.is_active ? 'text-success' : 'text-muted'
+                              }`}
+                            >
+                              {row.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              aria-label={`Edit ${row.name}`}
+                              data-tooltip="Edit"
+                              onClick={() =>
+                                navigate(
+                                  `/management/configuration/area-locality-delivery/edit/${row.id}`,
+                                )
+                              }
+                              className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-line text-ink hover:bg-primary/10 hover:text-primary"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${row.name}`}
+                              data-tooltip="Delete"
+                              onClick={() => setDeleteTarget(row)}
+                              className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-line text-ink hover:bg-primary/10 hover:text-primary"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          </div>
-        )}
-      </div>
+        </>
+      )}
     </ReportsPageShell>
   )
 }

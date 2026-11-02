@@ -109,7 +109,7 @@ function qtyError(raw: string): string | null {
   if (!trimmed) return null
   const parsed = Number(trimmed.replace(/,/g, ''))
   if (!Number.isFinite(parsed)) return 'Enter a number'
-  if (parsed <= 0) return 'Must be above 0'
+  if (parsed < 0) return 'Cannot be negative'
   return null
 }
 
@@ -595,6 +595,7 @@ const canWrite = hasAnyPermission(hasPermission, INV_STOCK_COUNT_WRITE_PERMISSIO
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="date"
+            max={new Date().toISOString().slice(0, 10)}
             value={stockDate}
             onChange={(event) => setStockDate(event.target.value)}
             className="h-9 rounded-md border border-line bg-card px-2.5 text-sm outline-none focus:border-primary"
@@ -944,7 +945,7 @@ const canWrite = hasAnyPermission(hasPermission, INV_STOCK_COUNT_WRITE_PERMISSIO
             </label>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+          <div className="sticky bottom-0 z-20 -mx-1 mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-line bg-page/95 px-1 py-3 backdrop-blur">
             <button
               type="button"
               onClick={() => {

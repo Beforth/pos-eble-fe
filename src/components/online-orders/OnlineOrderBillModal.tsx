@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
-import type { OnlineOrderRow } from '../../mocks/onlineOrdersData'
+import type { OnlineOrderRow } from '../../utils/onlineOrderRows'
 
 interface OnlineOrderBillModalProps {
   open: boolean

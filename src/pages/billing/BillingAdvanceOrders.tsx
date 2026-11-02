@@ -488,128 +488,130 @@ export default function BillingAdvanceOrders() {
           </div>
         ) : (
           <>
-            <ul className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              {visible.map((order) => {
-                const when = deliveryParts(order)
-                const advance = Number(order.advance_amount)
-                const total = Number(order.grand_total)
-                const balance = Math.max(0, Math.round((total - advance) * 100) / 100)
-                const open = order.status === 'booked' || order.status === 'confirmed'
-                const shownItems = order.items.slice(0, 2)
-                const moreItems = order.items.length - shownItems.length
-                return (
-                  <li
-                    key={order.id}
-                    className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm"
-                  >
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <CalendarDays size={18} />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-base font-bold text-ink">
-                              {when.date}
-                              {when.time ? ` · ${when.time}` : ''}
-                            </p>
-                            <p className="truncate text-xs text-muted">
-                              Advance #{order.adv_order_no} · Booked {createdText(order.created_at).slice(0, 16)}
-                            </p>
-                          </div>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[order.status].pill}`}
-                        >
-                          {STATUS_STYLE[order.status].label}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                        <span className="rounded-md bg-page px-2 py-0.5 text-xs font-semibold uppercase text-ink">
-                          {order.order_type_label || order.order_type}
-                        </span>
-                        <span className="truncate text-sm font-semibold text-ink">
-                          {order.customer_name || 'No customer name'}
-                        </span>
-                        {order.customer_phone ? (
-                          <span className="text-sm tabular-nums text-muted">
-                            {order.customer_phone}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      {order.items.length > 0 ? (
-                        <p className="mt-2 truncate text-sm text-muted">
-                          {shownItems.map((item) => `${item.qty} × ${item.name}`).join(', ')}
-                          {moreItems > 0 ? ` +${moreItems} more` : ''}
-                        </p>
-                      ) : null}
-                      {order.special_note ? (
-                        <p className="mt-1 truncate text-xs italic text-muted">
-                          Note: {order.special_note}
-                        </p>
-                      ) : null}
-
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-                        <div>
-                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
-                            Grand total
+            <div className="overflow-x-auto rounded-2xl border border-line bg-card shadow-sm">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-page text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold">Adv. No</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold">Delivery</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold">Customer</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold">Type</th>
+                    <th className="px-4 py-3 font-semibold">Items</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-right font-semibold">Total</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-right font-semibold">Advance</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-right font-semibold">Balance</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold">Status</th>
+                    <th className="whitespace-nowrap px-4 py-3 text-right font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((order) => {
+                    const when = deliveryParts(order)
+                    const advance = Number(order.advance_amount)
+                    const total = Number(order.grand_total)
+                    const balance = Math.max(0, Math.round((total - advance) * 100) / 100)
+                    const open = order.status === 'booked' || order.status === 'confirmed'
+                    const shownItems = order.items.slice(0, 2)
+                    const moreItems = order.items.length - shownItems.length
+                    return (
+                      <tr key={order.id} className="border-t border-line align-top hover:bg-page/60">
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <p className="font-semibold text-ink">#{order.adv_order_no}</p>
+                          <p className="text-xs text-muted">
+                            Booked {createdText(order.created_at).slice(0, 16)}
                           </p>
-                          <p className="text-xl font-bold tabular-nums text-ink">
-                            {formatINR(total, 2)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <p className="font-medium text-ink">{when.date}</p>
+                          {when.time ? <p className="text-xs text-muted">{when.time}</p> : null}
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-ink">
+                            {order.customer_name || 'No customer name'}
                           </p>
+                          {order.customer_phone ? (
+                            <p className="text-xs tabular-nums text-muted">{order.customer_phone}</p>
+                          ) : null}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className="rounded-md bg-page px-2 py-0.5 text-xs font-semibold uppercase text-ink">
+                            {order.order_type_label || order.order_type}
+                          </span>
+                        </td>
+                        <td className="max-w-[260px] px-4 py-3 text-muted">
+                          {order.items.length > 0 ? (
+                            <p className="truncate">
+                              {shownItems.map((item) => `${item.qty} × ${item.name}`).join(', ')}
+                              {moreItems > 0 ? ` +${moreItems} more` : ''}
+                            </p>
+                          ) : (
+                            '—'
+                          )}
+                          {order.special_note ? (
+                            <p className="truncate text-xs italic">Note: {order.special_note}</p>
+                          ) : null}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-bold tabular-nums text-ink">
+                          {formatINR(total, 2)}
                           {order.status === 'completed' && (order.bill_no || order.order_no) ? (
-                            <p className="text-xs text-muted">
+                            <p className="text-xs font-normal text-muted">
                               Billed as #{order.bill_no || order.order_no}
                             </p>
-                          ) : advance > 0 ? (
-                            <p className="text-xs text-muted">
-                              {formatINR(advance, 2)} advance paid ·{' '}
-                              <span className="font-semibold text-ink">
-                                {formatINR(balance, 2)} balance
-                              </span>
-                            </p>
                           ) : null}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {open ? (
-                            <button
-                              type="button"
-                              onClick={() => openInBilling(order)}
-                              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary-hover"
-                            >
-                              <ShoppingCart size={14} />
-                              Open in Billing
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            aria-label="View details"
-                            data-tooltip="View details"
-                            onClick={() => setViewOrder(order)}
-                            className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-ink hover:bg-page"
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-ink">
+                          {advance > 0 ? formatINR(advance, 2) : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-ink">
+                          {advance > 0 ? formatINR(balance, 2) : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[order.status].pill}`}
                           >
-                            <Eye size={15} />
-                          </button>
-                          {open ? (
+                            {STATUS_STYLE[order.status].label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            {open ? (
+                              <button
+                                type="button"
+                                onClick={() => openInBilling(order)}
+                                className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-2.5 text-xs font-semibold text-white hover:bg-primary-hover"
+                              >
+                                <ShoppingCart size={13} />
+                                Open in Billing
+                              </button>
+                            ) : null}
                             <button
                               type="button"
-                              aria-label="Cancel advance order"
-                              data-tooltip="Cancel advance order"
-                              onClick={() => setCancelTarget(order)}
-                              className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-ink hover:bg-page hover:text-primary"
+                              aria-label="View details"
+                              data-tooltip="View details"
+                              onClick={() => setViewOrder(order)}
+                              className="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink hover:bg-page"
                             >
-                              <X size={15} />
+                              <Eye size={14} />
                             </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                            {open ? (
+                              <button
+                                type="button"
+                                aria-label="Cancel advance order"
+                                data-tooltip="Cancel advance order"
+                                onClick={() => setCancelTarget(order)}
+                                className="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink hover:bg-page hover:text-primary"
+                              >
+                                <X size={14} />
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
             <Pagination
               page={currentPage}
               pageSize={PAGE_SIZE}
