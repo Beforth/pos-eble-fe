@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Clock3, Loader2, MapPin, Phone, StickyNote, X } from 'lucide-react'
+import { Check, Clock3, Globe, Loader2, MapPin, Phone, StickyNote, X } from 'lucide-react'
 import { AggregatorLogo } from '../common/AggregatorLogo'
 import { Badge } from '../common/Badge'
 import { formatINR } from '../../utils/format'
@@ -7,6 +7,7 @@ import type {
   OnlineOrder,
   RejectionReason,
 } from '../../services/onlineOrderApi'
+import type { WebsiteOrder } from '../../services/websiteOrderApi'
 
 const PREP_CHOICES = [10, 15, 20, 30, 45, 60]
 const MAX_PREP = 300
@@ -52,6 +53,134 @@ function countdown(iso: string | null, now: number): string | null {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+interface AcceptRejectPanelProps {
+  orderId: string
+  defaultPreparation: number
+  reasons: RejectionReason[]
+  busy: boolean
+  onAccept: (minutes: number) => void
+  onReject: (reasonId: number) => void
+}
+
+/** Prep-time quick picks plus the reject-reason step, shared by every order source. */
+function AcceptRejectPanel({
+  orderId,
+  defaultPreparation,
+  reasons,
+  busy,
+  onAccept,
+  onReject,
+}: AcceptRejectPanelProps) {
+  const [minutes, setMinutes] = useState(String(defaultPreparation))
+  const [rejecting, setRejecting] = useState(false)
+  const [reason, setReason] = useState<number | null>(null)
+  const prep = Number(minutes)
+  const prepValid = Number.isInteger(prep) && prep >= 1 && prep <= MAX_PREP
+  const choices = PREP_CHOICES.includes(defaultPreparation)
+    ? PREP_CHOICES
+    : [...PREP_CHOICES, defaultPreparation].sort((a, b) => a - b)
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-line pt-4">
+      {!rejecting ? (
+        <>
+          <div>
+            <p className="mb-1.5 text-xs font-semibold text-muted">
+              Preparation time (minutes)
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {choices.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMinutes(String(value))}
+                  aria-pressed={prep === value}
+                  className={`inline-flex h-8 min-w-10 cursor-pointer items-center justify-center rounded-md border px-2.5 text-sm font-medium ${
+                    prep === value
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-line bg-card text-ink hover:bg-page'
+                  }`}
+                >
+                  {value}
+                </button>
+              ))}
+              <input
+                type="number"
+                min={1}
+                max={MAX_PREP}
+                value={minutes}
+                onChange={(event) => setMinutes(event.target.value)}
+                aria-label="Preparation time in minutes"
+                className="h-8 w-20 rounded-md border border-line bg-card px-2 text-center text-sm text-ink outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onAccept(prep)}
+              disabled={busy || !prepValid}
+              className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+              Accept{prepValid ? ` · ${prep} min` : ''}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRejecting(true)}
+              disabled={busy}
+              className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-ink hover:bg-page disabled:opacity-60"
+            >
+              <X size={16} />
+              Reject
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-ink">Why are you rejecting it?</p>
+          <div role="radiogroup" aria-label="Reason for rejecting" className="space-y-1.5">
+            {reasons.map((item) => (
+              <label
+                key={item.id}
+                className="flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink hover:bg-page"
+              >
+                <input
+                  type="radio"
+                  name={`reason-${orderId}`}
+                  checked={reason === item.id}
+                  onChange={() => setReason(item.id)}
+                  className="size-4 cursor-pointer accent-primary"
+                />
+                {item.label}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => reason !== null && onReject(reason)}
+              disabled={busy || reason === null}
+              className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-danger px-4 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy && <Loader2 size={16} className="animate-spin" />}
+              Reject order
+            </button>
+            <button
+              type="button"
+              onClick={() => setRejecting(false)}
+              disabled={busy}
+              className="inline-flex h-10 cursor-pointer items-center justify-center rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page disabled:opacity-60"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface AcceptOrderCardProps {
   order: OnlineOrder
   now: number
@@ -73,17 +202,8 @@ export function AcceptOrderCard({
   onReject,
   onFoodReady,
 }: AcceptOrderCardProps) {
-  const [minutes, setMinutes] = useState(String(defaultPreparation))
-  const [rejecting, setRejecting] = useState(false)
-  const [reason, setReason] = useState<number | null>(null)
-
   const waiting = order.status === 'received'
   const left = waiting ? countdown(order.auto_accept_at, now) : null
-  const prep = Number(minutes)
-  const prepValid = Number.isInteger(prep) && prep >= 1 && prep <= MAX_PREP
-  const choices = PREP_CHOICES.includes(defaultPreparation)
-    ? PREP_CHOICES
-    : [...PREP_CHOICES, defaultPreparation].sort((a, b) => a - b)
   const platform = platformTitle(order.platform)
   const urgent = waiting && left !== null && Number(left.split(':')[0]) < 1
 
@@ -220,103 +340,14 @@ export function AcceptOrderCard({
       </div>
 
       {waiting ? (
-        <div className="mt-4 space-y-3 border-t border-line pt-4">
-          {!rejecting ? (
-            <>
-              <div>
-                <p className="mb-1.5 text-xs font-semibold text-muted">
-                  Preparation time (minutes)
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {choices.map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setMinutes(String(value))}
-                      aria-pressed={prep === value}
-                      className={`inline-flex h-8 min-w-10 cursor-pointer items-center justify-center rounded-md border px-2.5 text-sm font-medium ${
-                        prep === value
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-line bg-card text-ink hover:bg-page'
-                      }`}
-                    >
-                      {value}
-                    </button>
-                  ))}
-                  <input
-                    type="number"
-                    min={1}
-                    max={MAX_PREP}
-                    value={minutes}
-                    onChange={(event) => setMinutes(event.target.value)}
-                    aria-label="Preparation time in minutes"
-                    className="h-8 w-20 rounded-md border border-line bg-card px-2 text-center text-sm text-ink outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => onAccept(order, prep)}
-                  disabled={busy || !prepValid}
-                  className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {busy ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                  Accept{prepValid ? ` · ${prep} min` : ''}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRejecting(true)}
-                  disabled={busy}
-                  className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-ink hover:bg-page disabled:opacity-60"
-                >
-                  <X size={16} />
-                  Reject
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm font-semibold text-ink">Why are you rejecting it?</p>
-              <div role="radiogroup" aria-label="Reason for rejecting" className="space-y-1.5">
-                {reasons.map((item) => (
-                  <label
-                    key={item.id}
-                    className="flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink hover:bg-page"
-                  >
-                    <input
-                      type="radio"
-                      name={`reason-${order.id}`}
-                      checked={reason === item.id}
-                      onChange={() => setReason(item.id)}
-                      className="size-4 cursor-pointer accent-primary"
-                    />
-                    {item.label}
-                  </label>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => reason !== null && onReject(order, reason)}
-                  disabled={busy || reason === null}
-                  className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-danger px-4 text-sm font-semibold text-white hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {busy && <Loader2 size={16} className="animate-spin" />}
-                  Reject order
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRejecting(false)}
-                  disabled={busy}
-                  className="inline-flex h-10 cursor-pointer items-center justify-center rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:bg-page disabled:opacity-60"
-                >
-                  Back
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <AcceptRejectPanel
+          orderId={order.id}
+          defaultPreparation={defaultPreparation}
+          reasons={reasons}
+          busy={busy}
+          onAccept={(m) => onAccept(order, m)}
+          onReject={(r) => onReject(order, r)}
+        />
       ) : (
         <div className="mt-4 flex flex-1 flex-col space-y-1 border-t border-line pt-3 text-sm text-muted">
           {(order.status === 'accepted' || order.status === 'auto_accepted') && (
@@ -358,6 +389,191 @@ export function AcceptOrderCard({
                 </button>
               )}
             </div>
+          )}
+        </div>
+      )}
+    </article>
+  )
+}
+
+const WEBSITE_STATUS_LABEL: Record<WebsiteOrder['status'], string> = {
+  received: 'New',
+  accepted: 'Accepted',
+  preparing: 'Preparing',
+  ready: 'Ready',
+  out_for_delivery: 'Out for delivery',
+  delivered: 'Delivered',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+}
+
+/** `mm:ss` until the website order accepts itself, or null once that time is up. */
+function websiteCountdown(iso: string | null, now: number): string | null {
+  if (!iso) return null
+  const seconds = Math.floor((Date.parse(iso) - now) / 1000)
+  if (seconds <= 0) return null
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+interface WebsiteOrderCardProps {
+  order: WebsiteOrder
+  now: number
+  defaultPreparation: number
+  reasons: RejectionReason[]
+  busy: boolean
+  onAccept: (order: WebsiteOrder, minutes: number) => void
+  onReject: (order: WebsiteOrder, reasonId: number) => void
+}
+
+/** A first-party website order: same card frame as the Wera orders, no Wera-only fields. */
+export function WebsiteOrderCard({
+  order,
+  now,
+  defaultPreparation,
+  reasons,
+  busy,
+  onAccept,
+  onReject,
+}: WebsiteOrderCardProps) {
+  const waiting = order.status === 'received'
+  const left = waiting ? websiteCountdown(order.auto_accept_at, now) : null
+  const urgent = waiting && left !== null && Number(left.split(':')[0]) < 1
+
+  return (
+    <article
+      className={`flex flex-col rounded-xl border bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
+        waiting ? 'border-primary/40' : 'border-line'
+      }`}
+    >
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-page text-sm font-bold text-muted">
+            <Globe size={18} />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-ink">
+              Website #{order.reference}
+            </p>
+            <p className="text-xs text-muted">
+              Received {clock(order.received_at)} · {waited(order.received_at, now)}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="primary" size="md">
+            Website
+          </Badge>
+          <Badge variant="neutral" size="md">
+            Delivery
+          </Badge>
+          <Badge
+            variant={
+              waiting
+                ? 'primary'
+                : order.status === 'rejected' || order.status === 'cancelled'
+                  ? 'neutral'
+                  : 'success'
+            }
+            size="md"
+          >
+            {WEBSITE_STATUS_LABEL[order.status]}
+          </Badge>
+        </div>
+      </header>
+
+      {waiting && left && (
+        <p
+          className={`mt-3 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium ${
+            urgent ? 'bg-accent/10 text-accent' : 'bg-page text-muted'
+          }`}
+        >
+          <Clock3 size={14} />
+          Auto-accepts in {left}
+        </p>
+      )}
+
+      <div className="mt-3 space-y-1 text-sm">
+        <p className="font-semibold text-ink">{order.customer_name || 'Customer'}</p>
+        {order.customer_phone && (
+          <p className="flex items-center gap-1.5 text-muted">
+            <Phone size={13} />
+            {order.customer_phone}
+          </p>
+        )}
+        {order.address && (
+          <p className="flex items-start gap-1.5 text-muted">
+            <MapPin size={13} className="mt-0.5 shrink-0" />
+            <span>
+              {order.address}
+              {order.landmark ? ` (Landmark: ${order.landmark})` : ''}
+            </span>
+          </p>
+        )}
+        {order.instructions && (
+          <p className="flex items-start gap-1.5 rounded-md bg-accent/10 px-2 py-1.5 text-accent">
+            <StickyNote size={13} className="mt-0.5 shrink-0" />
+            <span>{order.instructions}</span>
+          </p>
+        )}
+      </div>
+
+      <ul className="mt-3 divide-y divide-line rounded-lg border border-line text-sm">
+        {order.items.map((item, index) => (
+          <li
+            key={`${item.item_id}-${index}`}
+            className="flex items-start justify-between gap-3 px-3 py-2"
+          >
+            <span className="min-w-0">
+              <span className="font-semibold text-ink tabular-nums">
+                {Number(item.qty)} ×
+              </span>{' '}
+              <span className="text-ink">{item.name}</span>
+              {item.variation && (
+                <span className="text-muted"> ({item.variation})</span>
+              )}
+              {item.addons?.length > 0 && (
+                <span className="block text-xs text-muted">
+                  {item.addons.map((addon) => addon.name).join(', ')}
+                </span>
+              )}
+              {item.note && <span className="block text-xs text-muted">{item.note}</span>}
+            </span>
+            <span className="shrink-0 text-ink tabular-nums">
+              {formatINR(Number(item.line_total), 2)}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-base font-bold text-ink tabular-nums">
+          {formatINR(Number(order.grand_total), 2)}
+        </p>
+      </div>
+
+      {waiting ? (
+        <AcceptRejectPanel
+          orderId={order.id}
+          defaultPreparation={defaultPreparation}
+          reasons={reasons}
+          busy={busy}
+          onAccept={(minutes) => onAccept(order, minutes)}
+          onReject={(reasonId) => onReject(order, reasonId)}
+        />
+      ) : (
+        <div className="mt-4 flex flex-1 flex-col space-y-1 border-t border-line pt-3 text-sm text-muted">
+          {order.accepted_at && (
+            <p>
+              {order.auto_accepted
+                ? 'Accepted automatically after the wait'
+                : `Accepted at ${clock(order.accepted_at)}`}
+              {order.preparation_minutes
+                ? ` · ${order.preparation_minutes} min to prepare`
+                : ''}
+            </p>
+          )}
+          {order.status === 'rejected' && order.reject_reason && (
+            <p>Rejected: {order.reject_reason}</p>
           )}
         </div>
       )}

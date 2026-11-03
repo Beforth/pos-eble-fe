@@ -13,16 +13,22 @@ import {
   listOnlineOrdersApi,
   type OnlineOrder,
 } from '../services/onlineOrderApi'
+import { listWebsiteOrdersApi, type WebsiteOrder } from '../services/websiteOrderApi'
 
 /** The Accept Orders screen is the one place orders are answered. */
 export const ACCEPT_ORDERS_PATH = '/online-orders/accept'
 
 const POLL_MS = 30_000
-const RAIL_EVENTS = new Set(['online_order.received', 'online_order.updated'])
+const RAIL_EVENTS = new Set([
+  'online_order.received',
+  'online_order.updated',
+  'website_order.received',
+  'website_order.updated',
+])
 
 interface OnlineOrdersValue {
-  /** Orders still waiting for an answer. Used for quiet counters only. */
-  pending: OnlineOrder[]
+  /** Wera and website orders still waiting for an answer. Quiet counters only. */
+  pending: Array<OnlineOrder | WebsiteOrder>
   refresh: () => void
 }
 
@@ -38,7 +44,7 @@ const OnlineOrdersContext = createContext<OnlineOrdersValue>({
  */
 export function OnlineOrdersProvider({ children }: { children: ReactNode }) {
   const { encryptedOutletId, token, canAccess } = useAuth()
-  const [pending, setPending] = useState<OnlineOrder[]>([])
+  const [pending, setPending] = useState<Array<OnlineOrder | WebsiteOrder>>([])
   const [reload, setReload] = useState(0)
   const allowed = canAccess(ACCEPT_ORDERS_PATH)
   const active = Boolean(encryptedOutletId && token && allowed)
@@ -51,13 +57,22 @@ export function OnlineOrdersProvider({ children }: { children: ReactNode }) {
       return
     }
     let cancelled = false
-    listOnlineOrdersApi(encryptedOutletId, { status: ['received'] })
-      .then((data) => {
-        if (!cancelled) setPending(data.results)
+    // Two independent sources: one failing must not zero the other's count.
+    Promise.allSettled([
+      listOnlineOrdersApi(encryptedOutletId, { status: ['received'] }),
+      listWebsiteOrdersApi(encryptedOutletId, { status: ['received'] }),
+    ]).then(([wera, website]) => {
+      if (cancelled) return
+      setPending((previous) => {
+        const previousWera = previous.filter((o) => o.platform !== 'website')
+        const previousWebsite = previous.filter((o) => o.platform === 'website')
+        // A failed check is not worth interrupting anyone for; keep that source's last count.
+        return [
+          ...(wera.status === 'fulfilled' ? wera.value.results : previousWera),
+          ...(website.status === 'fulfilled' ? website.value.results : previousWebsite),
+        ]
       })
-      .catch(() => {
-        // A failed check is not worth interrupting anyone for; keep the last count.
-      })
+    })
     return () => {
       cancelled = true
     }
