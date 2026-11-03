@@ -1881,6 +1881,22 @@ export type StockSummaryReport = {
   }
 }
 
+export type PaymentSummaryReport = {
+  rows: {
+    party_name: string
+    total: string
+    paid: string
+    pending: string
+    payments: {
+      date: string
+      method: string
+      amount: string
+      document_number: string
+    }[]
+  }[]
+  totals: { total: string; paid: string; pending: string }
+}
+
 export type ConsumptionSummaryRow = {
   raw_material_id: string
   raw_material_name: string
@@ -2325,6 +2341,35 @@ export async function getStockSummaryReportApi(
     `${reportPath(outletId, 'stock-summary')}?${query.toString()}`,
     { method: 'GET', token: authToken() },
   )
+}
+
+async function getPaymentSummaryReportApi(
+  slug: string,
+  outletId: string,
+  params: { search?: string; dateFrom: string; dateTo: string },
+): Promise<PaymentSummaryReport> {
+  const query = new URLSearchParams()
+  if (params.search) query.set('search', params.search)
+  query.set('date_from', params.dateFrom)
+  query.set('date_to', params.dateTo)
+  return apiRequest<PaymentSummaryReport>(
+    `${reportPath(outletId, slug)}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export function getSupplierPaymentReportApi(
+  outletId: string,
+  params: { search?: string; dateFrom: string; dateTo: string },
+) {
+  return getPaymentSummaryReportApi('supplier-payment', outletId, params)
+}
+
+export function getTransferPaymentReportApi(
+  outletId: string,
+  params: { search?: string; dateFrom: string; dateTo: string },
+) {
+  return getPaymentSummaryReportApi('transfer-payment', outletId, params)
 }
 
 export async function getConsumptionSummaryReportApi(
