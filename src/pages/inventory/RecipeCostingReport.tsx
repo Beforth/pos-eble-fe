@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/exportCsv'
@@ -7,29 +7,12 @@ import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { RecipeCostingCalculationDrawer } from '../../components/inventory/RecipeCostingCalculationDrawer'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
-
-const MENU_NAME_OPTIONS = [
-  'All',
-  'Aaloo Cheese Plate',
-  'Aaloo Papdi Chaat',
-  'Aloo Cheese Paav',
-  'Amul Butter Dabeli',
-  'Amul Cheese Dabeli',
-  'Amul Mayonnaise Dabeli',
-  'Schezwan Paneer Sandwich',
-  'Schezwan Cheese Sandwich',
-  'Samosa',
-  'Veg Junglee Sandwich',
-  'Tandoor Paneer Sandwich',
-  'Sukha Bhel',
-  'Dabeli',
-  'Vada Pav',
-  'Misal Pav',
-  'Masala Chai',
-  'Sev Puri',
-  'Pani Puri',
-  'Cheese Dabeli',
-]
+import { useAuth } from '../../auth/AuthContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  listRecipeCostingReportApi,
+} from '../../services/inventoryService'
 
 const CALCULATE_FROM_OPTIONS = [
   'Latest average purchase price',
@@ -37,163 +20,20 @@ const CALCULATE_FROM_OPTIONS = [
   "Raw material master's purchasing price",
 ]
 
+const PRICE_BASIS: Record<string, 'latest_avg' | 'last' | 'master'> = {
+  'Latest average purchase price': 'latest_avg',
+  'Last purchase price': 'last',
+  "Raw material master's purchasing price": 'master',
+}
+
 interface RecipeRow {
   id: string
   menuName: string
   recipeCosting: string
   sellingPrice: string
   margin: string
+  materials: { name: string; qty: string; unit: string; price: string }[]
 }
-
-const RECIPE_ROWS: RecipeRow[] = [
-  {
-    id: '1',
-    menuName: 'Aaloo Cheese Plate',
-    recipeCosting: '0.000',
-    sellingPrice: '120.000',
-    margin: '100.000',
-  },
-  {
-    id: '2',
-    menuName: 'Aaloo Papdi Chaat',
-    recipeCosting: '0.000',
-    sellingPrice: '80.000',
-    margin: '100.000',
-  },
-  {
-    id: '3',
-    menuName: 'Aloo Cheese Paav',
-    recipeCosting: '0.000',
-    sellingPrice: '60.000',
-    margin: '100.000',
-  },
-  {
-    id: '4',
-    menuName: 'Amul Butter Dabeli',
-    recipeCosting: '0.000',
-    sellingPrice: '45.000',
-    margin: '100.000',
-  },
-  {
-    id: '5',
-    menuName: 'Amul Cheese Dabeli',
-    recipeCosting: '0.000',
-    sellingPrice: '50.000',
-    margin: '100.000',
-  },
-  {
-    id: '6',
-    menuName: 'Amul Mayonnaise Dabeli',
-    recipeCosting: '0.000',
-    sellingPrice: '55.000',
-    margin: '100.000',
-  },
-  {
-    id: '7',
-    menuName: 'Schezwan Paneer Sandwich',
-    recipeCosting: '0.000',
-    sellingPrice: '150.000',
-    margin: '100.000',
-  },
-  {
-    id: '8',
-    menuName: 'Schezwan Cheese Sandwich',
-    recipeCosting: '0.000',
-    sellingPrice: '130.000',
-    margin: '100.000',
-  },
-  {
-    id: '9',
-    menuName: 'Samosa',
-    recipeCosting: '0.000',
-    sellingPrice: '20.000',
-    margin: '100.000',
-  },
-  {
-    id: '10',
-    menuName: 'Veg Junglee Sandwich',
-    recipeCosting: '0.000',
-    sellingPrice: '150.000',
-    margin: '100.000',
-  },
-  {
-    id: '11',
-    menuName: 'Tandoor Paneer Sandwich',
-    recipeCosting: '0.000',
-    sellingPrice: '100.000',
-    margin: '100.000',
-  },
-  {
-    id: '12',
-    menuName: 'Sukha Bhel',
-    recipeCosting: '0.000',
-    sellingPrice: '70.000',
-    margin: '100.000',
-  },
-  {
-    id: '13',
-    menuName: 'Dabeli',
-    recipeCosting: '0.000',
-    sellingPrice: '35.000',
-    margin: '100.000',
-  },
-  {
-    id: '14',
-    menuName: 'Vada Pav',
-    recipeCosting: '0.000',
-    sellingPrice: '25.000',
-    margin: '100.000',
-  },
-  {
-    id: '15',
-    menuName: 'Misal Pav',
-    recipeCosting: '0.000',
-    sellingPrice: '60.000',
-    margin: '100.000',
-  },
-  {
-    id: '16',
-    menuName: 'Masala Chai',
-    recipeCosting: '0.000',
-    sellingPrice: '15.000',
-    margin: '100.000',
-  },
-  {
-    id: '17',
-    menuName: 'Sev Puri',
-    recipeCosting: '0.000',
-    sellingPrice: '45.000',
-    margin: '100.000',
-  },
-  {
-    id: '18',
-    menuName: 'Pani Puri',
-    recipeCosting: '0.000',
-    sellingPrice: '40.000',
-    margin: '100.000',
-  },
-  {
-    id: '19',
-    menuName: 'Cheese Dabeli',
-    recipeCosting: '0.000',
-    sellingPrice: '50.000',
-    margin: '100.000',
-  },
-]
-
-function buildAllRows(): RecipeRow[] {
-  const named = RECIPE_ROWS
-  const extras = Array.from({ length: 10 }, (_, index) => ({
-    id: `extra-${index + 1}`,
-    menuName: `Special Item ${index + 1}`,
-    recipeCosting: '0.000',
-    sellingPrice: `${(30 + index * 5).toFixed(3)}`,
-    margin: '100.000',
-  }))
-  return [...named, ...extras]
-}
-
-const ALL_ROWS = buildAllRows()
 
 const RECIPE_HEADERS = [
   'Menu Name',
@@ -293,11 +133,45 @@ export default function RecipeCostingReport() {
   })
   const [selectedRow, setSelectedRow] = useState<RecipeRow | null>(null)
 
-  const rows = useMemo(() => {
-    if (applied.menuName === 'All') return ALL_ROWS
-    return ALL_ROWS.filter((row) => row.menuName === applied.menuName)
-  }, [applied.menuName])
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
+  const [rows, setRows] = useState<RecipeRow[]>([])
+  const [menuNames, setMenuNames] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
 
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    setLoading(true)
+    try {
+      const data = await listRecipeCostingReportApi(encryptedOutletId, {
+        search: applied.menuName === 'All' ? undefined : applied.menuName,
+        priceBasis: PRICE_BASIS[applied.calculateFrom] ?? 'latest_avg',
+      })
+      setRows(
+        data.map((row) => ({
+          id: row.menu_item_id,
+          menuName: row.menu_name,
+          recipeCosting: row.recipe_costing,
+          sellingPrice: row.selling_price,
+          margin: row.margin,
+          materials: row.materials,
+        })),
+      )
+      if (applied.menuName === 'All') {
+        setMenuNames(data.map((row) => row.menu_name))
+      }
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : 'Unable to load recipe costing',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, canRead, applied])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   return (
     <InventoryPageShell activeItem="other-reports">
@@ -315,7 +189,7 @@ export default function RecipeCostingReport() {
           <SearchableSelect
             label="Menu Name"
             value={menuName}
-            options={MENU_NAME_OPTIONS}
+            options={['All', ...menuNames]}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
@@ -336,7 +210,6 @@ export default function RecipeCostingReport() {
         <OutlineButton
           onClick={() => {
             setApplied({ menuName, calculateFrom })
-            showToast('Search applied')
           }}
         >
           Search
@@ -375,6 +248,13 @@ export default function RecipeCostingReport() {
               </tr>
             </thead>
             <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-12 text-center text-sm text-muted">
+                    {loading ? 'Loading recipes…' : 'No recipes found'}
+                  </td>
+                </tr>
+              ) : null}
               {rows.map((row, index) => (
                 <tr
                   key={row.id}
@@ -422,6 +302,7 @@ export default function RecipeCostingReport() {
         sellingPrice={selectedRow?.sellingPrice ?? '0.000'}
         recipeCosting={selectedRow?.recipeCosting ?? '0.000'}
         margin={selectedRow?.margin ?? '0.000'}
+        materials={selectedRow?.materials ?? []}
       />
     </InventoryPageShell>
   )

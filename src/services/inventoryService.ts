@@ -1881,6 +1881,15 @@ export type StockSummaryReport = {
   }
 }
 
+export type RecipeCostingRow = {
+  menu_item_id: string
+  menu_name: string
+  recipe_costing: string
+  selling_price: string
+  margin: string
+  materials: { name: string; qty: string; unit: string; price: string }[]
+}
+
 export type StockTimewiseRow = {
   raw_material_id: string
   raw_material_name: string
@@ -2349,6 +2358,22 @@ export async function getStockSummaryReportApi(
   if (params?.unitType) query.set('unit_type', params.unitType)
   return apiRequest<StockSummaryReport>(
     `${reportPath(outletId, 'stock-summary')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function listRecipeCostingReportApi(
+  outletId: string,
+  params: {
+    search?: string
+    priceBasis: 'latest_avg' | 'last' | 'master'
+  },
+): Promise<RecipeCostingRow[]> {
+  const query = new URLSearchParams()
+  if (params.search) query.set('search', params.search)
+  query.set('price_basis', params.priceBasis)
+  return apiRequest<RecipeCostingRow[]>(
+    `${reportPath(outletId, 'recipe-costing')}?${query.toString()}`,
     { method: 'GET', token: authToken() },
   )
 }
