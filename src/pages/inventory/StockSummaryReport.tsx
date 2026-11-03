@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/exportCsv'
@@ -14,47 +14,19 @@ import {
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
-
-const CATEGORY_OPTIONS = [
-  'All',
-  'Rice/pulses/flours',
-  'Bread/dairy',
-  'Oils/masala/salt/sugar',
-  'Ready To Cook/ready To Eat',
-  'Sauces/dressings/marinades',
-  'Snacks',
-  'Packaging/storage',
-  'Fruits/vegetables',
-  'No Category',
-]
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  categoryIdByName,
+  getStockSummaryReportApi,
+  type StockSummaryApiRow,
+} from '../../services/inventoryService'
 
 const UNIT_TYPE_OPTIONS = ['Purchase Unit', 'Consumption Unit']
 
 const PAGE_SIZE = 100
-const TOTAL_RECORDS = 492
-
-const RAW_MATERIAL_NAMES = [
-  'Instant Mix Gota Flour [pkt]',
-  'Dalda Ghee [carton]',
-  'Refined Oil [ltr]',
-  'Besan Flour [kg]',
-  'Wheat Flour [kg]',
-  'Sugar [kg]',
-  'Salt [kg]',
-  'Butter [kg]',
-  'Milk [ltr]',
-  'Paneer [kg]',
-  'Onion [kg]',
-  'Tomato [kg]',
-  'Potato [kg]',
-  'Green Chilli [kg]',
-  'Coriander [kg]',
-  'Lemon [kg]',
-  'Paper Bag Large [pcs]',
-  'Paper Bag Small [pcs]',
-  'Tissue Paper [pkt]',
-  'Disposable Glass [pcs]',
-]
 
 interface StockSummaryRow {
   id: string
@@ -75,35 +47,30 @@ interface StockSummaryRow {
   difference: string
 }
 
-function buildRows(): StockSummaryRow[] {
-  return Array.from({ length: TOTAL_RECORDS }, (_, index) => {
-    const name = RAW_MATERIAL_NAMES[index % RAW_MATERIAL_NAMES.length]
-    const suffix =
-      index >= RAW_MATERIAL_NAMES.length
-        ? ` #${Math.floor(index / RAW_MATERIAL_NAMES.length) + 1}`
-        : ''
-    return {
-      id: `row-${index + 1}`,
-      rawMaterial: `${name}${suffix}`,
-      opening: '0.000',
-      purchase: '0.000',
-      excess: '0.000',
-      totalIn: '0.000',
-      consumed: '0.000',
-      wastage: '0.000',
-      normalLoss: '0.000',
-      transfer: '0.000',
-      shortage: '0.000',
-      production: '0.000',
-      totalOut: '0.000',
-      closingStock: '0.000',
-      closingSummary: '0.000',
-      difference: '0.000',
-    }
-  })
+function toRow(row: StockSummaryApiRow): StockSummaryRow {
+  return {
+    id: row.raw_material_id,
+    rawMaterial: row.unit_name
+      ? `${row.raw_material_name} [${row.unit_name}]`
+      : row.raw_material_name,
+    opening: row.opening,
+    purchase: row.purchase,
+    excess: row.excess,
+    totalIn: row.total_in,
+    consumed: row.consumed,
+    wastage: row.wastage,
+    normalLoss: row.normal_loss,
+    transfer: row.transfer,
+    shortage: row.shortage,
+    production: row.production,
+    totalOut: row.total_out,
+    closingStock: row.closing_stock,
+    closingSummary: row.closing_summary,
+    difference: row.difference,
+  }
 }
 
-const ALL_ROWS = buildRows()
+const todayIso = () => new Date().toISOString().slice(0, 10)
 
 const STOCK_SUMMARY_HEADERS = [
   'Raw Material',
@@ -239,33 +206,76 @@ function HeaderWithInfo({
 }
 
 export default function StockSummaryReport() {
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
+  const { categories, loadMasters } = useInventoryMasters()
   const [rawMaterial, setRawMaterial] = useState('')
   const [category, setCategory] = useState('All')
   const [unitType, setUnitType] = useState('Purchase Unit')
-  const [fromDate, setFromDate] = useState('2026-08-11')
-  const [toDate, setToDate] = useState('2026-08-11')
+  const [fromDate, setFromDate] = useState(todayIso)
+  const [toDate, setToDate] = useState(todayIso)
   const [page, setPage] = useState(1)
-  const [appliedQuery, setAppliedQuery] = useState('')
+  const [applied, setApplied] = useState({
+    query: '',
+    category: 'All',
+    unitType: 'Purchase Unit',
+    fromDate: todayIso(),
+    toDate: todayIso(),
+  })
+  const [filteredRows, setFilteredRows] = useState<StockSummaryRow[]>([])
 
-  const filteredRows = useMemo(() => {
-    const q = appliedQuery.trim().toLowerCase()
-    if (!q) return ALL_ROWS
-    return ALL_ROWS.filter((row) => row.rawMaterial.toLowerCase().includes(q))
-  }, [appliedQuery])
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
 
-  const summary = useMemo(() => {
-    let totalIn = 0
-    let totalOut = 0
-    let closingStock = 0
-    let difference = 0
-    for (const row of filteredRows) {
-      totalIn += Number.parseFloat(row.totalIn) || 0
-      totalOut += Number.parseFloat(row.totalOut) || 0
-      closingStock += Number.parseFloat(row.closingStock) || 0
-      difference += Number.parseFloat(row.difference) || 0
+  const categoryOptions = useMemo(
+    () => ['All', ...categories.map((row) => row.name), 'No Category'],
+    [categories],
+  )
+
+  const [totals, setTotals] = useState({
+    totalIn: 0,
+    totalOut: 0,
+    closingStock: 0,
+    difference: 0,
+  })
+
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    try {
+      const categoryId =
+        applied.category === 'All'
+          ? undefined
+          : applied.category === 'No Category'
+            ? 'no-category'
+            : categoryIdByName(categories, applied.category)
+      const report = await getStockSummaryReportApi(encryptedOutletId, {
+        search: applied.query.trim() || undefined,
+        categoryId,
+        dateFrom: applied.fromDate,
+        dateTo: applied.toDate,
+        unitType:
+          applied.unitType === 'Purchase Unit' ? 'purchase' : 'consumption',
+      })
+      setFilteredRows(report.rows.map(toRow))
+      setTotals({
+        totalIn: Number.parseFloat(report.totals.total_in) || 0,
+        totalOut: Number.parseFloat(report.totals.total_out) || 0,
+        closingStock: Number.parseFloat(report.totals.closing_stock) || 0,
+        difference: Number.parseFloat(report.totals.difference) || 0,
+      })
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : 'Unable to load stock summary',
+      )
     }
-    return { totalIn, totalOut, closingStock, difference }
-  }, [filteredRows])
+  }, [encryptedOutletId, canRead, applied, categories])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const summary = totals
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -291,18 +301,23 @@ export default function StockSummaryReport() {
 
 
   function handleSearch() {
-    setAppliedQuery(rawMaterial)
+    setApplied({ query: rawMaterial, category, unitType, fromDate, toDate })
     setPage(1)
-    showToast('Search applied')
   }
 
   function handleClear() {
     setRawMaterial('')
     setCategory('All')
     setUnitType('Purchase Unit')
-    setFromDate('2026-08-11')
-    setToDate('2026-08-11')
-    setAppliedQuery('')
+    setFromDate(todayIso())
+    setToDate(todayIso())
+    setApplied({
+      query: '',
+      category: 'All',
+      unitType: 'Purchase Unit',
+      fromDate: todayIso(),
+      toDate: todayIso(),
+    })
     setPage(1)
   }
 
@@ -373,7 +388,7 @@ export default function StockSummaryReport() {
             <SearchableSelect
               label="Category"
               value={category}
-              options={CATEGORY_OPTIONS}
+              options={categoryOptions}
               placeholder="All"
               searchPlaceholder="Search"
               includePlaceholderOption={false}

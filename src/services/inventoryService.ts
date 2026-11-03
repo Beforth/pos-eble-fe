@@ -1851,6 +1851,52 @@ export type ProductionRunPayload = {
   purchase_order_id?: string | null
 }
 
+export type StockSummaryApiRow = {
+  raw_material_id: string
+  raw_material_name: string
+  unit_name: string
+  opening: string
+  purchase: string
+  excess: string
+  total_in: string
+  consumed: string
+  wastage: string
+  normal_loss: string
+  transfer: string
+  shortage: string
+  production: string
+  total_out: string
+  closing_stock: string
+  closing_summary: string
+  difference: string
+}
+
+export type StockSummaryReport = {
+  rows: StockSummaryApiRow[]
+  totals: {
+    total_in: string
+    total_out: string
+    closing_stock: string
+    difference: string
+  }
+}
+
+export type OpeningClosingRow = {
+  raw_material_id: string
+  raw_material_name: string
+  unit_name: string
+  opening_qty: string
+  opening_value: string
+  avg_price: string
+  closing_qty: string
+  closing_value: string
+}
+
+export type OpeningClosingReport = {
+  rows: OpeningClosingRow[]
+  totals: { opening_value: string; closing_value: string }
+}
+
 export type CurrentStockRow = {
   raw_material_id: string
   raw_material_name: string
@@ -2249,6 +2295,31 @@ export async function listCurrentStockReportApi(
   }
   return apiRequest<CurrentStockRow[]>(
     `${reportPath(outletId, 'current-stock')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function getStockSummaryReportApi(
+  outletId: string,
+  params?: ReportListParams & { unitType?: 'purchase' | 'consumption' },
+): Promise<StockSummaryReport> {
+  const query = new URLSearchParams(reportQuery(params).replace(/^\?/, ''))
+  query.delete('page_size')
+  if (params?.unitType) query.set('unit_type', params.unitType)
+  return apiRequest<StockSummaryReport>(
+    `${reportPath(outletId, 'stock-summary')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function getOpeningClosingReportApi(
+  outletId: string,
+  params?: ReportListParams,
+): Promise<OpeningClosingReport> {
+  const query = new URLSearchParams(reportQuery(params).replace(/^\?/, ''))
+  query.delete('page_size')
+  return apiRequest<OpeningClosingReport>(
+    `${reportPath(outletId, 'opening-closing')}?${query.toString()}`,
     { method: 'GET', token: authToken() },
   )
 }
