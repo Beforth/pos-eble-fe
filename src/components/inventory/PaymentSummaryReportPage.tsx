@@ -15,7 +15,10 @@ import {
 } from '../../services/inventoryService'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
-const monthStartIso = () => `${todayIso().slice(0, 8)}01`
+// Default window: the last 90 days, so a fresh page isn't empty just because
+// the latest documents are from earlier in the previous month.
+const defaultFromIso = () =>
+  new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 function ExportMenu({
   onExportPage,
@@ -100,11 +103,11 @@ export function PaymentSummaryReportPage({
   const { encryptedOutletId, hasPermission } = useAuth()
   const canRead = hasPermission(INV_REPORT_PERMISSION)
   const [party, setParty] = useState('All')
-  const [fromDate, setFromDate] = useState(monthStartIso)
+  const [fromDate, setFromDate] = useState(defaultFromIso)
   const [toDate, setToDate] = useState(todayIso)
   const [applied, setApplied] = useState({
     party: 'All',
-    fromDate: monthStartIso(),
+    fromDate: defaultFromIso(),
     toDate: todayIso(),
   })
   const [report, setReport] = useState<PaymentSummaryReport>({
@@ -145,9 +148,9 @@ export function PaymentSummaryReportPage({
 
   function handleClear() {
     setParty('All')
-    setFromDate(monthStartIso())
+    setFromDate(defaultFromIso())
     setToDate(todayIso())
-    setApplied({ party: 'All', fromDate: monthStartIso(), toDate: todayIso() })
+    setApplied({ party: 'All', fromDate: defaultFromIso(), toDate: todayIso() })
   }
 
   function toggle(name: string) {
