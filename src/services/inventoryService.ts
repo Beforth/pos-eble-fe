@@ -1881,6 +1881,21 @@ export type StockSummaryReport = {
   }
 }
 
+export type ConsumptionSummaryRow = {
+  raw_material_id: string
+  raw_material_name: string
+  unit_name: string
+  avg_price: string
+  days: { qty: string; cost: string }[]
+  total_qty: string
+  total_cost: string
+}
+
+export type ConsumptionSummaryReport = {
+  days: string[]
+  rows: ConsumptionSummaryRow[]
+}
+
 export type OpeningClosingRow = {
   raw_material_id: string
   raw_material_name: string
@@ -2308,6 +2323,21 @@ export async function getStockSummaryReportApi(
   if (params?.unitType) query.set('unit_type', params.unitType)
   return apiRequest<StockSummaryReport>(
     `${reportPath(outletId, 'stock-summary')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function getConsumptionSummaryReportApi(
+  outletId: string,
+  params?: ReportListParams & { categoryIds?: string[] },
+): Promise<ConsumptionSummaryReport> {
+  const query = new URLSearchParams(reportQuery(params).replace(/^\?/, ''))
+  query.delete('page_size')
+  if (params?.categoryIds?.length) {
+    query.set('category_ids', params.categoryIds.join(','))
+  }
+  return apiRequest<ConsumptionSummaryReport>(
+    `${reportPath(outletId, 'consumption-summary')}?${query.toString()}`,
     { method: 'GET', token: authToken() },
   )
 }
