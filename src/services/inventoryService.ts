@@ -1881,6 +1881,16 @@ export type StockSummaryReport = {
   }
 }
 
+export type StockTimewiseRow = {
+  raw_material_id: string
+  raw_material_name: string
+  category_name: string
+  unit_name: string
+  opening: string
+  closing: string
+  difference: string
+}
+
 export type PaymentSummaryReport = {
   rows: {
     party_name: string
@@ -2339,6 +2349,30 @@ export async function getStockSummaryReportApi(
   if (params?.unitType) query.set('unit_type', params.unitType)
   return apiRequest<StockSummaryReport>(
     `${reportPath(outletId, 'stock-summary')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function listStockTimewiseReportApi(
+  outletId: string,
+  params: {
+    search?: string
+    categoryId?: string
+    fromDateTime: Date
+    toDateTime: Date
+    unitType: 'purchase' | 'consumption'
+  },
+): Promise<StockTimewiseRow[]> {
+  const query = new URLSearchParams()
+  if (params.search) query.set('search', params.search)
+  if (params.categoryId && params.categoryId !== 'all') {
+    query.set('category_id', params.categoryId)
+  }
+  query.set('from_datetime', params.fromDateTime.toISOString())
+  query.set('to_datetime', params.toDateTime.toISOString())
+  query.set('unit_type', params.unitType)
+  return apiRequest<StockTimewiseRow[]>(
+    `${reportPath(outletId, 'stock-timewise')}?${query.toString()}`,
     { method: 'GET', token: authToken() },
   )
 }
