@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/exportCsv'
@@ -6,19 +6,21 @@ import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
+import { PaginationControls } from '../../components/common/PaginationControls'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  categoryIdByName,
+  listAllManualStockEntryReportApi,
+  type ManualStockEntryReportRow,
+} from '../../services/inventoryService'
 
-const CATEGORY_OPTIONS = [
-  'All',
-  'Rice/pulses/flours',
-  'Bread/dairy',
-  'Oils/masala/salt/sugar',
-  'Ready To Cook/ready To Eat',
-  'Sauces/dressings/marinades',
-  'Snacks',
-  'Packaging/storage',
-  'Fruits/vegetables',
-  'No Category',
-]
+const todayIso = () => new Date().toISOString().slice(0, 10)
+// Default window: the last 90 days.
+const defaultFromIso = () =>
+  new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 function ExportMenu({
   onExportPage,
@@ -85,29 +87,114 @@ function ExportMenu({
 }
 
 export default function ManualStockEntryReport() {
-  const [startDate, setStartDate] = useState('2026-08-04')
-  const [endDate, setEndDate] = useState('2026-08-11')
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
+  const { categories, loadMasters } = useInventoryMasters()
+  const [startDate, setStartDate] = useState(defaultFromIso)
+  const [endDate, setEndDate] = useState(todayIso)
   const [rawMaterial, setRawMaterial] = useState('')
   const [category, setCategory] = useState('All')
+  const [applied, setApplied] = useState({
+    startDate: defaultFromIso(),
+    endDate: todayIso(),
+    query: '',
+    category: 'All',
+  })
+  const [rows, setRows] = useState<ManualStockEntryReportRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
 
-  function handleClear() {
-    setStartDate('2026-08-04')
-    setEndDate('2026-08-11')
-    setRawMaterial('')
-    setCategory('All')
+  const categoryOptions = useMemo(
+    () => ['All', ...categories.map((row) => row.name), 'No Category'],
+    [categories],
+  )
+
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    setLoading(true)
+    try {
+      const categoryId =
+        applied.category === 'All'
+          ? undefined
+          : applied.category === 'No Category'
+            ? 'no-category'
+            : categoryIdByName(categories, applied.category)
+      setRows(
+        await listAllManualStockEntryReportApi(encryptedOutletId, {
+          search: applied.query.trim() || undefined,
+          categoryId,
+          dateFrom: applied.startDate,
+          dateTo: applied.endDate,
+        }),
+      )
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load manual adjustments',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, canRead, applied, categories])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+  const activePage = Math.min(page, totalPages)
+  const pageRows = rows.slice((activePage - 1) * pageSize, activePage * pageSize)
+
+  function handleSearch() {
+    setApplied({ startDate, endDate, query: rawMaterial, category })
+    setPage(1)
   }
 
-  function exportRows(
-    rows: (string | number | null | undefined)[][],
-    suffix: 'page' | 'all',
-  ) {
+  function handleClear() {
+    setStartDate(defaultFromIso())
+    setEndDate(todayIso())
+    setRawMaterial('')
+    setCategory('All')
+    setApplied({
+      startDate: defaultFromIso(),
+      endDate: todayIso(),
+      query: '',
+      category: 'All',
+    })
+    setPage(1)
+  }
+
+  function exportRows(list: ManualStockEntryReportRow[], suffix: 'page' | 'all') {
     downloadCsv(
       `manual-stock-entry-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Date', 'Raw Material', 'Unit', 'Category', 'Adjustment Type', 'Qty'],
-      rows,
+      [
+        'Date',
+        'Raw Material',
+        'Unit',
+        'Category',
+        'Adjustment Type',
+        'Qty',
+        'Value (₹)',
+        'Reason',
+      ],
+      list.map((row) => [
+        row.stock_date,
+        row.raw_material_name,
+        row.unit_name,
+        row.category_name,
+        row.kind_label,
+        row.qty,
+        row.value,
+        row.reason,
+      ]),
     )
-    showToast(`Exported ${rows.length} rows`)
+    showToast(`Exported ${list.length} rows`)
   }
 
   return (
@@ -116,8 +203,8 @@ export default function ManualStockEntryReport() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Manual Adjustment List</h1>
         <ExportMenu
-          onExportPage={() => exportRows([], 'page')}
-          onExportAll={() => exportRows([], 'all')}
+          onExportPage={() => exportRows(pageRows, 'page')}
+          onExportAll={() => exportRows(rows, 'all')}
         />
       </div>
 
@@ -159,14 +246,14 @@ export default function ManualStockEntryReport() {
           <SearchableSelect
             label="Category"
             value={category}
-            options={CATEGORY_OPTIONS}
+            options={categoryOptions}
             placeholder="All"
             searchPlaceholder="Search"
             includePlaceholderOption={false}
             onChange={setCategory}
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
+        <OutlineButton onClick={handleSearch}>
           Search
         </OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
@@ -174,17 +261,80 @@ export default function ManualStockEntryReport() {
         </OutlineButton>
       </div>
 
-      <div className="flex min-h-[360px] flex-col items-center justify-center rounded-xl border border-line bg-card px-6 py-16 text-center">
-        <span className="relative mb-4 text-muted">
-          <FileText size={56} strokeWidth={1.25} className="text-muted/50" />
-          <Search
-            size={24}
-            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-          />
-        </span>
-        <p className="text-base font-semibold text-ink">
-          Manual Adjustment Report Record Not Found
-        </p>
+      <div className="overflow-hidden rounded-xl border border-line bg-card">
+        <div className="overflow-x-auto">
+          <table className="min-w-[900px] w-full text-left text-sm">
+            <thead className="border-b border-line bg-page text-xs font-semibold text-ink">
+              <tr>
+                <th className="px-3 py-2.5">Date</th>
+                <th className="px-3 py-2.5">Raw Material</th>
+                <th className="px-3 py-2.5">Unit</th>
+                <th className="px-3 py-2.5">Category</th>
+                <th className="px-3 py-2.5">Adjustment Type</th>
+                <th className="px-3 py-2.5 text-right">Qty</th>
+                <th className="px-3 py-2.5 text-right">Value (₹)</th>
+                <th className="px-3 py-2.5">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-16 text-center">
+                    {loading ? (
+                      <span className="text-sm text-muted">
+                        Loading report…
+                      </span>
+                    ) : (
+                      <span className="flex flex-col items-center">
+                        <span className="relative mb-4 text-muted">
+                          <FileText
+                            size={56}
+                            strokeWidth={1.25}
+                            className="text-muted/50"
+                          />
+                          <Search
+                            size={24}
+                            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+                          />
+                        </span>
+                        <span className="text-base font-semibold text-ink">
+                          Manual Adjustment Report Record Not Found
+                        </span>
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                pageRows.map((row, index) => (
+                  <tr
+                    key={`${row.entry_id}-${row.raw_material_id}`}
+                    className={`border-b border-line last:border-b-0 ${
+                      index % 2 === 1 ? 'bg-page/50' : 'bg-card'
+                    }`}
+                  >
+                    <td className="whitespace-nowrap px-3 py-2">{row.stock_date}</td>
+                    <td className="px-3 py-2 font-medium text-ink">
+                      {row.raw_material_name}
+                    </td>
+                    <td className="px-3 py-2">{row.unit_name}</td>
+                    <td className="px-3 py-2">{row.category_name || '-'}</td>
+                    <td className="px-3 py-2">{row.kind_label}</td>
+                    <td className="px-3 py-2 text-right">{row.qty}</td>
+                    <td className="px-3 py-2 text-right">{row.value}</td>
+                    <td className="px-3 py-2">{row.reason || '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <PaginationControls
+          totalRecords={rows.length}
+          currentPage={activePage}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
     </InventoryPageShell>
   )
