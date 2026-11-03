@@ -1881,6 +1881,16 @@ export type StockSummaryReport = {
   }
 }
 
+export type PaymentLedgerReport = {
+  rows: {
+    party_name: string
+    company_name: string
+    payables: string
+    receivables: string
+  }[]
+  totals: { payables: string; receivables: string }
+}
+
 export type RecipeCostingRow = {
   menu_item_id: string
   menu_name: string
@@ -2358,6 +2368,22 @@ export async function getStockSummaryReportApi(
   if (params?.unitType) query.set('unit_type', params.unitType)
   return apiRequest<StockSummaryReport>(
     `${reportPath(outletId, 'stock-summary')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function getPaymentLedgerReportApi(
+  outletId: string,
+  params: {
+    partyType: 'supplier' | 'customer' | 'third_party' | 'all'
+    search?: string
+  },
+): Promise<PaymentLedgerReport> {
+  const query = new URLSearchParams()
+  query.set('party_type', params.partyType)
+  if (params.search) query.set('search', params.search)
+  return apiRequest<PaymentLedgerReport>(
+    `${reportPath(outletId, 'payment-ledger')}?${query.toString()}`,
     { method: 'GET', token: authToken() },
   )
 }
