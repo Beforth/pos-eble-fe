@@ -31,9 +31,8 @@ const PAGE_SIZE = 100
  * midnight (STANDARDS §22); only Day End resets them.
  *
  * Deliberately **additive**: an already-known ticket is left untouched rather
- * than re-mapped, so local display context (prices, ready state) is not
- * clobbered and a server `Ready` cannot flip a ticket to a state the board
- * hides.
+ * than re-mapped, so local display context (prices) is not clobbered. The only
+ * fields refreshed are `billed`, the bill number, and a one-way `Ready`.
  *
  * Returns `true` when the store changed. A failed fetch returns `false`
  * **without pruning**, so a screen that loses connectivity degrades to stale
@@ -64,13 +63,22 @@ export async function syncKotStoreFromServer(outletId: string): Promise<boolean>
           // number, so a bill paid on another terminal drops off this KOT view,
           // while local display state (prices, ready progress) is left untouched.
           const mappedBill = dto.bill_no?.trim() || undefined
+          // A server `Ready` is picked up too (one-way: never back to active), so
+          // a terminal that missed the `kot.modified` rail event still catches up.
+          const becameReady = dto.status === 'Ready' && existing.status !== 'ready'
           if (
+            becameReady ||
             Boolean(dto.billed) !== Boolean(existing.billed) ||
             (mappedBill !== undefined && mappedBill !== existing.billNo)
           ) {
             const mapped = kotEventToTicket(dto)
             upsertKotTicketFromServer(mapped)
-            known.set(dto.id, { ...existing, billed: mapped.billed, billNo: mapped.billNo })
+            known.set(dto.id, {
+              ...existing,
+              status: becameReady ? 'ready' : existing.status,
+              billed: mapped.billed,
+              billNo: mapped.billNo,
+            })
             changed = true
           }
           continue
