@@ -127,3 +127,21 @@ export function rejectWebsiteOrderApi(
     token: authToken(),
   })
 }
+
+function moveWebsiteOrder(outletId: string, id: string, step: string): Promise<WebsiteOrder> {
+  return apiRequest<WebsiteOrder>(ordersPath(outletId, `${id}/${step}/`), {
+    method: 'POST',
+    token: authToken(),
+  })
+}
+
+export function markWebsiteOrderOutForDeliveryApi(
+  outletId: string,
+  id: string,
+): Promise<WebsiteOrder> {
+  return moveWebsiteOrder(outletId, id, 'out-for-delivery')
+}
+
+export function markWebsiteOrderDeliveredApi(outletId: string, id: string): Promise<WebsiteOrder> {
+  return moveWebsiteOrder(outletId, id, 'delivered')
+}

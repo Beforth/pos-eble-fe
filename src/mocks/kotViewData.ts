@@ -35,6 +35,9 @@ export interface KotTicket {
   /** True once the ticket's bill is settled. The KOT view hides billed
    *  tickets; the kitchen screen ignores it and keeps cooking. */
   billed?: boolean
+  /** Status of the website order this ticket belongs to ("accepted",
+   *  "preparing", ...); blank for any other ticket. */
+  websiteStatus?: string
 }
 
 export const ORDER_TYPE_LEGEND: {

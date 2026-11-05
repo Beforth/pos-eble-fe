@@ -18,6 +18,8 @@ import {
 } from '../services/onlineOrderApi'
 import {
   acceptWebsiteOrderApi,
+  markWebsiteOrderDeliveredApi,
+  markWebsiteOrderOutForDeliveryApi,
   listWebsiteOrdersApi,
   rejectWebsiteOrderApi,
   WEBSITE_REJECT_REASONS,
@@ -238,6 +240,26 @@ export default function AcceptOnlineOrders() {
     }
   }
 
+  async function handleWebsiteStep(
+    order: WebsiteOrder,
+    call: (outletId: string, id: string) => Promise<WebsiteOrder>,
+    done: string,
+    failed: string,
+  ) {
+    if (!encryptedOutletId) return
+    setBusyId(order.id)
+    try {
+      await call(encryptedOutletId, order.id)
+      showToast(done)
+    } catch (failure) {
+      showToast(errorText(failure, failed))
+    } finally {
+      setBusyId(null)
+      refetch()
+      refreshCounter()
+    }
+  }
+
   async function handleFoodReady(order: OnlineOrder) {
     if (!encryptedOutletId) return
     setBusyId(order.id)
@@ -432,6 +454,22 @@ export default function AcceptOnlineOrders() {
                     busy={busyId === row.order.id}
                     onAccept={(_order, minutes) => handleAccept(row, minutes)}
                     onReject={(_order, reasonId) => handleReject(row, reasonId)}
+                    onOutForDelivery={(o) =>
+                      handleWebsiteStep(
+                        o,
+                        markWebsiteOrderOutForDeliveryApi,
+                        'Order is out for delivery',
+                        'Could not mark the order out for delivery',
+                      )
+                    }
+                    onDelivered={(o) =>
+                      handleWebsiteStep(
+                        o,
+                        markWebsiteOrderDeliveredApi,
+                        'Order delivered',
+                        'Could not mark the order delivered',
+                      )
+                    }
                   />
                 ) : (
                   <AcceptOrderCard

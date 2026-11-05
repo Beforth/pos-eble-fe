@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   CheckCheck,
+  ChefHat,
   Eye,
   MonitorSmartphone,
   Plus,
@@ -43,6 +44,7 @@ import { subscribeToRail } from '../../services/liveRailClient'
 import {
   kotEventToTicket,
   markKotReadyApi,
+  startKotPreparingApi,
   type KotEventData,
 } from '../../services/orderService'
 import { isServerBackedKotId } from '../../utils/kotListStore'
@@ -77,6 +79,7 @@ export default function ScreenDisplay() {
   const [readyByTicket, setReadyByTicket] = useState<Record<string, string[]>>({})
   const [now, setNow] = useState(Date.now())
   const [editOpen, setEditOpen] = useState(false)
+  const [preparingId, setPreparingId] = useState<string | null>(null)
 
 
   const loadScreenData = useCallback(() => {
@@ -278,6 +281,26 @@ export default function ScreenDisplay() {
         ? 'All stations done — order ready'
         : 'Station done — waiting for other categories',
     )
+  }
+
+  /** Website order: the kitchen starts cooking (accepted -> preparing). */
+  async function handleStartPreparing(ticketId: string) {
+    if (!encryptedOutletId) return
+    setPreparingId(ticketId)
+    try {
+      const dto = await startKotPreparingApi(encryptedOutletId, ticketId)
+      upsertKotTicketFromServer(kotEventToTicket(dto))
+      showToast('Preparing - the customer can see it')
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? `Could not start preparing: ${error.message}`
+          : 'Could not start preparing. Try again.',
+      )
+    } finally {
+      setPreparingId(null)
+      refreshTickets()
+    }
   }
 
   async function handleEnableAllCategories() {
@@ -616,6 +639,23 @@ export default function ScreenDisplay() {
 
                     {/* Action buttons */}
                     <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-line pt-2">
+                      {ticket.websiteStatus === 'accepted' && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartPreparing(ticket.id)}
+                          disabled={preparingId === ticket.id}
+                          className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-primary bg-card px-2.5 text-xs font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <ChefHat size={14} />
+                          Start preparing
+                        </button>
+                      )}
+                      {ticket.websiteStatus === 'preparing' && (
+                        <span className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary/10 px-2.5 text-xs font-semibold text-primary">
+                          <ChefHat size={14} />
+                          Preparing
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() =>

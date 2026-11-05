@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Clock3, Globe, Loader2, MapPin, Phone, StickyNote, X } from 'lucide-react'
+import { Check, Clock3, Globe, Loader2, MapPin, Phone, StickyNote, Truck, X } from 'lucide-react'
 import { AggregatorLogo } from '../common/AggregatorLogo'
 import { Badge } from '../common/Badge'
 import { formatINR } from '../../utils/format'
@@ -423,6 +423,8 @@ interface WebsiteOrderCardProps {
   busy: boolean
   onAccept: (order: WebsiteOrder, minutes: number) => void
   onReject: (order: WebsiteOrder, reasonId: number) => void
+  onOutForDelivery: (order: WebsiteOrder) => void
+  onDelivered: (order: WebsiteOrder) => void
 }
 
 /** A first-party website order: same card frame as the Wera orders, no Wera-only fields. */
@@ -434,6 +436,8 @@ export function WebsiteOrderCard({
   busy,
   onAccept,
   onReject,
+  onOutForDelivery,
+  onDelivered,
 }: WebsiteOrderCardProps) {
   const waiting = order.status === 'received'
   const left = waiting ? websiteCountdown(order.auto_accept_at, now) : null
@@ -574,6 +578,35 @@ export function WebsiteOrderCard({
           )}
           {order.status === 'rejected' && order.reject_reason && (
             <p>Rejected: {order.reject_reason}</p>
+          )}
+          {(order.status === 'accepted' ||
+            order.status === 'preparing' ||
+            order.status === 'ready' ||
+            order.status === 'out_for_delivery') && (
+            <div className="!mt-auto flex justify-end gap-2 pt-2">
+              {order.status !== 'out_for_delivery' && (
+                <button
+                  type="button"
+                  onClick={() => onOutForDelivery(order)}
+                  disabled={busy}
+                  className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-primary bg-card px-3 text-xs font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {busy ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+                  Out for delivery
+                </button>
+              )}
+              {(order.status === 'ready' || order.status === 'out_for_delivery') && (
+                <button
+                  type="button"
+                  onClick={() => onDelivered(order)}
+                  disabled={busy}
+                  className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  Delivered
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}

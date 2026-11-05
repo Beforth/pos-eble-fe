@@ -190,6 +190,8 @@ export interface KotDto {
   modified: boolean
   /** True once the ticket's bill is settled (KOT view hides it; KDS keeps it). */
   billed: boolean
+  /** Status of the website order this ticket belongs to; blank for any other. */
+  website_status?: string
   /** Raw materials short when this ticket took its recipe stock off. */
   stock_warnings?: StockWarning[]
 }
@@ -1011,6 +1013,11 @@ export async function markKotReadyApi(outletId: string, id: string): Promise<Kot
   return updateKotApi(outletId, id, { status: 'Ready' })
 }
 
+/** Kitchen screen: start cooking a website order's ticket (accepted -> preparing). */
+export async function startKotPreparingApi(outletId: string, id: string): Promise<KotDto> {
+  return jsonRequest<KotDto>(ordersPath(outletId, `/kots/${id}/start-preparing/`), 'POST', {})
+}
+
 export async function updateKotApi(
   outletId: string,
   id: string,
@@ -1306,6 +1313,7 @@ export function kotEventToTicket(dto: KotDto | KotEventData): KotTicket {
     customerName: dto.customer_name?.trim() || undefined,
     billed: Boolean(dto.billed),
     billNo: dto.bill_no?.trim() || undefined,
+    websiteStatus: dto.website_status ?? undefined,
   }
 }
 
