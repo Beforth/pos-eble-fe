@@ -166,7 +166,7 @@ export function KOTPrintTemplate({ ticket, onClose }: KOTPrintTemplateProps) {
 
         <Divider />
 
-        <div style={{ textAlign: 'center', fontSize: 16 }}>
+        <div style={{ textAlign: 'center', fontSize: 15 }}>
           Total Items: {totalQty}
         </div>
       </div>
@@ -181,7 +181,7 @@ export function KOTPrintTemplate({ ticket, onClose }: KOTPrintTemplateProps) {
 /* ---------- Styles ---------- */
 
 const outerWrapperStyle: React.CSSProperties = {
-  fontFamily: "'Courier New', Courier, monospace",
+  fontFamily: 'Verdana, Geneva, Tahoma, sans-serif',
   position: 'fixed',
   inset: 0,
   zIndex: 90,
@@ -224,21 +224,20 @@ const ticketStyle: React.CSSProperties = {
   width: '302px',
   background: '#fff',
   color: '#000',
-  padding: '4px 6px',
-  fontSize: 17,
+  padding: '6px 6px 4px 6px',
+  fontSize: 15,
   lineHeight: 1.35,
-  fontWeight: 600,
   boxShadow: '0 0 4px rgba(0,0,0,0.3)',
 }
 
 const shopNameStyle: React.CSSProperties = {
-  fontSize: 17,
+  fontSize: 15,
   fontWeight: 'bold',
   textTransform: 'uppercase',
 }
 
 const kotLabelStyle: React.CSSProperties = {
-  fontSize: 17,
+  fontSize: 15,
   fontWeight: 'bold',
   letterSpacing: 1,
   marginTop: 2,
@@ -247,7 +246,7 @@ const kotLabelStyle: React.CSSProperties = {
 const rowStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  fontSize: 17,
+  fontSize: 15,
 }
 
 const boldStyle: React.CSSProperties = {
@@ -260,20 +259,20 @@ const itemTableStyle: React.CSSProperties = {
 }
 
 const thStyle: React.CSSProperties = {
-  fontSize: 17,
+  fontSize: 15,
   borderBottom: '1px solid #000',
   paddingBottom: 1,
 }
 
 const itemNameStyle: React.CSSProperties = {
-  fontSize: 17,
+  fontSize: 15,
   fontWeight: 'bold',
   padding: '1px 0 0 0',
   verticalAlign: 'top',
 }
 
 const qtyStyle: React.CSSProperties = {
-  fontSize: 17,
+  fontSize: 15,
   fontWeight: 'bold',
   textAlign: 'center',
   padding: '1px 0 0 0',
@@ -282,7 +281,7 @@ const qtyStyle: React.CSSProperties = {
 }
 
 const noteStyle: React.CSSProperties = {
-  fontSize: 15.5,
+  fontSize: 13.5,
   fontStyle: 'italic',
   paddingLeft: 4,
   paddingBottom: 0,
