@@ -192,6 +192,8 @@ export interface KotDto {
   billed: boolean
   /** Status of the website order this ticket belongs to; blank for any other. */
   website_status?: string
+  /** Ticket-wide instruction for the kitchen (a website guest's cooking note). */
+  note?: string
   /** Raw materials short when this ticket took its recipe stock off. */
   stock_warnings?: StockWarning[]
 }
@@ -1314,6 +1316,7 @@ export function kotEventToTicket(dto: KotDto | KotEventData): KotTicket {
     billed: Boolean(dto.billed),
     billNo: dto.bill_no?.trim() || undefined,
     websiteStatus: dto.website_status ?? undefined,
+    note: dto.note?.trim() || undefined,
   }
 }
 
