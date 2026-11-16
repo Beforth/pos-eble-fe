@@ -24,7 +24,7 @@ function Divider({ dashed = false }: { dashed?: boolean }) {
     <div
       style={{
         borderTop: dashed ? '1px dashed #000' : '1px solid #000',
-        margin: '6px 0',
+        margin: '3px 0',
       }}
     />
   )
@@ -87,7 +87,7 @@ export function KOTPrintTemplate({ ticket, onClose }: KOTPrintTemplateProps) {
       </button>
 
       <div id="kot-ticket" style={ticketStyle}>
-        <div style={{ textAlign: 'center', marginBottom: 4 }}>
+        <div style={{ textAlign: 'center', marginBottom: 1 }}>
           <div style={shopNameStyle}>{brand.shopName}</div>
           <div style={kotLabelStyle}>KITCHEN ORDER TICKET</div>
         </div>
@@ -158,7 +158,7 @@ export function KOTPrintTemplate({ ticket, onClose }: KOTPrintTemplateProps) {
         <Divider dashed />
 
         {ticket.note ? (
-          <div style={{ marginBottom: 6 }}>
+          <div style={{ marginBottom: 3 }}>
             <div style={boldStyle}>Remarks:</div>
             <div>{ticket.note}</div>
           </div>
@@ -166,7 +166,7 @@ export function KOTPrintTemplate({ ticket, onClose }: KOTPrintTemplateProps) {
 
         <Divider />
 
-        <div style={{ textAlign: 'center', fontSize: 11 }}>
+        <div style={{ textAlign: 'center', fontSize: 16 }}>
           Total Items: {totalQty}
         </div>
       </div>
@@ -224,20 +224,21 @@ const ticketStyle: React.CSSProperties = {
   width: '302px',
   background: '#fff',
   color: '#000',
-  padding: '10px 12px',
-  fontSize: 12,
-  lineHeight: 1.4,
+  padding: '4px 6px',
+  fontSize: 17,
+  lineHeight: 1.35,
+  fontWeight: 600,
   boxShadow: '0 0 4px rgba(0,0,0,0.3)',
 }
 
 const shopNameStyle: React.CSSProperties = {
-  fontSize: 14,
+  fontSize: 17,
   fontWeight: 'bold',
   textTransform: 'uppercase',
 }
 
 const kotLabelStyle: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 17,
   fontWeight: 'bold',
   letterSpacing: 1,
   marginTop: 2,
@@ -246,7 +247,7 @@ const kotLabelStyle: React.CSSProperties = {
 const rowStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  fontSize: 12,
+  fontSize: 17,
 }
 
 const boldStyle: React.CSSProperties = {
@@ -259,30 +260,30 @@ const itemTableStyle: React.CSSProperties = {
 }
 
 const thStyle: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 17,
   borderBottom: '1px solid #000',
-  paddingBottom: 4,
+  paddingBottom: 1,
 }
 
 const itemNameStyle: React.CSSProperties = {
-  fontSize: 13,
+  fontSize: 17,
   fontWeight: 'bold',
-  padding: '4px 0 0 0',
+  padding: '1px 0 0 0',
   verticalAlign: 'top',
 }
 
 const qtyStyle: React.CSSProperties = {
-  fontSize: 13,
+  fontSize: 17,
   fontWeight: 'bold',
   textAlign: 'center',
-  padding: '4px 0 0 0',
+  padding: '1px 0 0 0',
   verticalAlign: 'top',
   width: 40,
 }
 
 const noteStyle: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 15.5,
   fontStyle: 'italic',
-  paddingLeft: 8,
-  paddingBottom: 2,
+  paddingLeft: 4,
+  paddingBottom: 0,
 }
