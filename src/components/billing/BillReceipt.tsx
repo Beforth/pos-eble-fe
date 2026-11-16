@@ -195,8 +195,8 @@ export function BillReceipt({
           ) : null}
           <div style={shopNameStyle}>{s.name}</div>
           <div style={taglineStyle}>{s.tagline}</div>
-          <div style={smallStyle}>{s.address}</div>
-          <div style={smallStyle}>
+          <div style={shopInfoStyle}>{s.address}</div>
+          <div style={shopInfoStyle}>
             Ph: {s.phone} &nbsp;|&nbsp; GSTIN: {s.gstin}
           </div>
           <div style={billTypeStyle}>{cancelled ? 'CANCELLED BILL' : s.billLabel}</div>
@@ -433,11 +433,10 @@ const receiptStyle: CSSProperties = {
   width: '302px',
   background: '#fff',
   color: '#111',
-  padding: '4px 6px',
-  fontSize: 16,
+  padding: '6px 6px 4px 6px',
+  fontSize: 15,
   lineHeight: 1.4,
-  fontFamily: "'Courier New', Consolas, monospace",
-  fontWeight: 600,
+  fontFamily: 'Verdana, Geneva, Tahoma, sans-serif',
   boxShadow: '0 0 4px rgba(0,0,0,0.3)',
 }
 
@@ -457,7 +456,7 @@ const logoStyle: CSSProperties = {
 }
 
 const shopNameStyle: CSSProperties = {
-  fontSize: 22,
+  fontSize: 16,
   fontWeight: 800,
   letterSpacing: 0.5,
   textTransform: 'uppercase',
@@ -465,8 +464,14 @@ const shopNameStyle: CSSProperties = {
 }
 
 const taglineStyle: CSSProperties = {
-  fontSize: 14.5,
+  fontSize: 15,
   letterSpacing: 0.5,
+}
+
+/** Address and phone/GSTIN lines under the tagline. */
+const shopInfoStyle: CSSProperties = {
+  fontSize: 15,
+  color: '#111',
 }
 
 const smallStyle: CSSProperties = {
@@ -513,14 +518,14 @@ const itemTableStyle: CSSProperties = {
 }
 
 const thStyle: CSSProperties = {
-  fontSize: 14.5,
+  fontSize: 12,
   fontWeight: 700,
   borderBottom: '1px dashed #111',
   padding: '0 0 1px 0',
 }
 
 const itemNameStyle: CSSProperties = {
-  fontSize: 15.5,
+  fontSize: 15,
   padding: '1px 0',
   verticalAlign: 'top',
 }
@@ -532,27 +537,27 @@ const itemNoteStyle: CSSProperties = {
 }
 
 const cellStyle: CSSProperties = {
-  fontSize: 15.5,
-  padding: '1px 0',
+  fontSize: 15,
+  padding: '1px 0 1px 6px',
   verticalAlign: 'top',
 }
 
 const totalsRowStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  fontSize: 15.5,
+  fontSize: 15,
   padding: '0.5px 0',
 }
 
 const mutedStyle: CSSProperties = {
   color: '#111',
-  fontSize: 14.5,
+  fontSize: 15,
 }
 
 const grandTotalStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  fontSize: 19.5,
+  fontSize: 15,
   fontWeight: 800,
   padding: '3px 0 1px 0',
   borderTop: '1.5px solid #111',
@@ -562,7 +567,7 @@ const grandTotalStyle: CSSProperties = {
 
 const paymentModeStyle: CSSProperties = {
   marginTop: 3,
-  fontSize: 15,
+  fontSize: 12,
   textAlign: 'center',
 }
 
@@ -575,10 +580,13 @@ const paymentTagStyle: CSSProperties = {
 
 const scissorsStyle: CSSProperties = {
   textAlign: 'center',
-  fontSize: 15,
+  fontSize: 12,
   color: '#555',
   margin: '4px 0 -2px 0',
   letterSpacing: 2,
+  // One line only: the dashes are clipped at the paper edge instead of wrapping.
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
 }
 
 const footerStyle: CSSProperties = {
