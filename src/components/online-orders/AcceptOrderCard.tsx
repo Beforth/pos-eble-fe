@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Check, Clock3, Globe, Loader2, MapPin, Phone, StickyNote, Truck, X } from 'lucide-react'
+import { Check, Clock3, Loader2, MapPin, Phone, StickyNote, Truck, X } from 'lucide-react'
 import { AggregatorLogo } from '../common/AggregatorLogo'
 import { Badge } from '../common/Badge'
+import { BrandLogo } from '../brand/BrandLogo'
 import { formatINR } from '../../utils/format'
 import type {
   OnlineOrder,
@@ -451,8 +452,8 @@ export function WebsiteOrderCard({
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-page text-sm font-bold text-muted">
-            <Globe size={18} />
+          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-page">
+            <BrandLogo size={40} />
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-ink">

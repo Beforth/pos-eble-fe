@@ -14,6 +14,7 @@ import {
   type OnlineOrder,
 } from '../services/onlineOrderApi'
 import { listWebsiteOrdersApi, type WebsiteOrder } from '../services/websiteOrderApi'
+import { bindOrderSoundUnlock, playNewOrderSound } from '../utils/orderSound'
 
 /** The Accept Orders screen is the one place orders are answered. */
 export const ACCEPT_ORDERS_PATH = '/online-orders/accept'
@@ -39,8 +40,9 @@ const OnlineOrdersContext = createContext<OnlineOrdersValue>({
 
 /**
  * Keeps the number of waiting online orders up to date for the header and the
- * dashboard. It never opens a pop-up, plays a sound or shows a toast: a new
- * order only raises a counter, and is answered on the Accept Orders page.
+ * dashboard. It never opens a pop-up or shows a toast: a new order raises a
+ * counter and is answered on the Accept Orders page. The one exception is a new
+ * website (delivery) order, which also plays a short chime so the counter is heard.
  */
 export function OnlineOrdersProvider({ children }: { children: ReactNode }) {
   const { encryptedOutletId, token, canAccess } = useAuth()
@@ -90,10 +92,17 @@ export function OnlineOrdersProvider({ children }: { children: ReactNode }) {
       outletId: encryptedOutletId,
       token,
       onEvent: (event) => {
+        if (event === 'website_order.received') playNewOrderSound()
         if (RAIL_EVENTS.has(event)) refresh()
       },
     })
   }, [active, encryptedOutletId, token, refresh])
+
+  // Sound is allowed only after the first click or key press; listen for it while signed in.
+  useEffect(() => {
+    if (!active) return
+    return bindOrderSoundUnlock()
+  }, [active])
 
   const value = useMemo(() => ({ pending, refresh }), [pending, refresh])
   return (
