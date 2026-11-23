@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Globe, Loader2, RefreshCw, Search } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { AcceptOrderCard } from '../components/online-orders/AcceptOrderCard'
+import { AcceptOrderCard, WebsiteOrderCard } from '../components/online-orders/AcceptOrderCard'
 import { ActionCenterDrawer } from '../components/layout/ActionCenterDrawer'
 import { NotificationsDrawer } from '../components/layout/NotificationsDrawer'
 import { Sidebar } from '../components/layout/Sidebar'
@@ -13,14 +13,24 @@ import {
   markFoodReadyApi,
   rejectOnlineOrderApi,
   type OnlineOrder,
-  type OnlineOrderList,
   type OnlineOrderStatus,
+  type RejectionReason,
 } from '../services/onlineOrderApi'
+import {
+  acceptWebsiteOrderApi,
+  markWebsiteOrderDeliveredApi,
+  markWebsiteOrderOutForDeliveryApi,
+  listWebsiteOrdersApi,
+  rejectWebsiteOrderApi,
+  WEBSITE_REJECT_REASONS,
+  WEBSITE_TAB_STATUSES,
+  type WebsiteOrder,
+} from '../services/websiteOrderApi'
 import { subscribeToRail } from '../services/liveRailClient'
 import { useChrome } from '../state/ChromeContext'
 import { useOnlineOrders } from '../state/OnlineOrdersContext'
 import { brand } from '../theme/brand'
-import { showToast } from '../utils/toast'
+import { showError, showToast } from '../utils/toast'
 
 type Tab = 'received' | 'in_progress' | 'closed'
 
@@ -34,10 +44,30 @@ const PLATFORMS: Array<{ id: string; label: string }> = [
   { id: '', label: 'All' },
   { id: 'zomato', label: 'Zomato' },
   { id: 'swiggy', label: 'Swiggy' },
+  { id: 'website', label: 'Website' },
 ]
 
+/** Wera orders and first-party website orders share one queue; the data stays separate. */
+type Row =
+  | { source: 'wera'; order: OnlineOrder }
+  | { source: 'website'; order: WebsiteOrder }
+
+interface QueueData {
+  rows: Row[]
+  counts: Record<Tab, number>
+  defaultPreparation: number
+  reasons: RejectionReason[]
+}
+
+const FALLBACK_PREPARATION = 20
+
 const POLL_MS = 15_000
-const RAIL_EVENTS = new Set(['online_order.received', 'online_order.updated'])
+const RAIL_EVENTS = new Set([
+  'online_order.received',
+  'online_order.updated',
+  'website_order.received',
+  'website_order.updated',
+])
 
 function errorText(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
@@ -61,12 +91,14 @@ export default function AcceptOnlineOrders() {
   const [platform, setPlatform] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [data, setData] = useState<OnlineOrderList | null>(null)
+  const [data, setData] = useState<QueueData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [reload, setReload] = useState(0)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  // A source that is down is reported once, not on every 15 s poll.
+  const failedSources = useRef({ wera: false, website: false })
 
   const refetch = useCallback(() => setReload((n) => n + 1), [])
 
@@ -82,14 +114,58 @@ export default function AcceptOnlineOrders() {
     }
     let cancelled = false
     const statuses = TABS.find((t) => t.id === tab)?.statuses ?? []
-    listOnlineOrdersApi(encryptedOutletId, { status: statuses, platform, search })
-      .then((result) => {
+    const wantWera = platform !== 'website'
+    const wantWebsite = platform === '' || platform === 'website'
+    const empty = { results: [], counts: { received: 0, in_progress: 0, closed: 0 } }
+    Promise.allSettled([
+      wantWera
+        ? listOnlineOrdersApi(encryptedOutletId, { status: statuses, platform, search })
+        : Promise.resolve(null),
+      wantWebsite
+        ? listWebsiteOrdersApi(encryptedOutletId, {
+            status: WEBSITE_TAB_STATUSES[tab],
+            search,
+          })
+        : Promise.resolve(null),
+    ])
+      .then(([wera, website]) => {
         if (cancelled) return
-        setData(result)
+        const failed = {
+          wera: wera.status === 'rejected',
+          website: website.status === 'rejected',
+        }
+        if (failed.wera && failed.website) {
+          setError(true)
+          return
+        }
+        if (failed.wera && !failedSources.current.wera) {
+          showError("Couldn't load Zomato and Swiggy orders")
+        }
+        if (failed.website && !failedSources.current.website) {
+          showError("Couldn't load website orders")
+        }
+        failedSources.current = failed
+        const weraData = wera.status === 'fulfilled' ? wera.value : null
+        const webData = website.status === 'fulfilled' ? website.value : null
+        const rows: Row[] = [
+          ...(weraData?.results ?? []).map((order): Row => ({ source: 'wera', order })),
+          ...(webData?.results ?? []).map((order): Row => ({ source: 'website', order })),
+        ].sort(
+          (a, b) => Date.parse(b.order.received_at) - Date.parse(a.order.received_at),
+        )
+        const wc = weraData?.counts ?? empty.counts
+        const bc = webData?.counts ?? empty.counts
+        setData({
+          rows,
+          counts: {
+            received: wc.received + bc.received,
+            in_progress: wc.in_progress + bc.in_progress,
+            closed: wc.closed + bc.closed,
+          },
+          defaultPreparation: weraData?.default_preparation_time ?? FALLBACK_PREPARATION,
+          reasons: weraData?.rejection_reasons ?? [],
+        })
         setError(false)
-      })
-      .catch(() => {
-        if (!cancelled) setError(true)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -117,18 +193,23 @@ export default function AcceptOnlineOrders() {
     return () => window.clearInterval(timer)
   }, [refetch])
 
-  const hasWaiting = tab === 'received' && (data?.results.length ?? 0) > 0
+  const hasWaiting = tab === 'received' && (data?.rows.length ?? 0) > 0
   useEffect(() => {
     if (!hasWaiting) return
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [hasWaiting])
 
-  async function handleAccept(order: OnlineOrder, minutes: number) {
+  async function handleAccept(row: Row, minutes: number) {
     if (!encryptedOutletId) return
+    const order = row.order
     setBusyId(order.id)
     try {
-      await acceptOnlineOrderApi(encryptedOutletId, order.id, minutes)
+      if (row.source === 'website') {
+        await acceptWebsiteOrderApi(encryptedOutletId, order.id, minutes)
+      } else {
+        await acceptOnlineOrderApi(encryptedOutletId, order.id, minutes)
+      }
       showToast('Order accepted - kitchen ticket sent')
     } catch (failure) {
       showToast(errorText(failure, 'Could not accept the order'))
@@ -139,14 +220,39 @@ export default function AcceptOnlineOrders() {
     }
   }
 
-  async function handleReject(order: OnlineOrder, reasonId: number) {
+  async function handleReject(row: Row, reasonId: number) {
     if (!encryptedOutletId) return
+    const order = row.order
     setBusyId(order.id)
     try {
-      await rejectOnlineOrderApi(encryptedOutletId, order.id, reasonId)
+      if (row.source === 'website') {
+        await rejectWebsiteOrderApi(encryptedOutletId, order.id, reasonId)
+      } else {
+        await rejectOnlineOrderApi(encryptedOutletId, order.id, reasonId)
+      }
       showToast('Order rejected')
     } catch (failure) {
       showToast(errorText(failure, 'Could not reject the order'))
+    } finally {
+      setBusyId(null)
+      refetch()
+      refreshCounter()
+    }
+  }
+
+  async function handleWebsiteStep(
+    order: WebsiteOrder,
+    call: (outletId: string, id: string) => Promise<WebsiteOrder>,
+    done: string,
+    failed: string,
+  ) {
+    if (!encryptedOutletId) return
+    setBusyId(order.id)
+    try {
+      await call(encryptedOutletId, order.id)
+      showToast(done)
+    } catch (failure) {
+      showToast(errorText(failure, failed))
     } finally {
       setBusyId(null)
       refetch()
@@ -219,8 +325,8 @@ export default function AcceptOnlineOrders() {
                 Accept Online Orders
               </h1>
               <p className="mt-0.5 text-xs text-muted">
-                Zomato and Swiggy orders appear here by themselves. Answer within
-                3 minutes, or Wera accepts them for you.
+                Zomato, Swiggy and website orders appear here by themselves. Answer
+                within 3 minutes, or they are accepted for you.
               </p>
             </div>
             <button
@@ -320,7 +426,7 @@ export default function AcceptOnlineOrders() {
                 Retry
               </button>
             </div>
-          ) : data && data.results.length === 0 ? (
+          ) : data && data.rows.length === 0 ? (
             <div className="flex min-h-[260px] flex-col items-center justify-center rounded-xl border border-dashed border-line bg-card px-6 text-center">
               <p className="text-sm font-semibold text-ink">
                 {tab === 'received'
@@ -337,19 +443,48 @@ export default function AcceptOnlineOrders() {
             </div>
           ) : data ? (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              {data.results.map((order) => (
-                <AcceptOrderCard
-                  key={order.id}
-                  order={order}
-                  now={now}
-                  defaultPreparation={data.default_preparation_time}
-                  reasons={data.rejection_reasons}
-                  busy={busyId === order.id}
-                  onAccept={handleAccept}
-                  onReject={handleReject}
-                  onFoodReady={handleFoodReady}
-                />
-              ))}
+              {data.rows.map((row) =>
+                row.source === 'website' ? (
+                  <WebsiteOrderCard
+                    key={`website-${row.order.id}`}
+                    order={row.order}
+                    now={now}
+                    defaultPreparation={data.defaultPreparation}
+                    reasons={WEBSITE_REJECT_REASONS}
+                    busy={busyId === row.order.id}
+                    onAccept={(_order, minutes) => handleAccept(row, minutes)}
+                    onReject={(_order, reasonId) => handleReject(row, reasonId)}
+                    onOutForDelivery={(o) =>
+                      handleWebsiteStep(
+                        o,
+                        markWebsiteOrderOutForDeliveryApi,
+                        'Order is out for delivery',
+                        'Could not mark the order out for delivery',
+                      )
+                    }
+                    onDelivered={(o) =>
+                      handleWebsiteStep(
+                        o,
+                        markWebsiteOrderDeliveredApi,
+                        'Order delivered',
+                        'Could not mark the order delivered',
+                      )
+                    }
+                  />
+                ) : (
+                  <AcceptOrderCard
+                    key={`wera-${row.order.id}`}
+                    order={row.order}
+                    now={now}
+                    defaultPreparation={data.defaultPreparation}
+                    reasons={data.reasons}
+                    busy={busyId === row.order.id}
+                    onAccept={(_order, minutes) => handleAccept(row, minutes)}
+                    onReject={(_order, reasonId) => handleReject(row, reasonId)}
+                    onFoodReady={handleFoodReady}
+                  />
+                ),
+              )}
             </div>
           ) : null}
         </main>

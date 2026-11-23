@@ -195,8 +195,8 @@ export function BillReceipt({
           ) : null}
           <div style={shopNameStyle}>{s.name}</div>
           <div style={taglineStyle}>{s.tagline}</div>
-          <div style={smallStyle}>{s.address}</div>
-          <div style={smallStyle}>
+          <div style={shopInfoStyle}>{s.address}</div>
+          <div style={shopInfoStyle}>
             Ph: {s.phone} &nbsp;|&nbsp; GSTIN: {s.gstin}
           </div>
           <div style={billTypeStyle}>{cancelled ? 'CANCELLED BILL' : s.billLabel}</div>
@@ -433,22 +433,22 @@ const receiptStyle: CSSProperties = {
   width: '302px',
   background: '#fff',
   color: '#111',
-  padding: '10px 12px',
-  fontSize: 11.5,
-  lineHeight: 1.45,
-  fontFamily: "'Courier New', Consolas, monospace",
+  padding: '6px 6px 4px 6px',
+  fontSize: 15,
+  lineHeight: 1.4,
+  fontFamily: 'Verdana, Geneva, Tahoma, sans-serif',
   boxShadow: '0 0 4px rgba(0,0,0,0.3)',
 }
 
 const headerStyle: CSSProperties = {
   textAlign: 'center',
-  marginBottom: 4,
+  marginBottom: 1,
 }
 
 /** The outlet's print logo, centred above the name; kept black-and-white for thermal paper. */
 const logoStyle: CSSProperties = {
   display: 'block',
-  margin: '0 auto 6px',
+  margin: '0 auto 2px',
   maxWidth: '60%',
   maxHeight: '64px',
   objectFit: 'contain',
@@ -464,41 +464,47 @@ const shopNameStyle: CSSProperties = {
 }
 
 const taglineStyle: CSSProperties = {
-  fontSize: 10.5,
+  fontSize: 15,
   letterSpacing: 0.5,
 }
 
+/** Address and phone/GSTIN lines under the tagline. */
+const shopInfoStyle: CSSProperties = {
+  fontSize: 15,
+  color: '#111',
+}
+
 const smallStyle: CSSProperties = {
-  fontSize: 10,
-  color: '#555',
+  fontSize: 13.5,
+  color: '#111',
 }
 
 const billTypeStyle: CSSProperties = {
   display: 'inline-block',
   border: '1px solid #111',
-  padding: '1px 8px',
+  padding: '1px 5px',
   borderRadius: 2,
-  fontSize: 10,
+  fontSize: 13.5,
   fontWeight: 700,
   letterSpacing: 0.5,
-  marginTop: 4,
+  marginTop: 1,
 }
 
 const solidDividerStyle: CSSProperties = {
   borderTop: '1.5px solid #111',
-  margin: '6px 0',
+  margin: '3px 0',
 }
 
 const dashedDividerStyle: CSSProperties = {
   borderTop: '1px dashed #111',
-  margin: '6px 0',
+  margin: '3px 0',
 }
 
 const rowStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  gap: 8,
-  fontSize: 10.5,
+  gap: 6,
+  fontSize: 15,
 }
 
 const boldStyle: CSSProperties = {
@@ -508,91 +514,94 @@ const boldStyle: CSSProperties = {
 const itemTableStyle: CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
-  marginTop: 4,
+  marginTop: 1,
 }
 
 const thStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 700,
   borderBottom: '1px dashed #111',
-  padding: '0 0 3px 0',
+  padding: '0 0 1px 0',
 }
 
 const itemNameStyle: CSSProperties = {
-  fontSize: 11,
-  padding: '3px 0',
+  fontSize: 15,
+  padding: '1px 0',
   verticalAlign: 'top',
 }
 
 const itemNoteStyle: CSSProperties = {
   display: 'block',
-  fontSize: 9.5,
-  color: '#555',
+  fontSize: 13.5,
+  color: '#111',
 }
 
 const cellStyle: CSSProperties = {
-  fontSize: 11,
-  padding: '3px 0',
+  fontSize: 15,
+  padding: '1px 0 1px 6px',
   verticalAlign: 'top',
 }
 
 const totalsRowStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  fontSize: 11,
-  padding: '1.5px 0',
+  fontSize: 15,
+  padding: '0.5px 0',
 }
 
 const mutedStyle: CSSProperties = {
-  color: '#555',
-  fontSize: 10,
+  color: '#111',
+  fontSize: 15,
 }
 
 const grandTotalStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
-  fontSize: 14,
+  fontSize: 15,
   fontWeight: 800,
-  padding: '6px 0 2px 0',
+  padding: '3px 0 1px 0',
   borderTop: '1.5px solid #111',
   borderBottom: '1.5px solid #111',
-  marginTop: 4,
+  marginTop: 1,
 }
 
 const paymentModeStyle: CSSProperties = {
-  marginTop: 6,
-  fontSize: 10.5,
+  marginTop: 3,
+  fontSize: 12,
   textAlign: 'center',
 }
 
 const paymentTagStyle: CSSProperties = {
   border: '1px dashed #111',
-  padding: '2px 10px',
+  padding: '1px 6px',
   borderRadius: 2,
   fontWeight: 700,
 }
 
 const scissorsStyle: CSSProperties = {
   textAlign: 'center',
-  fontSize: 11,
-  color: '#999',
-  margin: '10px 0 -2px 0',
+  fontSize: 12,
+  color: '#555',
+  margin: '4px 0 -2px 0',
   letterSpacing: 2,
+  // One line only: the dashes are clipped at the paper edge instead of wrapping.
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
 }
 
 const footerStyle: CSSProperties = {
-  marginTop: 10,
+  marginTop: 4,
   textAlign: 'center',
 }
 
 const thanksStyle: CSSProperties = {
-  fontSize: 12.5,
+  fontSize: 17.5,
   fontWeight: 700,
   letterSpacing: 0.5,
 }
 
 const fssaiStyle: CSSProperties = {
-  fontSize: 9,
-  color: '#555',
-  marginTop: 4,
+  fontSize: 13,
+  color: '#111',
+  marginTop: 1,
 }

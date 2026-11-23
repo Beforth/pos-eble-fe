@@ -219,6 +219,8 @@ export function upsertKotTicketFromServer(ticket: KotTicket): KotTicket[] {
     status: ticket.status === 'ready' ? 'ready' : existing.status,
     billed: ticket.billed ?? existing.billed,
     billNo: ticket.billNo ?? existing.billNo,
+    websiteStatus: ticket.websiteStatus ?? existing.websiteStatus,
+    note: ticket.note ?? existing.note,
     items:
       ticket.items.length > 0
         ? ticket.items.map((item, i) => ({

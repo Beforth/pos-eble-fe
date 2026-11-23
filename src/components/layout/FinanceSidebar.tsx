@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Home,
   LayoutGrid,
   Receipt,
@@ -14,7 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { brand } from '../../theme/brand'
-import { BrandLogo } from '../brand/BrandLogo'
+import { SidebarLogoToggle } from './SidebarLogoToggle'
 
 type IconType = typeof ArrowLeft
 
@@ -91,11 +89,11 @@ export function FinanceSidebar({
         <div className="flex h-14 items-center gap-2.5 border-b border-line px-3">
           {collapsed ? (
             <div className="flex w-full justify-center">
-              <BrandLogo size={36} />
+              <SidebarLogoToggle collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
             </div>
           ) : (
             <>
-              <BrandLogo size={36} />
+              <SidebarLogoToggle collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold leading-tight text-ink">
                   {brand.shortName}
@@ -115,20 +113,6 @@ export function FinanceSidebar({
               </button>
             </>
           )}
-        </div>
-
-        <div
-          className={`hidden border-b border-line lg:flex ${collapsed ? 'justify-center' : 'justify-end'}`}
-        >
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'}
-            data-tooltip={collapsed ? 'Expand sidebar ([)' : 'Collapse sidebar ([)'}
-            className="m-1.5 cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-page hover:text-ink"
-          >
-            {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
-          </button>
         </div>
 
         {!collapsed ? (

@@ -13,16 +13,23 @@ import {
   listOnlineOrdersApi,
   type OnlineOrder,
 } from '../services/onlineOrderApi'
+import { listWebsiteOrdersApi, type WebsiteOrder } from '../services/websiteOrderApi'
+import { bindOrderSoundUnlock, playNewOrderSound } from '../utils/orderSound'
 
 /** The Accept Orders screen is the one place orders are answered. */
 export const ACCEPT_ORDERS_PATH = '/online-orders/accept'
 
 const POLL_MS = 30_000
-const RAIL_EVENTS = new Set(['online_order.received', 'online_order.updated'])
+const RAIL_EVENTS = new Set([
+  'online_order.received',
+  'online_order.updated',
+  'website_order.received',
+  'website_order.updated',
+])
 
 interface OnlineOrdersValue {
-  /** Orders still waiting for an answer. Used for quiet counters only. */
-  pending: OnlineOrder[]
+  /** Wera and website orders still waiting for an answer. Quiet counters only. */
+  pending: Array<OnlineOrder | WebsiteOrder>
   refresh: () => void
 }
 
@@ -33,12 +40,13 @@ const OnlineOrdersContext = createContext<OnlineOrdersValue>({
 
 /**
  * Keeps the number of waiting online orders up to date for the header and the
- * dashboard. It never opens a pop-up, plays a sound or shows a toast: a new
- * order only raises a counter, and is answered on the Accept Orders page.
+ * dashboard. It never opens a pop-up or shows a toast: a new order raises a
+ * counter and is answered on the Accept Orders page. The one exception is a new
+ * website (delivery) order, which also plays a short chime so the counter is heard.
  */
 export function OnlineOrdersProvider({ children }: { children: ReactNode }) {
   const { encryptedOutletId, token, canAccess } = useAuth()
-  const [pending, setPending] = useState<OnlineOrder[]>([])
+  const [pending, setPending] = useState<Array<OnlineOrder | WebsiteOrder>>([])
   const [reload, setReload] = useState(0)
   const allowed = canAccess(ACCEPT_ORDERS_PATH)
   const active = Boolean(encryptedOutletId && token && allowed)
@@ -51,13 +59,22 @@ export function OnlineOrdersProvider({ children }: { children: ReactNode }) {
       return
     }
     let cancelled = false
-    listOnlineOrdersApi(encryptedOutletId, { status: ['received'] })
-      .then((data) => {
-        if (!cancelled) setPending(data.results)
+    // Two independent sources: one failing must not zero the other's count.
+    Promise.allSettled([
+      listOnlineOrdersApi(encryptedOutletId, { status: ['received'] }),
+      listWebsiteOrdersApi(encryptedOutletId, { status: ['received'] }),
+    ]).then(([wera, website]) => {
+      if (cancelled) return
+      setPending((previous) => {
+        const previousWera = previous.filter((o) => o.platform !== 'website')
+        const previousWebsite = previous.filter((o) => o.platform === 'website')
+        // A failed check is not worth interrupting anyone for; keep that source's last count.
+        return [
+          ...(wera.status === 'fulfilled' ? wera.value.results : previousWera),
+          ...(website.status === 'fulfilled' ? website.value.results : previousWebsite),
+        ]
       })
-      .catch(() => {
-        // A failed check is not worth interrupting anyone for; keep the last count.
-      })
+    })
     return () => {
       cancelled = true
     }
@@ -75,10 +92,17 @@ export function OnlineOrdersProvider({ children }: { children: ReactNode }) {
       outletId: encryptedOutletId,
       token,
       onEvent: (event) => {
+        if (event === 'website_order.received') playNewOrderSound()
         if (RAIL_EVENTS.has(event)) refresh()
       },
     })
   }, [active, encryptedOutletId, token, refresh])
+
+  // Sound is allowed only after the first click or key press; listen for it while signed in.
+  useEffect(() => {
+    if (!active) return
+    return bindOrderSoundUnlock()
+  }, [active])
 
   const value = useMemo(() => ({ pending, refresh }), [pending, refresh])
   return (
