@@ -1851,6 +1851,112 @@ export type ProductionRunPayload = {
   purchase_order_id?: string | null
 }
 
+export type StockSummaryApiRow = {
+  raw_material_id: string
+  raw_material_name: string
+  unit_name: string
+  opening: string
+  purchase: string
+  excess: string
+  total_in: string
+  consumed: string
+  wastage: string
+  normal_loss: string
+  transfer: string
+  shortage: string
+  production: string
+  total_out: string
+  closing_stock: string
+  closing_summary: string
+  difference: string
+}
+
+export type StockSummaryReport = {
+  rows: StockSummaryApiRow[]
+  totals: {
+    total_in: string
+    total_out: string
+    closing_stock: string
+    difference: string
+  }
+}
+
+export type PaymentLedgerReport = {
+  rows: {
+    party_name: string
+    company_name: string
+    payables: string
+    receivables: string
+  }[]
+  totals: { payables: string; receivables: string }
+}
+
+export type RecipeCostingRow = {
+  menu_item_id: string
+  menu_name: string
+  recipe_costing: string
+  selling_price: string
+  margin: string
+  materials: { name: string; qty: string; unit: string; price: string }[]
+}
+
+export type StockTimewiseRow = {
+  raw_material_id: string
+  raw_material_name: string
+  category_name: string
+  unit_name: string
+  opening: string
+  closing: string
+  difference: string
+}
+
+export type PaymentSummaryReport = {
+  rows: {
+    party_name: string
+    total: string
+    paid: string
+    pending: string
+    payments: {
+      date: string
+      method: string
+      amount: string
+      document_number: string
+    }[]
+  }[]
+  totals: { total: string; paid: string; pending: string }
+}
+
+export type ConsumptionSummaryRow = {
+  raw_material_id: string
+  raw_material_name: string
+  unit_name: string
+  avg_price: string
+  days: { qty: string; cost: string }[]
+  total_qty: string
+  total_cost: string
+}
+
+export type ConsumptionSummaryReport = {
+  days: string[]
+  rows: ConsumptionSummaryRow[]
+}
+
+export type OpeningClosingRow = {
+  raw_material_id: string
+  raw_material_name: string
+  unit_name: string
+  opening_qty: string
+  opening_value: string
+  avg_price: string
+  closing_qty: string
+  closing_value: string
+}
+
+export type OpeningClosingReport = {
+  rows: OpeningClosingRow[]
+  totals: { opening_value: string; closing_value: string }
+}
+
 export type CurrentStockRow = {
   raw_material_id: string
   raw_material_name: string
@@ -2249,6 +2355,131 @@ export async function listCurrentStockReportApi(
   }
   return apiRequest<CurrentStockRow[]>(
     `${reportPath(outletId, 'current-stock')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function getStockSummaryReportApi(
+  outletId: string,
+  params?: ReportListParams & { unitType?: 'purchase' | 'consumption' },
+): Promise<StockSummaryReport> {
+  const query = new URLSearchParams(reportQuery(params).replace(/^\?/, ''))
+  query.delete('page_size')
+  if (params?.unitType) query.set('unit_type', params.unitType)
+  return apiRequest<StockSummaryReport>(
+    `${reportPath(outletId, 'stock-summary')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function getPaymentLedgerReportApi(
+  outletId: string,
+  params: {
+    partyType: 'supplier' | 'customer' | 'third_party' | 'all'
+    search?: string
+  },
+): Promise<PaymentLedgerReport> {
+  const query = new URLSearchParams()
+  query.set('party_type', params.partyType)
+  if (params.search) query.set('search', params.search)
+  return apiRequest<PaymentLedgerReport>(
+    `${reportPath(outletId, 'payment-ledger')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function listRecipeCostingReportApi(
+  outletId: string,
+  params: {
+    search?: string
+    priceBasis: 'latest_avg' | 'last' | 'master'
+  },
+): Promise<RecipeCostingRow[]> {
+  const query = new URLSearchParams()
+  if (params.search) query.set('search', params.search)
+  query.set('price_basis', params.priceBasis)
+  return apiRequest<RecipeCostingRow[]>(
+    `${reportPath(outletId, 'recipe-costing')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function listStockTimewiseReportApi(
+  outletId: string,
+  params: {
+    search?: string
+    categoryId?: string
+    fromDateTime: Date
+    toDateTime: Date
+    unitType: 'purchase' | 'consumption'
+  },
+): Promise<StockTimewiseRow[]> {
+  const query = new URLSearchParams()
+  if (params.search) query.set('search', params.search)
+  if (params.categoryId && params.categoryId !== 'all') {
+    query.set('category_id', params.categoryId)
+  }
+  query.set('from_datetime', params.fromDateTime.toISOString())
+  query.set('to_datetime', params.toDateTime.toISOString())
+  query.set('unit_type', params.unitType)
+  return apiRequest<StockTimewiseRow[]>(
+    `${reportPath(outletId, 'stock-timewise')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+async function getPaymentSummaryReportApi(
+  slug: string,
+  outletId: string,
+  params: { search?: string; dateFrom: string; dateTo: string },
+): Promise<PaymentSummaryReport> {
+  const query = new URLSearchParams()
+  if (params.search) query.set('search', params.search)
+  query.set('date_from', params.dateFrom)
+  query.set('date_to', params.dateTo)
+  return apiRequest<PaymentSummaryReport>(
+    `${reportPath(outletId, slug)}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export function getSupplierPaymentReportApi(
+  outletId: string,
+  params: { search?: string; dateFrom: string; dateTo: string },
+) {
+  return getPaymentSummaryReportApi('supplier-payment', outletId, params)
+}
+
+export function getTransferPaymentReportApi(
+  outletId: string,
+  params: { search?: string; dateFrom: string; dateTo: string },
+) {
+  return getPaymentSummaryReportApi('transfer-payment', outletId, params)
+}
+
+export async function getConsumptionSummaryReportApi(
+  outletId: string,
+  params?: ReportListParams & { categoryIds?: string[] },
+): Promise<ConsumptionSummaryReport> {
+  const query = new URLSearchParams(reportQuery(params).replace(/^\?/, ''))
+  query.delete('page_size')
+  if (params?.categoryIds?.length) {
+    query.set('category_ids', params.categoryIds.join(','))
+  }
+  return apiRequest<ConsumptionSummaryReport>(
+    `${reportPath(outletId, 'consumption-summary')}?${query.toString()}`,
+    { method: 'GET', token: authToken() },
+  )
+}
+
+export async function getOpeningClosingReportApi(
+  outletId: string,
+  params?: ReportListParams,
+): Promise<OpeningClosingReport> {
+  const query = new URLSearchParams(reportQuery(params).replace(/^\?/, ''))
+  query.delete('page_size')
+  return apiRequest<OpeningClosingReport>(
+    `${reportPath(outletId, 'opening-closing')}?${query.toString()}`,
     { method: 'GET', token: authToken() },
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/exportCsv'
@@ -6,16 +6,22 @@ import { ChevronDown, FileText, Search } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { SearchableSelect } from '../../components/inventory/SearchableSelect'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  getPaymentLedgerReportApi,
+  type PaymentLedgerReport as LedgerData,
+} from '../../services/inventoryService'
 
 const FROM_OPTIONS = ['Supplier', 'Customer', 'Third Party', 'All']
 
-const SUPPLIER_OPTIONS = [
-  'All',
-  'Local Fresh Mart',
-  'Dairy Farm Co.',
-  'Spice Traders',
-  'Packaging Hub',
-]
+const PARTY_TYPES: Record<string, 'supplier' | 'customer' | 'third_party' | 'all'> = {
+  Supplier: 'supplier',
+  Customer: 'customer',
+  'Third Party': 'third_party',
+  All: 'all',
+}
 
 function ExportMenu({ onExportAll }: { onExportAll?: () => void }) {
   const [open, setOpen] = useState(false)
@@ -64,25 +70,65 @@ function ExportMenu({ onExportAll }: { onExportAll?: () => void }) {
 }
 
 export default function PaymentLedgerReport() {
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
   const [from, setFrom] = useState('Supplier')
   const [supplier, setSupplier] = useState('')
+  const [applied, setApplied] = useState({ from: 'Supplier', supplier: '' })
+  const [report, setReport] = useState<LedgerData>({
+    rows: [],
+    totals: { payables: '0', receivables: '0' },
+  })
+  const [partyNames, setPartyNames] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
 
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    setLoading(true)
+    try {
+      const data = await getPaymentLedgerReportApi(encryptedOutletId, {
+        partyType: PARTY_TYPES[applied.from] ?? 'all',
+        search: applied.supplier || undefined,
+      })
+      setReport(data)
+      if (!applied.supplier) {
+        setPartyNames(data.rows.map((row) => row.party_name))
+      }
+    } catch (err) {
+      showToast(
+        err instanceof ApiError ? err.message : 'Unable to load payment ledger',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, canRead, applied])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  function handleSearch() {
+    setApplied({ from, supplier })
+  }
 
   function handleClear() {
     setFrom('Supplier')
     setSupplier('')
+    setApplied({ from: 'Supplier', supplier: '' })
   }
 
-  function exportRows(
-    rows: (string | number | null | undefined)[][],
-    suffix: 'page' | 'all',
-  ) {
+  function exportAll() {
     downloadCsv(
-      `payment-ledger-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Vendor Name', 'Company Name', 'Payables', 'Receivables', 'Action'],
-      rows,
+      `payment-ledger-all-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Vendor Name', 'Company Name', 'Payables', 'Receivables'],
+      report.rows.map((row) => [
+        row.party_name,
+        row.company_name,
+        row.payables,
+        row.receivables,
+      ]),
     )
-    showToast(`Exported ${rows.length} rows`)
+    showToast(`Exported ${report.rows.length} rows`)
   }
 
   return (
@@ -90,7 +136,7 @@ export default function PaymentLedgerReport() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-ink">Ledger Payment Report</h1>
-        <ExportMenu onExportAll={() => exportRows([], 'all')} />
+        <ExportMenu onExportAll={exportAll} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-card p-4">
@@ -109,14 +155,14 @@ export default function PaymentLedgerReport() {
           <SearchableSelect
             label="Supplier/Third Party"
             value={supplier}
-            options={SUPPLIER_OPTIONS}
+            options={['All', ...partyNames]}
             placeholder="Supplier/Third Party"
             searchPlaceholder="Search"
             includePlaceholderOption
-            onChange={setSupplier}
+            onChange={(value) => setSupplier(value === 'All' ? '' : value)}
           />
         </div>
-        <OutlineButton onClick={() => showToast('Search applied')}>
+        <OutlineButton onClick={handleSearch}>
           Search
         </OutlineButton>
         <OutlineButton variant="gray" onClick={handleClear}>
@@ -137,26 +183,61 @@ export default function PaymentLedgerReport() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td colSpan={5} className="px-3 py-16">
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <span className="relative mb-4 text-muted">
-                      <FileText
-                        size={56}
-                        strokeWidth={1.25}
-                        className="text-muted/50"
-                      />
-                      <Search
-                        size={24}
-                        className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
-                      />
-                    </span>
-                    <p className="text-base font-semibold text-ink">
-                      Ledger Payment Report Record Not Found
-                    </p>
-                  </div>
-                </td>
-              </tr>
+              {report.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-16">
+                    {loading ? (
+                      <p className="text-center text-sm text-muted">
+                        Loading report…
+                      </p>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <span className="relative mb-4 text-muted">
+                          <FileText
+                            size={56}
+                            strokeWidth={1.25}
+                            className="text-muted/50"
+                          />
+                          <Search
+                            size={24}
+                            className="absolute -bottom-1 -right-2 rounded-full bg-card p-0.5 text-muted"
+                          />
+                        </span>
+                        <p className="text-base font-semibold text-ink">
+                          Ledger Payment Report Record Not Found
+                        </p>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {report.rows.map((row, index) => (
+                    <tr
+                      key={row.party_name}
+                      className={`border-b border-line ${
+                        index % 2 === 1 ? 'bg-page/50' : 'bg-card'
+                      }`}
+                    >
+                      <td className="px-3 py-2 font-medium text-ink">
+                        {row.party_name}
+                      </td>
+                      <td className="px-3 py-2">{row.company_name || '-'}</td>
+                      <td className="px-3 py-2">{row.payables}</td>
+                      <td className="px-3 py-2">{row.receivables}</td>
+                      <td className="px-3 py-2 text-muted">-</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-page font-semibold text-ink">
+                    <td className="px-3 py-2.5" colSpan={2}>
+                      Total
+                    </td>
+                    <td className="px-3 py-2.5">{report.totals.payables}</td>
+                    <td className="px-3 py-2.5">{report.totals.receivables}</td>
+                    <td />
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
         </div>

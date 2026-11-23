@@ -1,73 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { showToast } from '../../utils/toast'
 import { downloadCsv } from '../../utils/exportCsv'
 import { ChevronDown, FileText } from 'lucide-react'
 import { InventoryPageShell } from '../../components/layout/InventoryPageShell'
 import { OutlineButton } from '../../components/menu/MenuActionButtons'
+import { useAuth } from '../../auth/AuthContext'
+import { useInventoryMasters } from '../../state/InventoryMastersContext'
+import { ApiError } from '../../services/apiClient'
+import {
+  INV_REPORT_PERMISSION,
+  getConsumptionSummaryReportApi,
+  type ConsumptionSummaryReport as ConsumptionData,
+} from '../../services/inventoryService'
 
-const CATEGORY_OPTIONS = [
-  { id: 'all', name: 'All' },
-  { id: 'no-category', name: 'No Category' },
-  { id: 'rice-pulses-flours', name: 'Rice/pulses/flours' },
-  { id: 'bread-dairy', name: 'Bread/dairy' },
-  { id: 'oils-masala', name: 'Oils/masala/salt/sugar' },
-  { id: 'ready-to-cook', name: 'Ready To Cook/ready To Eat' },
-  { id: 'sauces', name: 'Sauces/dressings/marinades' },
-  { id: 'snacks', name: 'Snacks' },
-  { id: 'packaging', name: 'Packaging/storage' },
-  { id: 'fruits-vegetables', name: 'Fruits/vegetables' },
-]
-
-const CATEGORY_IDS = CATEGORY_OPTIONS.map((option) => option.id)
-const CATEGORY_IDS_WITHOUT_ALL = CATEGORY_IDS.filter((id) => id !== 'all')
+interface CategoryOption {
+  id: string
+  name: string
+}
 
 const PAGE_SIZE = 10
-const TOTAL_RECORDS = 58
 
-const MATERIAL_NAMES = [
-  'Instant Mix Gota Flour [pkt]',
-  'Instant Mix Gota Flour [carton]',
-  'Instant Mix Gota Flour [Bag]',
-  'Instant Mix Gota Flour [Kg]',
-  'Dalda Ghee [carton]',
-  'Dalda Ghee [pkt]',
-  'Refined Oil [ltr]',
-  'Besan Flour [kg]',
-  'Wheat Flour [kg]',
-  'Onion [kg]',
-]
-
-interface ConsumptionRow {
-  id: string
-  rawMaterial: string
-  unit: string
-  consumption: string
-  avgPurchasePrice: string
-  consumptionCost: string
-  totalQty: string
-  totalCost: string
-}
-
-function buildRows(): ConsumptionRow[] {
-  return Array.from({ length: TOTAL_RECORDS }, (_, index) => {
-    const name = MATERIAL_NAMES[index % MATERIAL_NAMES.length]
-    const unitMatch = name.match(/\[([^\]]+)\]/)
-    const unit = unitMatch?.[1] ?? 'pcs'
-    return {
-      id: `row-${index + 1}`,
-      rawMaterial: name,
-      unit,
-      consumption: '0',
-      avgPurchasePrice: '0.000',
-      consumptionCost: '0.000',
-      totalQty: `0 / ${unit}`,
-      totalCost: '0.000',
-    }
-  })
-}
-
-const ALL_ROWS = buildRows()
+const todayIso = () => new Date().toISOString().slice(0, 10)
 
 function formatDayLabel(dateValue: string) {
   const date = new Date(`${dateValue}T00:00:00`)
@@ -145,12 +99,17 @@ function ExportMenu({
 }
 
 function CategoryMultiSelect({
+  options,
   selectedIds,
   onChange,
 }: {
+  options: CategoryOption[]
   selectedIds: string[]
   onChange: (ids: string[]) => void
 }) {
+  const CATEGORY_OPTIONS = options
+  const CATEGORY_IDS = options.map((option) => option.id)
+  const CATEGORY_IDS_WITHOUT_ALL = CATEGORY_IDS.filter((id) => id !== 'all')
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -278,19 +237,66 @@ function MetricBars({
 }
 
 export default function ConsumptionSummaryReport() {
+  const { encryptedOutletId, hasPermission } = useAuth()
+  const canRead = hasPermission(INV_REPORT_PERMISSION)
+  const { categories: masterCategories, loadMasters } = useInventoryMasters()
   const [rawMaterial, setRawMaterial] = useState('')
   const [categories, setCategories] = useState<string[]>([])
-  const [fromDate, setFromDate] = useState('2026-08-11')
-  const [toDate, setToDate] = useState('2026-08-11')
-  const [appliedQuery, setAppliedQuery] = useState('')
+  const [fromDate, setFromDate] = useState(todayIso)
+  const [toDate, setToDate] = useState(todayIso)
+  const [applied, setApplied] = useState({
+    query: '',
+    categories: [] as string[],
+    fromDate: todayIso(),
+    toDate: todayIso(),
+  })
+  const [data, setData] = useState<ConsumptionData>({ days: [], rows: [] })
+  const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
 
-  const filteredRows = useMemo(() => {
-    const q = appliedQuery.trim().toLowerCase()
-    if (!q) return ALL_ROWS
-    return ALL_ROWS.filter((row) => row.rawMaterial.toLowerCase().includes(q))
-  }, [appliedQuery])
+  useEffect(() => {
+    void loadMasters()
+  }, [loadMasters])
 
+  const categoryOptions = useMemo<CategoryOption[]>(
+    () => [
+      { id: 'all', name: 'All' },
+      { id: 'no-category', name: 'No Category' },
+      ...masterCategories.map((row) => ({ id: row.id, name: row.name })),
+    ],
+    [masterCategories],
+  )
+
+  const load = useCallback(async () => {
+    if (!encryptedOutletId || !canRead) return
+    setLoading(true)
+    try {
+      setData(
+        await getConsumptionSummaryReportApi(encryptedOutletId, {
+          search: applied.query.trim() || undefined,
+          categoryIds: applied.categories.includes('all')
+            ? undefined
+            : applied.categories,
+          dateFrom: applied.fromDate,
+          dateTo: applied.toDate,
+        }),
+      )
+    } catch (err) {
+      showToast(
+        err instanceof ApiError
+          ? err.message
+          : 'Unable to load consumption summary',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [encryptedOutletId, canRead, applied])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const filteredRows = data.rows
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
   const pageRows = filteredRows.slice(
@@ -310,40 +316,46 @@ export default function ConsumptionSummaryReport() {
     )
   }, [currentPage, totalPages])
 
-  const dayLabel = formatDayLabel(fromDate)
-
-  function exportRows(rows: ConsumptionRow[], suffix: 'page' | 'all') {
+  function exportRows(rows: ConsumptionData['rows'], suffix: 'page' | 'all') {
     const date = new Date().toISOString().slice(0, 10)
     downloadCsv(
       `consumption-summary-${suffix}-${date}.csv`,
       [
         'Raw Material',
-        dayLabel,
+        'Unit',
+        ...data.days.map(formatDayLabel),
+        'Avg Purchase Price (₹)',
         'Total Consumption Qty',
         'Total Consumption Cost (₹)',
       ],
       rows.map((row) => [
-        row.rawMaterial,
-        `${row.consumption} / ${row.avgPurchasePrice} / ${row.consumptionCost}`,
-        row.totalQty,
-        row.totalCost,
+        row.raw_material_name,
+        row.unit_name,
+        ...row.days.map((day) => `${day.qty} / ${day.cost}`),
+        row.avg_price,
+        row.total_qty,
+        row.total_cost,
       ]),
     )
     showToast(`Exported ${rows.length} rows`)
   }
 
   function handleSearch() {
-    setAppliedQuery(rawMaterial)
+    setApplied({ query: rawMaterial, categories, fromDate, toDate })
     setPage(1)
-    showToast('Search applied')
   }
 
   function handleClear() {
     setRawMaterial('')
     setCategories([])
-    setFromDate('2026-08-11')
-    setToDate('2026-08-11')
-    setAppliedQuery('')
+    setFromDate(todayIso())
+    setToDate(todayIso())
+    setApplied({
+      query: '',
+      categories: [],
+      fromDate: todayIso(),
+      toDate: todayIso(),
+    })
     setPage(1)
   }
 
@@ -372,6 +384,7 @@ export default function ConsumptionSummaryReport() {
         </div>
         <div className="min-w-[180px] flex-1">
           <CategoryMultiSelect
+            options={categoryOptions}
             selectedIds={categories}
             onChange={setCategories}
           />
@@ -425,34 +438,53 @@ export default function ConsumptionSummaryReport() {
             <thead className="border-b border-line bg-page text-xs font-semibold text-muted">
               <tr>
                 <th className="px-3 py-2.5">Raw Material</th>
-                <th className="min-w-[180px] px-3 py-2.5">{dayLabel}</th>
+                {data.days.map((day) => (
+                  <th key={day} className="min-w-[180px] px-3 py-2.5">
+                    {formatDayLabel(day)}
+                  </th>
+                ))}
                 <th className="px-3 py-2.5">Total Consumption Qty</th>
                 <th className="px-3 py-2.5">Total Consumption Cost (₹)</th>
               </tr>
             </thead>
             <tbody>
+              {pageRows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={data.days.length + 3}
+                    className="px-3 py-16 text-center text-sm text-muted"
+                  >
+                    {loading ? 'Loading report…' : 'No consumption found'}
+                  </td>
+                </tr>
+              ) : null}
               {pageRows.map((row, index) => (
                 <tr
-                  key={row.id}
+                  key={row.raw_material_id}
                   className={`border-b border-line last:border-b-0 ${
                     index % 2 === 1 ? 'bg-page/50' : 'bg-card'
                   }`}
                 >
                   <td className="whitespace-nowrap px-3 py-2 align-middle text-ink">
-                    {row.rawMaterial}
+                    {`${row.raw_material_name} [${row.unit_name}]`}
                   </td>
-                  <td className="px-3 py-2 align-middle">
-                    <MetricBars
-                      consumption={row.consumption}
-                      avgPurchasePrice={row.avgPurchasePrice}
-                      consumptionCost={row.consumptionCost}
-                    />
+                  {row.days.map((day, dayIndex) => (
+                    <td
+                      key={data.days[dayIndex]}
+                      className="px-3 py-2 align-middle"
+                    >
+                      <MetricBars
+                        consumption={day.qty}
+                        avgPurchasePrice={row.avg_price}
+                        consumptionCost={day.cost}
+                      />
+                    </td>
+                  ))}
+                  <td className="whitespace-nowrap px-3 py-2 align-middle text-ink">
+                    {`${row.total_qty} / ${row.unit_name}`}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 align-middle text-ink">
-                    {row.totalQty}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 align-middle text-ink">
-                    {row.totalCost}
+                    {row.total_cost}
                   </td>
                 </tr>
               ))}
